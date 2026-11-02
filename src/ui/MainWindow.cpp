@@ -13,6 +13,7 @@
 #include "ui/Theme.h"
 
 #include <QAbstractButton>
+#include <QActionGroup>
 #include <QApplication>
 #include <QClipboard>
 #include <QCloseEvent>
@@ -153,6 +154,16 @@ MainWindow::MainWindow(const QStringList& startPaths)
     createMenus();
     loadSettings(startPaths);
     DesktopApps::instance().loadAsync();
+    QPointer<MainWindow> self(this);
+    ioPool()->start([self] {
+        auto themes = std::make_shared<QList<IconTheme>>(scanIconThemes());
+        postToUi([self, themes] {
+            if (!self)
+                return;
+            self->m_iconThemes = *themes;
+            self->m_iconThemesLoaded = true;
+        });
+    });
 }
 
 Panel* MainWindow::other() const
@@ -266,6 +277,8 @@ void MainWindow::createMenus()
         m_right->setShowHidden(m_hiddenAction->isChecked());
     });
     m_hiddenAction->setCheckable(true);
+    QMenu* icons = view->addMenu(tr("Icon theme"));
+    connect(icons, &QMenu::aboutToShow, this, [this, icons] { populateIconThemeMenu(icons); });
     addCommand(view, tr("Toggle menu bar"), {K(Qt::CTRL | Qt::Key_M)},
                [this] { menuBar()->setVisible(!menuBar()->isVisible()); });
 
@@ -551,6 +564,41 @@ void MainWindow::showShortcuts()
     box.exec();
 }
 
+// ------------------------------------------------------------ icon themes
+
+void MainWindow::populateIconThemeMenu(QMenu* menu)
+{
+    menu->clear();
+    const QString current = QSettings().value(QStringLiteral("view/iconTheme")).toString();
+    auto* group = new QActionGroup(menu);
+    QAction* sys = menu->addAction(tr("System default (%1)").arg(IconCache::systemTheme()));
+    sys->setCheckable(true);
+    sys->setChecked(current.isEmpty());
+    group->addAction(sys);
+    connect(sys, &QAction::triggered, this, [this] { setIconTheme({}); });
+    menu->addSeparator();
+    if (!m_iconThemesLoaded) {
+        menu->addAction(tr("Loading…"))->setEnabled(false);
+        return;
+    }
+    for (const IconTheme& t : std::as_const(m_iconThemes)) {
+        QAction* a = menu->addAction(t.name == t.id ? t.name : QStringLiteral("%1  (%2)").arg(t.name, t.id));
+        a->setCheckable(true);
+        a->setChecked(t.id == current);
+        group->addAction(a);
+        connect(a, &QAction::triggered, this, [this, id = t.id] { setIconTheme(id); });
+    }
+}
+
+void MainWindow::setIconTheme(const QString& id)
+{
+    QSettings().setValue(QStringLiteral("view/iconTheme"), id);
+    IconCache::setTheme(id);
+    for (Panel* p : {m_left, m_right})
+        p->view()->viewport()->update();
+    update();
+}
+
 // ---------------------------------------------------------- context menus
 
 void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
@@ -791,6 +839,9 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     if (!m_splitter->restoreState(s.value(QStringLiteral("window/splitter")).toByteArray()))
         m_splitter->setSizes({10000, 10000});
     menuBar()->setVisible(s.value(QStringLiteral("window/menuBar"), true).toBool());
+    const QString iconTheme = s.value(QStringLiteral("view/iconTheme")).toString();
+    if (!iconTheme.isEmpty())
+        IconCache::setTheme(iconTheme);
     const bool hidden = s.value(QStringLiteral("view/showHidden"), false).toBool();
     m_hiddenAction->setChecked(hidden);
 

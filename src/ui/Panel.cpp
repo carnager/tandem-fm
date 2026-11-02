@@ -382,7 +382,7 @@ void Panel::applyDefaultColumns()
     h->setSectionResizeMode(FileModel::ColName, QHeaderView::Stretch);
     for (int c = FileModel::ColExt; c < FileModel::ColCount; ++c)
         h->setSectionResizeMode(c, QHeaderView::Interactive);
-    m_view->setColumnWidth(FileModel::ColExt, fm.horizontalAdvance(QStringLiteral("extn")) + 24);
+    m_view->setColumnWidth(FileModel::ColExt, fm.horizontalAdvance(QStringLiteral("desktop")) + 24);
     m_view->setColumnWidth(FileModel::ColSize, fm.horizontalAdvance(QStringLiteral("999.9 MiB")) + 24);
     m_view->setColumnWidth(FileModel::ColTime, fm.horizontalAdvance(QStringLiteral("2026-12-31 23:59")) + 24);
     m_view->setColumnWidth(FileModel::ColAttr, fm.horizontalAdvance(QStringLiteral("drwxr-xr-x")) + 24);

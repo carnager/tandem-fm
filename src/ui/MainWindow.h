@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/FileOps.h"
+#include "ui/IconCache.h"
 
 #include <QHash>
 #include <QMainWindow>
@@ -54,6 +55,8 @@ private:
     void makeFile();
     void openTerminal(const QString& dir = {});
     void pasteInto(const QString& dir);
+    void populateIconThemeMenu(QMenu* menu);
+    void setIconTheme(const QString& id);
 
     void loadSettings(const QStringList& startPaths);
     void saveSettings();
@@ -66,6 +69,8 @@ private:
     JobsPanel* m_jobsPanel;
     QAction* m_hiddenAction = nullptr;
     QHash<QString, QAction*> m_actions;
+    QList<IconTheme> m_iconThemes;
+    bool m_iconThemesLoaded = false;
 };
 
 }  // namespace tandem

@@ -79,7 +79,9 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
     const QString text = idx.data(Qt::DisplayRole).toString();
     const Qt::Alignment align = col == FileModel::ColSize ? (Qt::AlignRight | Qt::AlignVCenter)
                                                           : (Qt::AlignLeft | Qt::AlignVCenter);
-    const QString shown = QFontMetrics(f).elidedText(text, Qt::ElideMiddle, r.width());
+    // Names elide in the middle (keeps the end visible); short columns at the end.
+    const Qt::TextElideMode elide = col == FileModel::ColName ? Qt::ElideMiddle : Qt::ElideRight;
+    const QString shown = QFontMetrics(f).elidedText(text, elide, r.width());
     p->drawText(r, int(align) | Qt::TextSingleLine, shown);
 }
 

@@ -4,11 +4,13 @@
 #include "ui/DirTab.h"
 #include "ui/FileModel.h"
 #include "ui/FileView.h"
+#include "ui/IconCache.h"
 #include "ui/MainWindow.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
+#include <QImage>
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QMenu>
@@ -379,6 +381,37 @@ private slots:
         m_left->navigate(L("does-not-exist"));
         QTest::qWait(200);
         QCOMPARE(leftModel()->path(), L());  // stays where it was
+    }
+
+    void iconThemes()
+    {
+        const QString base = m_tmp.filePath("icons");
+        QVERIFY(QDir().mkpath(base + "/Tandem Test/places/16"));
+        QVERIFY(QDir().mkpath(base + "/SomeCursors/cursors"));
+        writeFile(base + "/Tandem Test/index.theme",
+                  "[Icon Theme]\nName=Tandem Test\nDirectories=places/16\n\n[places/16]\nSize=16\nType=Fixed\n");
+        writeFile(base + "/SomeCursors/index.theme", "[Icon Theme]\nName=Some Cursors\n");
+        QImage img(16, 16, QImage::Format_ARGB32);
+        img.fill(Qt::red);
+        QVERIFY(img.save(base + "/Tandem Test/places/16/folder.png"));
+
+        QIcon::setThemeSearchPaths(QIcon::themeSearchPaths() << base);
+        const QList<IconTheme> themes = scanIconThemes();
+        const auto has = [&](const QString& id) {
+            return std::any_of(themes.begin(), themes.end(), [&](const IconTheme& t) { return t.id == id; });
+        };
+        QVERIFY(has("Tandem Test"));
+        QVERIFY(!has("SomeCursors"));  // cursor-only theme
+
+        const QString before = QIcon::themeName();
+        IconCache::setTheme("Tandem Test");
+        QCOMPARE(QIcon::themeName(), QString("Tandem Test"));
+        FileEntry dir;
+        dir.isDir = true;
+        const QImage got = IconCache::forEntry(dir).pixmap(16).toImage();
+        QCOMPARE(got.pixelColor(8, 8), QColor(Qt::red));
+        IconCache::setTheme({});  // back to the system theme
+        QCOMPARE(QIcon::themeName(), before);
     }
 
     void cleanupTestCase()
