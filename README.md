@@ -64,7 +64,7 @@ Visual check without a display:
 | Ctrl+T / Ctrl+W / Ctrl+Tab | New / close / next tab (double-click a tab closes it) |
 | Alt+← / Alt+→ | History back / forward (mouse back/forward buttons too) |
 | Ctrl+PgUp, Ctrl+\\, Ctrl+\` | Parent, root, home |
-| Ctrl+L | Type a path |
+| Ctrl+L | Type a path (the path bar shows clickable segments; middle-click opens a tab) |
 | Ctrl+J, Ctrl+D | Jump to a folder: fuzzy search over pinned and frequently used folders (zoxide-style) |
 | Ctrl+Shift+D | Pin / unpin the current folder |
 | Ctrl+Z | Undo the last operation: moves go back, copies go to the trash, trashed items come back, renames revert, new empty folders/files disappear |

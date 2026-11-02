@@ -50,6 +50,7 @@ add_library(tandem_ui STATIC
   src/ui/MultiRenameDialog.h src/ui/MultiRenameDialog.cpp
   src/ui/EditNames.h src/ui/EditNames.cpp
   src/ui/FuzzyPopup.h src/ui/FuzzyPopup.cpp
+  src/ui/PathBar.h src/ui/PathBar.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp

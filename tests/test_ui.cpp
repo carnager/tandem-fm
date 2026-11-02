@@ -11,6 +11,7 @@
 #include "ui/MainWindow.h"
 #include "ui/MultiRenameDialog.h"
 #include "ui/Panel.h"
+#include "ui/PathBar.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ViewerWindow.h"
 
@@ -18,6 +19,7 @@
 #include <QSignalSpy>
 
 #include <QApplication>
+#include <QToolButton>
 #include <QSettings>
 #include <QImage>
 #include <QClipboard>
@@ -797,6 +799,45 @@ private slots:
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         QTRY_VERIFY(m_right->isVisible());
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") == nullptr);
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void pathSegments()
+    {
+        m_left->navigate(L("sub/deep"));
+        QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+        auto* bar = m_left->findChild<PathBar*>();
+        QVERIFY(bar);
+        auto segment = [bar](const QString& path) -> QToolButton* {
+            for (auto* b : bar->findChildren<QToolButton*>("crumb"))
+                if (b->property("path").toString() == path)
+                    return b;
+            return nullptr;
+        };
+        QTRY_VERIFY(segment(L("sub")) != nullptr);
+        segment(L("sub"))->click();
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+        QCOMPARE(m_left->currentName(), QString("deep"));  // lands where it came from
+
+        // Middle click opens a tab in the background.
+        QTRY_VERIFY(segment(L()) != nullptr);
+        QTest::mouseClick(segment(L()), Qt::MiddleButton);
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L("sub"), L()}));
+        QCOMPARE(m_left->path(), L("sub"));
+        m_left->cycleTab(1);
+        m_left->closeCurrentTab();
+
+        // Ctrl+L still takes a typed path (relative to the current folder).
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_L, Qt::ControlModifier);
+        QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()));
+        QTest::keyClicks(QApplication::focusWidget(), "deep");
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
 
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());

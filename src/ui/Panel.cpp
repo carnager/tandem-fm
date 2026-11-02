@@ -8,6 +8,7 @@
 #include "ui/FileModel.h"
 #include "ui/FileView.h"
 #include "ui/IconCache.h"
+#include "ui/PathBar.h"
 #include "ui/Theme.h"
 
 #include <QDir>
@@ -61,13 +62,12 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_mountButton->setAutoRaise(true);
     m_mountButton->setFocusPolicy(Qt::NoFocus);
     m_mountButton->setToolTip(tr("Locations (Alt+F1 / Alt+F2)"));
-    m_pathEdit = new QLineEdit(m_header);
-    m_pathEdit->setFrame(false);
-    m_pathEdit->setFocusPolicy(Qt::ClickFocus);
-    m_pathEdit->installEventFilter(this);
+    m_pathBar = new PathBar(m_header);
+    if (auto* edit = m_pathBar->findChild<QLineEdit*>())
+        edit->installEventFilter(this);
     m_freeLabel = new QLabel(m_header);
     hl->addWidget(m_mountButton);
-    hl->addWidget(m_pathEdit, 1);
+    hl->addWidget(m_pathBar, 1);
     hl->addWidget(m_freeLabel);
     layout->addWidget(m_header);
 
@@ -148,14 +148,25 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
         }
     });
 
-    connect(m_pathEdit, &QLineEdit::returnPressed, this, [this] {
-        QString text = m_pathEdit->text().trimmed();
+    connect(m_pathBar, &PathBar::pathEntered, this, [this](QString text) {
+        text = text.trimmed();
         if (!text.startsWith(QLatin1Char('/')) && !text.startsWith(QLatin1Char('~')) &&
             !text.startsWith(QLatin1String("file:")))
             text = joinPath(path(), text);
         navigate(expandUserPath(text));
         m_view->setFocus();
     });
+    connect(m_pathBar, &PathBar::segmentClicked, this, [this](const QString& p) {
+        // Going up lands on the folder you came from.
+        const QString cur = path();
+        const QString focus = cur.startsWith(p + QLatin1Char('/'))
+                                  ? cur.mid(p == QLatin1String("/") ? 1 : p.size() + 1).section(QLatin1Char('/'), 0, 0)
+                                  : QString();
+        navigate(p, focus);
+        m_view->setFocus();
+    });
+    connect(m_pathBar, &PathBar::segmentMiddleClicked, this, [this](const QString& p) { addTab(p, false); });
+    connect(m_pathBar, &PathBar::focused, this, [this] { emit activated(this); });
 
     auto* menu = new QMenu(this);
     m_mountButton->setMenu(menu);
@@ -771,10 +782,14 @@ void Panel::updateActiveStyle()
     m_header->setStyleSheet(t.css(m_active ? QStringLiteral(
         "#panelHeader { background: @headerActive; border-top-left-radius: 7px; border-top-right-radius: 7px; }"
         "QLineEdit { background: transparent; color: @text; font-weight: 600; }"
+        "QToolButton#crumb { color: @text; border: none; padding: 1px 4px; border-radius: 4px; }"
+        "QToolButton#crumb:hover { background: @border; }"
         "QLabel { color: @dimText; }")
                                            : QStringLiteral(
         "#panelHeader { background: @header; border-top-left-radius: 7px; border-top-right-radius: 7px; }"
         "QLineEdit { background: transparent; color: @dimText; font-weight: 600; }"
+        "QToolButton#crumb { color: @dimText; border: none; padding: 1px 4px; border-radius: 4px; }"
+        "QToolButton#crumb:hover { background: @border; color: @text; }"
         "QLabel { color: @dimText; }")));
 }
 
@@ -793,8 +808,7 @@ void Panel::updateHeader()
     DirTab* t = tab();
     if (!t)
         return;
-    if (!m_pathEdit->hasFocus())
-        m_pathEdit->setText(t->path());
+    m_pathBar->setPath(t->path());
     m_mountButton->setIcon(t->inArchive() ? IconCache::themed("package-x-generic", "application-x-archive")
                                           : IconCache::themed("drive-harddisk", "folder"));
     m_mountButton->setToolTip(t->inArchive() ? tr("Inside archive %1").arg(t->archivePath())
@@ -865,8 +879,7 @@ void Panel::clearFilter()
 
 void Panel::focusPathEdit()
 {
-    m_pathEdit->setFocus();
-    m_pathEdit->selectAll();
+    m_pathBar->startEditing();
 }
 
 void Panel::showMountMenu()
@@ -876,16 +889,9 @@ void Panel::showMountMenu()
 
 bool Panel::eventFilter(QObject* obj, QEvent* e)
 {
-    if (obj == m_pathEdit) {
-        if (e->type() == QEvent::KeyPress && static_cast<QKeyEvent*>(e)->key() == Qt::Key_Escape) {
-            m_pathEdit->setText(path());
-            m_view->setFocus();
-            return true;
-        }
-        if (e->type() == QEvent::FocusIn)
-            emit activated(this);
-        if (e->type() == QEvent::FocusOut)
-            m_pathEdit->setText(path());
+    if (e->type() == QEvent::KeyPress && static_cast<QKeyEvent*>(e)->key() == Qt::Key_Escape &&
+        qobject_cast<QLineEdit*>(obj) && obj->parent() == m_pathBar) {
+        m_view->setFocus();
         return false;
     }
     if (obj == m_filterEdit && e->type() == QEvent::KeyPress) {

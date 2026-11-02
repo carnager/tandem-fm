@@ -17,6 +17,7 @@ class QToolButton;
 namespace tandem {
 
 class DirTab;
+class PathBar;
 class FileView;
 
 class Panel : public QFrame {
@@ -118,7 +119,7 @@ private:
     QTabBar* m_tabBar;
     QWidget* m_header;
     QToolButton* m_mountButton;
-    QLineEdit* m_pathEdit;
+    PathBar* m_pathBar;
     QLabel* m_freeLabel;
     FileView* m_view;
     QLabel* m_status;
