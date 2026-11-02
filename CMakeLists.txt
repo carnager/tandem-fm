@@ -35,6 +35,7 @@ add_library(tandem_core STATIC
   src/core/Remote.h src/core/Remote.cpp
   src/core/Backend.h src/core/Backend.cpp
   src/core/BackendCopy.cpp
+  src/core/SftpBackend.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)
@@ -61,6 +62,7 @@ add_library(tandem_ui STATIC
   src/ui/CommandBar.h src/ui/CommandBar.cpp
   src/ui/SyncDialog.h src/ui/SyncDialog.cpp
   src/ui/Network.h src/ui/Network.cpp
+  src/ui/AuthDialogs.h src/ui/AuthDialogs.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp
@@ -81,6 +83,18 @@ if(GIO_FOUND)
   message(STATUS "Network locations (GIO/GVfs): enabled")
 else()
   message(STATUS "Network locations (GIO/GVfs): disabled (gio-2.0 not found)")
+endif()
+
+# Optional: native SFTP (libssh).
+if(PkgConfig_FOUND)
+  pkg_check_modules(LIBSSH IMPORTED_TARGET libssh>=0.11)
+endif()
+if(LIBSSH_FOUND)
+  target_link_libraries(tandem_core PRIVATE PkgConfig::LIBSSH)
+  target_compile_definitions(tandem_core PRIVATE TANDEM_HAVE_LIBSSH)
+  message(STATUS "Native SFTP (libssh ${LIBSSH_VERSION}): enabled")
+else()
+  message(STATUS "Native SFTP: disabled (libssh >= 0.11 not found; GVfs is used instead)")
 endif()
 
 # Optional: syntax highlighting in the viewer (KDE's KSyntaxHighlighting).

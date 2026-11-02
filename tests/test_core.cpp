@@ -1,4 +1,5 @@
 #include "core/Archive.h"
+#include "core/Backend.h"
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
@@ -6,6 +7,7 @@
 #include "core/FolderCompare.h"
 #include "core/Remote.h"
 #include "TestBackend.h"
+#include "SshServer.h"
 #include "core/GitStatus.h"
 #include "core/Undo.h"
 #include "core/FolderHistory.h"
@@ -16,6 +18,7 @@
 
 #include <QDateTime>
 #include <QFile>
+#include <QElapsedTimer>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QSignalSpy>
@@ -24,6 +27,7 @@
 #include <QTest>
 
 #include <sys/stat.h>
+#include <thread>
 #include <unistd.h>
 
 using namespace tandem;
@@ -923,6 +927,7 @@ private slots:
         QCOMPARE(IoScheduler::deviceOf(root + "/a"), IoScheduler::deviceOf(root + "/b/c"));
         QVERIFY(IoScheduler::deviceOf(root + "/a") != IoScheduler::deviceOf(other + "/a"));
 
+        const QByteArray realUser = qgetenv("USER");
         qputenv("USER", "me");
         QCOMPARE(normalizeServerUri("sftp://h/srv"), QString("sftp://h/srv"));
         QCOMPARE(normalizeServerUri("ssh://u@h"), QString("sftp://u@h"));
@@ -936,6 +941,7 @@ private slots:
         QCOMPARE(normalizeServerUri("file:///x"), QString());
         QCOMPARE(normalizeServerUri("plainname"), QString());
         QCOMPARE(normalizeServerUri("my file@2x.png"), QString());
+        qputenv("USER", realUser);
     }
 
     void locationPaths()
@@ -1077,6 +1083,148 @@ private slots:
         QVERIFY(!*sameContents(local + "/tree/sub/b.bin", S + "/cmp/sub/b.bin"));
 
         registerBackend("test", nullptr);
+    }
+
+    void sftpBackend()
+    {
+        registerBuiltinBackends();
+        if (!hasBackend("sftp"))
+            QSKIP("built without libssh");
+        SshServer server;
+        if (!server.start())
+            QSKIP("could not start a test sshd");
+        QAtomicInt hostKeyQuestions = 0, otherQuestions = 0;
+        setAuthHandler([&](const AuthQuestion& q) -> std::optional<QString> {
+            if (q.kind == AuthQuestion::Kind::HostKey) {
+                ++hostKeyQuestions;
+                return QString("yes");
+            }
+            ++otherQuestions;
+            return std::nullopt;
+        });
+        QTemporaryDir tmp;
+        const QString base = tmp.path();  // the "server" is this machine
+        QVERIFY(QDir().mkpath(base + "/srv/sub"));
+        writeFile(base + "/srv/a.txt", "alpha");
+        writeFile(base + "/srv/.hidden", "h");
+        QVERIFY(QFile::link("a.txt", base + "/srv/link"));
+        QVERIFY(QFile::link(base + "/srv/sub", base + "/srv/dirlink"));
+        const QString S = server.location(base + "/srv");
+
+        // Listing: first contact asks about the host key, once.
+        ListOptions opt;
+        ListResult l = listLocation(S, opt);
+        QVERIFY2(l.error == 0, qPrintable(l.errorText + " / " + server.log()));
+        QCOMPARE(int(hostKeyQuestions), 1);
+        QCOMPARE(int(otherQuestions), 0);  // key login, no password
+        QStringList names;
+        for (const FileEntry& e : l.entries)
+            names << e.name;
+        QCOMPARE(names, QStringList({"dirlink", "sub", "a.txt", "link"}));  // folders (and links to them) first
+        QVERIFY(l.entries[0].isLink && l.entries[0].isDir);
+        QCOMPARE(l.entries[2].size, int64_t(5));
+        QCOMPARE(l.entries[2].mtime, QFileInfo(base + "/srv/a.txt").lastModified().toSecsSinceEpoch());
+        QVERIFY(l.freeBytes > 0);
+        opt.showHidden = true;
+        QCOMPARE(listLocation(S, opt).entries.size(), size_t(5));
+        QCOMPARE(listLocation(S + "/missing", opt).error, ENOENT);
+        QCOMPARE(int(hostKeyQuestions), 1);  // remembered in known_hosts
+
+        Backend* b = backendFor(S);
+        QCOMPARE(b->homeLocation(S), server.location(QDir::homePath()));
+        FileStat st;
+        QCOMPARE(b->stat(S + "/link", st), 0);
+        QVERIFY(st.isLink);
+
+        // Transfers both ways, bigger than the in-flight window.
+        QByteArray big(9 * 1024 * 1024 + 123, Qt::Uninitialized);
+        for (int i = 0; i < big.size(); ++i)
+            big[i] = char((i * 7919) >> 3);
+        writeFile(base + "/big.bin", big);
+        QElapsedTimer t;
+        t.start();
+        CopyJob up(CopyJob::Mode::Copy, {base + "/big.bin", base + "/srv/sub"}, S + "/up");
+        QVERIFY(runJob(up));
+        QVERIFY2(up.errors().isEmpty(), qPrintable(up.errors().join('\n')));
+        const qint64 upMs = t.restart();
+        QCOMPARE(readFile(base + "/srv/up/big.bin"), big);
+        QVERIFY(QFileInfo(base + "/srv/up/sub").isDir());
+        QCOMPARE(QFileInfo(base + "/srv/up/big.bin").lastModified().toSecsSinceEpoch(),
+                 QFileInfo(base + "/big.bin").lastModified().toSecsSinceEpoch());
+        CopyJob down(CopyJob::Mode::Copy, {S + "/up/big.bin"}, base + "/down.bin");
+        QVERIFY(runJob(down));
+        const qint64 downMs = t.elapsed();
+        QCOMPARE(readFile(base + "/down.bin"), big);
+        QVERIFY(*sameContents(base + "/big.bin", S + "/up/big.bin"));
+        qInfo("sftp to localhost: 9 MiB up %lld ms, down %lld ms", upMs, downMs);
+
+        // Big files go over several connections at once ("lanes"), both ways.
+        QByteArray huge(40 * 1024 * 1024 + 4321, Qt::Uninitialized);
+        for (int i = 0; i < huge.size(); i += 4)
+            *reinterpret_cast<quint32*>(huge.data() + qMin(i, int(huge.size()) - 4)) = quint32(i * 2654435761u);
+        writeFile(base + "/huge.bin", huge);
+        CopyJob hugeUp(CopyJob::Mode::Copy, {base + "/huge.bin"}, S + "/huge-up.bin");
+        QVERIFY(runJob(hugeUp));
+        QVERIFY2(hugeUp.errors().isEmpty(), qPrintable(hugeUp.errors().join('\n')));
+        QVERIFY(readFile(base + "/srv/huge-up.bin") == huge);
+        CopyJob hugeDown(CopyJob::Mode::Copy, {S + "/huge-up.bin"}, base + "/huge-down.bin");
+        QVERIFY(runJob(hugeDown));
+        QVERIFY(readFile(base + "/huge-down.bin") == huge);
+        QCOMPARE(hugeDown.snapshot().bytesDone, int64_t(huge.size()));
+        // Cancelling a laned download stops cleanly and leaves no partial file.
+        CopyJob stopped(CopyJob::Mode::Copy, {S + "/huge-up.bin"}, base + "/stopped.bin");
+        stopped.start();
+        stopped.cancel();
+        QTRY_VERIFY(stopped.isFinished());
+        QVERIFY(!QFile::exists(base + "/stopped.bin"));
+        QCOMPARE(listLocation(S, opt).error, 0);  // connections still usable
+
+        // Links are copied as links.
+        QVERIFY(QDir().mkpath(base + "/fromserver"));
+        CopyJob links(CopyJob::Mode::Copy, {S + "/link"}, base + "/fromserver");
+        QVERIFY(runJob(links));
+        QCOMPARE(QFileInfo(base + "/fromserver/link").symLinkTarget(), base + "/fromserver/a.txt");
+
+        // Rename never replaces; mkdir/exists; delete trees.
+        QCOMPARE(renameNoReplaceAt(S + "/a.txt", S + "/up/big.bin"), EEXIST);
+        QCOMPARE(renameNoReplaceAt(S + "/a.txt", S + "/b.txt"), 0);
+        QVERIFY(QFile::exists(base + "/srv/b.txt"));
+        QCOMPARE(makeDirectoriesAt(S + "/x/y/z"), 0);
+        QCOMPARE(b->mkdir(S + "/x", 0755), EEXIST);
+        QCOMPARE(createEmptyFile(S + "/x/new"), 0);
+        QCOMPARE(createEmptyFile(S + "/x/new"), EEXIST);
+        DeleteJob del({S + "/up", S + "/x"}, true);
+        QVERIFY(runJob(del));
+        QVERIFY(!QFile::exists(base + "/srv/up"));
+        QVERIFY(!QFile::exists(base + "/srv/x"));
+
+        // Many parallel listings share a few connections.
+        std::vector<std::thread> threads;
+        std::atomic<int> ok{0};
+        for (int i = 0; i < 12; ++i)
+            threads.emplace_back([&] {
+                if (listLocation(S, ListOptions{}).error == 0)
+                    ++ok;
+            });
+        for (auto& th : threads)
+            th.join();
+        QCOMPARE(ok.load(), 12);
+
+        // The server goes away and comes back: pooled connections are dead,
+        // the next call reconnects instead of failing.
+        QVERIFY(server.restart());
+        QTest::qWait(200);  // let the pooled connections notice they're closed
+        const ListResult again = listLocation(S, opt);
+        QVERIFY2(again.error == 0, qPrintable(again.errorText));
+        QCOMPARE(b->stat(S + "/b.txt", st), 0);
+
+        // Wrong key: a clear error, no hang.
+        qputenv("TANDEM_SSH_IDENTITY", (base + "/nokey").toUtf8());
+        const ListResult denied = listLocation(server.location(base) .replace("127.0.0.1", "localhost"), opt);
+        QVERIFY(denied.error != 0);
+        QVERIFY(!denied.errorText.isEmpty());
+
+        setAuthHandler({});
     }
 
     void helpers()

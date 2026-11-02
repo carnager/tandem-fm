@@ -403,6 +403,62 @@
         <source>Mounted, but it has no local path</source>
         <translation>Eingehängt, aber ohne lokalen Pfad</translation>
     </message>
+    <message>
+        <source>Passphrase for your SSH key</source>
+        <translation>Passphrase für deinen SSH-Schlüssel</translation>
+    </message>
+    <message>
+        <source>No host in %1</source>
+        <translation>Kein Host in %1</translation>
+    </message>
+    <message>
+        <source>The server has no SFTP: %1</source>
+        <translation>Der Server bietet kein SFTP: %1</translation>
+    </message>
+    <message>
+        <source>The host key of %1 has CHANGED (now %2 %3). This can mean someone is intercepting the connection. If the server was reinstalled, remove its old key from ~/.ssh/known_hosts.</source>
+        <translation>Der Host-Schlüssel von %1 hat sich GEÄNDERT (jetzt %2 %3). Das kann heißen, dass jemand die Verbindung abfängt. Wurde der Server neu installiert, den alten Schlüssel aus ~/.ssh/known_hosts entfernen.</translation>
+    </message>
+    <message>
+        <source>First connection to %1. Is this its key?</source>
+        <translation>Erste Verbindung zu %1. Ist das sein Schlüssel?</translation>
+    </message>
+    <message>
+        <source>Password for %1</source>
+        <translation>Passwort für %1</translation>
+    </message>
+    <message>
+        <source>Wrong password. Password for %1</source>
+        <translation>Falsches Passwort. Passwort für %1</translation>
+    </message>
+    <message>
+        <source>Login to %1 failed (tried keys%2)</source>
+        <translation>Anmeldung bei %1 fehlgeschlagen (Schlüssel%2 versucht)</translation>
+    </message>
+    <message>
+        <source> and password</source>
+        <translation> und Passwort</translation>
+    </message>
+    <message>
+        <source>Answer for %1</source>
+        <translation>Antwort für %1</translation>
+    </message>
+    <message>
+        <source>Unknown server</source>
+        <translation>Unbekannter Server</translation>
+    </message>
+    <message>
+        <source>Log in</source>
+        <translation>Anmelden</translation>
+    </message>
+    <message>
+        <source>Compare it with what the server&apos;s admin gives you. Tandem remembers it in ~/.ssh/known_hosts, like ssh does.</source>
+        <translation>Mit dem vergleichen, was der Admin des Servers angibt. Tandem merkt ihn sich in ~/.ssh/known_hosts, wie ssh.</translation>
+    </message>
+    <message>
+        <source>Trust and connect</source>
+        <translation>Vertrauen und verbinden</translation>
+    </message>
 </context>
 <context>
     <name>tandem::CommandBar</name>

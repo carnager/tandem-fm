@@ -1180,7 +1180,23 @@ void Panel::connectTo(const QString& uri)
 {
     if (hasBackend(uri.section(QLatin1Char(':'), 0, 0))) {  // built in: just go there
         Network::instance().rememberServer(uri);
-        navigate(normalizeLocation(uri));
+        if (!QUrl(uri).path().isEmpty()) {
+            navigate(normalizeLocation(uri));
+            return;
+        }
+        // No path: start in the login's home folder, which only the server
+        // knows (asking it means connecting, so off the UI thread).
+        showMessage(tr("Connecting to %1 …").arg(uri));
+        QPointer<Panel> self(this);
+        const QString root = normalizeLocation(uri);
+        ioPool()->start([self, root] {
+            Backend* b = backendFor(root);
+            const QString home = b ? b->homeLocation(root) : root;
+            postToUi([self, home] {
+                if (self)
+                    self->navigate(home);
+            });
+        });
         return;
     }
     if (!Network::available()) {

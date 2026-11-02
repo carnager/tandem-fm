@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 
 namespace tandem {
 
@@ -18,6 +19,8 @@ namespace tandem {
 // Local paths never go through here, so everything that is fast today (reflink,
 // copy_file_range, inotify) stays as it is; generic code that has to work with
 // both sides uses localBackend() for the local one.
+
+QString locationRoot(const QString& path);
 
 struct FileStat {
     bool isDir = false;
@@ -65,10 +68,31 @@ public:
     virtual int symlink(const QString& target, const QString& path) { (void)target; (void)path; return ENOTSUP; }
     virtual int chmod(const QString& path, uint32_t mode) { (void)path; (void)mode; return 0; }
 
+    // Where "sftp://host" without a path should open (the login's home).
+    virtual QString homeLocation(const QString& path);
     // Transfers to the same key share a queue (one server = one key).
     virtual QString queueKey(const QString& path) const;
     virtual bool isLocal() const { return false; }
 };
+
+// Questions a backend has to ask while connecting (host key, password, key
+// passphrase). Asked from worker threads; blocks until answered. The UI
+// installs the handler, tests install their own.
+struct AuthQuestion {
+    enum class Kind { HostKey, Password, Passphrase, Prompt };
+    Kind kind = Kind::Password;
+    QString location;  // "sftp://bob@host"
+    QString message;
+    QString detail;    // e.g. the key fingerprint
+    bool secret = true;
+};
+// nullopt: the user cancelled. For HostKey any answer means "trust it".
+using AuthHandler = std::function<std::optional<QString>(const AuthQuestion&)>;
+void setAuthHandler(AuthHandler handler);
+std::optional<QString> askAuth(const AuthQuestion& q);
+
+// Built-in backends (sftp, smb, …) that this build has.
+void registerBuiltinBackends();
 
 // nullptr for local paths. Unknown schemes return nullptr too; check
 // isRemoteLocation() for "looks like a URL".

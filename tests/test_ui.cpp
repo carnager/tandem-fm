@@ -9,8 +9,11 @@
 #include "ui/SyncDialog.h"
 #include "ui/Network.h"
 #include "ui/PathBar.h"
+#include "core/Backend.h"
 #include "core/Remote.h"
 #include "TestBackend.h"
+#include "SshServer.h"
+#include "ui/AuthDialogs.h"
 #include "ui/viewer/ViewerWindow.h"
 #include "ui/FileView.h"
 #include "ui/FuzzyPopup.h"
@@ -156,6 +159,8 @@ private slots:
         qputenv("XDG_CONFIG_HOME", QFile::encodeName(m_tmp.filePath("config")));
         applyTheme(*qApp);
         DirWatcher::instance();
+        registerBuiltinBackends();
+        installAuthDialogs();
         FolderHistory::instance().setStoragePath(m_tmp.filePath("folders.tsv"));
         QSettings().clear();  // test mode keeps settings in ~/.qttest across runs: start clean
 
@@ -1427,6 +1432,57 @@ private slots:
         m_right->navigate(R());
         QTRY_COMPARE(rightModel()->path(), R());
         registerBackend("test", nullptr);
+    }
+
+    void sftpInPanel()
+    {
+        if (!hasBackend("sftp"))
+            QSKIP("built without libssh");
+        SshServer server;
+        if (!server.start())
+            QSKIP("could not start a test sshd");
+        QVERIFY(QDir().mkpath(L("remote/docs")));
+        writeFile(L("remote/readme.txt"), "served over sftp");
+        writeFile(L("toupload.txt"), "uploaded");
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+
+        // Typed address; the unknown host key is asked in a dialog.
+        QString question;
+        answerNextDialog([&](QWidget* w) {
+            question = w->windowTitle();
+            for (auto* b : w->findChildren<QPushButton*>())
+                if (b->text() == QObject::tr("Trust and connect"))
+                    b->click();
+        });
+        m_right->focusPathEdit();
+        auto* edit = qobject_cast<QLineEdit*>(QApplication::focusWidget());
+        QVERIFY(edit);
+        const QString loc = server.location(L("remote"));
+        edit->setText(loc);
+        QTest::keyClick(edit, Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(rightModel()->path(), loc, 10000);
+        QCOMPARE(question, QObject::tr("Unknown server"));
+        QVERIFY(m_right->isRemote());
+        QVERIFY(rightModel()->rowOf("docs") >= 0);
+        QVERIFY(rightModel()->rowOf("readme.txt") >= 0);
+
+        // F5 upload into the sftp panel.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "toupload.txt");
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_left->view(), Qt::Key_F5);
+        QTRY_COMPARE(readFile(L("remote/toupload.txt")), QByteArray("uploaded"));
+        QTRY_VERIFY(rightModel()->rowOf("toupload.txt") >= 0);
+
+        // A bare address opens the login's home folder.
+        m_right->connectTo(server.location().chopped(1));
+        QTRY_COMPARE_WITH_TIMEOUT(rightModel()->path(), server.location(QDir::homePath()), 10000);
+
+        m_right->navigate(R());
+        QTRY_COMPARE(rightModel()->path(), R());
     }
 
     void cleanupTestCase()

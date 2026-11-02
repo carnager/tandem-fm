@@ -4,6 +4,7 @@
 #include "core/Util.h"
 
 #include <QHash>
+#include <QMutex>
 #include <QReadWriteLock>
 #include <QRegularExpression>
 #include <QStandardPaths>
@@ -155,9 +156,35 @@ const QRegularExpression& uriPattern()
 
 }  // namespace
 
+QString Backend::homeLocation(const QString& path)
+{
+    return locationRoot(path);
+}
+
 QString Backend::queueKey(const QString& path) const
 {
     return locationAuthority(path);
+}
+
+namespace {
+QMutex g_authMutex;
+AuthHandler g_auth;
+}  // namespace
+
+void setAuthHandler(AuthHandler handler)
+{
+    QMutexLocker locker(&g_authMutex);
+    g_auth = std::move(handler);
+}
+
+std::optional<QString> askAuth(const AuthQuestion& q)
+{
+    AuthHandler h;
+    {
+        QMutexLocker locker(&g_authMutex);
+        h = g_auth;
+    }
+    return h ? h(q) : std::nullopt;
 }
 
 Backend* localBackend()

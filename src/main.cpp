@@ -1,4 +1,6 @@
+#include "core/Backend.h"
 #include "core/DirWatcher.h"
+#include "ui/AuthDialogs.h"
 #include "ui/MainWindow.h"
 #include "ui/Theme.h"
 
@@ -34,6 +36,8 @@ int main(int argc, char** argv)
     tandem::applyTheme(app);
     QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("system-file-manager")));
     tandem::DirWatcher::instance();  // must be created on the UI thread
+    tandem::registerBuiltinBackends();
+    tandem::installAuthDialogs();
 
     QStringList paths = app.arguments().mid(1);
     tandem::MainWindow w(paths);
