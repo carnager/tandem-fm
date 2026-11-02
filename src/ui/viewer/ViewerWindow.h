@@ -30,7 +30,10 @@ class ViewerWindow : public QWidget {
 public:
     enum class Mode { None, Text, Hex, Image };
 
-    ViewerWindow(const QStringList& files, int index, QWidget* parent = nullptr);
+    // embedded: a plain child widget (quick view): no own shortcuts, not a window.
+    ViewerWindow(const QStringList& files, int index, QWidget* parent = nullptr, bool embedded = false);
+    void showFile(const QString& path);
+    void showNote(const QString& text);
     ~ViewerWindow() override;
 
     void openIndex(int index);
@@ -67,6 +70,7 @@ private:
     void findInBytes(bool backward);
     void zoom(int steps);
 
+    bool m_embedded = false;
     QStringList m_files;
     int m_index = -1;
     QString m_path;

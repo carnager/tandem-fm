@@ -43,6 +43,7 @@ signals:
     void markGroupRequested(int mode);  // Num+ (1), Num- (-1), Num* (0)
     void historyRequested(int step);    // mouse back/forward buttons
     void focused();
+    void cursorMoved();
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void dragPathsRequested(QStringList& out);  // panel fills marked/current paths
     void contextMenuRequested(const QPoint& globalPos, int row);  // row -1: empty area
@@ -62,6 +63,7 @@ protected:
     void dragLeaveEvent(QDragLeaveEvent* e) override;
     void dropEvent(QDropEvent* e) override;
     void contextMenuEvent(QContextMenuEvent* e) override;
+    void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
 
 private:
     void moveCursorBy(int delta);

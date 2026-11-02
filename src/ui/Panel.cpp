@@ -179,6 +179,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     });
 
     connect(m_view, &FileView::focused, this, [this] { emit activated(this); });
+    connect(m_view, &FileView::cursorMoved, this, [this] { emit cursorChanged(this); });
     connect(m_view, &FileView::openRequested, this, &Panel::openCurrent);
     connect(m_view, &FileView::parentRequested, this, &Panel::goUp);
     connect(m_view, &FileView::switchPanelRequested, this, &Panel::switchRequested);

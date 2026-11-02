@@ -770,6 +770,38 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void quickView()
+    {
+        QVERIFY(QDir().mkpath(L("qv")));
+        writeFile(L("qv/a.txt"), "first file");
+        writeFile(L("qv/b.txt"), "second file");
+        m_left->navigate(L("qv"));
+        QTRY_COMPARE(leftModel()->path(), L("qv"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "a.txt");
+
+        QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
+        ViewerWindow* qv = nullptr;
+        QTRY_VERIFY((qv = m_window->findChild<ViewerWindow*>("quickView")) != nullptr);
+        QVERIFY(!m_right->isVisible());
+        QTRY_COMPARE(qv->textEdit()->toPlainText(), QString("first file"));
+        QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(m_left->view()));  // focus stays
+
+        QTest::keyClick(m_left->view(), Qt::Key_Down);
+        QTRY_COMPARE(qv->currentPath(), L("qv/b.txt"));
+        QTRY_COMPARE(qv->textEdit()->toPlainText(), QString("second file"));
+        QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(m_left->view()));
+
+        QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
+        QTRY_VERIFY(m_right->isVisible());
+        QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") == nullptr);
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
     void cleanupTestCase()
     {
         m_window->close();

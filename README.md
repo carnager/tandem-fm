@@ -81,6 +81,8 @@ Visual check without a display:
 | Right click, Menu key, Shift+F10 | Context menu |
 | Alt+F5 / Alt+F9 | Pack into a new archive / unpack archives to the other panel |
 | Ctrl+PgDn | Enter folder, or browse any file as an archive |
+| Ctrl+Q | Quick view: the other panel previews the file under the cursor (text, code, images, hex) |
+| Alt+F4 | Quit |
 | Esc | Cancel a slow folder load |
 
 Drag and drop works within Tandem and with other applications (Shift = move).

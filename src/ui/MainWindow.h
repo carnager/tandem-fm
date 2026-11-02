@@ -19,6 +19,7 @@ class QVBoxLayout;
 namespace tandem {
 
 class JobManager;
+class ViewerWindow;
 class JobsPanel;
 class Panel;
 
@@ -78,6 +79,8 @@ private:
     void jumpToFolder();
     QList<PopupItem> folderItems() const;
     void togglePin();
+    void toggleQuickView();
+    void updateQuickView();
     void setIconTheme(const QString& id);
 
     void loadSettings(const QStringList& startPaths);
@@ -92,6 +95,9 @@ private:
     QAction* m_hiddenAction = nullptr;
     QHash<QString, QAction*> m_actions;
     FuzzyPopup* m_popup = nullptr;
+    ViewerWindow* m_quickView = nullptr;  // replaces the other panel (Ctrl+Q)
+    Panel* m_quickHidden = nullptr;
+    QTimer* m_quickTimer = nullptr;
     QList<IconTheme> m_iconThemes;
     bool m_iconThemesLoaded = false;
     QList<UndoEntry> m_undo;

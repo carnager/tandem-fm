@@ -88,6 +88,7 @@ signals:
     void stateChanged();
     void contextMenuRequested(Panel* panel, const QPoint& globalPos, bool onItem);
     void renamed(const QString& dir, const QString& from, const QString& to);
+    void cursorChanged(Panel* panel);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;

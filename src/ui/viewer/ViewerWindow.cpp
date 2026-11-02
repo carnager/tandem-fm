@@ -99,10 +99,11 @@ KSyntaxHighlighting::Repository& repository()
 
 }  // namespace
 
-ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent)
-    : QWidget(parent, Qt::Window), m_files(files)
+ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent, bool embedded)
+    : QWidget(parent, embedded ? Qt::Widget : Qt::Window), m_embedded(embedded), m_files(files)
 {
-    setAttribute(Qt::WA_DeleteOnClose);
+    if (!embedded)
+        setAttribute(Qt::WA_DeleteOnClose);
     const Theme& t = theme();
 
     auto* layout = new QVBoxLayout(this);
@@ -203,10 +204,11 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent)
     m_wrapButton->setChecked(s.value(QStringLiteral("viewer/wrap"), false).toBool());
     m_text->setLineWrapMode(m_wrapButton->isChecked() ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
     m_big->setWrap(m_wrapButton->isChecked());
-    if (!restoreGeometry(s.value(QStringLiteral("viewer/geometry")).toByteArray()))
-        resize(1000, 720);
-
-    setupShortcuts();
+    if (!embedded) {
+        if (!restoreGeometry(s.value(QStringLiteral("viewer/geometry")).toByteArray()))
+            resize(1000, 720);
+        setupShortcuts();
+    }
     openIndex(index);
 }
 
@@ -218,7 +220,8 @@ ViewerWindow::~ViewerWindow()
 
 void ViewerWindow::closeEvent(QCloseEvent* e)
 {
-    QSettings().setValue(QStringLiteral("viewer/geometry"), saveGeometry());
+    if (!m_embedded)
+        QSettings().setValue(QStringLiteral("viewer/geometry"), saveGeometry());
     QWidget::closeEvent(e);
 }
 
@@ -254,6 +257,30 @@ void ViewerWindow::setupShortcuts()
     add(Qt::Key_0, [this] { zoom(0); });
 }
 
+void ViewerWindow::showFile(const QString& path)
+{
+    m_files = {path};
+    openIndex(0);
+}
+
+void ViewerWindow::showNote(const QString& text)
+{
+    ++m_gen;
+    m_index = -1;
+    m_path.clear();
+    m_loading = false;
+    m_mode = Mode::None;
+    m_big->setCache(nullptr);
+    m_hex->setCache(nullptr);
+    delete m_cache;
+    m_cache = nullptr;
+    m_title->clear();
+    m_status->clear();
+    for (QToolButton* b : {m_textButton, m_hexButton, m_imageButton, m_wrapButton})
+        b->hide();
+    showMessage(text);
+}
+
 // ------------------------------------------------------------------ loading
 
 void ViewerWindow::openIndex(int index)
@@ -279,7 +306,10 @@ void ViewerWindow::openIndex(int index)
     m_cache = nullptr;
 
     setWindowTitle(QStringLiteral("%1 — Tandem").arg(baseName(m_path)));
-    m_title->setText(QStringLiteral("%1   (%2/%3)").arg(m_path).arg(index + 1).arg(m_files.size()));
+    m_title->setText(m_files.size() == 1 ? m_path
+                                         : QStringLiteral("%1   (%2/%3)").arg(m_path).arg(index + 1).arg(m_files.size()));
+    m_textButton->show();
+    m_hexButton->show();
     showMessage(tr("Loading…"));
 
     const quint64 gen = m_gen;
@@ -326,13 +356,15 @@ void ViewerWindow::setMode(Mode mode)
         if (m_size > kSmallText) {
             m_big->setCache(m_cache);
             m_stack->setCurrentWidget(m_big);
-            m_big->setFocus();
+            if (!m_embedded)
+                m_big->setFocus();
             m_encoding = QStringLiteral("UTF-8");
             m_loading = false;
             emit loaded();
         } else if (m_textLoaded) {
             m_stack->setCurrentWidget(m_text);
-            m_text->setFocus();
+            if (!m_embedded)
+                m_text->setFocus();
         } else {
             loadText();
         }
@@ -340,14 +372,16 @@ void ViewerWindow::setMode(Mode mode)
     case Mode::Hex:
         m_hex->setCache(m_cache);
         m_stack->setCurrentWidget(m_hex);
-        m_hex->setFocus();
+        if (!m_embedded)
+            m_hex->setFocus();
         m_loading = false;
         emit loaded();
         break;
     case Mode::Image:
         if (m_imageLoaded) {
             m_stack->setCurrentWidget(m_image);
-            m_image->setFocus();
+            if (!m_embedded)
+                m_image->setFocus();
         } else {
             loadImage();
         }
@@ -411,7 +445,8 @@ void ViewerWindow::loadText()
             w->m_textLoaded = true;
             if (w->m_mode == Mode::Text) {
                 w->m_stack->setCurrentWidget(w->m_text);
-                w->m_text->setFocus();
+                if (!w->m_embedded)
+                    w->m_text->setFocus();
             }
             w->updateStatus();
             emit w->loaded();
@@ -446,7 +481,8 @@ void ViewerWindow::loadImage()
             w->m_image->setImage(img);
             if (w->m_mode == Mode::Image) {
                 w->m_stack->setCurrentWidget(w->m_image);
-                w->m_image->setFocus();
+                if (!w->m_embedded)
+                    w->m_image->setFocus();
             }
             w->updateStatus();
             emit w->loaded();

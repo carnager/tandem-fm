@@ -148,7 +148,14 @@ MainWindow::MainWindow(const QStringList& startPaths)
 
     for (Panel* p : {m_left, m_right}) {
         connect(p, &Panel::activated, this, &MainWindow::setActive);
-        connect(p, &Panel::switchRequested, this, [this] { other()->view()->setFocus(); });
+        connect(p, &Panel::switchRequested, this, [this] {
+            if (!m_quickView)  // the other panel is a preview right now
+                other()->view()->setFocus();
+        });
+        connect(p, &Panel::cursorChanged, this, [this](Panel* panel) {
+            if (m_quickView && panel == active())
+                m_quickTimer->start();
+        });
         connect(p, &Panel::openFileRequested, this, [this, p](const QString& path) { openFrom(p, path); });
         connect(p, &Panel::dropRequested, this,
                 [this, p](const QList<QUrl>& urls, const QString& dir, Qt::DropAction action) {
@@ -175,6 +182,10 @@ MainWindow::MainWindow(const QStringList& startPaths)
     DesktopApps::instance().loadAsync();
     FolderHistory::instance().loadAsync();
     m_popup = new FuzzyPopup(this);
+    m_quickTimer = new QTimer(this);
+    m_quickTimer->setSingleShot(true);
+    m_quickTimer->setInterval(120);  // holding an arrow key doesn't decode every file
+    connect(m_quickTimer, &QTimer::timeout, this, &MainWindow::updateQuickView);
     ioPool()->start([] { pruneExtractCache(); });
     QPointer<MainWindow> self(this);
     ioPool()->start([self] {
@@ -255,7 +266,7 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("terminal")] =
         addCommand(files, tr("Open terminal here"), {K(Qt::CTRL | Qt::ALT | Qt::Key_T)}, [this] { openTerminal(); });
     files->addSeparator();
-    addCommand(files, tr("Quit"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { close(); });
+    addCommand(files, tr("Quit"), {K(Qt::ALT | Qt::Key_F4)}, [this] { close(); });
 
     QMenu* mark = bar->addMenu(tr("&Mark"));
     addCommand(mark, tr("Filter as you type…"), {K(Qt::CTRL | Qt::Key_F)}, [this] { active()->startFilter(); });
@@ -317,6 +328,7 @@ void MainWindow::createMenus()
     m_hiddenAction->setCheckable(true);
     QMenu* icons = view->addMenu(tr("Icon theme"));
     connect(icons, &QMenu::aboutToShow, this, [this, icons] { populateIconThemeMenu(icons); });
+    addCommand(view, tr("Quick view in the other panel"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
     addCommand(view, tr("Toggle menu bar"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_M)},
                [this] { menuBar()->setVisible(!menuBar()->isVisible()); });
 
@@ -660,6 +672,8 @@ void MainWindow::showShortcuts()
         {"Alt+F5 / Alt+F9", "Pack / unpack archives"},
         {"Ctrl+PgDn", "Enter folder, or browse any file as archive"},
         {"Menu key, Shift+F10", "Context menu"},
+        {"Ctrl+Q", "Quick view of the file under the cursor in the other panel"},
+        {"Alt+F4", "Quit"},
         {"Esc", "Cancel a slow folder load"},
     };
     QString html = QStringLiteral("<table cellspacing='0' cellpadding='4'>");
@@ -672,6 +686,46 @@ void MainWindow::showShortcuts()
     box.setTextFormat(Qt::RichText);
     box.setText(html);
     box.exec();
+}
+
+// --------------------------------------------------------------- quick view
+
+void MainWindow::toggleQuickView()
+{
+    if (m_quickView) {
+        const int idx = m_splitter->indexOf(m_quickView);
+        m_splitter->replaceWidget(idx, m_quickHidden);
+        m_quickHidden->show();
+        m_quickView->deleteLater();
+        m_quickView = nullptr;
+        m_quickHidden = nullptr;
+        active()->view()->setFocus();
+        return;
+    }
+    Panel* o = other();
+    m_quickView = new ViewerWindow({}, -1, this, true);
+    m_quickView->setObjectName(QStringLiteral("quickView"));
+    m_quickHidden = o;
+    m_splitter->replaceWidget(m_splitter->indexOf(o), m_quickView);
+    updateQuickView();
+    active()->view()->setFocus();
+}
+
+void MainWindow::updateQuickView()
+{
+    if (!m_quickView)
+        return;
+    Panel* p = active();
+    const FileEntry* e = p->currentEntry();
+    if (!e || e->isParent) {
+        m_quickView->showNote(tr("Quick view: move the cursor onto a file"));
+    } else if (e->isDir) {
+        m_quickView->showNote(tr("Folder “%1”\n\nSpace calculates its size").arg(e->name));
+    } else if (p->inArchive()) {
+        m_quickView->showNote(tr("“%1” is inside an archive\n\nF3 opens it in the viewer").arg(e->name));
+    } else if (m_quickView->currentPath() != p->currentPath()) {
+        m_quickView->showFile(p->currentPath());
+    }
 }
 
 // ------------------------------------------------- command palette & jump

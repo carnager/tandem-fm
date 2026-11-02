@@ -448,6 +448,13 @@ void FileView::dropEvent(QDropEvent* e)
     emit dropRequested(e->mimeData()->urls(), target, action);
 }
 
+void FileView::currentChanged(const QModelIndex& current, const QModelIndex& previous)
+{
+    QTreeView::currentChanged(current, previous);
+    if (current.row() != previous.row())
+        emit cursorMoved();
+}
+
 void FileView::contextMenuEvent(QContextMenuEvent* e)
 {
     if (e->reason() == QContextMenuEvent::Keyboard) {
