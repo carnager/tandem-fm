@@ -1,0 +1,456 @@
+#include "ui/FileView.h"
+
+#include "ui/FileModel.h"
+#include "ui/Theme.h"
+
+#include <QApplication>
+#include <QDrag>
+#include <QHeaderView>
+#include <QKeyEvent>
+#include <QLineEdit>
+#include <QMimeData>
+#include <QPainter>
+#include <QScrollBar>
+
+namespace tandem {
+
+// ------------------------------------------------------------ FileDelegate
+
+FileDelegate::FileDelegate(QTreeView* view) : QStyledItemDelegate(view), m_view(view) {}
+
+QSize FileDelegate::sizeHint(const QStyleOptionViewItem& opt, const QModelIndex&) const
+{
+    const int h = qMax(opt.fontMetrics.height() + 8, 22);
+    return {40, h};
+}
+
+void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QModelIndex& idx) const
+{
+    const auto* model = static_cast<const FileModel*>(idx.model());
+    const FileEntry* e = model->entry(idx.row());
+    if (!e)
+        return;
+    const Theme& t = theme();
+
+    QColor fg = t.text;
+    if (e->marked)
+        fg = t.mark;
+    else if (!e->isParent && e->name.startsWith(QLatin1Char('.')))
+        fg = t.dimText;
+    else if (e->brokenLink)
+        fg = t.error;
+
+    QRect r = opt.rect.adjusted(6, 0, -6, 0);
+    const int col = idx.column();
+    if (col == FileModel::ColName) {
+        const int iconSize = 16;
+        const QIcon ic = idx.data(Qt::DecorationRole).value<QIcon>();
+        const QRect iconRect(r.left(), r.top() + (r.height() - iconSize) / 2, iconSize, iconSize);
+        ic.paint(p, iconRect);
+        if (e->isLink && !e->isParent) {
+            // Small arrow badge for symlinks.
+            p->save();
+            p->setRenderHint(QPainter::Antialiasing);
+            const QRect b(iconRect.right() - 6, iconRect.bottom() - 6, 8, 8);
+            p->setPen(Qt::NoPen);
+            p->setBrush(t.base);
+            p->drawEllipse(b);
+            p->setPen(QPen(t.accent, 1.4));
+            p->drawLine(b.left() + 2, b.bottom() - 2, b.right() - 2, b.top() + 2);
+            p->restore();
+        }
+        r.setLeft(iconRect.right() + 7);
+    }
+
+    QFont f = (col == FileModel::ColSize || col == FileModel::ColTime) ? t.numberFont : t.listFont;
+    if (e->isDir && col == FileModel::ColName)
+        f.setWeight(QFont::DemiBold);
+    if (e->marked)
+        f.setWeight(QFont::Bold);
+    p->setFont(f);
+    // Secondary columns are dimmed so names stand out; marks keep their color.
+    const bool secondary = col == FileModel::ColTime || col == FileModel::ColAttr ||
+                           (col == FileModel::ColSize && e->isDir);
+    if (secondary && !e->marked)
+        fg = t.dimText;
+    p->setPen(fg);
+
+    const QString text = idx.data(Qt::DisplayRole).toString();
+    const Qt::Alignment align = col == FileModel::ColSize ? (Qt::AlignRight | Qt::AlignVCenter)
+                                                          : (Qt::AlignLeft | Qt::AlignVCenter);
+    const QString shown = QFontMetrics(f).elidedText(text, Qt::ElideMiddle, r.width());
+    p->drawText(r, int(align) | Qt::TextSingleLine, shown);
+}
+
+QWidget* FileDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem&, const QModelIndex&) const
+{
+    auto* ed = new QLineEdit(parent);
+    ed->setFrame(false);
+    ed->setStyleSheet(theme().css(QStringLiteral(
+        "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 4px; padding: 0 4px; }")));
+    return ed;
+}
+
+void FileDelegate::setEditorData(QWidget* editor, const QModelIndex& idx) const
+{
+    auto* ed = static_cast<QLineEdit*>(editor);
+    const QString name = idx.data(Qt::EditRole).toString();
+    ed->setText(name);
+    // Select the name without extension, like every good file manager.
+    const auto* model = static_cast<const FileModel*>(idx.model());
+    const FileEntry* e = model->entry(idx.row());
+    const int dot = (e && !e->isDir) ? int(name.lastIndexOf(QLatin1Char('.'))) : -1;
+    if (dot > 0)
+        ed->setSelection(0, dot);
+    else
+        ed->selectAll();
+}
+
+void FileDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& opt, const QModelIndex&) const
+{
+    QRect r = opt.rect;
+    r.setLeft(r.left() + 26);
+    r.setRight(r.right() + m_view->columnWidth(FileModel::ColExt));
+    editor->setGeometry(r.adjusted(0, 1, 0, -1));
+}
+
+// --------------------------------------------------------------- FileView
+
+FileView::FileView(QWidget* parent) : QTreeView(parent)
+{
+    setItemDelegate(new FileDelegate(this));
+    setRootIsDecorated(false);
+    setItemsExpandable(false);
+    setUniformRowHeights(true);  // essential for huge directories
+    setAllColumnsShowFocus(true);
+    setSelectionMode(QAbstractItemView::NoSelection);
+    setEditTriggers(QAbstractItemView::NoEditTriggers);
+    setTextElideMode(Qt::ElideMiddle);
+    setFrameShape(QFrame::NoFrame);
+    setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    setAcceptDrops(true);
+    setDragDropMode(QAbstractItemView::DragDrop);
+    setDropIndicatorShown(false);
+    setMouseTracking(false);
+    viewport()->setAcceptDrops(true);
+
+    QHeaderView* h = header();
+    h->setSectionsClickable(true);
+    h->setSortIndicatorShown(true);
+    h->setHighlightSections(false);
+    h->setStretchLastSection(false);
+    h->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    h->setMinimumSectionSize(30);
+    h->setStyleSheet(theme().css(QStringLiteral(
+        "QHeaderView { background: @base; border: none; border-bottom: 1px solid @border; }"
+        "QHeaderView::section { background: @base; color: @dimText; border: none; padding: 4px 6px; }"
+        "QHeaderView::section:hover { color: @text; }")));
+}
+
+FileModel* FileView::fileModel() const
+{
+    return static_cast<FileModel*>(model());
+}
+
+void FileView::setActive(bool active)
+{
+    if (m_active == active)
+        return;
+    m_active = active;
+    viewport()->update();
+}
+
+void FileView::setCurrentRow(int row, bool center)
+{
+    if (!model() || model()->rowCount() == 0)
+        return;
+    row = std::clamp(row, 0, model()->rowCount() - 1);
+    const QModelIndex idx = model()->index(row, 0);
+    setCurrentIndex(idx);
+    scrollTo(idx, center ? QAbstractItemView::PositionAtCenter : QAbstractItemView::EnsureVisible);
+}
+
+void FileView::moveCursorBy(int delta)
+{
+    setCurrentRow(currentRow() + delta);
+}
+
+bool FileView::event(QEvent* e)
+{
+    if (e->type() == QEvent::KeyPress) {
+        auto* ke = static_cast<QKeyEvent*>(e);
+        if ((ke->key() == Qt::Key_Tab || ke->key() == Qt::Key_Backtab) &&
+            !(ke->modifiers() & (Qt::ControlModifier | Qt::AltModifier))) {
+            emit switchPanelRequested();
+            return true;
+        }
+    }
+    return QTreeView::event(e);
+}
+
+void FileView::keyPressEvent(QKeyEvent* e)
+{
+    const bool keypad = e->modifiers() & Qt::KeypadModifier;
+    const Qt::KeyboardModifiers mods = e->modifiers() & ~Qt::KeypadModifier;
+    FileModel* m = fileModel();
+
+    switch (e->key()) {
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        if (mods == Qt::NoModifier) {
+            emit openRequested();
+            return;
+        }
+        break;
+    case Qt::Key_Backspace:
+        if (mods == Qt::NoModifier) {
+            emit parentRequested();
+            return;
+        }
+        break;
+    case Qt::Key_Escape:
+        emit escapePressed();
+        return;
+    case Qt::Key_Insert:
+        if (mods == Qt::NoModifier && m) {
+            m->toggleMarked(currentRow());
+            moveCursorBy(1);
+            return;
+        }
+        break;
+    case Qt::Key_Space:
+        if (mods == Qt::NoModifier) {
+            emit spaceMarkRequested(currentRow());
+            moveCursorBy(1);
+            return;
+        }
+        break;
+    case Qt::Key_Up:
+    case Qt::Key_Down:
+        if (mods == Qt::ShiftModifier && m) {
+            m->toggleMarked(currentRow());
+            moveCursorBy(e->key() == Qt::Key_Down ? 1 : -1);
+            return;
+        }
+        break;
+    case Qt::Key_Plus:
+    case Qt::Key_Minus:
+    case Qt::Key_Asterisk:
+        if (keypad && mods == Qt::NoModifier) {
+            emit markGroupRequested(e->key() == Qt::Key_Plus ? 1 : (e->key() == Qt::Key_Minus ? -1 : 0));
+            return;
+        }
+        break;
+    case Qt::Key_Left:
+    case Qt::Key_Right:
+        if (mods == Qt::NoModifier)
+            return;  // no tree to expand; don't scroll sideways either
+        break;
+    default:
+        break;
+    }
+
+    const QString text = e->text();
+    if (!text.isEmpty() && text.at(0).isPrint() && !(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
+        emit quickSearchRequested(text);
+        return;
+    }
+    QTreeView::keyPressEvent(e);
+}
+
+void FileView::focusInEvent(QFocusEvent* e)
+{
+    QTreeView::focusInEvent(e);
+    emit focused();
+}
+
+void FileView::mousePressEvent(QMouseEvent* e)
+{
+    if (e->button() == Qt::BackButton || e->button() == Qt::ForwardButton) {
+        emit historyRequested(e->button() == Qt::BackButton ? -1 : 1);
+        return;
+    }
+    const QModelIndex idx = indexAt(e->position().toPoint());
+    FileModel* m = fileModel();
+    if (e->button() == Qt::LeftButton && idx.isValid() && m) {
+        if (e->modifiers() & Qt::ControlModifier) {
+            m->toggleMarked(idx.row());
+            setCurrentRow(idx.row());
+            setFocus();
+            return;
+        }
+        if (e->modifiers() & Qt::ShiftModifier) {
+            const int from = qMin(currentRow(), idx.row());
+            const int to = qMax(currentRow(), idx.row());
+            for (int r = from; r <= to; ++r)
+                m->setMarked(r, true);
+            setCurrentRow(idx.row());
+            setFocus();
+            return;
+        }
+        m_pressPos = e->position().toPoint();
+        m_maybeDrag = true;
+    }
+    QTreeView::mousePressEvent(e);
+}
+
+void FileView::mouseMoveEvent(QMouseEvent* e)
+{
+    if (m_maybeDrag && (e->buttons() & Qt::LeftButton) &&
+        (e->position().toPoint() - m_pressPos).manhattanLength() >= QApplication::startDragDistance()) {
+        m_maybeDrag = false;
+        startFileDrag();
+        return;
+    }
+    // Swallow plain moves: the base class would start rubber-band selection.
+    if (e->buttons() & Qt::LeftButton)
+        return;
+    QTreeView::mouseMoveEvent(e);
+}
+
+void FileView::mouseReleaseEvent(QMouseEvent* e)
+{
+    m_maybeDrag = false;
+    QTreeView::mouseReleaseEvent(e);
+}
+
+void FileView::mouseDoubleClickEvent(QMouseEvent* e)
+{
+    if (e->button() == Qt::LeftButton && indexAt(e->position().toPoint()).isValid()) {
+        emit openRequested();
+        return;
+    }
+    QTreeView::mouseDoubleClickEvent(e);
+}
+
+void FileView::drawRow(QPainter* p, const QStyleOptionViewItem& opt, const QModelIndex& idx) const
+{
+    const Theme& t = theme();
+    const FileModel* m = fileModel();
+    const FileEntry* e = m ? m->entry(idx.row()) : nullptr;
+    const QRect r(0, opt.rect.top(), viewport()->width(), opt.rect.height());
+
+    if (idx.row() % 2)
+        p->fillRect(r, t.altBase);
+    if (e && e->marked)
+        p->fillRect(r, t.markBg);
+    if (idx.row() == m_dropRow)
+        p->fillRect(r, t.dropTarget);
+
+    if (idx.row() == currentIndex().row()) {
+        p->save();
+        p->setRenderHint(QPainter::Antialiasing);
+        const QRectF cr = QRectF(r).adjusted(2.5, 0.5, -2.5, -0.5);
+        if (m_active && hasFocus()) {
+            p->setPen(Qt::NoPen);
+            p->setBrush(t.cursorActive);
+            p->drawRoundedRect(cr, 5, 5);
+        } else if (m_active) {
+            p->setPen(QPen(t.accent, 1.2));
+            p->setBrush(t.cursorActive.lighter(100));
+            p->drawRoundedRect(cr, 5, 5);
+        } else {
+            p->setPen(QPen(t.cursorInactive, 1.2));
+            p->setBrush(Qt::NoBrush);
+            p->drawRoundedRect(cr, 5, 5);
+        }
+        p->restore();
+    }
+
+    QStyleOptionViewItem o = opt;
+    o.state &= ~(QStyle::State_Selected | QStyle::State_HasFocus | QStyle::State_MouseOver);
+    QTreeView::drawRow(p, o, idx);
+}
+
+QString FileView::dropTargetFor(const QPoint& pos, int* row) const
+{
+    const FileModel* m = fileModel();
+    if (!m)
+        return {};
+    const QModelIndex idx = indexAt(pos);
+    const FileEntry* e = idx.isValid() ? m->entry(idx.row()) : nullptr;
+    if (e && e->isDir) {
+        *row = idx.row();
+        return m->filePath(idx.row());
+    }
+    *row = -1;
+    return m->path();
+}
+
+void FileView::dragEnterEvent(QDragEnterEvent* e)
+{
+    if (e->mimeData()->hasUrls())
+        e->acceptProposedAction();
+    else
+        e->ignore();
+}
+
+void FileView::dragMoveEvent(QDragMoveEvent* e)
+{
+    if (!e->mimeData()->hasUrls()) {
+        e->ignore();
+        return;
+    }
+    int row = -1;
+    dropTargetFor(e->position().toPoint(), &row);
+    if (row != m_dropRow) {
+        m_dropRow = row;
+        viewport()->update();
+    }
+    if (e->modifiers() & Qt::ShiftModifier)
+        e->setDropAction(Qt::MoveAction);
+    else if (e->modifiers() & Qt::ControlModifier)
+        e->setDropAction(Qt::CopyAction);
+    else
+        e->setDropAction(e->proposedAction());
+    e->accept();
+}
+
+void FileView::dragLeaveEvent(QDragLeaveEvent* e)
+{
+    m_dropRow = -1;
+    viewport()->update();
+    QTreeView::dragLeaveEvent(e);
+}
+
+void FileView::dropEvent(QDropEvent* e)
+{
+    int row = -1;
+    const QString target = dropTargetFor(e->position().toPoint(), &row);
+    m_dropRow = -1;
+    viewport()->update();
+    if (!e->mimeData()->hasUrls() || target.isEmpty()) {
+        e->ignore();
+        return;
+    }
+    Qt::DropAction action = e->proposedAction();
+    if (e->modifiers() & Qt::ShiftModifier)
+        action = Qt::MoveAction;
+    else if (e->modifiers() & Qt::ControlModifier)
+        action = Qt::CopyAction;
+    e->setDropAction(action);
+    e->accept();
+    emit dropRequested(e->mimeData()->urls(), target, action);
+}
+
+void FileView::startFileDrag()
+{
+    QStringList paths;
+    emit dragPathsRequested(paths);
+    if (paths.isEmpty())
+        return;
+    auto* mime = new QMimeData;
+    QList<QUrl> urls;
+    for (const QString& p : std::as_const(paths))
+        urls.append(QUrl::fromLocalFile(p));
+    mime->setUrls(urls);
+    auto* drag = new QDrag(this);
+    drag->setMimeData(mime);
+    const FileEntry* e = fileModel() ? fileModel()->entry(currentRow()) : nullptr;
+    if (e)
+        drag->setPixmap(model()->index(currentRow(), 0).data(Qt::DecorationRole).value<QIcon>().pixmap(32));
+    drag->exec(Qt::CopyAction | Qt::MoveAction | Qt::LinkAction, Qt::CopyAction);
+}
+
+}  // namespace tandem

@@ -1,0 +1,306 @@
+// Drives the real main window with keystrokes (run with QT_QPA_PLATFORM=offscreen).
+
+#include "core/DirWatcher.h"
+#include "ui/DirTab.h"
+#include "ui/FileModel.h"
+#include "ui/FileView.h"
+#include "ui/MainWindow.h"
+#include "ui/Panel.h"
+#include "ui/Theme.h"
+
+#include <QApplication>
+#include <QDialog>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QStandardPaths>
+#include <QTemporaryDir>
+#include <QTest>
+#include <QTimer>
+
+using namespace tandem;
+
+namespace {
+
+void writeFile(const QString& path, const QByteArray& data)
+{
+    QFile f(path);
+    QVERIFY(f.open(QIODevice::WriteOnly));
+    f.write(data);
+}
+
+// Answers the next modal dialog once it is open.
+void answerNextDialog(std::function<void(QWidget*)> answer)
+{
+    auto attempt = std::make_shared<std::function<void(int)>>();
+    *attempt = [answer, attempt](int tries) {
+        QWidget* w = QApplication::activeModalWidget();
+        if (!w) {
+            if (tries > 0)
+                QTimer::singleShot(20, [attempt, tries] { (*attempt)(tries - 1); });
+            return;
+        }
+        answer(w);
+    };
+    QTimer::singleShot(20, [attempt] { (*attempt)(200); });
+}
+
+void acceptDialog(QWidget* w)
+{
+    if (auto* box = qobject_cast<QMessageBox*>(w)) {
+        box->button(QMessageBox::Yes)->click();
+        return;
+    }
+    if (auto* d = qobject_cast<QDialog*>(w))
+        d->accept();
+}
+
+}  // namespace
+
+class TestUi : public QObject {
+    Q_OBJECT
+
+    QTemporaryDir m_tmp;
+    std::unique_ptr<MainWindow> m_window;
+    Panel* m_left = nullptr;
+    Panel* m_right = nullptr;
+
+    QString L(const QString& rel = {}) const { return m_tmp.filePath("left" + (rel.isEmpty() ? "" : "/" + rel)); }
+    QString R(const QString& rel = {}) const { return m_tmp.filePath("right" + (rel.isEmpty() ? "" : "/" + rel)); }
+    FileModel* leftModel() const { return m_left->tab()->model(); }
+    FileModel* rightModel() const { return m_right->tab()->model(); }
+
+    void moveCursorTo(Panel* p, const QString& name)
+    {
+        const int row = p->tab()->model()->rowOf(name);
+        QVERIFY2(row >= 0, qPrintable(name));
+        p->view()->setCurrentRow(row);
+    }
+
+private slots:
+    void initTestCase()
+    {
+        QStandardPaths::setTestModeEnabled(true);
+        qputenv("XDG_CONFIG_HOME", QFile::encodeName(m_tmp.filePath("config")));
+        applyTheme(*qApp);
+        DirWatcher::instance();
+
+        QVERIFY(QDir().mkpath(L("sub/deep")));
+        QVERIFY(QDir().mkpath(R()));
+        writeFile(L("file1.txt"), "one");
+        writeFile(L("file2.txt"), "two two");
+        writeFile(L("file10.txt"), "ten ten ten");
+        writeFile(L("photo.jpg"), QByteArray(5000, 'p'));
+        writeFile(L("sub/inner.txt"), "inner");
+
+        m_window = std::make_unique<MainWindow>(QStringList{L(), R()});
+        m_window->show();
+        QVERIFY(QTest::qWaitForWindowExposed(m_window.get()));
+        m_left = m_window->findChild<Panel*>("leftPanel");
+        m_right = m_window->findChild<Panel*>("rightPanel");
+        QVERIFY(m_left && m_right);
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTRY_COMPARE(rightModel()->path(), R());
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+    }
+
+    // The offscreen platform does not reactivate the window after a dialog
+    // closes (a real compositor does), so do it before every step.
+    void init()
+    {
+        if (!m_window)
+            return;
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        if (!m_right->isActive())
+            m_left->view()->setFocus();
+    }
+
+    void listingIsSortedNaturally()
+    {
+        QStringList names;
+        for (int r = 0; r < leftModel()->count(); ++r)
+            names << leftModel()->entry(r)->name;
+        QCOMPARE(names, QStringList({"..", "sub", "file1.txt", "file2.txt", "file10.txt", "photo.jpg"}));
+    }
+
+    void enterAndLeaveFolder()
+    {
+        moveCursorTo(m_left, "sub");
+        QTest::keyClick(m_left->view(), Qt::Key_Return);
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+        QTest::keyClick(m_left->view(), Qt::Key_Backspace);
+        QTRY_COMPARE(leftModel()->path(), L());
+        QCOMPARE(m_left->currentName(), QString("sub"));  // cursor returns to where we came from
+        QTest::keyClick(m_left->view(), Qt::Key_Left, Qt::AltModifier);  // history back
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+        QTest::keyClick(m_left->view(), Qt::Key_Backspace);
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void quickSearch()
+    {
+        m_left->view()->setCurrentRow(0);
+        QTest::keyClicks(m_left->view(), "pho");
+        QTRY_COMPARE(m_left->currentName(), QString("photo.jpg"));
+        QWidget* search = QApplication::focusWidget();
+        QVERIFY(qobject_cast<QLineEdit*>(search));
+        QTest::keyClick(search, Qt::Key_Escape);
+        QTRY_COMPARE(QApplication::focusWidget(), static_cast<QWidget*>(m_left->view()));
+    }
+
+    void markWithInsertAndPattern()
+    {
+        moveCursorTo(m_left, "file1.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_Insert);
+        QTest::keyClick(m_left->view(), Qt::Key_Insert);
+        QCOMPARE(leftModel()->markedNames(), QStringList({"file1.txt", "file2.txt"}));
+        QCOMPARE(leftModel()->stats().markedBytes, int64_t(3 + 7));
+        leftModel()->markAll(false);
+        QCOMPARE(leftModel()->markByPattern("*.txt", true), 3);
+        leftModel()->markAll(false);
+    }
+
+    void copyWithF5()
+    {
+        moveCursorTo(m_left, "file1.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_Insert);
+        moveCursorTo(m_left, "sub");
+        QTest::keyClick(m_left->view(), Qt::Key_Insert);
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_left->view(), Qt::Key_F5);
+        QTRY_VERIFY(QFile::exists(R("sub/inner.txt")));
+        QTRY_VERIFY(rightModel()->rowOf("file1.txt") >= 0);  // watcher updated the other panel
+        QTRY_VERIFY(rightModel()->rowOf("sub") >= 0);
+        QCOMPARE(leftModel()->markedNames(), QStringList());  // marks cleared after the op
+    }
+
+    void moveWithF6()
+    {
+        writeFile(L("movable.txt"), "m");
+        QTRY_VERIFY(leftModel()->rowOf("movable.txt") >= 0);
+        moveCursorTo(m_left, "movable.txt");
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_left->view(), Qt::Key_F6);
+        QTRY_VERIFY(QFile::exists(R("movable.txt")));
+        QTRY_COMPARE(leftModel()->rowOf("movable.txt"), -1);
+        QTRY_VERIFY(rightModel()->rowOf("movable.txt") >= 0);
+    }
+
+    void conflictPromptSkip()
+    {
+        moveCursorTo(m_left, "file1.txt");
+        answerNextDialog([](QWidget* w) {
+            acceptDialog(w);  // the destination prompt
+            answerNextDialog([](QWidget* prompt) {
+                for (auto* b : prompt->findChildren<QPushButton*>())
+                    if (b->text() == QObject::tr("&Skip"))
+                        b->click();
+            });
+        });
+        writeFile(R("file1.txt"), "keep me");
+        QTest::keyClick(m_left->view(), Qt::Key_F5);
+        QTest::qWait(500);
+        QCOMPARE(QFile(R("file1.txt")).size(), qint64(7));
+    }
+
+    void newFolderWithF7()
+    {
+        answerNextDialog([](QWidget* w) {
+            auto* dlg = qobject_cast<QInputDialog*>(w);
+            QVERIFY(dlg);
+            dlg->setTextValue("made/nested");
+            dlg->accept();
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_F7);
+        QTRY_VERIFY(QFileInfo(L("made/nested")).isDir());
+        QTRY_COMPARE(m_left->currentName(), QString("made"));  // cursor jumps to the new folder
+    }
+
+    void renameInPlace()
+    {
+        moveCursorTo(m_left, "file2.txt");
+        leftModel()->setData(leftModel()->index(m_left->view()->currentRow(), 0), "renamed.txt", Qt::EditRole);
+        QTRY_VERIFY(QFile::exists(L("renamed.txt")));
+        QTRY_COMPARE(m_left->currentName(), QString("renamed.txt"));
+    }
+
+    void deletePermanentlyWithShiftF8()
+    {
+        moveCursorTo(m_left, "made");
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_left->view(), Qt::Key_F8, Qt::ShiftModifier);
+        QTRY_VERIFY(!QFile::exists(L("made")));
+        QTRY_COMPARE(leftModel()->rowOf("made"), -1);
+    }
+
+    void externalChangesShowUp()
+    {
+        writeFile(L("from-outside.txt"), "hello");
+        QTRY_VERIFY(leftModel()->rowOf("from-outside.txt") >= 0);
+        QFile::remove(L("from-outside.txt"));
+        QTRY_COMPARE(leftModel()->rowOf("from-outside.txt"), -1);
+    }
+
+    void tabs()
+    {
+        moveCursorTo(m_left, "sub");
+        QTest::keyClick(m_left->view(), Qt::Key_T, Qt::ControlModifier);
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L(), L("sub")}));
+        QTRY_COMPARE(m_left->path(), L("sub"));
+        QTest::keyClick(m_left->view(), Qt::Key_W, Qt::ControlModifier);
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L()}));
+    }
+
+    void restoredTabsKeepOrder()
+    {
+        Panel p;
+        p.restoreTabs({L(), L("sub"), R()}, 1);
+        QCOMPARE(p.tabPaths(), QStringList({L(), L("sub"), R()}));
+        QCOMPARE(p.currentTabIndex(), 1);
+        QTRY_COMPARE(p.path(), L("sub"));
+    }
+
+    void switchPanelsWithTab()
+    {
+        QTest::keyClick(m_left->view(), Qt::Key_Tab);
+        QTRY_VERIFY(m_right->isActive());
+        QVERIFY(!m_left->isActive());
+        QTest::keyClick(m_right->view(), Qt::Key_Tab);
+        QTRY_VERIFY(m_left->isActive());
+    }
+
+    void sortBySize()
+    {
+        QTest::keyClick(m_left->view(), Qt::Key_F6, Qt::ControlModifier);
+        QCOMPARE(m_left->sortSpec().column, SortColumn::Size);
+        // Biggest file first, folders stay on top.
+        int firstFile = -1;
+        for (int r = 0; r < leftModel()->count(); ++r)
+            if (!leftModel()->entry(r)->isDir) {
+                firstFile = r;
+                break;
+            }
+        QCOMPARE(leftModel()->entry(firstFile)->name, QString("photo.jpg"));
+        QTest::keyClick(m_left->view(), Qt::Key_F3, Qt::ControlModifier);
+        QCOMPARE(m_left->sortSpec().column, SortColumn::Name);
+    }
+
+    void missingFolderShowsError()
+    {
+        m_left->navigate(L("does-not-exist"));
+        QTest::qWait(200);
+        QCOMPARE(leftModel()->path(), L());  // stays where it was
+    }
+
+    void cleanupTestCase()
+    {
+        m_window->close();
+        m_window.reset();
+    }
+};
+
+QTEST_MAIN(TestUi)
+#include "test_ui.moc"

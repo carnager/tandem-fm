@@ -1,0 +1,81 @@
+#pragma once
+
+#include "core/DirLister.h"
+#include "core/FileEntry.h"
+#include "core/Sorting.h"
+
+#include <QAbstractTableModel>
+#include <QSet>
+
+#include <vector>
+
+namespace tandem {
+
+// Flat, sorted listing of one directory. Marks (TC-style selection) live in
+// the entries, independent of the cursor (the view's current index).
+class FileModel : public QAbstractTableModel {
+    Q_OBJECT
+public:
+    enum Column { ColName, ColExt, ColSize, ColTime, ColAttr, ColCount };
+
+    struct Stats {
+        int files = 0, dirs = 0;
+        int64_t bytes = 0;
+        int markedFiles = 0, markedDirs = 0;
+        int64_t markedBytes = 0;
+    };
+
+    explicit FileModel(QObject* parent = nullptr);
+
+    int rowCount(const QModelIndex& parent = {}) const override;
+    int columnCount(const QModelIndex& parent = {}) const override;
+    QVariant data(const QModelIndex& index, int role) const override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+    Qt::ItemFlags flags(const QModelIndex& index) const override;
+    bool setData(const QModelIndex& index, const QVariant& value, int role) override;
+    void sort(int column, Qt::SortOrder order) override;
+
+    void setListing(const QString& path, std::vector<FileEntry>&& entries);
+    void applyUpdates(std::vector<EntryUpdate>&& updates);
+    void setDirSize(const QString& name, int64_t size);
+
+    QString path() const { return m_path; }
+    const FileEntry* entry(int row) const;
+    int rowOf(const QString& name) const;
+    QString filePath(int row) const;
+    int count() const { return int(m_entries.size()); }
+
+    SortSpec sortSpec() const { return m_sort; }
+    void setSortSpec(const SortSpec& spec);  // re-sorts
+
+    void setMarked(int row, bool on);
+    void toggleMarked(int row) { if (auto* e = entry(row)) setMarked(row, !e->marked); }
+    void markAll(bool on);
+    void invertMarks();
+    int markByPattern(const QString& patterns, bool on);
+    QStringList markedNames() const;
+    QSet<QString> markedSet() const;
+    void restoreMarks(const QSet<QString>& names);
+    Stats stats() const { return m_stats; }
+
+    static QString displayName(const FileEntry& e);
+    static QString displayExt(const FileEntry& e);
+
+signals:
+    void renameRequested(const QString& from, const QString& to);
+    void statsChanged();
+
+private:
+    void account(const FileEntry& e, int sign);
+    void accountMark(const FileEntry& e, int sign);
+    int insertPosition(const FileEntry& e) const;
+    void insertEntry(FileEntry&& e);
+    void removeRow(int row);
+
+    QString m_path;
+    std::vector<FileEntry> m_entries;  // ".." first when not at "/"
+    SortSpec m_sort;
+    Stats m_stats;
+};
+
+}  // namespace tandem

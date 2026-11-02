@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Tandem
+GenericName=File Manager
+Comment=Fast two-panel file manager
+Exec=tandem-fm %F
+Icon=system-file-manager
+Terminal=false
+Categories=System;FileTools;FileManager;Utility;Qt;
+MimeType=inode/directory;
+Keywords=files;commander;twin;panel;

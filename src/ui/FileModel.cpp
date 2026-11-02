@@ -1,0 +1,424 @@
+#include "ui/FileModel.h"
+
+#include "core/Util.h"
+#include "ui/IconCache.h"
+#include "ui/Theme.h"
+
+#include <QDateTime>
+#include <QRegularExpression>
+
+#include <algorithm>
+#include <numeric>
+
+namespace tandem {
+
+FileModel::FileModel(QObject* parent) : QAbstractTableModel(parent) {}
+
+int FileModel::rowCount(const QModelIndex& parent) const
+{
+    return parent.isValid() ? 0 : int(m_entries.size());
+}
+
+int FileModel::columnCount(const QModelIndex& parent) const
+{
+    return parent.isValid() ? 0 : ColCount;
+}
+
+const FileEntry* FileModel::entry(int row) const
+{
+    if (row < 0 || row >= int(m_entries.size()))
+        return nullptr;
+    return &m_entries[size_t(row)];
+}
+
+int FileModel::rowOf(const QString& name) const
+{
+    for (size_t i = 0; i < m_entries.size(); ++i)
+        if (m_entries[i].name == name)
+            return int(i);
+    return -1;
+}
+
+QString FileModel::filePath(int row) const
+{
+    const FileEntry* e = entry(row);
+    if (!e)
+        return {};
+    if (e->isParent)
+        return parentPath(m_path);
+    return joinPath(m_path, e->name);
+}
+
+QString FileModel::displayName(const FileEntry& e)
+{
+    if (e.isDir || e.isParent)
+        return e.name;
+    const QStringView ext = extensionOf(e.name);
+    return ext.isEmpty() ? e.name : e.name.left(e.name.size() - ext.size() - 1);
+}
+
+QString FileModel::displayExt(const FileEntry& e)
+{
+    if (e.isDir || e.isParent)
+        return {};
+    return extensionOf(e.name).toString();
+}
+
+QVariant FileModel::data(const QModelIndex& index, int role) const
+{
+    const FileEntry* e = entry(index.row());
+    if (!e)
+        return {};
+    switch (role) {
+    case Qt::DisplayRole:
+        switch (index.column()) {
+        case ColName:
+            return displayName(*e);
+        case ColExt:
+            return displayExt(*e);
+        case ColSize:
+            if (e->isParent)
+                return QString();
+            if (e->isDir)
+                return e->size >= 0 ? formatSize(e->size) : QStringLiteral("<DIR>");
+            return formatSize(e->size);
+        case ColTime:
+            if (e->isParent || e->mtime == 0)
+                return QString();
+            return QDateTime::fromSecsSinceEpoch(e->mtime).toString(QStringLiteral("yyyy-MM-dd HH:mm"));
+        case ColAttr:
+            return e->isParent ? QString() : modeString(e->mode);
+        }
+        break;
+    case Qt::EditRole:
+        if (index.column() == ColName)
+            return e->name;
+        break;
+    case Qt::DecorationRole:
+        if (index.column() == ColName)
+            return IconCache::forEntry(*e);
+        break;
+    case Qt::TextAlignmentRole:
+        if (index.column() == ColSize)
+            return QVariant::fromValue(Qt::AlignRight | Qt::AlignVCenter);
+        return QVariant::fromValue(Qt::AlignLeft | Qt::AlignVCenter);
+    case Qt::ToolTipRole:
+        if (index.column() == ColName && !e->isParent)
+            return e->name;
+        break;
+    }
+    return {};
+}
+
+QVariant FileModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+    if (orientation != Qt::Horizontal)
+        return {};
+    if (role == Qt::DisplayRole) {
+        switch (section) {
+        case ColName: return tr("Name");
+        case ColExt: return tr("Ext");
+        case ColSize: return tr("Size");
+        case ColTime: return tr("Modified");
+        case ColAttr: return tr("Attributes");
+        }
+    }
+    if (role == Qt::TextAlignmentRole)
+        return QVariant::fromValue((section == ColSize ? Qt::AlignRight : Qt::AlignLeft) | Qt::AlignVCenter);
+    return {};
+}
+
+Qt::ItemFlags FileModel::flags(const QModelIndex& index) const
+{
+    const FileEntry* e = entry(index.row());
+    if (!e)
+        return Qt::NoItemFlags;
+    Qt::ItemFlags f = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemNeverHasChildren;
+    if (index.column() == ColName && !e->isParent)
+        f |= Qt::ItemIsEditable;
+    return f;
+}
+
+bool FileModel::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+    const FileEntry* e = entry(index.row());
+    if (!e || role != Qt::EditRole || index.column() != ColName || e->isParent)
+        return false;
+    const QString newName = value.toString();
+    if (newName.isEmpty() || newName == e->name)
+        return false;
+    // The rename runs off-thread; the watcher brings the new name in.
+    emit renameRequested(e->name, newName);
+    return false;
+}
+
+void FileModel::account(const FileEntry& e, int sign)
+{
+    if (e.isParent)
+        return;
+    if (e.isDir) {
+        m_stats.dirs += sign;
+        if (e.size > 0)
+            m_stats.bytes += sign * e.size;
+    } else {
+        m_stats.files += sign;
+        m_stats.bytes += sign * std::max<int64_t>(e.size, 0);
+    }
+    if (e.marked)
+        accountMark(e, sign);
+}
+
+void FileModel::accountMark(const FileEntry& e, int sign)
+{
+    if (e.isDir) {
+        m_stats.markedDirs += sign;
+        if (e.size > 0)
+            m_stats.markedBytes += sign * e.size;
+    } else {
+        m_stats.markedFiles += sign;
+        m_stats.markedBytes += sign * std::max<int64_t>(e.size, 0);
+    }
+}
+
+void FileModel::setListing(const QString& path, std::vector<FileEntry>&& entries)
+{
+    beginResetModel();
+    m_path = path;
+    m_entries.clear();
+    m_entries.reserve(entries.size() + 1);
+    if (path != QLatin1String("/")) {
+        FileEntry up;
+        up.name = QStringLiteral("..");
+        up.isDir = true;
+        up.isParent = true;
+        m_entries.push_back(std::move(up));
+    }
+    for (auto& e : entries)
+        m_entries.push_back(std::move(e));
+    m_stats = {};
+    for (const auto& e : m_entries)
+        account(e, +1);
+    endResetModel();
+    emit statsChanged();
+}
+
+int FileModel::insertPosition(const FileEntry& e) const
+{
+    auto it = std::lower_bound(m_entries.begin(), m_entries.end(), e,
+                               [this](const FileEntry& a, const FileEntry& b) { return entryLess(a, b, m_sort); });
+    return int(it - m_entries.begin());
+}
+
+void FileModel::insertEntry(FileEntry&& e)
+{
+    const int pos = insertPosition(e);
+    beginInsertRows({}, pos, pos);
+    account(e, +1);
+    m_entries.insert(m_entries.begin() + pos, std::move(e));
+    endInsertRows();
+}
+
+void FileModel::removeRow(int row)
+{
+    beginRemoveRows({}, row, row);
+    account(m_entries[size_t(row)], -1);
+    m_entries.erase(m_entries.begin() + row);
+    endRemoveRows();
+}
+
+void FileModel::applyUpdates(std::vector<EntryUpdate>&& updates)
+{
+    for (auto& [name, maybe] : updates) {
+        const int row = rowOf(name);
+        if (!maybe) {
+            if (row >= 0)
+                removeRow(row);
+            continue;
+        }
+        FileEntry e = std::move(*maybe);
+        if (row < 0) {
+            insertEntry(std::move(e));
+            continue;
+        }
+        FileEntry& old = m_entries[size_t(row)];
+        e.marked = old.marked;
+        if (e.isDir && old.isDir && e.size < 0)
+            e.size = old.size;  // keep a computed folder size
+        const bool before = row == 0 || !entryLess(e, m_entries[size_t(row - 1)], m_sort);
+        const bool after = row + 1 >= int(m_entries.size()) || !entryLess(m_entries[size_t(row + 1)], e, m_sort);
+        if (before && after) {
+            account(old, -1);
+            account(e, +1);
+            old = std::move(e);
+            emit dataChanged(index(row, 0), index(row, ColCount - 1));
+        } else {
+            removeRow(row);
+            insertEntry(std::move(e));
+        }
+    }
+    emit statsChanged();
+}
+
+void FileModel::setDirSize(const QString& name, int64_t size)
+{
+    const int row = rowOf(name);
+    if (row < 0)
+        return;
+    FileEntry& e = m_entries[size_t(row)];
+    account(e, -1);
+    e.size = size;
+    account(e, +1);
+    if (m_sort.column == SortColumn::Size) {
+        FileEntry copy = std::move(e);
+        removeRow(row);
+        insertEntry(std::move(copy));
+    } else {
+        emit dataChanged(index(row, ColSize), index(row, ColSize));
+    }
+    emit statsChanged();
+}
+
+void FileModel::sort(int column, Qt::SortOrder order)
+{
+    SortSpec s;
+    s.column = SortColumn(std::clamp(column, 0, int(ColCount) - 1));
+    s.descending = order == Qt::DescendingOrder;
+    setSortSpec(s);
+}
+
+void FileModel::setSortSpec(const SortSpec& spec)
+{
+    m_sort = spec;
+    if (m_entries.size() < 2)
+        return;
+    emit layoutAboutToBeChanged({}, QAbstractItemModel::VerticalSortHint);
+
+    std::vector<int> order(m_entries.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::stable_sort(order.begin(), order.end(), [this](int a, int b) {
+        return entryLess(m_entries[size_t(a)], m_entries[size_t(b)], m_sort);
+    });
+    std::vector<int> newRowOf(order.size());
+    std::vector<FileEntry> sorted;
+    sorted.reserve(m_entries.size());
+    for (size_t i = 0; i < order.size(); ++i) {
+        newRowOf[size_t(order[i])] = int(i);
+        sorted.push_back(std::move(m_entries[size_t(order[i])]));
+    }
+    m_entries = std::move(sorted);
+
+    const QModelIndexList from = persistentIndexList();
+    QModelIndexList to;
+    to.reserve(from.size());
+    for (const QModelIndex& idx : from)
+        to.append(index(newRowOf[size_t(idx.row())], idx.column()));
+    changePersistentIndexList(from, to);
+    emit layoutChanged({}, QAbstractItemModel::VerticalSortHint);
+}
+
+void FileModel::setMarked(int row, bool on)
+{
+    if (row < 0 || row >= int(m_entries.size()))
+        return;
+    FileEntry& e = m_entries[size_t(row)];
+    if (e.isParent || e.marked == on)
+        return;
+    e.marked = on;
+    accountMark(e, on ? +1 : -1);
+    emit dataChanged(index(row, 0), index(row, ColCount - 1));
+    emit statsChanged();
+}
+
+void FileModel::markAll(bool on)
+{
+    for (auto& e : m_entries) {
+        if (e.isParent || e.marked == on)
+            continue;
+        e.marked = on;
+        accountMark(e, on ? +1 : -1);
+    }
+    if (!m_entries.empty())
+        emit dataChanged(index(0, 0), index(int(m_entries.size()) - 1, ColCount - 1));
+    emit statsChanged();
+}
+
+void FileModel::invertMarks()
+{
+    for (auto& e : m_entries) {
+        if (e.isParent || e.isDir)
+            continue;  // TC inverts files only
+        e.marked = !e.marked;
+        accountMark(e, e.marked ? +1 : -1);
+    }
+    if (!m_entries.empty())
+        emit dataChanged(index(0, 0), index(int(m_entries.size()) - 1, ColCount - 1));
+    emit statsChanged();
+}
+
+int FileModel::markByPattern(const QString& patterns, bool on)
+{
+    // "*.jpg *.png" or "*.jpg;*.png". A trailing "/" targets folders ("build/").
+    QList<QRegularExpression> fileRx, dirRx;
+    for (QString p : patterns.split(QRegularExpression(QStringLiteral("[;\\s]+")), Qt::SkipEmptyParts)) {
+        const bool dirs = p.endsWith(QLatin1Char('/'));
+        if (dirs)
+            p.chop(1);
+        if (p == QLatin1String("*.*"))
+            p = QStringLiteral("*");
+        const QRegularExpression rx(QRegularExpression::wildcardToRegularExpression(p),
+                                    QRegularExpression::CaseInsensitiveOption);
+        (dirs ? dirRx : fileRx).append(rx);
+    }
+    int n = 0;
+    for (auto& e : m_entries) {
+        if (e.isParent || e.marked == on)
+            continue;
+        const auto& list = e.isDir ? dirRx : fileRx;
+        const bool match = std::any_of(list.begin(), list.end(),
+                                       [&](const QRegularExpression& rx) { return rx.match(e.name).hasMatch(); });
+        if (match) {
+            e.marked = on;
+            accountMark(e, on ? +1 : -1);
+            ++n;
+        }
+    }
+    if (n && !m_entries.empty())
+        emit dataChanged(index(0, 0), index(int(m_entries.size()) - 1, ColCount - 1));
+    emit statsChanged();
+    return n;
+}
+
+QStringList FileModel::markedNames() const
+{
+    QStringList out;
+    for (const auto& e : m_entries)
+        if (e.marked)
+            out.append(e.name);
+    return out;
+}
+
+QSet<QString> FileModel::markedSet() const
+{
+    QSet<QString> out;
+    for (const auto& e : m_entries)
+        if (e.marked)
+            out.insert(e.name);
+    return out;
+}
+
+void FileModel::restoreMarks(const QSet<QString>& names)
+{
+    if (names.isEmpty())
+        return;
+    for (auto& e : m_entries) {
+        if (!e.isParent && !e.marked && names.contains(e.name)) {
+            e.marked = true;
+            accountMark(e, +1);
+        }
+    }
+    if (!m_entries.empty())
+        emit dataChanged(index(0, 0), index(int(m_entries.size()) - 1, ColCount - 1));
+    emit statsChanged();
+}
+
+}  // namespace tandem
