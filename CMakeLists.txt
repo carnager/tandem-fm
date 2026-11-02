@@ -58,6 +58,7 @@ add_library(tandem_ui STATIC
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp
   src/ui/viewer/ViewerWindow.h src/ui/viewer/ViewerWindow.cpp
   src/ui/viewer/Previewers.h src/ui/viewer/Previewers.cpp
+  src/ui/viewer/FileInfo.h src/ui/viewer/FileInfo.cpp
 )
 target_link_libraries(tandem_ui PUBLIC tandem_core Qt6::Widgets Qt6::DBus Qt6::Pdf)
 

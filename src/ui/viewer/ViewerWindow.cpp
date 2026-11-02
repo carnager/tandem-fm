@@ -1,9 +1,11 @@
 #include "ui/viewer/ViewerWindow.h"
 
+#include "core/FileOps.h"
 #include "core/Util.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
 #include "ui/viewer/BlockCache.h"
+#include "ui/viewer/FileInfo.h"
 #include "ui/viewer/ByteViews.h"
 #include "ui/viewer/ImageView.h"
 
@@ -23,7 +25,10 @@
 #include <QShortcut>
 #include <QStackedWidget>
 #include <QStringDecoder>
+#include <QGridLayout>
 #include <QHeaderView>
+#include <QPushButton>
+#include <QScrollArea>
 #include <QJsonDocument>
 #include <QTextBlock>
 #include <QTextBrowser>
@@ -183,11 +188,26 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_textButton = makeButton(tr("Text"), tr("Text (1)"));
     m_hexButton = makeButton(tr("Hex"), tr("Hex (3)"));
     m_imageButton = makeButton(tr("Image"), tr("Image, page, frame, contents… (4)"));
+    m_infoButton = makeButton(tr("Info"), tr("Details: type, dates, permissions, owner, checksum… (I)"));
     tl->addSpacing(8);
     m_wrapButton = makeButton(tr("Wrap"), tr("Wrap long lines (W)"));
     connect(m_textButton, &QToolButton::clicked, this, [this] { setMode(Mode::Text); });
     connect(m_hexButton, &QToolButton::clicked, this, [this] { setMode(Mode::Hex); });
-    connect(m_imageButton, &QToolButton::clicked, this, [this] { setMode(Mode::Image); });
+    connect(m_imageButton, &QToolButton::clicked, this, [this] {
+        setMode(Mode::Image);
+        if (m_embedded)
+            QSettings().setValue(QStringLiteral("preview/info"), false);
+    });
+    connect(m_infoButton, &QToolButton::clicked, this, [this] {
+        setMode(Mode::Info);
+        if (m_embedded)
+            QSettings().setValue(QStringLiteral("preview/info"), true);
+    });
+    for (QToolButton* b : {m_textButton, m_hexButton})
+        connect(b, &QToolButton::clicked, this, [this] {
+            if (m_embedded)
+                QSettings().setValue(QStringLiteral("preview/info"), false);
+        });
     connect(m_wrapButton, &QToolButton::toggled, this, [this](bool on) {
         m_text->setLineWrapMode(on ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
         m_big->setWrap(on);
@@ -234,6 +254,19 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_list->header()->setStretchLastSection(false);
     m_list->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    auto* infoScroll = new QScrollArea(m_stack);
+    infoScroll->setFrameShape(QFrame::NoFrame);
+    infoScroll->setWidgetResizable(true);
+    infoScroll->viewport()->setAutoFillBackground(false);
+    auto* infoBody = new QWidget(infoScroll);
+    infoBody->setAutoFillBackground(false);
+    m_infoGrid = new QGridLayout(infoBody);
+    m_infoGrid->setContentsMargins(14, 10, 14, 14);
+    m_infoGrid->setHorizontalSpacing(16);
+    m_infoGrid->setVerticalSpacing(5);
+    m_infoGrid->setColumnStretch(1, 1);
+    infoScroll->setWidget(infoBody);
+    m_infoPage = infoScroll;
     m_noteBox = new QWidget(m_stack);
     auto* nl = new QVBoxLayout(m_noteBox);
     nl->addStretch(1);
@@ -259,7 +292,8 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     nl->addWidget(m_message);
     nl->addStretch(1);
     for (QWidget* w : {static_cast<QWidget*>(m_text), static_cast<QWidget*>(m_big), static_cast<QWidget*>(m_hex),
-                       m_mediaPage, static_cast<QWidget*>(m_doc), static_cast<QWidget*>(m_list), m_noteBox})
+                       m_mediaPage, static_cast<QWidget*>(m_doc), static_cast<QWidget*>(m_list), m_infoPage,
+                       m_noteBox})
         m_stack->addWidget(w);
     if (embedded) {
         m_sheet = new QFrame(this);
@@ -404,6 +438,7 @@ void ViewerWindow::setupShortcuts()
     add(Qt::Key_1, [this] { setMode(Mode::Text); });
     add(Qt::Key_3, [this] { setMode(Mode::Hex); });
     add(Qt::Key_4, [this] { setMode(Mode::Image); });
+    add(Qt::Key_I, [this] { setMode(m_mode == Mode::Info ? defaultMode() : Mode::Info); });
     add(Qt::Key_W, [this] { m_wrapButton->toggle(); });
     add(Qt::Key_F7, [this] { showSearch(); });
     add(QKeySequence::Find, [this] { showSearch(); });
@@ -448,7 +483,7 @@ void ViewerWindow::showNote(const QString& text)
     m_titleIcon->hide();
     m_title->setToolTip(QString());
     m_status->clear();
-    for (QToolButton* b : {m_textButton, m_hexButton, m_imageButton, m_wrapButton})
+    for (QToolButton* b : {m_textButton, m_hexButton, m_imageButton, m_infoButton, m_wrapButton})
         b->hide();
     showMessage(text);
     m_noteIcon->show();  // the empty state gets the big icon
@@ -465,7 +500,9 @@ void ViewerWindow::openIndex(int index)
     ++m_gen;
     if (m_searchCancel)
         m_searchCancel->store(true);
-    m_textLoaded = m_imageLoaded = false;
+    m_textLoaded = m_imageLoaded = m_infoLoaded = false;
+    if (m_infoCancel)
+        m_infoCancel->store(true);
     m_matchStart = -1;
     m_mode = Mode::None;
     m_loading = true;
@@ -529,15 +566,33 @@ void ViewerWindow::openIndex(int index)
                 connect(w->m_cache, &BlockCache::failed, w,
                         [w](const QString& err) { w->showMessage(tr("Read error: %1").arg(err)); });
             }
-            w->setMode(hasRichView(w->m_kind) ? Mode::Image : (w->m_binary ? Mode::Hex : Mode::Text));
+            const bool info = w->m_embedded && QSettings().value(QStringLiteral("preview/info"), false).toBool();
+            w->setMode(info ? Mode::Info : w->defaultMode());
         });
     });
 }
 
+ViewerWindow::Mode ViewerWindow::defaultMode() const
+{
+    return hasRichView(m_kind) ? Mode::Image : (m_binary ? Mode::Hex : Mode::Text);
+}
+
+void ViewerWindow::setShowInfo(bool on)
+{
+    QSettings().setValue(QStringLiteral("preview/info"), on);
+    if (m_path.isEmpty() || m_kind == PreviewKind::Special)
+        return;
+    setMode(on ? Mode::Info : defaultMode());
+}
+
 void ViewerWindow::setMode(Mode mode)
 {
-    if (mode == Mode::Image ? !hasRichView(m_kind) : !m_cache)
+    if (mode == Mode::Info) {
+        if (m_path.isEmpty())
+            return;
+    } else if (mode == Mode::Image ? !hasRichView(m_kind) : !m_cache) {
         return;
+    }
     m_mode = mode;
     updateModeButtons();
     switch (mode) {
@@ -568,6 +623,14 @@ void ViewerWindow::setMode(Mode mode)
         break;
     case Mode::Image:
         loadRich();
+        break;
+    case Mode::Info:
+        if (m_infoLoaded) {
+            m_stack->setCurrentWidget(m_infoPage);
+        } else {
+            loadInfo();
+        }
+        m_loading = false;
         break;
     case Mode::None:
         break;
@@ -645,6 +708,122 @@ void ViewerWindow::loadText()
             emit w->loaded();
         });
     });
+}
+
+void ViewerWindow::loadInfo()
+{
+    const quint64 gen = m_gen;
+    const QString path = m_path;
+    const char git = m_gitHint;
+    QPointer<ViewerWindow> self(this);
+    ioPool()->start([self, gen, path, git] {
+        auto info = std::make_shared<FileInfo>(gatherFileInfo(path, git));
+        postToUi([self, gen, info] {
+            if (!self || gen != self->m_gen)
+                return;
+            self->fillInfo(*info);
+        });
+    });
+}
+
+void ViewerWindow::fillInfo(const FileInfo& info)
+{
+    const Theme& t = theme();
+    while (QLayoutItem* item = m_infoGrid->takeAt(0)) {
+        if (QWidget* w = item->widget()) {
+            w->hide();
+            w->deleteLater();
+        }
+        delete item;
+    }
+    QWidget* body = m_infoGrid->parentWidget();
+    int row = 0;
+    auto addRow = [&](const QString& key, QWidget* value) {
+        auto* k = new QLabel(key, body);
+        k->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+        k->setAlignment(Qt::AlignRight | Qt::AlignTop);
+        k->show();
+        value->show();
+        m_infoGrid->addWidget(k, row, 0);
+        m_infoGrid->addWidget(value, row, 1);
+        ++row;
+    };
+    auto valueLabel = [&](const QString& text) {
+        auto* v = new QLabel(text, body);
+        v->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        v->setWordWrap(true);
+        v->setTextFormat(Qt::PlainText);
+        return v;
+    };
+    if (!info.error.isEmpty()) {
+        addRow(tr("Error"), valueLabel(info.error));
+    }
+    for (const FileInfoRow& r : info.rows) {
+        if (r.key.isEmpty()) {  // section title
+            auto* title = new QLabel(r.value.toUpper(), body);
+            QFont f = title->font();
+            f.setPointSizeF(f.pointSizeF() * 0.78);
+            f.setWeight(QFont::DemiBold);
+            f.setLetterSpacing(QFont::PercentageSpacing, 112);
+            title->setFont(f);
+            title->setStyleSheet(t.css(QStringLiteral("color: @accent; padding-top: %1px;").arg(row ? 10 : 0)));
+            title->show();
+            m_infoGrid->addWidget(title, row++, 0, 1, 2);
+            continue;
+        }
+        addRow(r.key, valueLabel(r.value));
+    }
+    const QString path = m_path;
+    QPointer<ViewerWindow> self(this);
+    if (m_infoCancel)
+        m_infoCancel->store(true);
+    m_infoCancel = std::make_shared<std::atomic<bool>>(false);
+    auto cancel = m_infoCancel;
+    if (info.isDir) {
+        // Total size can take a while: fill it in when it's known.
+        QLabel* total = valueLabel(tr("calculating…"));
+        addRow(tr("Total size"), total);
+        QPointer<QLabel> target(total);
+        mediaPool()->start([path, cancel, target] {
+            const int64_t size = directorySize(path, cancel.get());
+            postToUi([target, size] {
+                if (target)
+                    target->setText(size < 0 ? QObject::tr("unknown") : formatSize(size));
+            });
+        });
+    } else if (info.isRegular) {
+        auto* compute = new QPushButton(tr("Compute"), body);
+        compute->setFlat(true);
+        compute->setCursor(Qt::PointingHandCursor);
+        compute->setStyleSheet(t.css(QStringLiteral("QPushButton { color: @accent; text-align: left; padding: 0; border: none; }")));
+        addRow(QStringLiteral("SHA-256"), compute);
+        QPointer<QPushButton> button(compute);
+        connect(compute, &QPushButton::clicked, this, [path, cancel, button] {
+            if (!button)
+                return;
+            button->setText(QObject::tr("computing…"));
+            button->setEnabled(false);
+            mediaPool()->start([path, cancel, button] {
+                const QString hash = sha256Of(path, cancel.get());
+                postToUi([button, hash] {
+                    if (!button)
+                        return;
+                    button->setText(hash.isEmpty() ? QObject::tr("not readable") : hash);
+                    button->setEnabled(true);
+                    button->setStyleSheet(QStringLiteral("QPushButton { text-align: left; padding: 0; border: none; font-family: monospace; }"));
+                });
+            });
+        });
+    }
+    m_infoGrid->setRowStretch(row, 1);
+    m_infoLoaded = true;
+    m_loading = false;
+    if (m_mode == Mode::Info) {
+        m_stack->setCurrentWidget(m_infoPage);
+        updateSheet();
+    }
+    updateStatus();
+    emit loaded();
 }
 
 QSize ViewerWindow::richMaxSize() const
@@ -788,6 +967,8 @@ void ViewerWindow::updateModeButtons()
     m_textButton->setChecked(m_mode == Mode::Text);
     m_hexButton->setChecked(m_mode == Mode::Hex);
     m_imageButton->setChecked(m_mode == Mode::Image);
+    m_infoButton->setChecked(m_mode == Mode::Info);
+    m_infoButton->setVisible(!m_path.isEmpty());
     m_imageButton->setVisible(hasRichView(m_kind));
     m_imageButton->setText(richViewLabel(m_kind));
     m_textButton->setVisible(m_cache != nullptr);
@@ -826,6 +1007,7 @@ void ViewerWindow::updateStatus()
             parts << m_richInfo;
         }
         break;
+    case Mode::Info:
     case Mode::None:
         break;
     }
@@ -853,6 +1035,7 @@ void ViewerWindow::zoom(int steps)
             m_text->setFont(f);
         }
         break;
+    case Mode::Info:
     case Mode::None:
         break;
     }

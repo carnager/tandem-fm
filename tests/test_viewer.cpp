@@ -6,6 +6,8 @@
 #include "ui/viewer/ViewerWindow.h"
 
 #include <QApplication>
+#include <QLabel>
+#include <QPushButton>
 #include <QDirIterator>
 #include <QPainter>
 #include <QPdfWriter>
@@ -259,6 +261,48 @@ private slots:
         QCOMPARE(w->kind(), PreviewKind::Font);
         QTRY_VERIFY(!w->imageView()->image().isNull());
         QVERIFY(!w->richInfo().isEmpty());  // family name
+    }
+
+    void infoView()
+    {
+        writeFile(P("info.txt"), "abc");
+        auto w = open({P("info.txt")});
+        QTest::keyClick(w.get(), Qt::Key_I);
+        QTRY_COMPARE(w->mode(), ViewerWindow::Mode::Info);
+        auto labels = [&] {
+            QStringList out;
+            for (QLabel* l : w->infoPage()->findChildren<QLabel*>())
+                if (l->isVisible())
+                    out << l->text();
+            return out;
+        };
+        QTRY_VERIFY(labels().contains("info.txt"));
+        QVERIFY(labels().contains("3 B"));
+        const QStringList all = labels();
+        QVERIFY(std::any_of(all.begin(), all.end(), [](const QString& s) { return s.startsWith("-rw"); }));
+        // SHA-256 on demand.
+        QPushButton* compute = nullptr;
+        for (QPushButton* b : w->infoPage()->findChildren<QPushButton*>())
+            if (b->isVisible())
+                compute = b;
+        QVERIFY(compute);
+        compute->click();
+        QTRY_COMPARE(compute->text(), QString("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"));
+        QTest::keyClick(w.get(), Qt::Key_I);  // back to the content
+        QTRY_COMPARE(w->mode(), ViewerWindow::Mode::Text);
+
+        // Folders: counts right away, total size once calculated.
+        QVERIFY(QDir().mkpath(P("tree/sub")));
+        writeFile(P("tree/sub/x.bin"), QByteArray(5000, 'x'));
+        auto d = open({P("tree")});
+        QTest::keyClick(d.get(), Qt::Key_I);
+        auto hasTotal = [&] {
+            for (QLabel* l : d->infoPage()->findChildren<QLabel*>())
+                if (l->text() == "4.88 KiB")
+                    return true;
+            return false;
+        };
+        QTRY_VERIFY(hasTotal());
     }
 
     void escapeCloses()

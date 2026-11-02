@@ -410,6 +410,15 @@ void MainWindow::createMenus()
     QMenu* icons = view->addMenu(tr("Icon theme"));
     connect(icons, &QMenu::aboutToShow, this, [this, icons] { populateIconThemeMenu(icons); });
     addCommand(view, tr("Preview"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
+    addCommand(view, tr("Preview: details instead of content"), {K(Qt::CTRL | Qt::Key_I)}, [this] {
+        const bool on = !QSettings().value(QStringLiteral("preview/info"), false).toBool();
+        if (!m_quickView)
+            toggleQuickView();
+        for (ViewerWindow* v : {m_quickView, m_quickView2})
+            if (v)
+                v->setShowInfo(on);
+        QSettings().setValue(QStringLiteral("preview/info"), on);
+    });
     QMenu* where = view->addMenu(tr("Preview position"));
     {
         auto* group = new QActionGroup(where);
@@ -774,6 +783,7 @@ void MainWindow::showShortcuts()
         {"Ctrl+PgDn", QT_TR_NOOP("Enter folder, or browse any file as archive")},
         {"Menu key, Shift+F10", QT_TR_NOOP("Context menu")},
         {"Ctrl+Q", QT_TR_NOOP("Preview: below each panel, below both or on the right (View > Preview position)")},
+        {"Ctrl+I", QT_TR_NOOP("Previews show details: type, dates, permissions, owner, checksum…")},
         {"Alt+F4", QT_TR_NOOP("Quit")},
         {"Ctrl+D / Ctrl+Shift+D", QT_TR_NOOP("Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder")},
         {"Ctrl+J", QT_TR_NOOP("Jump to any visited folder (fuzzy)")},
@@ -895,6 +905,7 @@ void MainWindow::updatePreviewFor(ViewerWindow* preview, Panel* p)
     } else if (p->inArchive()) {
         preview->showNote(tr("“%1” is inside an archive\n\nF3 opens it in the viewer").arg(e->name));
     } else if (preview->currentPath() != p->currentPath()) {
+        preview->setGitHint(p->tab()->model()->gitStatus(e->name));
         preview->showFile(p->currentPath());
         // Prepare the neighbours, so moving on is instant (like yazi's preloaders).
         const FileModel* m = p->tab()->model();

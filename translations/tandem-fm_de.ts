@@ -2,6 +2,41 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="de" sourcelanguage="en">
 <context>
+    <name>FileInfo</name>
+    <message>
+        <source>Camera make</source>
+        <translation>Kamerahersteller</translation>
+    </message>
+    <message>
+        <source>Camera</source>
+        <translation>Kamera</translation>
+    </message>
+    <message>
+        <source>Lens</source>
+        <translation>Objektiv</translation>
+    </message>
+    <message>
+        <source>Taken</source>
+        <translation>Aufgenommen</translation>
+    </message>
+    <message>
+        <source>Exposure</source>
+        <translation>Belichtung</translation>
+    </message>
+    <message>
+        <source>Aperture</source>
+        <translation>Blende</translation>
+    </message>
+    <message>
+        <source>ISO</source>
+        <translation>ISO</translation>
+    </message>
+    <message>
+        <source>Focal length</source>
+        <translation>Brennweite</translation>
+    </message>
+</context>
+<context>
     <name>QObject</name>
     <message>
         <source>Not a readable archive</source>
@@ -167,6 +202,154 @@
     <message>
         <source>%1 unpacked</source>
         <translation>%1 entpackt</translation>
+    </message>
+    <message>
+        <source>unknown</source>
+        <translation>unbekannt</translation>
+    </message>
+    <message>
+        <source>computing…</source>
+        <translation>wird berechnet…</translation>
+    </message>
+    <message>
+        <source>not readable</source>
+        <translation>nicht lesbar</translation>
+    </message>
+    <message>
+        <source>modified</source>
+        <translation>geändert</translation>
+    </message>
+    <message>
+        <source>added (staged)</source>
+        <translation>hinzugefügt (vorgemerkt)</translation>
+    </message>
+    <message>
+        <source>untracked</source>
+        <translation>nicht verfolgt</translation>
+    </message>
+    <message>
+        <source>ignored</source>
+        <translation>ignoriert</translation>
+    </message>
+    <message>
+        <source>conflict</source>
+        <translation>Konflikt</translation>
+    </message>
+    <message>
+        <source>General</source>
+        <translation>Allgemein</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <source>Location</source>
+        <translation>Ort</translation>
+    </message>
+    <message>
+        <source>Type</source>
+        <translation>Typ</translation>
+    </message>
+    <message>
+        <source>Link to</source>
+        <translation>Verweist auf</translation>
+    </message>
+    <message>
+        <source>(unreadable)</source>
+        <translation>(nicht lesbar)</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Größe</translation>
+    </message>
+    <message>
+        <source>Contains</source>
+        <translation>Enthält</translation>
+    </message>
+    <message>
+        <source>%1 folders, %2 files (%3 hidden)</source>
+        <translation>%1 Ordner, %2 Dateien (%3 versteckt)</translation>
+    </message>
+    <message>
+        <source>Git</source>
+        <translation>Git</translation>
+    </message>
+    <message>
+        <source>Dates</source>
+        <translation>Zeiten</translation>
+    </message>
+    <message>
+        <source>Modified</source>
+        <translation>Geändert</translation>
+    </message>
+    <message>
+        <source>Created</source>
+        <translation>Erstellt</translation>
+    </message>
+    <message>
+        <source>Changed</source>
+        <translation>Status geändert</translation>
+    </message>
+    <message>
+        <source>Accessed</source>
+        <translation>Zugriff</translation>
+    </message>
+    <message>
+        <source>Permissions</source>
+        <translation>Berechtigungen</translation>
+    </message>
+    <message>
+        <source>Mode</source>
+        <translation>Modus</translation>
+    </message>
+    <message>
+        <source>Owner</source>
+        <translation>Eigentümer</translation>
+    </message>
+    <message>
+        <source>Readable / writable</source>
+        <translation>Lesbar / schreibbar</translation>
+    </message>
+    <message>
+        <source>yes</source>
+        <translation>ja</translation>
+    </message>
+    <message>
+        <source>no</source>
+        <translation>nein</translation>
+    </message>
+    <message>
+        <source>Storage</source>
+        <translation>Speicher</translation>
+    </message>
+    <message>
+        <source>Filesystem</source>
+        <translation>Dateisystem</translation>
+    </message>
+    <message>
+        <source>Inode / links</source>
+        <translation>Inode / Links</translation>
+    </message>
+    <message>
+        <source>On disk</source>
+        <translation>Belegt</translation>
+    </message>
+    <message>
+        <source>%1 (sparse or compressed)</source>
+        <translation>%1 (dünn besetzt oder komprimiert)</translation>
+    </message>
+    <message>
+        <source>Dimensions</source>
+        <translation>Abmessungen</translation>
+    </message>
+    <message>
+        <source>Format</source>
+        <translation>Format</translation>
+    </message>
+    <message>
+        <source>Camera</source>
+        <translation>Kamera</translation>
     </message>
 </context>
 <context>
@@ -871,6 +1054,10 @@
         <translation>Unter jedem Panel</translation>
     </message>
     <message>
+        <source>Preview: details instead of content</source>
+        <translation>Vorschau: Details statt Inhalt</translation>
+    </message>
+    <message>
         <source>Below both panels</source>
         <translation>Unter beiden Panels</translation>
     </message>
@@ -1059,7 +1246,11 @@
     </message>
     <message>
         <source>Preview: below each panel, below both or on the right (View &gt; Preview position)</source>
-        <translation>Vorschau: unter jedem Panel, unter beiden oder rechts (Ansicht > Position der Vorschau)</translation>
+        <translation>Vorschau: unter jedem Panel, unter beiden oder rechts (Ansicht &gt; Position der Vorschau)</translation>
+    </message>
+    <message>
+        <source>Previews show details: type, dates, permissions, owner, checksum…</source>
+        <translation>Vorschauen zeigen Details: Typ, Zeiten, Berechtigungen, Eigentümer, Prüfsumme…</translation>
     </message>
     <message>
         <source>Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder</source>
@@ -1786,6 +1977,14 @@ F3 öffnet es im Betrachter</translation>
         <translation>Bild, Seite, Frame, Inhalt… (4)</translation>
     </message>
     <message>
+        <source>Info</source>
+        <translation>Info</translation>
+    </message>
+    <message>
+        <source>Details: type, dates, permissions, owner, checksum… (I)</source>
+        <translation>Details: Typ, Zeiten, Berechtigungen, Eigentümer, Prüfsumme… (I)</translation>
+    </message>
+    <message>
         <source>Wrap</source>
         <translation>Umbruch</translation>
     </message>
@@ -1820,6 +2019,22 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>Cannot read: %1</source>
         <translation>Kann nicht gelesen werden: %1</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>Fehler</translation>
+    </message>
+    <message>
+        <source>calculating…</source>
+        <translation>wird berechnet…</translation>
+    </message>
+    <message>
+        <source>Total size</source>
+        <translation>Gesamtgröße</translation>
+    </message>
+    <message>
+        <source>Compute</source>
+        <translation>Berechnen</translation>
     </message>
     <message>
         <source>Reading media…</source>

@@ -9,6 +9,7 @@
 #include <memory>
 
 class QFrame;
+class QGridLayout;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
@@ -33,7 +34,7 @@ class TextScrollView;
 class ViewerWindow : public QWidget {
     Q_OBJECT
 public:
-    enum class Mode { None, Text, Hex, Image };
+    enum class Mode { None, Text, Hex, Image, Info };
 
     // embedded: a plain child widget (quick view): no own shortcuts, not a window.
     ViewerWindow(const QStringList& files, int index, QWidget* parent = nullptr, bool embedded = false);
@@ -54,6 +55,11 @@ public:
     QTextBrowser* documentView() const { return m_doc; }
     // Prepare rich previews of these files in the background (preview column).
     void preload(const QStringList& paths);
+    // Info instead of content (Ctrl+I in the previews); remembered.
+    void setShowInfo(bool on);
+    // Git state of the next file shown (the viewer doesn't know the panel).
+    void setGitHint(char status) { m_gitHint = status; }
+    QWidget* infoPage() const { return m_infoPage; }
 
     QPlainTextEdit* textEdit() const { return m_text; }
     TextScrollView* largeTextView() const { return m_big; }
@@ -78,6 +84,9 @@ private:
     void loadRich();
     void showRich(const RichPreview& r);
     QSize richMaxSize() const;
+    void loadInfo();
+    void fillInfo(const struct FileInfo& info);
+    Mode defaultMode() const;
     void showMessage(const QString& text);
     void updateStatus();
     void updateModeButtons();
@@ -115,6 +124,12 @@ private:
     QLabel* m_info;
     QTextBrowser* m_doc;
     QTreeWidget* m_list;
+    QWidget* m_infoPage;
+    QGridLayout* m_infoGrid;
+    QToolButton* m_infoButton;
+    bool m_infoLoaded = false;
+    char m_gitHint = 0;
+    std::shared_ptr<std::atomic<bool>> m_infoCancel;
     QLabel* m_message;
     QWidget* m_noteBox;
     QLabel* m_noteIcon;

@@ -84,6 +84,7 @@ Visual check without a display:
 | Alt+F5 / Alt+F9 | Pack into a new archive / unpack archives to the other panel |
 | Ctrl+PgDn | Enter folder, or browse any file as an archive |
 | Ctrl+Q | Previews: one below each panel, each showing its own cursor (or one below both / on the right: View → Preview position) |
+| Ctrl+I | Previews show details instead of content (type, dates, permissions, owner, filesystem, image/camera data, folder totals, SHA-256 on demand); `I` in F3 |
 | Alt+F4 | Quit |
 | Esc | Cancel a slow folder load |
 
