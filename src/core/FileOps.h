@@ -21,6 +21,9 @@ class CopyJob : public Job {
 public:
     enum class Mode { Copy, Move };
     CopyJob(Mode mode, QStringList sources, QString destination);
+    // Explicit (source, target path) pairs, e.g. from a folder sync. Missing
+    // parent folders of targets are created.
+    explicit CopyJob(QList<QPair<QString, QString>> pairs);
 
     Mode mode() const { return m_mode; }
     QString destination() const { return m_destination; }
@@ -41,6 +44,7 @@ private:
     Mode m_mode;
     QStringList m_sources;
     QString m_destination;
+    QList<QPair<QString, QString>> m_pairs;
     bool m_crossDevice = false;
     std::vector<char> m_buffer;
 };

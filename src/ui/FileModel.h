@@ -56,6 +56,8 @@ public:
     void markAll(bool on);
     void invertMarks();
     int markByPattern(const QString& patterns, bool on);
+    // Marks exactly these names (everything else unmarked).
+    void setMarkedNames(const QSet<QString>& names);
     QStringList markedNames() const;
     QSet<QString> markedSet() const;
     void restoreMarks(const QSet<QString>& names);

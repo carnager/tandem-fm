@@ -411,6 +411,20 @@ void FileModel::setMarked(int row, bool on)
     emit statsChanged();
 }
 
+void FileModel::setMarkedNames(const QSet<QString>& names)
+{
+    for (auto& e : m_entries) {
+        const bool on = !e.isParent && names.contains(e.name);
+        if (e.marked == on)
+            continue;
+        e.marked = on;
+        accountMark(e, on ? +1 : -1);
+    }
+    if (!m_entries.empty())
+        emit dataChanged(index(0, 0), index(int(m_entries.size()) - 1, ColCount - 1));
+    emit statsChanged();
+}
+
 void FileModel::markAll(bool on)
 {
     for (auto& e : m_entries) {

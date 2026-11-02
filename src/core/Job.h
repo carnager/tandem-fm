@@ -73,6 +73,8 @@ public:
     void startNow();
     void runNext();
     void setStartImmediately(bool on) { m_force.store(on); }
+    // Replace existing targets without asking (sync: the user already chose).
+    void setOverwriteExisting() { m_conflictPolicy = ConflictPolicy::OverwriteAll; }
 
     QString title() const { return m_title; }
     Snapshot snapshot() const;

@@ -31,6 +31,7 @@ add_library(tandem_core STATIC
   src/core/Undo.h src/core/Undo.cpp
   src/core/GitStatus.h src/core/GitStatus.cpp
   src/core/Search.h src/core/Search.cpp
+  src/core/FolderCompare.h src/core/FolderCompare.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)
@@ -55,6 +56,7 @@ add_library(tandem_ui STATIC
   src/ui/PathBar.h src/ui/PathBar.cpp
   src/ui/KeyChordPopup.h src/ui/KeyChordPopup.cpp
   src/ui/CommandBar.h src/ui/CommandBar.cpp
+  src/ui/SyncDialog.h src/ui/SyncDialog.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp

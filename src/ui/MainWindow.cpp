@@ -12,6 +12,7 @@
 #include "ui/IconCache.h"
 #include "ui/JobManager.h"
 #include "ui/CommandBar.h"
+#include "ui/SyncDialog.h"
 #include "ui/JobsPanel.h"
 #include "ui/KeyChordPopup.h"
 #include "ui/EditNames.h"
@@ -303,6 +304,11 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("pack")] = addCommand(files, tr("Pack…"), {K(Qt::ALT | Qt::Key_F5)}, [this] { pack(); });
     m_actions[QStringLiteral("unpack")] =
         addCommand(files, tr("Unpack to other panel…"), {K(Qt::ALT | Qt::Key_F9)}, [this] { unpack(); });
+    files->addSeparator();
+    m_actions[QStringLiteral("compare")] =
+        addCommand(files, tr("Compare folders (mark differences)"), {K(Qt::SHIFT | Qt::Key_F2)}, [this] { compareFolders(); });
+    m_actions[QStringLiteral("sync")] =
+        addCommand(files, tr("Synchronize folders…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_S)}, [this] { synchronizeFolders(); });
     m_actions[QStringLiteral("command")] =
         addCommand(files, tr("Run command…"), {K(Qt::CTRL | Qt::Key_Semicolon)}, [this] { openCommandBar(); });
     m_actions[QStringLiteral("terminal")] =
@@ -792,6 +798,8 @@ void MainWindow::showShortcuts()
         {"Ctrl+PgDn", QT_TR_NOOP("Enter folder, or browse any file as archive")},
         {"Menu key, Shift+F10", QT_TR_NOOP("Context menu")},
         {"Ctrl+Q", QT_TR_NOOP("Preview: below each panel, below both or on the right (View > Preview position)")},
+        {"Shift+F2", QT_TR_NOOP("Compare the two panels: marks what is newer or missing on the other side")},
+        {"Ctrl+Shift+S", QT_TR_NOOP("Synchronize folders: compare both trees, choose directions, copy (or mirror)")},
         {"Ctrl+;", QT_TR_NOOP("Run a shell command: %s marked files, %f file, %d folder, %D other panel; Ctrl+Enter in a terminal")},
         {"Alt+F7", QT_TR_NOOP("Search names (fd) or contents (rg) here and below; results are a folder you can work in")},
         {"Ctrl+I", QT_TR_NOOP("Previews show details: type, dates, permissions, owner, checksum…")},
@@ -1238,6 +1246,85 @@ void MainWindow::runRenamePlan(Panel* p, const RenamePlan& plan)
             panel->unmarkAll();
         });
     });
+}
+
+// ------------------------------------------------------------ compare & sync
+
+void MainWindow::compareFolders()
+{
+    Panel* panels[2] = {m_left, m_right};
+    for (Panel* p : panels) {
+        if (p->inArchive() || (p->tab() && p->tab()->isSearch())) {
+            active()->showMessage(tr("Comparing needs two plain folders"), true);
+            return;
+        }
+    }
+    // Uses what the panels already show: instant, no disk access.
+    QHash<QString, const FileEntry*> byName[2];
+    for (int s = 0; s < 2; ++s) {
+        FileModel* m = panels[s]->tab()->model();
+        for (int r = 0; r < m->count(); ++r)
+            if (const FileEntry* e = m->entry(r); e && !e->isParent)
+                byName[s].insert(e->name, e);
+    }
+    QSet<QString> marks[2];
+    int same = 0;
+    for (int s = 0; s < 2; ++s) {
+        for (auto it = byName[s].cbegin(); it != byName[s].cend(); ++it) {
+            const FileEntry* mine = it.value();
+            const FileEntry* theirs = byName[1 - s].value(it.key());
+            if (!theirs) {
+                marks[s].insert(it.key());  // only here
+            } else if (!mine->isDir && !theirs->isDir) {
+                const int64_t dt = mine->mtime - theirs->mtime;
+                if (dt > 2)
+                    marks[s].insert(it.key());  // newer here
+                else if (s == 0 && dt >= -2 && mine->size == theirs->size)
+                    ++same;
+                else if (s == 0 && dt >= -2)
+                    marks[0].insert(it.key()), marks[1].insert(it.key());  // same time, other size
+            }
+        }
+    }
+    for (int s = 0; s < 2; ++s)
+        panels[s]->tab()->model()->setMarkedNames(marks[s]);
+    if (marks[0].isEmpty() && marks[1].isEmpty())
+        active()->showMessage(tr("No differences (%1 identical files; folder contents not compared)").arg(same));
+    else
+        active()->showMessage(tr("Marked what is newer or missing on the other side: %1 left, %2 right · %3 identical")
+                                  .arg(marks[0].size())
+                                  .arg(marks[1].size())
+                                  .arg(same));
+}
+
+void MainWindow::synchronizeFolders()
+{
+    if (m_left->inArchive() || m_right->inArchive() || (m_left->tab() && m_left->tab()->isSearch()) ||
+        (m_right->tab() && m_right->tab()->isSearch())) {
+        active()->showMessage(tr("Synchronizing needs two plain folders"), true);
+        return;
+    }
+    if (m_left->path() == m_right->path()) {
+        active()->showMessage(tr("Both panels show the same folder"), true);
+        return;
+    }
+    auto* dlg = new SyncDialog(m_left->path(), m_right->path(), [this](const SyncPlan& plan) {
+        QList<Job*> jobs;
+        if (!plan.copies.isEmpty()) {
+            auto* copy = new CopyJob(plan.copies);
+            copy->setOverwriteExisting();
+            m_jobs->add(copy);
+            jobs << copy;
+        }
+        if (!plan.deletions.isEmpty()) {
+            auto* del = new DeleteJob(plan.deletions, true);
+            m_jobs->add(del);
+            jobs << del;
+        }
+        return jobs;
+    }, this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->show();
 }
 
 // ------------------------------------------------------------ run command

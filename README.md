@@ -53,6 +53,8 @@ Visual check without a display:
 | Tab | Switch panel |
 | Enter / Backspace | Open / parent folder |
 | Type letters | Quick search (↑/↓ next match, Esc close) |
+| Shift+F2 | Compare the panels: marks files that are newer or missing on the other side (instant, uses what's listed) |
+| Ctrl+Shift+S | Synchronize folders: compares both trees off-thread (optionally byte by byte), shows every difference with a direction (→ ← = ≠ ✕). Change it with ←/→/Space/Del or a click, Enter diffs two files (meld/kdiff3/…, else `diff -u`), Ctrl+Enter syncs. Modes: both ways (newer wins), mirror left→right, mirror right→left (extra files go to the trash) |
 | Ctrl+; (vim: `!`) | Run a shell command: `%s` marked files (quoted), `%f` file, `%n` name, `%d` folder, `%D` other panel's folder. Enter runs it in the background (output in a window), Ctrl+Enter in your terminal. ↑↓ history |
 | Alt+F7 | Search names (`fd`) or contents (`rg`) from here down; Tab flips names/contents. Results show up as a folder (relative paths) where preview, F3, copy, move, delete, rename work; Esc/Backspace leaves. Without `fd` a built-in name search is used (it doesn't read `.gitignore`); without `rg`, `grep` |
 | Ctrl+F | Filter as you type: words must all appear, `*`/`?` wildcards; Esc clears |

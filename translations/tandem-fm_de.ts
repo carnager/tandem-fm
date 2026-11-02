@@ -363,6 +363,10 @@
         <source>Install ripgrep (rg) to search file contents</source>
         <translation>Für die Inhaltssuche ripgrep (rg) installieren</translation>
     </message>
+    <message>
+        <source>&lt;DIR&gt;</source>
+        <translation>&lt;DIR&gt;</translation>
+    </message>
 </context>
 <context>
     <name>tandem::CommandBar</name>
@@ -376,7 +380,7 @@
     </message>
     <message>
         <source>%s marked files · %f file · %n name · %d this folder · %D other panel   ·   Enter: run in background · Ctrl+Enter: in terminal · ↑↓ history</source>
-        <translation>%s markierte Dateien · %f Datei · %n Name · %d dieser Ordner · %D anderes Panel   ·   Enter: im Hintergrund · Ctrl+Enter: im Terminal · ↑↓ Verlauf</translation>
+        <translation>%s markierte Dateien · %f Datei · %n Name · %d dieser Ordner · %D anderes Panel   ·   Enter: im Hintergrund · Strg+Enter: im Terminal · ↑↓ Verlauf</translation>
     </message>
 </context>
 <context>
@@ -388,6 +392,10 @@
     <message>
         <source>Move</source>
         <translation>Verschieben</translation>
+    </message>
+    <message>
+        <source>Synchronize</source>
+        <translation>Synchronisieren</translation>
     </message>
     <message>
         <source>Cannot create folder</source>
@@ -1081,6 +1089,14 @@
         <translation>Unter jedem Panel</translation>
     </message>
     <message>
+        <source>Compare folders (mark differences)</source>
+        <translation>Ordner vergleichen (Unterschiede markieren)</translation>
+    </message>
+    <message>
+        <source>Synchronize folders…</source>
+        <translation>Ordner synchronisieren…</translation>
+    </message>
+    <message>
         <source>Run command…</source>
         <translation>Befehl ausführen…</translation>
     </message>
@@ -1284,8 +1300,16 @@
         <translation>Vorschau: unter jedem Panel, unter beiden oder rechts (Ansicht &gt; Position der Vorschau)</translation>
     </message>
     <message>
+        <source>Compare the two panels: marks what is newer or missing on the other side</source>
+        <translation>Beide Panels vergleichen: markiert, was auf der anderen Seite neuer ist oder fehlt</translation>
+    </message>
+    <message>
+        <source>Synchronize folders: compare both trees, choose directions, copy (or mirror)</source>
+        <translation>Ordner synchronisieren: beide Bäume vergleichen, Richtungen wählen, kopieren (oder spiegeln)</translation>
+    </message>
+    <message>
         <source>Run a shell command: %s marked files, %f file, %d folder, %D other panel; Ctrl+Enter in a terminal</source>
-        <translation>Shell-Befehl ausführen: %s markierte Dateien, %f Datei, %d Ordner, %D anderes Panel; Ctrl+Enter im Terminal</translation>
+        <translation>Shell-Befehl ausführen: %s markierte Dateien, %f Datei, %d Ordner, %D anderes Panel; Strg+Enter im Terminal</translation>
     </message>
     <message>
         <source>Search names (fd) or contents (rg) here and below; results are a folder you can work in</source>
@@ -1415,6 +1439,26 @@ F3 öffnet es im Betrachter</translation>
             <numerusform>%n Element umbenannt. Ctrl+Z macht es rückgängig.</numerusform>
             <numerusform>%n Elemente umbenannt. Ctrl+Z macht es rückgängig.</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>Comparing needs two plain folders</source>
+        <translation>Zum Vergleichen braucht es zwei normale Ordner</translation>
+    </message>
+    <message>
+        <source>No differences (%1 identical files; folder contents not compared)</source>
+        <translation>Keine Unterschiede (%1 identische Dateien; Ordnerinhalte nicht verglichen)</translation>
+    </message>
+    <message>
+        <source>Marked what is newer or missing on the other side: %1 left, %2 right · %3 identical</source>
+        <translation>Markiert, was auf der anderen Seite neuer ist oder fehlt: %1 links, %2 rechts · %3 identisch</translation>
+    </message>
+    <message>
+        <source>Synchronizing needs two plain folders</source>
+        <translation>Zum Synchronisieren braucht es zwei normale Ordner</translation>
+    </message>
+    <message>
+        <source>Both panels show the same folder</source>
+        <translation>Beide Panels zeigen denselben Ordner</translation>
     </message>
     <message>
         <source>nothing selected</source>
@@ -2052,6 +2096,203 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>Problem</source>
         <translation>Problem</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::SyncDialog</name>
+    <message>
+        <source>Synchronize folders</source>
+        <translation>Ordner synchronisieren</translation>
+    </message>
+    <message>
+        <source>Subfolders</source>
+        <translation>Unterordner</translation>
+    </message>
+    <message>
+        <source>Compare contents</source>
+        <translation>Inhalte vergleichen</translation>
+    </message>
+    <message>
+        <source>Read files with equal sizes byte by byte instead of trusting their times (slower)</source>
+        <translation>Gleich große Dateien Byte für Byte lesen, statt den Zeitstempeln zu trauen (langsamer)</translation>
+    </message>
+    <message>
+        <source>Hidden files</source>
+        <translation>Versteckte Dateien</translation>
+    </message>
+    <message>
+        <source>Both ways (newer wins)</source>
+        <translation>In beide Richtungen (neuere gewinnt)</translation>
+    </message>
+    <message>
+        <source>Mirror left → right</source>
+        <translation>Links → rechts spiegeln</translation>
+    </message>
+    <message>
+        <source>Mirror right → left</source>
+        <translation>Rechts → links spiegeln</translation>
+    </message>
+    <message>
+        <source>Mirroring makes the target like the source: it also overwrites newer files and deletes extra ones (to the trash)</source>
+        <translation>Spiegeln macht das Ziel gleich der Quelle: auch neuere Dateien werden überschrieben und überzählige gelöscht (in den Papierkorb)</translation>
+    </message>
+    <message>
+        <source>Compare again</source>
+        <translation>Erneut vergleichen</translation>
+    </message>
+    <message>
+        <source>Show:</source>
+        <translation>Zeigen:</translation>
+    </message>
+    <message>
+        <source>Copied to the right</source>
+        <translation>Wird nach rechts kopiert</translation>
+    </message>
+    <message>
+        <source>Copied to the left</source>
+        <translation>Wird nach links kopiert</translation>
+    </message>
+    <message>
+        <source>Different, but left alone</source>
+        <translation>Unterschiedlich, bleibt aber unberührt</translation>
+    </message>
+    <message>
+        <source>Identical</source>
+        <translation>Identisch</translation>
+    </message>
+    <message>
+        <source>Deleted (to the trash)</source>
+        <translation>Wird gelöscht (Papierkorb)</translation>
+    </message>
+    <message>
+        <source>← → direction · Space: leave alone · Del: delete · Enter: diff · Ctrl+Enter: synchronize</source>
+        <translation>← → Richtung · Leertaste: nicht anfassen · Entf: löschen · Enter: Diff · Strg+Enter: synchronisieren</translation>
+    </message>
+    <message>
+        <source>Synchronize</source>
+        <translation>Synchronisieren</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <source>Comparing…</source>
+        <translation>Vergleiche…</translation>
+    </message>
+    <message>
+        <source>Comparing %1 …</source>
+        <translation>Vergleiche %1 …</translation>
+    </message>
+    <message>
+        <source>Cannot compare: %1</source>
+        <translation>Vergleich nicht möglich: %1</translation>
+    </message>
+    <message>
+        <source>%1 → right (%2)</source>
+        <translation>%1 → rechts (%2)</translation>
+    </message>
+    <message>
+        <source>%1 ← left (%2)</source>
+        <translation>%1 ← links (%2)</translation>
+    </message>
+    <message>
+        <source>%1 to the trash</source>
+        <translation>%1 in den Papierkorb</translation>
+    </message>
+    <message>
+        <source>The folders are in sync</source>
+        <translation>Die Ordner sind synchron</translation>
+    </message>
+    <message>
+        <source>Nothing selected to synchronize</source>
+        <translation>Nichts zum Synchronisieren ausgewählt</translation>
+    </message>
+    <message>
+        <source>Synchronizing…</source>
+        <translation>Synchronisiere…</translation>
+    </message>
+    <message>
+        <source>Copy to the right  →</source>
+        <translation>Nach rechts kopieren  →</translation>
+    </message>
+    <message>
+        <source>Copy to the left  ←</source>
+        <translation>Nach links kopieren  ←</translation>
+    </message>
+    <message>
+        <source>Leave alone</source>
+        <translation>Nicht anfassen</translation>
+    </message>
+    <message>
+        <source>Delete on the left</source>
+        <translation>Links löschen</translation>
+    </message>
+    <message>
+        <source>Delete on the right</source>
+        <translation>Rechts löschen</translation>
+    </message>
+    <message>
+        <source>Compare the two files</source>
+        <translation>Die beiden Dateien vergleichen</translation>
+    </message>
+    <message>
+        <source>The files are identical.</source>
+        <translation>Die Dateien sind identisch.</translation>
+    </message>
+    <message numerus="yes">
+        <source>Move %n item(s) to the trash?</source>
+        <translation>
+            <numerusform>%n Element in den Papierkorb verschieben?</numerusform>
+            <numerusform>%n Elemente in den Papierkorb verschieben?</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>tandem::SyncModel</name>
+    <message>
+        <source>Name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <source>Left size</source>
+        <translation>Größe links</translation>
+    </message>
+    <message>
+        <source>Modified</source>
+        <translation>Geändert</translation>
+    </message>
+    <message>
+        <source>Right size</source>
+        <translation>Größe rechts</translation>
+    </message>
+    <message>
+        <source>Same on both sides</source>
+        <translation>Auf beiden Seiten gleich</translation>
+    </message>
+    <message>
+        <source>Newer on the left</source>
+        <translation>Links neuer</translation>
+    </message>
+    <message>
+        <source>Newer on the right</source>
+        <translation>Rechts neuer</translation>
+    </message>
+    <message>
+        <source>Only on the left</source>
+        <translation>Nur links</translation>
+    </message>
+    <message>
+        <source>Only on the right</source>
+        <translation>Nur rechts</translation>
+    </message>
+    <message>
+        <source>Same time, different contents: decide yourself</source>
+        <translation>Gleiche Zeit, anderer Inhalt: selbst entscheiden</translation>
+    </message>
+    <message>
+        <source>A file on one side, a folder on the other: not synchronized</source>
+        <translation>Auf einer Seite eine Datei, auf der anderen ein Ordner: wird nicht synchronisiert</translation>
     </message>
 </context>
 <context>

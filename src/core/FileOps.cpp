@@ -93,12 +93,26 @@ CopyJob::CopyJob(Mode mode, QStringList sources, QString destination)
 {
 }
 
+CopyJob::CopyJob(QList<QPair<QString, QString>> pairs)
+    : Job(tr("Synchronize")), m_mode(Mode::Copy), m_pairs(std::move(pairs))
+{
+}
+
 void CopyJob::run()
 {
     setState(State::Scanning);
+    for (const auto& [from, to] : std::as_const(m_pairs)) {
+        const QString parent = parentPath(to);
+        for (int e; (e = makeDirectories(parent)) != 0 && e != EEXIST;) {
+            if (askError(tr("Cannot create folder"), parent, e) != Answer::Retry) {
+                setState(State::Failed);
+                return;
+            }
+        }
+    }
     const QByteArray dest = toNative(m_destination);
     struct stat ds;
-    bool destIsDir = ::stat(dest.constData(), &ds) == 0 && S_ISDIR(ds.st_mode);
+    bool destIsDir = !m_pairs.isEmpty() || (::stat(dest.constData(), &ds) == 0 && S_ISDIR(ds.st_mode));
 
     if (!destIsDir && m_sources.size() > 1) {
         for (;;) {
@@ -116,6 +130,8 @@ void CopyJob::run()
     }
 
     std::vector<std::pair<QByteArray, QByteArray>> items;
+    for (const auto& [from, to] : std::as_const(m_pairs))
+        items.emplace_back(toNative(from), toNative(to));
     for (const QString& s : std::as_const(m_sources)) {
         const QByteArray src = toNative(s);
         const QByteArray dst = destIsDir ? joinPath(dest, toNative(baseName(s))) : dest;

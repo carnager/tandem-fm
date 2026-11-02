@@ -3,6 +3,7 @@
 #include "core/DirLister.h"
 #include "core/FileOps.h"
 #include "core/Search.h"
+#include "core/FolderCompare.h"
 #include "core/GitStatus.h"
 #include "core/Undo.h"
 #include "core/FolderHistory.h"
@@ -813,6 +814,89 @@ private slots:
         QCOMPARE(run({{}, "fuzzy", false, true}).size(), 4);                // incl. hidden & build
         QVERIFY(run({{}, "needle", true, false}).first().startsWith("ERROR"));
         qputenv("PATH", oldPath);
+    }
+
+    void folderCompare()
+    {
+        QTemporaryDir tmp;
+        const QString L = tmp.filePath("L"), R = tmp.filePath("R");
+        auto at = [](const QString& p, qint64 secs) {
+            QFile f(p);
+            QVERIFY(f.open(QIODevice::ReadWrite));
+            QVERIFY(f.setFileTime(QDateTime::fromSecsSinceEpoch(secs), QFileDevice::FileModificationTime));
+        };
+        QVERIFY(QDir().mkpath(L + "/sub/deep"));
+        QVERIFY(QDir().mkpath(R + "/sub"));
+        QVERIFY(QDir().mkpath(L + "/onlyleft"));
+        writeFile(L + "/same.txt", "same");          writeFile(R + "/same.txt", "same");
+        writeFile(L + "/newer.txt", "new!");         writeFile(R + "/newer.txt", "old");
+        writeFile(L + "/older.txt", "old");          writeFile(R + "/older.txt", "new!");
+        writeFile(L + "/sametime.txt", "aaaa");      writeFile(R + "/sametime.txt", "bbbb");
+        writeFile(L + "/sub/deep/x.txt", "x");
+        writeFile(L + "/onlyleft/y.txt", "y");
+        writeFile(R + "/sub/r.txt", "r");
+        writeFile(L + "/clash", "file");             QVERIFY(QDir().mkpath(R + "/clash"));
+        at(L + "/same.txt", 1000);     at(R + "/same.txt", 1001);  // within tolerance
+        at(L + "/newer.txt", 5000);    at(R + "/newer.txt", 2000);
+        at(L + "/older.txt", 2000);    at(R + "/older.txt", 5000);
+        at(L + "/sametime.txt", 3000); at(R + "/sametime.txt", 3000);
+
+        auto diffs = [](const CompareResult& r) {
+            QMap<QString, Diff> m;
+            for (const CompareItem& i : r.items)
+                m[i.rel] = i.diff;
+            return m;
+        };
+        CompareResult res = compareFolders(L, R, {});
+        QVERIFY(res.error.isEmpty());
+        auto d = diffs(res);
+        QCOMPARE(d.value("same.txt"), Diff::Equal);
+        QCOMPARE(d.value("newer.txt"), Diff::LeftNewer);
+        QCOMPARE(d.value("older.txt"), Diff::RightNewer);
+        QCOMPARE(d.value("sametime.txt"), Diff::Equal);  // same size and time: trusted
+        QCOMPARE(d.value("sub/deep"), Diff::LeftOnly);    // one-sided folder = one item
+        QCOMPARE(d.value("onlyleft"), Diff::LeftOnly);
+        QCOMPARE(d.value("sub/r.txt"), Diff::RightOnly);
+        QCOMPARE(d.value("clash"), Diff::TypeMismatch);
+        QVERIFY(!d.contains("sub"));  // folders on both sides only show their contents
+
+        CompareOptions byContent;
+        byContent.contents = true;
+        QCOMPARE(diffs(compareFolders(L, R, byContent)).value("sametime.txt"), Diff::Differs);
+        CompareOptions flat;
+        flat.recursive = false;
+        QVERIFY(!diffs(compareFolders(L, R, flat)).contains("sub/r.txt"));
+        QVERIFY(!compareFolders(L, tmp.filePath("missing"), {}).error.isEmpty());
+
+        // Two-way sync: newer wins, one-sided items are copied over.
+        std::vector<SyncAction> actions;
+        for (const CompareItem& i : res.items)
+            actions.push_back(defaultAction(i.diff, SyncMode::TwoWay));
+        const SyncPlan plan = buildSyncPlan(L, R, res.items, actions);
+        QVERIFY(plan.deletions.isEmpty());
+        CopyJob job(plan.copies);
+        job.setOverwriteExisting();
+        QVERIFY(runJob(job));
+        QCOMPARE(readFile(R + "/newer.txt"), QByteArray("new!"));
+        QCOMPARE(readFile(L + "/older.txt"), QByteArray("new!"));
+        QCOMPARE(readFile(R + "/sub/deep/x.txt"), QByteArray("x"));
+        QCOMPARE(readFile(L + "/sub/r.txt"), QByteArray("r"));
+        QCOMPARE(readFile(R + "/onlyleft/y.txt"), QByteArray("y"));
+        QCOMPARE(readFile(L + "/clash"), QByteArray("file"));  // mismatches are left alone
+        QCOMPARE(readFile(L + "/sametime.txt"), QByteArray("aaaa"));
+        auto after = diffs(compareFolders(L, R, {}));
+        for (auto it = after.cbegin(); it != after.cend(); ++it)
+            QVERIFY2(it.value() == Diff::Equal || it.key() == "clash", qPrintable(it.key()));
+
+        // Mirror: the right side ends up like the left, extra files deleted.
+        writeFile(R + "/extra.txt", "extra");
+        CompareResult res2 = compareFolders(L, R, {});
+        actions.clear();
+        for (const CompareItem& i : res2.items)
+            actions.push_back(defaultAction(i.diff, SyncMode::MirrorToRight));
+        const SyncPlan mirror = buildSyncPlan(L, R, res2.items, actions);
+        QCOMPARE(mirror.deletions, QStringList({R + "/extra.txt"}));
+        QVERIFY(mirror.copies.isEmpty());
     }
 
     void helpers()

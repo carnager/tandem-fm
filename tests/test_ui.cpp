@@ -6,6 +6,7 @@
 #include "ui/DirTab.h"
 #include "ui/FileModel.h"
 #include "ui/CommandBar.h"
+#include "ui/SyncDialog.h"
 #include "ui/FileView.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/KeyChordPopup.h"
@@ -21,6 +22,7 @@
 #include <QSignalSpy>
 
 #include <QApplication>
+#include <QComboBox>
 #include <QPlainTextEdit>
 #include <QSplitter>
 #include <QTabBar>
@@ -52,6 +54,12 @@ void writeFile(const QString& path, const QByteArray& data)
 }
 
 // Answers the next modal dialog once it is open.
+QByteArray readFile(const QString& path)
+{
+    QFile f(path);
+    return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray("<missing>");
+}
+
 void answerNextDialog(std::function<void(QWidget*)> answer)
 {
     auto attempt = std::make_shared<std::function<void(int)>>();
@@ -1169,6 +1177,83 @@ private slots:
         }());
         QCOMPARE(out->toPlainText().trimmed(), QString("hello from ") + L("cmd"));
         out->window()->close();
+
+        m_left->navigate(L());
+        m_right->navigate(R());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void compareAndSync()
+    {
+        auto at = [](const QString& p, qint64 secs) {
+            QFile f(p);
+            QVERIFY(f.open(QIODevice::ReadWrite));
+            QVERIFY(f.setFileTime(QDateTime::fromSecsSinceEpoch(secs), QFileDevice::FileModificationTime));
+        };
+        QVERIFY(QDir().mkpath(L("cmp/sub")));
+        QVERIFY(QDir().mkpath(R("cmp")));
+        writeFile(L("cmp/same.txt"), "same");    writeFile(R("cmp/same.txt"), "same");
+        writeFile(L("cmp/newer.txt"), "new!");   writeFile(R("cmp/newer.txt"), "old");
+        writeFile(L("cmp/sub/deep.txt"), "deep");
+        writeFile(R("cmp/rightonly.txt"), "r");
+        at(L("cmp/same.txt"), 4000);  at(R("cmp/same.txt"), 4000);
+        at(L("cmp/newer.txt"), 9000); at(R("cmp/newer.txt"), 3000);
+        m_left->navigate(L("cmp"));
+        m_right->navigate(R("cmp"));
+        QTRY_COMPARE(leftModel()->path(), L("cmp"));
+        QTRY_COMPARE(rightModel()->path(), R("cmp"));
+        QTRY_VERIFY(leftModel()->rowOf("newer.txt") >= 0 && rightModel()->rowOf("rightonly.txt") >= 0);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+
+        // Shift+F2 marks what is newer or missing on the other side.
+        QTest::keyClick(m_left->view(), Qt::Key_F2, Qt::ShiftModifier);
+        QCOMPARE(QSet<QString>(leftModel()->markedSet()), QSet<QString>({"newer.txt", "sub"}));
+        QCOMPARE(QSet<QString>(rightModel()->markedSet()), QSet<QString>({"rightonly.txt"}));
+        leftModel()->markAll(false);
+        rightModel()->markAll(false);
+
+        // Ctrl+Shift+S: the sync dialog.
+        QTest::keyClick(m_left->view(), Qt::Key_S, Qt::ControlModifier | Qt::ShiftModifier);
+        SyncDialog* dlg = nullptr;
+        QTRY_VERIFY((dlg = m_window->findChild<SyncDialog*>()) != nullptr);
+        QTRY_VERIFY(!dlg->isComparing());
+        SyncModel* m = dlg->model();
+        QCOMPARE(m->rowCount(), 3);  // equal files hidden by default
+        QCOMPARE(m->action(m->rowOf("newer.txt")), SyncAction::ToRight);
+        QCOMPARE(m->action(m->rowOf("sub")), SyncAction::ToRight);
+        QCOMPARE(m->action(m->rowOf("rightonly.txt")), SyncAction::ToLeft);
+
+        // Keys change directions: Space leaves "rightonly.txt" alone.
+        dlg->view()->setCurrentIndex(m->index(m->rowOf("rightonly.txt"), 0));
+        QTest::keyClick(dlg->view(), Qt::Key_Space);
+        QCOMPARE(m->action(m->rowOf("rightonly.txt")), SyncAction::None);
+        QTest::keyClick(dlg->view(), Qt::Key_Left);
+        QCOMPARE(m->action(m->rowOf("rightonly.txt")), SyncAction::ToLeft);
+        QTest::keyClick(dlg->view(), Qt::Key_Right);  // impossible: nothing on the left
+        QCOMPARE(m->action(m->rowOf("rightonly.txt")), SyncAction::ToLeft);
+
+        QTest::keyClick(dlg->view(), Qt::Key_Return, Qt::ControlModifier);
+        QTRY_COMPARE(readFile(R("cmp/newer.txt")), QByteArray("new!"));
+        QTRY_COMPARE(readFile(R("cmp/sub/deep.txt")), QByteArray("deep"));
+        QTRY_COMPARE(readFile(L("cmp/rightonly.txt")), QByteArray("r"));
+        // It compares again afterwards: nothing left to do.
+        QTRY_VERIFY(!dlg->isComparing() && m->rowCount() == 0);
+        QTRY_VERIFY(rightModel()->rowOf("sub") >= 0);
+
+        // Mirror right → left removes what the right side doesn't have.
+        writeFile(L("cmp/extra.txt"), "x");
+        auto* modeBox = dlg->findChild<QComboBox*>();
+        modeBox->setCurrentIndex(2);
+        dlg->compare();
+        QTRY_VERIFY(!dlg->isComparing() && m->rowOf("extra.txt") >= 0);
+        QCOMPARE(m->action(m->rowOf("extra.txt")), SyncAction::DeleteLeft);
+        answerNextDialog(acceptDialog);
+        dlg->synchronize();
+        QTRY_VERIFY(!QFile::exists(L("cmp/extra.txt")));
+        modeBox->setCurrentIndex(0);
+        dlg->close();
 
         m_left->navigate(L());
         m_right->navigate(R());
