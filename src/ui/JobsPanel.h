@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QElapsedTimer>
+#include <QAbstractButton>
 #include <QFrame>
 #include <QHash>
 #include <QTimer>
@@ -21,6 +22,7 @@ public:
     JobRow(Job* job, JobManager* manager, QWidget* parent);
     void refresh();
     Job* job() const { return m_job; }
+    double speed() const;  // bytes/s, 0 once finished
 
 private:
     Job* m_job;
@@ -36,23 +38,51 @@ private:
     double m_speed = 0;
 };
 
-// Bottom strip listing background operations. Polls job progress at 10 Hz
-// while anything runs; hides itself when idle.
-class JobsPanel : public QFrame {
+// Collapsed: a pill in the bottom-right corner with overall progress.
+// Clicking it opens the job list above it, floating over the panels.
+class JobsPill : public QAbstractButton {
     Q_OBJECT
 public:
-    JobsPanel(JobManager* manager, QWidget* parent);
+    explicit JobsPill(QWidget* parent);
+    void setState(const QString& text, double fraction, bool attention);
+    QSize sizeHint() const override;
+
+protected:
+    void paintEvent(QPaintEvent* e) override;
+
+private:
+    QString m_text;
+    double m_fraction = 0;
+    bool m_attention = false;
+};
+
+class JobsPanel : public QWidget {
+    Q_OBJECT
+public:
+    JobsPanel(JobManager* manager, QWidget* overlayParent);
+    void setBottomMargin(int px);
+    bool isExpanded() const { return m_expanded; }
+    void setExpanded(bool on);
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* e) override;
 
 private:
     void onAdded(Job* job);
     void onFinished(Job* job);
     void onRemoved(Job* job);
     void tick();
+    void updatePill();
+    void reposition();
 
     JobManager* m_manager;
+    QFrame* m_list;
     QVBoxLayout* m_rows;
+    JobsPill* m_pill;
     QHash<Job*, JobRow*> m_rowFor;
     QTimer m_timer;
+    bool m_expanded = false;
+    int m_bottomMargin = 48;
 };
 
 }  // namespace tandem

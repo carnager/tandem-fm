@@ -44,6 +44,10 @@ public:
     // Expands Exec field codes (%f %F %u %U ...) and starts the app detached.
     static bool launch(const DesktopApp& app, const QStringList& paths, const QString& workDir,
                        const QString& terminal);
+    // argv that runs `command` inside `terminal`, using that terminal's own
+    // convention (kitty/foot take the command directly, wezterm needs
+    // "start --", gnome-terminal "--wait --", most others "-e").
+    static QStringList terminalCommand(const QString& terminal, const QStringList& command);
     // Builds argv lists for launching; one entry per process to start.
     static QList<QStringList> commandLines(const QString& exec, const QStringList& paths);
 

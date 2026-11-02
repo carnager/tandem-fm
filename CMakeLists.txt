@@ -44,6 +44,7 @@ add_library(tandem_ui STATIC
   src/ui/JobsPanel.h src/ui/JobsPanel.cpp
   src/ui/MainWindow.h src/ui/MainWindow.cpp
   src/ui/MultiRenameDialog.h src/ui/MultiRenameDialog.cpp
+  src/ui/EditNames.h src/ui/EditNames.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp

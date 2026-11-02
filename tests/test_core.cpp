@@ -262,6 +262,17 @@ private slots:
         QCOMPARE(DesktopApps::commandLines("\"my app\" --x=100%%", {"/f"}), L({{"my app", "--x=100%", "/f"}}));
     }
 
+    void terminalCommands()
+    {
+        const QStringList cmd = {"nvim", "/tmp/f"};
+        QCOMPARE(DesktopApps::terminalCommand("kitty", cmd), QStringList({"kitty", "nvim", "/tmp/f"}));
+        QCOMPARE(DesktopApps::terminalCommand("/usr/bin/foot", cmd), QStringList({"/usr/bin/foot", "nvim", "/tmp/f"}));
+        QCOMPARE(DesktopApps::terminalCommand("alacritty", cmd), QStringList({"alacritty", "-e", "nvim", "/tmp/f"}));
+        QCOMPARE(DesktopApps::terminalCommand("wezterm", cmd), QStringList({"wezterm", "start", "--", "nvim", "/tmp/f"}));
+        QCOMPARE(DesktopApps::terminalCommand("kitty --class x", cmd),
+                 QStringList({"kitty", "--class", "x", "nvim", "/tmp/f"}));
+    }
+
     void defaultAppFromMimeappsList()
     {
         QTemporaryDir tmp;

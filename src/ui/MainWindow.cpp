@@ -11,6 +11,7 @@
 #include "ui/IconCache.h"
 #include "ui/JobManager.h"
 #include "ui/JobsPanel.h"
+#include "ui/EditNames.h"
 #include "ui/MultiRenameDialog.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
@@ -135,10 +136,12 @@ MainWindow::MainWindow(const QStringList& startPaths)
     m_splitter->addWidget(m_right);
     layout->addWidget(m_splitter, 1);
 
-    m_jobsPanel = new JobsPanel(m_jobs, central);
-    layout->addWidget(m_jobsPanel);
-    layout->addWidget(createFKeyBar());
+    QWidget* fkeys = createFKeyBar();
+    layout->addWidget(fkeys);
     setCentralWidget(central);
+    // Floats over the panels in the bottom-right corner, above the F-key bar.
+    m_jobsPanel = new JobsPanel(m_jobs, central);
+    m_jobsPanel->setBottomMargin(fkeys->sizeHint().height() + 14);
 
     for (Panel* p : {m_left, m_right}) {
         connect(p, &Panel::activated, this, &MainWindow::setActive);
@@ -218,6 +221,8 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("rename")] = addCommand(files, tr("Rename"), {K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
     m_actions[QStringLiteral("multiRename")] =
         addCommand(files, tr("Multi-rename…"), {K(Qt::CTRL | Qt::Key_M)}, [this] { multiRename(); });
+    m_actions[QStringLiteral("editorRename")] =
+        addCommand(files, tr("Rename in text editor…"), {K(Qt::CTRL | Qt::Key_E)}, [this] { renameInEditor(); });
     m_actions[QStringLiteral("undoRename")] =
         addCommand(files, tr("Undo last multi-rename"), {}, [this] { undoMultiRename(); });
     m_actions[QStringLiteral("undoRename")]->setEnabled(false);
@@ -603,7 +608,7 @@ void MainWindow::showShortcuts()
         {"Num + / Num - / Num *", "Mark group / unmark group / invert"},
         {"F3 / F4", "Viewer (Esc closes, N/P next file, 1/3/4 modes) / edit"},
         {"F5 / F6", "Copy / move to other panel"},
-        {"Shift+F6 / Ctrl+M", "Rename in place / multi-rename"},
+        {"Shift+F6 / Ctrl+M / Ctrl+E", "Rename in place / multi-rename / in your text editor"},
         {"F7 / Shift+F4", "New folder / new file"},
         {"F8, Del / Shift+F8", "Trash / delete permanently"},
         {"Ctrl+T / Ctrl+W / Ctrl+Tab", "New / close / next tab"},
@@ -769,29 +774,67 @@ void MainWindow::unpack()
 
 // ------------------------------------------------------------ multi-rename
 
-void MainWindow::multiRename()
+bool MainWindow::collectRenameItems(Panel* p, QList<RenameItem>& items, QSet<QString>& existing)
 {
-    Panel* p = active();
     if (refuseInArchive(p))
-        return;
+        return false;
     const FileModel* m = p->tab()->model();
-    QList<RenameItem> items;
     for (const QString& path : p->selectedPaths()) {
         const FileEntry* e = m->entry(m->rowOf(baseName(path)));
         if (e)
             items.append({e->name, e->isDir, e->mtime});
     }
-    if (items.isEmpty())
-        return;
-    QSet<QString> existing;
     for (int r = 0; r < m->count(); ++r)
         if (!m->entry(r)->isParent)
             existing.insert(m->entry(r)->name);
+    return !items.isEmpty();
+}
 
-    MultiRenameDialog dlg(items, baseName(p->path()), existing, this);
-    if (dlg.exec() != QDialog::Accepted)
+void MainWindow::multiRename()
+{
+    Panel* p = active();
+    QList<RenameItem> items;
+    QSet<QString> existing;
+    if (!collectRenameItems(p, items, existing))
         return;
-    const RenamePlan plan = dlg.plan();
+    MultiRenameDialog dlg(items, baseName(p->path()), existing, this);
+    const int result = dlg.exec();
+    if (result == MultiRenameDialog::EditInEditor)
+        startEditorRename(p, items, existing);
+    else if (result == QDialog::Accepted)
+        runRenamePlan(p, dlg.plan());
+}
+
+void MainWindow::renameInEditor()
+{
+    Panel* p = active();
+    QList<RenameItem> items;
+    QSet<QString> existing;
+    if (collectRenameItems(p, items, existing))
+        startEditorRename(p, items, existing);
+}
+
+void MainWindow::startEditorRename(Panel* p, const QList<RenameItem>& items, const QSet<QString>& existing)
+{
+    auto* session = new EditNamesSession(items, existing, this);
+    QPointer<Panel> panel(p);
+    const QString dir = p->path();
+    connect(session, &EditNamesSession::message, this, [panel](const QString& text, bool error) {
+        if (panel)
+            panel->showMessage(text, error);
+    });
+    connect(session, &EditNamesSession::confirmed, this, [this, panel, dir](const RenamePlan& plan) {
+        if (panel && panel->path() == dir)
+            runRenamePlan(panel, plan);
+        else if (panel)
+            panel->showMessage(tr("The folder changed while editing; nothing renamed"), true);
+    });
+    connect(session, &EditNamesSession::done, session, &QObject::deleteLater);
+    session->start();
+}
+
+void MainWindow::runRenamePlan(Panel* p, const RenamePlan& plan)
+{
     const QString dir = p->path();
     QPointer<Panel> panel(p);
     QPointer<MainWindow> self(this);
@@ -947,6 +990,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     if (single)
         menu.addAction(act("rename"));
     menu.addAction(act("multiRename"));
+    menu.addAction(act("editorRename"));
     menu.addAction(act("copyPath"));
     menu.addSeparator();
     if (e && e->isDir)

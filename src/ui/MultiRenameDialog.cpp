@@ -85,6 +85,59 @@ QVariant RenamePreviewModel::headerData(int section, Qt::Orientation o, int role
     return {};
 }
 
+// ------------------------------------------------------ RenameConfirmDialog
+
+RenameConfirmDialog::RenameConfirmDialog(const RenamePlan& plan, QWidget* parent) : QDialog(parent)
+{
+    setWindowTitle(tr("Rename from editor"));
+    resize(820, 560);
+    auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(16, 14, 16, 12);
+    auto* model = new RenamePreviewModel(this);
+    model->setPlan(plan);
+    auto* table = new QTableView(this);
+    table->setModel(model);
+    table->verticalHeader()->hide();
+    table->setShowGrid(false);
+    table->setSelectionMode(QAbstractItemView::NoSelection);
+    table->setFocusPolicy(Qt::NoFocus);
+    table->setAlternatingRowColors(true);
+    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    table->setColumnHidden(2, plan.problems == 0);
+    table->verticalHeader()->setDefaultSectionSize(table->fontMetrics().height() + 8);
+    layout->addWidget(table, 1);
+
+    const Theme& t = theme();
+    auto* bottom = new QHBoxLayout;
+    auto* summary = new QLabel(this);
+    if (plan.problems)
+        summary->setText(tr("%n name(s) can't be used. Edit again to fix them.", nullptr, plan.problems));
+    else
+        summary->setText(tr("%n item(s) will be renamed", nullptr, plan.changes));
+    QPalette pal = summary->palette();
+    pal.setColor(QPalette::WindowText, plan.problems ? t.error : t.text);
+    summary->setPalette(pal);
+    bottom->addWidget(summary, 1);
+    auto* again = new QPushButton(tr("Edit again"), this);
+    auto* cancel = new QPushButton(tr("Cancel"), this);
+    m_rename = new QPushButton(tr("Rename"), this);
+    again->setAutoDefault(false);
+    cancel->setAutoDefault(false);
+    m_rename->setDefault(true);
+    m_rename->setEnabled(plan.canRun());
+    if (!plan.canRun())
+        again->setDefault(true);
+    connect(again, &QPushButton::clicked, this, [this] { done(EditAgain); });
+    connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
+    connect(m_rename, &QPushButton::clicked, this, &QDialog::accept);
+    bottom->addWidget(again);
+    bottom->addWidget(cancel);
+    bottom->addWidget(m_rename);
+    layout->addLayout(bottom);
+}
+
 // -------------------------------------------------------- MultiRenameDialog
 
 MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString parentFolderName, QSet<QString> existing,
@@ -176,6 +229,11 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString parentFold
     m_summary = new QLabel(this);
     m_summary->setTextFormat(Qt::PlainText);
     bottom->addWidget(m_summary, 1);
+    auto* inEditor = new QPushButton(tr("Edit names in editor…"), this);
+    inEditor->setAutoDefault(false);
+    inEditor->setToolTip(tr("Rename with your text editor, one name per line (Ctrl+E)"));
+    connect(inEditor, &QPushButton::clicked, this, [this] { done(EditInEditor); });
+    bottom->addWidget(inEditor);
     auto* reset = new QPushButton(tr("Reset"), this);
     reset->setAutoDefault(false);
     auto* cancel = new QPushButton(tr("Cancel"), this);

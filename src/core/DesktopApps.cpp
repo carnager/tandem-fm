@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
+#include <QFileInfo>
 #include <QLocale>
 #include <QProcess>
 #include <QSaveFile>
@@ -345,6 +346,23 @@ QList<QStringList> DesktopApps::commandLines(const QString& exec, const QStringL
     return out;
 }
 
+QStringList DesktopApps::terminalCommand(const QString& terminal, const QStringList& command)
+{
+    QStringList base = QProcess::splitCommand(terminal);
+    if (base.isEmpty())
+        return command;
+    const QString name = QFileInfo(base.first()).fileName();
+    if (name == QLatin1String("kitty") || name == QLatin1String("foot") || name == QLatin1String("footclient"))
+        return base + command;
+    if (name == QLatin1String("wezterm"))
+        return base + QStringList{QStringLiteral("start"), QStringLiteral("--")} + command;
+    if (name == QLatin1String("gnome-terminal") || name == QLatin1String("kgx"))
+        return base + QStringList{QStringLiteral("--wait"), QStringLiteral("--")} + command;
+    if (name == QLatin1String("ghostty"))
+        return base + QStringList{QStringLiteral("-e")} + command;
+    return base + QStringList{QStringLiteral("-e")} + command;
+}
+
 bool DesktopApps::launch(const DesktopApp& app, const QStringList& paths, const QString& workDir,
                          const QString& terminal)
 {
@@ -353,7 +371,7 @@ bool DesktopApps::launch(const DesktopApp& app, const QStringList& paths, const 
         if (argv.isEmpty())
             return false;
         if (app.terminal && !terminal.isEmpty())
-            argv = QStringList{terminal, QStringLiteral("-e")} + argv;
+            argv = terminalCommand(terminal, argv);
         const QString program = argv.takeFirst();
         ok = QProcess::startDetached(program, argv, workDir) && ok;
     }

@@ -52,7 +52,7 @@ Visual check without a display:
 | Num + / Num − / Num * | Mark group / unmark group / invert |
 | F3 / F4 | Built-in viewer / edit (default app; set `tools/editor` in the config for F4) |
 | F5 / F6 | Copy / move to the other panel (`name/` = into that folder) |
-| Shift+F6 / Ctrl+M | Rename in place / multi-rename tool |
+| Shift+F6 / Ctrl+M / Ctrl+E | Rename in place / multi-rename tool / rename in your text editor (vidir-style) |
 | F7 / Shift+F4 | New folder (`a/b/c` creates nested folders) / new file |
 | F8, Del / Shift+F8, Shift+Del | Move to trash / delete permanently |
 | Ctrl+T / Ctrl+W / Ctrl+Tab | New / close / next tab (double-click a tab closes it) |

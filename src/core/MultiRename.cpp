@@ -157,6 +157,41 @@ QString applyCase(const QString& s, RenameOptions::Case mode)
     return s;
 }
 
+void validatePlan(RenamePlan& plan, const QSet<QString>& existing)
+{
+    // Validate: names, duplicates, collisions with files outside the set.
+    QHash<QString, int> targetCount;
+    QSet<QString> leaving;  // old names that will be free afterwards
+    for (const RenameRow& r : std::as_const(plan.rows)) {
+        targetCount[r.newName] += 1;
+        if (r.newName != r.oldName)
+            leaving.insert(r.oldName);
+    }
+    for (RenameRow& r : plan.rows) {
+        if (r.newName == r.oldName) {
+            r.status = RenameRow::Status::Unchanged;
+            continue;
+        }
+        if (r.newName.isEmpty() || r.newName == QLatin1String(".") || r.newName == QLatin1String("..") ||
+            r.newName.contains(QLatin1Char('/')) || r.newName.contains(QChar(0))) {
+            r.status = RenameRow::Status::Invalid;
+            r.note = QObject::tr("not a valid file name");
+        } else if (targetCount.value(r.newName) > 1) {
+            r.status = RenameRow::Status::Conflict;
+            r.note = QObject::tr("same new name as another file");
+        } else if (existing.contains(r.newName) && !leaving.contains(r.newName)) {
+            r.status = RenameRow::Status::Conflict;
+            r.note = QObject::tr("a file with this name exists");
+        } else {
+            r.status = RenameRow::Status::Ok;
+        }
+        if (r.status == RenameRow::Status::Ok)
+            ++plan.changes;
+        else
+            ++plan.problems;
+    }
+}
+
 }  // namespace
 
 RenamePlan buildRenamePlan(const QList<RenameItem>& items, const QString& parentFolderName,
@@ -226,37 +261,21 @@ RenamePlan buildRenamePlan(const QList<RenameItem>& items, const QString& parent
         plan.rows.append(row);
     }
 
-    // Validate: names, duplicates, collisions with files outside the set.
-    QHash<QString, int> targetCount;
-    QSet<QString> leaving;  // old names that will be free afterwards
-    for (const RenameRow& r : std::as_const(plan.rows)) {
-        targetCount[r.newName] += 1;
-        if (r.newName != r.oldName)
-            leaving.insert(r.oldName);
+    validatePlan(plan, existing);
+    return plan;
+}
+
+RenamePlan buildRenamePlanFromNames(const QList<RenameItem>& items, const QStringList& newNames,
+                                    const QSet<QString>& existing)
+{
+    RenamePlan plan;
+    for (int i = 0; i < items.size() && i < newNames.size(); ++i) {
+        RenameRow row;
+        row.oldName = items[i].name;
+        row.newName = newNames[i];
+        plan.rows.append(row);
     }
-    for (RenameRow& r : plan.rows) {
-        if (r.newName == r.oldName) {
-            r.status = RenameRow::Status::Unchanged;
-            continue;
-        }
-        if (r.newName.isEmpty() || r.newName == QLatin1String(".") || r.newName == QLatin1String("..") ||
-            r.newName.contains(QLatin1Char('/')) || r.newName.contains(QChar(0))) {
-            r.status = RenameRow::Status::Invalid;
-            r.note = QObject::tr("not a valid file name");
-        } else if (targetCount.value(r.newName) > 1) {
-            r.status = RenameRow::Status::Conflict;
-            r.note = QObject::tr("same new name as another file");
-        } else if (existing.contains(r.newName) && !leaving.contains(r.newName)) {
-            r.status = RenameRow::Status::Conflict;
-            r.note = QObject::tr("a file with this name exists");
-        } else {
-            r.status = RenameRow::Status::Ok;
-        }
-        if (r.status == RenameRow::Status::Ok)
-            ++plan.changes;
-        else
-            ++plan.problems;
-    }
+    validatePlan(plan, existing);
     return plan;
 }
 

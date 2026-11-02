@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/FileOps.h"
+#include "core/MultiRename.h"
 #include "ui/IconCache.h"
 
 #include <QHash>
@@ -61,6 +62,10 @@ private:
     void openFrom(Panel* p, const QString& path);
     void pack();
     void multiRename();
+    void renameInEditor();
+    bool collectRenameItems(Panel* p, QList<RenameItem>& items, QSet<QString>& existing);
+    void startEditorRename(Panel* p, const QList<RenameItem>& items, const QSet<QString>& existing);
+    void runRenamePlan(Panel* p, const RenamePlan& plan);
     void undoMultiRename();
     void unpack();
     void populateIconThemeMenu(QMenu* menu);

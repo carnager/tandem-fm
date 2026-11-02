@@ -59,6 +59,10 @@ struct RenamePlan {
 RenamePlan buildRenamePlan(const QList<RenameItem>& items, const QString& parentFolderName,
                            const RenameOptions& options, const QSet<QString>& existing);
 
+// Plan from names typed elsewhere (e.g. in a text editor), one per item.
+RenamePlan buildRenamePlanFromNames(const QList<RenameItem>& items, const QStringList& newNames,
+                                    const QSet<QString>& existing);
+
 // Renames in dir. Chains and swaps (a->b, b->a) go through temporary names.
 // Returns the (new, old) pairs that were actually done, for undo.
 QList<QPair<QString, QString>> executeRenamePlan(const QString& dir, const RenamePlan& plan, QStringList* errors);

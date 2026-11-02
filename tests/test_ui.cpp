@@ -16,6 +16,7 @@
 #include <QSignalSpy>
 
 #include <QApplication>
+#include <QSettings>
 #include <QImage>
 #include <QClipboard>
 #include <QContextMenuEvent>
@@ -526,15 +527,21 @@ private slots:
         QTRY_VERIFY(leftModel()->rowOf("img_2.txt") >= 0);
 
         // A mask producing a clash keeps the Rename button disabled.
+        m_window->activateWindow();  // offscreen: the window stays inactive after a dialog
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
         leftModel()->markByPattern("*", true);
-        answerNextDialog([](QWidget* w) {
+        auto clashChecked = std::make_shared<bool>(false);
+        answerNextDialog([clashChecked](QWidget* w) {
             auto* dlg = qobject_cast<MultiRenameDialog*>(w);
+            QVERIFY(dlg);
             dlg->nameMaskEdit()->setText("same");
             QTest::qWait(100);
-            QVERIFY(!dlg->renameButton()->isEnabled());
+            *clashChecked = !dlg->renameButton()->isEnabled();
             dlg->reject();
         });
         QTest::keyClick(m_left->view(), Qt::Key_M, Qt::ControlModifier);
+        QTRY_VERIFY(*clashChecked);
         QTRY_VERIFY(QApplication::activeModalWidget() == nullptr);
         leftModel()->markAll(false);
 
@@ -551,6 +558,62 @@ private slots:
         QVERIFY(QFile::exists(L("mr/c.txt")));
         QVERIFY(!QFile::exists(L("mr/img_1.txt")));
 
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void renameInTextEditor()
+    {
+        QVERIFY(QDir().mkpath(L("ed")));
+        for (const char* n : {"one.txt", "two.txt", "three.log"})
+            writeFile(L(QString("ed/") + n), n);
+        m_left->navigate(L("ed"));
+        QTRY_COMPARE(leftModel()->path(), L("ed"));
+        auto useEditor = [](const QString& cmd) { QSettings().setValue("tools/nameEditor", cmd); };
+
+        // The "editor" swaps .txt for .md on every line.
+        useEditor("sed -i s/\\.txt$/.md/ %f");
+        leftModel()->markByPattern("*", true);
+        answerNextDialog([](QWidget* w) {
+            auto* dlg = qobject_cast<RenameConfirmDialog*>(w);
+            QVERIFY(dlg);
+            QVERIFY(dlg->renameButton()->isEnabled());
+            dlg->renameButton()->click();
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_E, Qt::ControlModifier);
+        QTRY_VERIFY(QFile::exists(L("ed/one.md")));
+        QVERIFY(QFile::exists(L("ed/two.md")));
+        QVERIFY(QFile::exists(L("ed/three.log")));
+        QTRY_VERIFY(leftModel()->rowOf("one.md") >= 0);
+
+        // A deleted line: warn, rename nothing.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        useEditor("sed -i 1d %f");
+        leftModel()->markByPattern("*", true);
+        answerNextDialog([](QWidget* w) {
+            auto* box = qobject_cast<QMessageBox*>(w);
+            QVERIFY(box);
+            QVERIFY(box->text().contains("Expected 3 lines"));
+            box->button(QMessageBox::Cancel)->click();
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_E, Qt::ControlModifier);
+        QTRY_VERIFY(QApplication::activeModalWidget() == nullptr);
+        QTest::qWait(200);
+        QVERIFY(QFile::exists(L("ed/one.md")));
+
+        // Nothing changed: no dialog at all.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        useEditor("true");
+        QTest::keyClick(m_left->view(), Qt::Key_E, Qt::ControlModifier);
+        QTest::qWait(400);
+        QVERIFY(QApplication::activeModalWidget() == nullptr);
+
+        QSettings().remove("tools/nameEditor");
+        leftModel()->markAll(false);
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
     }

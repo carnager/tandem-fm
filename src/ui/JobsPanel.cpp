@@ -6,12 +6,17 @@
 #include "ui/JobManager.h"
 #include "ui/Theme.h"
 
+#include <QGraphicsDropShadowEffect>
 #include <QHBoxLayout>
+#include <QPainter>
+#include <QPainterPath>
 #include <QLabel>
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QToolButton>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 namespace tandem {
 
@@ -65,6 +70,11 @@ JobRow::JobRow(Job* job, JobManager* manager, QWidget* parent) : QWidget(parent)
     layout->addWidget(m_pause);
     layout->addWidget(m_close);
     m_clock.start();
+}
+
+double JobRow::speed() const
+{
+    return m_job->isFinished() ? 0 : m_speed;
 }
 
 void JobRow::refresh()
@@ -147,16 +157,90 @@ void JobRow::refresh()
     m_close->setToolTip(m_job->isFinished() ? tr("Dismiss") : tr("Cancel"));
 }
 
+// ---------------------------------------------------------------- JobsPill
+
+JobsPill::JobsPill(QWidget* parent) : QAbstractButton(parent)
+{
+    setFocusPolicy(Qt::NoFocus);
+    setCursor(Qt::PointingHandCursor);
+    setAttribute(Qt::WA_Hover);
+}
+
+void JobsPill::setState(const QString& text, double fraction, bool attention)
+{
+    const bool resize = text.size() != m_text.size();
+    m_text = text;
+    m_fraction = std::clamp(fraction, 0.0, 1.0);
+    m_attention = attention;
+    if (resize)
+        updateGeometry();
+    update();
+}
+
+QSize JobsPill::sizeHint() const
+{
+    const QFontMetrics fm(font());
+    return {qMax(160, fm.horizontalAdvance(m_text) + 36), fm.height() + 14};
+}
+
+void JobsPill::paintEvent(QPaintEvent*)
+{
+    const Theme& t = theme();
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QRectF r = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+    const qreal radius = r.height() / 2;
+    QPainterPath shape;
+    shape.addRoundedRect(r, radius, radius);
+    p.fillPath(shape, underMouse() ? t.headerActive : t.header);
+    if (m_fraction > 0) {
+        p.save();
+        p.setClipPath(shape);
+        QColor fill = m_attention ? t.error : t.accent;
+        fill.setAlpha(70);
+        p.fillRect(QRectF(r.left(), r.top(), r.width() * m_fraction, r.height()), fill);
+        p.restore();
+    }
+    p.setPen(QPen(m_attention ? t.error : t.accent, 1.2));
+    p.drawPath(shape);
+    p.setPen(m_attention ? t.error : t.text);
+    p.drawText(rect(), Qt::AlignCenter, m_text);
+}
+
 // --------------------------------------------------------------- JobsPanel
 
-JobsPanel::JobsPanel(JobManager* manager, QWidget* parent) : QFrame(parent), m_manager(manager)
+JobsPanel::JobsPanel(JobManager* manager, QWidget* overlayParent) : QWidget(overlayParent), m_manager(manager)
 {
-    setObjectName(QStringLiteral("jobsPanel"));
-    setStyleSheet(theme().css(QStringLiteral(
-        "#jobsPanel { background: @header; border: 1px solid @border; border-radius: 8px; }")));
-    m_rows = new QVBoxLayout(this);
-    m_rows->setContentsMargins(2, 2, 2, 2);
+    auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(10, 10, 10, 10);  // room for the shadows
+    layout->setSpacing(8);
+
+    m_list = new QFrame(this);
+    m_list->setObjectName(QStringLiteral("jobsList"));
+    m_list->setStyleSheet(theme().css(QStringLiteral(
+        "#jobsList { background: @header; border: 1px solid @border; border-radius: 10px; }")));
+    m_rows = new QVBoxLayout(m_list);
+    m_rows->setContentsMargins(4, 4, 4, 4);
     m_rows->setSpacing(0);
+    auto* listShadow = new QGraphicsDropShadowEffect(m_list);
+    listShadow->setBlurRadius(24);
+    listShadow->setOffset(0, 4);
+    listShadow->setColor(QColor(0, 0, 0, theme().dark ? 150 : 60));
+    m_list->setGraphicsEffect(listShadow);
+    m_list->hide();
+    layout->addWidget(m_list);
+
+    m_pill = new JobsPill(this);
+    auto* pillShadow = new QGraphicsDropShadowEffect(m_pill);
+    pillShadow->setBlurRadius(18);
+    pillShadow->setOffset(0, 3);
+    pillShadow->setColor(QColor(0, 0, 0, theme().dark ? 140 : 50));
+    m_pill->setGraphicsEffect(pillShadow);
+    m_pill->setToolTip(tr("Background operations: click to show or hide"));
+    connect(m_pill, &QAbstractButton::clicked, this, [this] { setExpanded(!m_expanded); });
+    layout->addWidget(m_pill, 0, Qt::AlignRight);
+
+    overlayParent->installEventFilter(this);
     hide();
 
     m_timer.setInterval(100);
@@ -166,13 +250,49 @@ JobsPanel::JobsPanel(JobManager* manager, QWidget* parent) : QFrame(parent), m_m
     connect(manager, &JobManager::jobRemoved, this, &JobsPanel::onRemoved);
 }
 
+void JobsPanel::setBottomMargin(int px)
+{
+    m_bottomMargin = px;
+    reposition();
+}
+
+void JobsPanel::setExpanded(bool on)
+{
+    m_expanded = on;
+    m_list->setVisible(on && !m_rowFor.isEmpty());
+    reposition();
+}
+
+bool JobsPanel::eventFilter(QObject* obj, QEvent* e)
+{
+    if (obj == parent() && e->type() == QEvent::Resize)
+        reposition();
+    return QWidget::eventFilter(obj, e);
+}
+
+void JobsPanel::reposition()
+{
+    auto* p = parentWidget();
+    if (!p || m_rowFor.isEmpty())
+        return;
+    const int width = m_expanded ? qMin(480, p->width() - 16) : m_pill->sizeHint().width() + 20;
+    m_list->setFixedWidth(width - 20);
+    layout()->activate();
+    const int height = layout()->sizeHint().height();
+    setGeometry(p->width() - width - 2, p->height() - height - m_bottomMargin + 10, width, height);
+    raise();
+}
+
 void JobsPanel::onAdded(Job* job)
 {
-    auto* row = new JobRow(job, m_manager, this);
+    auto* row = new JobRow(job, m_manager, m_list);
     m_rowFor.insert(job, row);
     m_rows->addWidget(row);
     row->refresh();
+    m_list->setVisible(m_expanded);
     show();
+    updatePill();
+    reposition();
     if (!m_timer.isActive())
         m_timer.start();
 }
@@ -185,6 +305,7 @@ void JobsPanel::onFinished(Job* job)
     const Job::Snapshot s = job->snapshot();
     if (s.errorCount == 0)
         QTimer::singleShot(s.state == Job::State::Done ? 1500 : 3000, this, [this, job] { m_manager->dismiss(job); });
+    updatePill();
 }
 
 void JobsPanel::onRemoved(Job* job)
@@ -194,7 +315,12 @@ void JobsPanel::onRemoved(Job* job)
     if (m_rowFor.isEmpty()) {
         hide();
         m_timer.stop();
+        m_expanded = false;
+        m_list->hide();
+        return;
     }
+    updatePill();
+    QTimer::singleShot(0, this, &JobsPanel::reposition);  // after the row is gone
 }
 
 void JobsPanel::tick()
@@ -202,6 +328,50 @@ void JobsPanel::tick()
     for (JobRow* row : std::as_const(m_rowFor))
         if (!row->job()->isFinished())
             row->refresh();
+    updatePill();
+}
+
+void JobsPanel::updatePill()
+{
+    int64_t done = 0, total = 0, filesDone = 0, filesTotal = 0;
+    double speed = 0;
+    int running = 0, problems = 0, waiting = 0;
+    Job* only = nullptr;
+    for (auto it = m_rowFor.cbegin(); it != m_rowFor.cend(); ++it) {
+        Job* j = it.key();
+        const Job::Snapshot s = j->snapshot();
+        done += s.bytesDone;
+        total += s.bytesTotal;
+        filesDone += s.filesDone;
+        filesTotal += s.filesTotal;
+        speed += it.value()->speed();
+        if (!j->isFinished()) {
+            ++running;
+            only = j;
+        }
+        if (s.state == Job::State::Waiting)
+            ++waiting;
+        if (j->isFinished() && s.errorCount)
+            ++problems;
+    }
+    const double fraction = total > 0 ? double(done) / double(total)
+                                      : (filesTotal > 0 ? double(filesDone) / double(filesTotal) : 0.0);
+    QString text;
+    if (waiting)
+        text = tr("Needs your answer");
+    else if (running == 1)
+        text = QStringLiteral("%1  %2%").arg(only->title()).arg(int(fraction * 100));
+    else if (running > 1)
+        text = tr("%1 operations  %2%").arg(running).arg(int(fraction * 100));
+    else if (problems)
+        text = tr("%n problem(s): click to see", nullptr, problems);
+    else
+        text = tr("Done");
+    if (running && speed > 1)
+        text += QStringLiteral("  ·  ") + formatSpeed(speed);
+    m_pill->setState(text, running ? fraction : (problems ? 1.0 : 1.0), waiting > 0 || problems > 0);
+    if (!m_expanded)
+        reposition();
 }
 
 }  // namespace tandem

@@ -30,10 +30,24 @@ private:
     RenamePlan m_plan;
 };
 
+// Shows a finished plan (from the text editor) and asks to go ahead.
+// Result: Accepted = rename, EditAgain = back to the editor.
+class RenameConfirmDialog : public QDialog {
+    Q_OBJECT
+public:
+    enum { EditAgain = 2 };
+    RenameConfirmDialog(const RenamePlan& plan, QWidget* parent = nullptr);
+    QPushButton* renameButton() const { return m_rename; }
+
+private:
+    QPushButton* m_rename;
+};
+
 // Ctrl+M: Total Commander style multi-rename with a live preview.
 class MultiRenameDialog : public QDialog {
     Q_OBJECT
 public:
+    enum { EditInEditor = 2 };  // dialog result: hand the names to a text editor
     MultiRenameDialog(QList<RenameItem> items, QString parentFolderName, QSet<QString> existing,
                       QWidget* parent = nullptr);
 
