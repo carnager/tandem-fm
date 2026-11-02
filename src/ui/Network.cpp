@@ -112,9 +112,12 @@ struct MountCall {
     GFile* file = nullptr;
     bool eject = false;
     QString defaultUser;
+    QPointer<QDialog> dialog;  // the open question: GVfs re-asks when one takes long
 
     ~MountCall()
     {
+        if (dialog)  // the mount ended (failed, timed out) while still asking
+            dialog->reject();
         if (op)
             g_object_unref(op);
         if (file)
@@ -126,7 +129,12 @@ void onAskPassword(GMountOperation* op, const char* message, const char* default
                    GAskPasswordFlags flags, gpointer data)
 {
     auto* call = static_cast<MountCall*>(data);
+    if (call->dialog) {  // the same question again: the open dialog answers it
+        call->dialog->raise();
+        return;
+    }
     auto* dlg = new QDialog(call->parent);
+    call->dialog = dlg;
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     dlg->setWindowTitle(QObject::tr("Connect"));
     auto* layout = new QVBoxLayout(dlg);

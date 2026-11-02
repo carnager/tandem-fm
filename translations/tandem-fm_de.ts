@@ -459,6 +459,14 @@
         <source>Trust and connect</source>
         <translation>Vertrauen und verbinden</translation>
     </message>
+    <message>
+        <source>Log in to %1. Write the user as DOMAIN\user if needed; leave both empty for guest.</source>
+        <translation>Bei %1 anmelden. Den Benutzer bei Bedarf als DOMÄNE\benutzer schreiben; beides leer lassen für Gast.</translation>
+    </message>
+    <message>
+        <source>Access denied by %1</source>
+        <translation>Zugriff verweigert von %1</translation>
+    </message>
 </context>
 <context>
     <name>tandem::CommandBar</name>

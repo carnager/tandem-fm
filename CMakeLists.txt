@@ -36,6 +36,7 @@ add_library(tandem_core STATIC
   src/core/Backend.h src/core/Backend.cpp
   src/core/BackendCopy.cpp
   src/core/SftpBackend.cpp
+  src/core/SmbBackend.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)
@@ -95,6 +96,18 @@ if(LIBSSH_FOUND)
   message(STATUS "Native SFTP (libssh ${LIBSSH_VERSION}): enabled")
 else()
   message(STATUS "Native SFTP: disabled (libssh >= 0.11 not found; GVfs is used instead)")
+endif()
+
+# Optional: native SMB (Samba's libsmbclient).
+if(PkgConfig_FOUND)
+  pkg_check_modules(SMBCLIENT IMPORTED_TARGET smbclient)
+endif()
+if(SMBCLIENT_FOUND)
+  target_link_libraries(tandem_core PRIVATE PkgConfig::SMBCLIENT)
+  target_compile_definitions(tandem_core PRIVATE TANDEM_HAVE_SMBCLIENT)
+  message(STATUS "Native SMB (libsmbclient): enabled")
+else()
+  message(STATUS "Native SMB: disabled (libsmbclient not found; GVfs is used instead)")
 endif()
 
 # Optional: syntax highlighting in the viewer (KDE's KSyntaxHighlighting).

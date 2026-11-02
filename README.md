@@ -31,7 +31,7 @@ cmake --build build
 ./build/tandem-fm [left-path] [right-path]
 ```
 
-Requires Qt ≥ 6.5 (Core, Gui, Widgets, Test) and a C++20 compiler.
+Requires Qt ≥ 6.5 (Core, Gui, Widgets, Test) and a C++20 compiler. Optional, picked up when found: GIO (GVfs network places), libssh ≥ 0.11 (SFTP), libsmbclient (SMB).
 
 ## Tests and benchmarks
 
@@ -53,7 +53,7 @@ Visual check without a display:
 | Tab | Switch panel |
 | Enter / Backspace | Open / parent folder |
 | Type letters | Quick search (↑/↓ next match, Esc close) |
-| Ctrl+K | Connect to a server: `sftp://user@host/path`, `user@host:folder`, `smb://nas/share`, `davs://…`, `ftp://…`. Also works typed into the path bar (Ctrl+L). **SFTP is built in** (libssh): it uses `~/.ssh/config`, the agent, your keys and `known_hosts` like `ssh`; a bare `user@host` opens your home there; big files go over up to 4 connections at once (at 80 ms round trip: ~32 MiB/s down, ~39 up, vs ~17 for `sftp`/`scp`). Other protocols go through GVfs (keyring passwords, other apps see the mount). On a server, F3/F4/previews work on downloaded copies (F4 uploads every save), F8 deletes permanently. Servers you used are listed in the Locations menu (Alt+F1/F2), which also mounts drives and has "Disconnect / eject" |
+| Ctrl+K | Connect to a server: `sftp://user@host/path`, `user@host:folder`, `smb://nas/share`, `davs://…`, `ftp://…`. Also works typed into the path bar (Ctrl+L). **SFTP is built in** (libssh): it uses `~/.ssh/config`, the agent, your keys and `known_hosts` like `ssh`; a bare `user@host` opens your home there; big files go over up to 4 connections at once (at 80 ms round trip: ~32 MiB/s down, ~39 up, vs ~17 for `sftp`/`scp`). **SMB is built in too** (libsmbclient): `smb://nas/` lists the shares; Kerberos if you have a ticket, otherwise one login dialog per server and session (user as `DOMAIN\user`, both empty for guest); big blocks keep transfers near link speed, and folders keep listing fast while a copy runs. Other protocols go through GVfs (keyring passwords, other apps see the mount). On a server, F3/F4/previews work on downloaded copies (F4 uploads every save), F8 deletes permanently. Servers you used are listed in the Locations menu (Alt+F1/F2), which also mounts drives and has "Disconnect / eject" |
 | Shift+F2 | Compare the panels: marks files that are newer or missing on the other side (instant, uses what's listed) |
 | Ctrl+Shift+S | Synchronize folders: compares both trees off-thread (optionally byte by byte), shows every difference with a direction (→ ← = ≠ ✕). Change it with ←/→/Space/Del or a click, Enter diffs two files (meld/kdiff3/…, else `diff -u`), Ctrl+Enter syncs. Modes: both ways (newer wins), mirror left→right, mirror right→left (extra files go to the trash) |
 | Ctrl+; (vim: `!`) | Run a shell command: `%s` marked files (quoted), `%f` file, `%n` name, `%d` folder, `%D` other panel's folder. Enter runs it in the background (output in a window), Ctrl+Enter in your terminal. ↑↓ history |

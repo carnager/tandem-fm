@@ -7,6 +7,7 @@
 #include <QApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPointer>
@@ -23,9 +24,20 @@ namespace {
 
 std::atomic<bool> g_quitting{false};
 
-QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut)
+QWidget* dialogParent()
 {
-    auto* dlg = new QDialog(QApplication::activeWindow());
+    if (QWidget* w = QApplication::activeWindow())
+        return w;
+    // Between two dialogs nothing is active: stay on the main window anyway.
+    for (QWidget* w : QApplication::topLevelWidgets())
+        if (w->inherits("QMainWindow") && w->isVisible())
+            return w;
+    return nullptr;
+}
+
+QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut, QLineEdit** userOut)
+{
+    auto* dlg = new QDialog(dialogParent());
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     dlg->setObjectName(QStringLiteral("authDialog"));
     const bool hostKey = q.kind == AuthQuestion::Kind::HostKey;
@@ -46,7 +58,20 @@ QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut)
         layout->addWidget(detail);
     }
     QLineEdit* edit = nullptr;
-    if (!hostKey) {
+    QLineEdit* user = nullptr;
+    if (q.kind == AuthQuestion::Kind::Login) {
+        auto* form = new QFormLayout;
+        user = new QLineEdit(q.user, dlg);
+        edit = new QLineEdit(dlg);
+        edit->setEchoMode(QLineEdit::Password);
+        form->addRow(QObject::tr("User"), user);
+        form->addRow(QObject::tr("Password"), edit);
+        layout->addLayout(form);
+        if (q.user.isEmpty())
+            user->setFocus();
+        else
+            edit->setFocus();
+    } else if (!hostKey) {
         edit = new QLineEdit(dlg);
         if (q.secret)
             edit->setEchoMode(QLineEdit::Password);
@@ -66,6 +91,7 @@ QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut)
     QObject::connect(buttons, &QDialogButtonBox::accepted, dlg, &QDialog::accept);
     QObject::connect(buttons, &QDialogButtonBox::rejected, dlg, &QDialog::reject);
     *editOut = edit;
+    *userOut = user;
     return dlg;
 }
 
@@ -84,11 +110,15 @@ void installAuthDialogs()
         std::future<std::optional<QString>> result = promise->get_future();
         postToUi([q, reply] {
             QLineEdit* edit = nullptr;
-            QDialog* dlg = makeDialog(q, &edit);
+            QLineEdit* user = nullptr;
+            QDialog* dlg = makeDialog(q, &edit, &user);
             QPointer<QLineEdit> e(edit);
-            QObject::connect(dlg, &QDialog::finished, [reply, e](int r) {
+            QPointer<QLineEdit> u(user);
+            QObject::connect(dlg, &QDialog::finished, [reply, e, u](int r) {
                 if (r != QDialog::Accepted)
                     reply(std::nullopt);
+                else if (u)
+                    reply(u->text().trimmed() + QLatin1Char('\n') + (e ? e->text() : QString()));
                 else
                     reply(e ? e->text() : QStringLiteral("yes"));
             });

@@ -42,6 +42,8 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QDialog>
+#include <QLineEdit>
+#include <thread>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -1432,6 +1434,36 @@ private slots:
         m_right->navigate(R());
         QTRY_COMPARE(rightModel()->path(), R());
         registerBackend("test", nullptr);
+    }
+
+    // A login asks user and password in one dialog.
+    void loginDialog()
+    {
+        std::optional<QString> answer;
+        std::thread asker([&] {
+            AuthQuestion q;
+            q.kind = AuthQuestion::Kind::Login;
+            q.location = QStringLiteral("smb://nas/");
+            q.message = QStringLiteral("Log in to nas");
+            q.user = QStringLiteral("bob");
+            answer = askAuth(q);
+        });
+        QDialog* dlg = nullptr;
+        QTRY_VERIFY([&] {
+            for (QWidget* w : QApplication::allWidgets())
+                if (w->objectName() == QLatin1String("authDialog") && w->isVisible())
+                    dlg = qobject_cast<QDialog*>(w);
+            return dlg != nullptr;
+        }());
+        const QList<QLineEdit*> edits = dlg->findChildren<QLineEdit*>();
+        QCOMPARE(edits.size(), 2);
+        QCOMPARE(edits[0]->text(), QStringLiteral("bob"));
+        QCOMPARE(edits[1]->echoMode(), QLineEdit::Password);
+        edits[0]->setText(QStringLiteral(" WORK\\alice "));
+        edits[1]->setText(QStringLiteral("se cret"));
+        dlg->accept();
+        asker.join();
+        QCOMPARE(answer, std::optional<QString>(QStringLiteral("WORK\\alice\nse cret")));
     }
 
     void sftpInPanel()

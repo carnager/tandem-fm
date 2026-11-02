@@ -79,11 +79,13 @@ public:
 // passphrase). Asked from worker threads; blocks until answered. The UI
 // installs the handler, tests install their own.
 struct AuthQuestion {
-    enum class Kind { HostKey, Password, Passphrase, Prompt };
+    // Login: user and password in one go; the answer is "user\npassword".
+    enum class Kind { HostKey, Password, Passphrase, Prompt, Login };
     Kind kind = Kind::Password;
     QString location;  // "sftp://bob@host"
     QString message;
     QString detail;    // e.g. the key fingerprint
+    QString user;      // Login: the suggested user name
     bool secret = true;
 };
 // nullopt: the user cancelled. For HostKey any answer means "trust it".

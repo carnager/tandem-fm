@@ -1266,9 +1266,12 @@ void registerSftpBackend() {}
 
 namespace tandem {
 
+void registerSmbBackend();  // SmbBackend.cpp
+
 void registerBuiltinBackends()
 {
     registerSftpBackend();
+    registerSmbBackend();
 }
 
 }  // namespace tandem
