@@ -2,6 +2,7 @@
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
+#include "core/IoScheduler.h"
 #include "core/MultiRename.h"
 #include "core/Sorting.h"
 
@@ -522,6 +523,74 @@ private slots:
         QVERIFY(errors.isEmpty());
         QCOMPARE(readFile(tmp.filePath("a")), QByteArray("A"));
         QCOMPARE(readFile(tmp.filePath("c")), QByteArray("C"));
+    }
+
+    void queuePerDrive()
+    {
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("f1"), QByteArray(4096, '1'));
+        writeFile(tmp.filePath("f2"), QByteArray(4096, '2'));
+        writeFile(tmp.filePath("f3"), QByteArray(4096, '3'));
+        QVERIFY(QDir().mkdir(tmp.filePath("out")));
+        auto state = [](Job& j) { return j.snapshot().state; };
+
+        CopyJob a(CopyJob::Mode::Copy, {tmp.filePath("f1")}, tmp.filePath("out"));
+        a.setPaused(true);  // gets the drive, then sits paused
+        QSignalSpy aDone(&a, &Job::finished);
+        a.start();
+        QTRY_VERIFY(state(a) != Job::State::Pending && state(a) != Job::State::Queued);
+
+        CopyJob b(CopyJob::Mode::Copy, {tmp.filePath("f2")}, tmp.filePath("out"));
+        QSignalSpy bDone(&b, &Job::finished);
+        b.start();
+        CopyJob c(CopyJob::Mode::Copy, {tmp.filePath("f3")}, tmp.filePath("out"));
+        c.setPaused(true);
+        QSignalSpy cDone(&c, &Job::finished);
+        c.start();
+        QTRY_COMPARE(state(b), Job::State::Queued);
+        QTRY_COMPARE(state(c), Job::State::Queued);
+
+        // A move inside the same filesystem is a rename: never queued.
+        writeFile(tmp.filePath("m"), "m");
+        CopyJob move(CopyJob::Mode::Move, {tmp.filePath("m")}, tmp.filePath("out"));
+        QVERIFY(runJob(move));
+        QVERIFY(QFile::exists(tmp.filePath("out/m")));
+
+        // c jumps ahead of b; when a is done, c takes the drive (and pauses), b keeps waiting.
+        c.runNext();
+        a.setPaused(false);
+        QVERIFY(aDone.wait(5000));
+        QTRY_VERIFY(state(c) != Job::State::Queued);
+        QTest::qWait(300);
+        QCOMPARE(state(b), Job::State::Queued);
+
+        // "Start now" lets b run alongside.
+        b.startNow();
+        QVERIFY(bDone.wait(5000));
+        QCOMPARE(readFile(tmp.filePath("out/f2")), QByteArray(4096, '2'));
+        c.setPaused(false);
+        QVERIFY(cDone.wait(5000));
+    }
+
+    void queueDifferentDrivesRunInParallel()
+    {
+        QTemporaryDir tmp;  // usually tmpfs
+        QTemporaryDir local(QDir::currentPath() + "/queue-test-XXXXXX");
+        if (IoScheduler::deviceOf(tmp.path()) == IoScheduler::deviceOf(local.path()))
+            QSKIP("temp and working directory are on the same filesystem");
+        writeFile(tmp.filePath("a"), "a");
+        writeFile(local.filePath("b"), "b");
+        QVERIFY(QDir().mkdir(tmp.filePath("out")));
+        QVERIFY(QDir().mkdir(local.filePath("out")));
+        CopyJob first(CopyJob::Mode::Copy, {tmp.filePath("a")}, tmp.filePath("out"));
+        first.setPaused(true);
+        QSignalSpy firstDone(&first, &Job::finished);
+        first.start();
+        QTRY_VERIFY(first.snapshot().state != Job::State::Queued && first.snapshot().state != Job::State::Pending);
+        CopyJob second(CopyJob::Mode::Copy, {local.filePath("b")}, local.filePath("out"));
+        QVERIFY(runJob(second));  // not blocked by the paused job on the other drive
+        first.setPaused(false);
+        QVERIFY(firstDone.wait(5000));
     }
 
     void helpers()

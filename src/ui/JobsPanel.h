@@ -31,6 +31,7 @@ private:
     QLabel* m_detail;
     QProgressBar* m_bar;
     QToolButton* m_pause;
+    QToolButton* m_startNow;
     QToolButton* m_close;
     QElapsedTimer m_clock;
     int64_t m_lastBytes = 0;
@@ -77,6 +78,7 @@ private:
 
     JobManager* m_manager;
     QFrame* m_list;
+    QToolButton* m_pauseAll;
     QVBoxLayout* m_rows;
     JobsPill* m_pill;
     QHash<Job*, JobRow*> m_rowFor;

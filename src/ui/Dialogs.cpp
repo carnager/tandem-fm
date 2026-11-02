@@ -9,11 +9,13 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QShortcut>
 #include <QVBoxLayout>
 
 namespace tandem {
 
-QString askDestination(QWidget* parent, const QString& title, const QString& label, const QString& initial)
+QString askDestination(QWidget* parent, const QString& title, const QString& label, const QString& initial,
+                       bool* startNow)
 {
     QDialog dlg(parent);
     dlg.setWindowTitle(title);
@@ -30,6 +32,21 @@ QString askDestination(QWidget* parent, const QString& title, const QString& lab
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
     layout->addWidget(lbl);
     layout->addWidget(edit);
+    if (startNow) {
+        *startNow = false;
+        auto* hint = new QLabel(QObject::tr("Enter: queue behind other operations on the same drive   ·   "
+                                            "Shift+Enter: start right away"),
+                                &dlg);
+        hint->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+        layout->addWidget(hint);
+        for (auto key : {Qt::SHIFT | Qt::Key_Return, Qt::SHIFT | Qt::Key_Enter}) {
+            auto* sc = new QShortcut(QKeySequence(key), &dlg);
+            QObject::connect(sc, &QShortcut::activated, &dlg, [&dlg, startNow] {
+                *startNow = true;
+                dlg.accept();
+            });
+        }
+    }
     layout->addWidget(buttons);
     if (dlg.exec() != QDialog::Accepted)
         return {};

@@ -152,6 +152,16 @@ void CopyJob::run()
         items = std::move(rest);
     }
 
+    if (items.empty())
+        return;
+    // Data has to move: wait for the drives involved to be free.
+    {
+        QStringList involved;
+        for (const auto& it : items)
+            involved << fromNative(it.first) << parentPath(fromNative(it.second));
+        if (!waitForTurn(involved))
+            return;
+    }
     int64_t files = 0, bytes = 0;
     for (const auto& it : items) {
         scan(it.first, files, bytes);

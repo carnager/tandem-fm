@@ -48,7 +48,7 @@ struct PromptRequest {
 class Job : public QObject {
     Q_OBJECT
 public:
-    enum class State { Pending, Scanning, Running, Waiting, Done, Failed, Cancelled };
+    enum class State { Pending, Queued, Scanning, Running, Waiting, Done, Failed, Cancelled };
 
     struct Snapshot {
         State state = State::Pending;
@@ -68,6 +68,10 @@ public:
     void start();
     void cancel();
     void setPaused(bool paused);
+    // Queue control: skip the per-drive queue, or go to its front.
+    void startNow();
+    void runNext();
+    void setStartImmediately(bool on) { m_force.store(on); }
 
     QString title() const { return m_title; }
     Snapshot snapshot() const;
@@ -88,6 +92,9 @@ protected:
     bool isCancelled() const { return m_cancel.load(std::memory_order_relaxed); }
     // Blocks while paused. Returns true if the job was cancelled.
     bool checkpoint();
+    // Waits (state Queued) until no other job uses these paths' drives.
+    // Returns false if cancelled while waiting.
+    bool waitForTurn(const QStringList& paths);
     Answer prompt(PromptRequest req);
     // Error prompt honoring "skip all". Returns Retry, Skip or Cancel.
     Answer askError(const QString& message, const QString& path, int err);
@@ -118,6 +125,7 @@ private:
     std::atomic<bool> m_cancel{false};
     std::atomic<bool> m_paused{false};
     std::atomic<bool> m_finished{false};
+    std::atomic<bool> m_force{false};
     std::atomic<State> m_state{State::Pending};
     std::mutex m_pauseMutex;
     std::condition_variable m_pauseCv;

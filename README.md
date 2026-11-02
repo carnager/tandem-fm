@@ -9,7 +9,12 @@ Total Commander. Written from scratch in C++20 and Qt 6.
   mkdir, rename, folder sizes) runs on worker threads. A dead NFS/SMB mount
   leaves one tab "loading" (Esc cancels); everything else keeps working.
 - **Transfers run in the background** with their own threads, pause/resume,
-  cancel, and conflict prompts that queue up instead of blocking.
+  cancel, and conflict prompts that queue up instead of blocking. They are
+  queued per drive: two copies on the same disk run one after another,
+  copies on different drives in parallel. Same-disk moves (renames) and
+  deletes never wait. Shift+Enter in the copy dialog, or "Start now" on a
+  queued job, skips the queue; "Run next" reorders it. Progress lives in a
+  pill in the bottom-right corner; click it for the list.
 - **Fast with huge folders.** Listings are read, stat'ed, given locale-aware
   natural sort keys and sorted off-thread; the view only paints visible rows.
 - **Live updates without re-listing.** inotify reports *which* names changed,

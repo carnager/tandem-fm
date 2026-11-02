@@ -353,14 +353,17 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
             refuseInArchive(src);
             return;
         }
+        bool now = false;
         const QString dest = askDestination(this, tr("Extract"),
-                                            tr("Extract %1 to:").arg(describeItems(paths)), dst->path());
+                                            tr("Extract %1 to:").arg(describeItems(paths)), dst->path(), &now);
         if (dest.isEmpty())
             return;
         QStringList inner;
         for (const QString& p : paths)
             inner.append(src->innerPath(p));
-        m_jobs->add(new ExtractJob(src->archivePath(), inner, expandUserPath(dest)));
+        auto* job = new ExtractJob(src->archivePath(), inner, expandUserPath(dest));
+        job->setStartImmediately(now);
+        m_jobs->add(job);
         if (!src->hasSelectionOverride())
             src->unmarkAll();
         return;
@@ -369,7 +372,9 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
     QString initial = dst->path();
     if (!initial.endsWith(QLatin1Char('/')))
         initial += QLatin1Char('/');
-    const QString text = askDestination(this, title, tr("%1 %2 to:").arg(title, describeItems(paths)), initial);
+    bool now = false;
+    const QString text =
+        askDestination(this, title, tr("%1 %2 to:").arg(title, describeItems(paths)), initial, &now);
     if (text.isEmpty())
         return;
 
@@ -382,7 +387,9 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
     if (intoDir && paths.size() == 1)
         dest = joinPath(dest, baseName(paths.first()));
 
-    m_jobs->add(new CopyJob(mode, paths, dest));
+    auto* job = new CopyJob(mode, paths, dest);
+    job->setStartImmediately(now);
+    m_jobs->add(job);
     if (!src->hasSelectionOverride())
         src->unmarkAll();
 }
@@ -728,18 +735,21 @@ void MainWindow::pack()
         src->showMessage(tr("Extract first (F5), then pack."), true);
         return;
     }
+    bool now = false;
     const QString base = paths.size() == 1 ? baseName(paths.first()) : baseName(src->path());
     const QString dir = other()->inArchive() ? src->path() : other()->path();
     const QString text = askDestination(
         this, tr("Pack"),
         tr("Pack %1 into (the extension picks the format: .zip .7z .tar.gz .tar.xz .tar.zst .tar):")
             .arg(describeItems(paths)),
-        joinPath(dir, base + QStringLiteral(".zip")));
+        joinPath(dir, base + QStringLiteral(".zip")), &now);
     if (text.isEmpty())
         return;
     QString target = text.startsWith(QLatin1Char('/')) || text.startsWith(QLatin1Char('~')) ? text
                                                                                              : joinPath(src->path(), text);
-    m_jobs->add(new PackJob(paths, expandUserPath(target)));
+    auto* packJob = new PackJob(paths, expandUserPath(target));
+    packJob->setStartImmediately(now);
+    m_jobs->add(packJob);
     if (!src->hasSelectionOverride())
         src->unmarkAll();
 }
@@ -752,6 +762,7 @@ void MainWindow::unpack()
         refuseInArchive(dst);
         return;
     }
+    bool now = false;
     QStringList archives;
     for (const QString& p : src->selectedPaths())
         if (isArchiveName(baseName(p)))
@@ -763,11 +774,14 @@ void MainWindow::unpack()
     const QString dest = askDestination(
         this, tr("Unpack"),
         tr("Unpack %1 to (archives with several top-level items get their own folder):").arg(describeItems(archives)),
-        dst->path());
+        dst->path(), &now);
     if (dest.isEmpty())
         return;
-    for (const QString& a : std::as_const(archives))
-        m_jobs->add(new ExtractJob(a, {QString()}, expandUserPath(dest), true));
+    for (const QString& a : std::as_const(archives)) {
+        auto* job = new ExtractJob(a, {QString()}, expandUserPath(dest), true);
+        job->setStartImmediately(now);
+        m_jobs->add(job);
+    }
     if (!src->hasSelectionOverride())
         src->unmarkAll();
 }

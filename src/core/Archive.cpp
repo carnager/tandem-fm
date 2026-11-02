@@ -366,6 +366,8 @@ ExtractJob::ExtractJob(QString archivePath, QStringList innerPaths, QString dest
 
 void ExtractJob::run()
 {
+    if (!waitForTurn({m_archive, m_destDir}))
+        return;
     setState(State::Scanning);
     setCurrent(m_archive);
     QString error;
@@ -598,6 +600,8 @@ PackJob::PackJob(QStringList sources, QString archivePath)
 
 void PackJob::run()
 {
+    if (!waitForTurn(m_sources + QStringList{parentPath(m_archive)}))
+        return;
     setState(State::Scanning);
     struct Item {
         QByteArray abs;

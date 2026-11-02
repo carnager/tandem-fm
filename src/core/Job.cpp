@@ -1,5 +1,6 @@
 #include "core/Job.h"
 
+#include "core/IoScheduler.h"
 #include "core/Util.h"
 
 #include <chrono>
@@ -21,6 +22,7 @@ void Job::start()
     m_thread = std::thread([this] {
         setState(State::Running);
         run();
+        IoScheduler::instance().release(this);
         const State s = m_state.load();
         if (isCancelled())
             setState(State::Cancelled);
@@ -34,9 +36,32 @@ void Job::start()
     });
 }
 
+bool Job::waitForTurn(const QStringList& paths)
+{
+    QSet<quint64> devices;
+    for (const QString& p : paths)
+        devices.insert(IoScheduler::deviceOf(p));
+    const State before = m_state.exchange(State::Queued);
+    const bool ok = IoScheduler::instance().acquire(this, devices, [this] { return isCancelled(); }, m_force);
+    m_state.store(before);
+    return ok;
+}
+
+void Job::startNow()
+{
+    m_force.store(true);
+    IoScheduler::instance().wake();
+}
+
+void Job::runNext()
+{
+    IoScheduler::instance().prioritize(this);
+}
+
 void Job::cancel()
 {
     m_cancel.store(true);
+    IoScheduler::instance().wake();
     std::lock_guard lock(m_pauseMutex);
     m_pauseCv.notify_all();
 }

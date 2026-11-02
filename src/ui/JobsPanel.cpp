@@ -11,6 +11,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QLabel>
+#include <QMenu>
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QToolButton>
@@ -67,8 +68,33 @@ JobRow::JobRow(Job* job, JobManager* manager, QWidget* parent) : QWidget(parent)
     m_close->setToolTip(tr("Cancel"));
     // Cancels a running job; dismisses a finished one.
     connect(m_close, &QToolButton::clicked, this, [this] { m_manager->dismiss(m_job); });
+    m_startNow = new QToolButton(this);
+    m_startNow->setAutoRaise(true);
+    m_startNow->setFocusPolicy(Qt::NoFocus);
+    m_startNow->setIcon(IconCache::themed("media-skip-forward", "go-next"));
+    m_startNow->setToolTip(tr("Start now, alongside the running operation"));
+    m_startNow->hide();
+    connect(m_startNow, &QToolButton::clicked, this, [this] { m_job->startNow(); });
+    layout->addWidget(m_startNow);
     layout->addWidget(m_pause);
     layout->addWidget(m_close);
+
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        if (m_job->isFinished())
+            return;
+        QMenu menu(this);
+        const bool queued = m_job->snapshot().state == Job::State::Queued;
+        if (queued) {
+            menu.addAction(tr("Run next"), this, [this] { m_job->runNext(); });
+            menu.addAction(tr("Start now"), this, [this] { m_job->startNow(); });
+            menu.addSeparator();
+        }
+        const bool paused = m_job->snapshot().paused;
+        menu.addAction(paused ? tr("Resume") : tr("Pause"), this, [this, paused] { m_job->setPaused(!paused); });
+        menu.addAction(tr("Cancel"), this, [this] { m_manager->dismiss(m_job); });
+        menu.exec(mapToGlobal(pos));
+    });
     m_clock.start();
 }
 
@@ -90,6 +116,9 @@ void JobRow::refresh()
 
     QString state;
     switch (s.state) {
+    case Job::State::Queued:
+        state = tr("queued: waits for its drive");
+        break;
     case Job::State::Pending:
     case Job::State::Scanning:
         state = tr("scanning…");
@@ -143,7 +172,11 @@ void JobRow::refresh()
         permille = int(1000 * s.filesDone / s.filesTotal);
     if (m_job->isFinished())
         permille = 1000;
-    if (s.state == Job::State::Scanning && !m_job->isFinished())
+    m_startNow->setVisible(s.state == Job::State::Queued);
+    if (s.state == Job::State::Queued) {
+        m_bar->setRange(0, 1000);
+        m_bar->setValue(0);
+    } else if (s.state == Job::State::Scanning && !m_job->isFinished())
         m_bar->setRange(0, 0);  // busy indicator
     else {
         m_bar->setRange(0, 1000);
@@ -222,6 +255,28 @@ JobsPanel::JobsPanel(JobManager* manager, QWidget* overlayParent) : QWidget(over
     m_rows = new QVBoxLayout(m_list);
     m_rows->setContentsMargins(4, 4, 4, 4);
     m_rows->setSpacing(0);
+    auto* header = new QHBoxLayout;
+    header->setContentsMargins(12, 4, 6, 2);
+    auto* title = new QLabel(tr("Operations"), m_list);
+    title->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    m_pauseAll = new QToolButton(m_list);
+    m_pauseAll->setAutoRaise(true);
+    m_pauseAll->setFocusPolicy(Qt::NoFocus);
+    m_pauseAll->setText(tr("Pause all"));
+    m_pauseAll->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    connect(m_pauseAll, &QToolButton::clicked, this, [this] {
+        bool anyRunning = false;
+        for (Job* j : m_rowFor.keys())
+            anyRunning |= !j->isFinished() && !j->snapshot().paused;
+        for (Job* j : m_rowFor.keys())
+            if (!j->isFinished())
+                j->setPaused(anyRunning);
+        tick();
+    });
+    header->addWidget(title);
+    header->addStretch();
+    header->addWidget(m_pauseAll);
+    m_rows->addLayout(header);
     auto* listShadow = new QGraphicsDropShadowEffect(m_list);
     listShadow->setBlurRadius(24);
     listShadow->setOffset(0, 4);
@@ -335,7 +390,7 @@ void JobsPanel::updatePill()
 {
     int64_t done = 0, total = 0, filesDone = 0, filesTotal = 0;
     double speed = 0;
-    int running = 0, problems = 0, waiting = 0;
+    int running = 0, problems = 0, waiting = 0, queued = 0, paused = 0;
     Job* only = nullptr;
     for (auto it = m_rowFor.cbegin(); it != m_rowFor.cend(); ++it) {
         Job* j = it.key();
@@ -351,6 +406,10 @@ void JobsPanel::updatePill()
         }
         if (s.state == Job::State::Waiting)
             ++waiting;
+        if (!j->isFinished() && s.state == Job::State::Queued)
+            ++queued;
+        if (!j->isFinished() && s.paused)
+            ++paused;
         if (j->isFinished() && s.errorCount)
             ++problems;
     }
@@ -367,8 +426,11 @@ void JobsPanel::updatePill()
         text = tr("%n problem(s): click to see", nullptr, problems);
     else
         text = tr("Done");
+    if (queued)
+        text += QStringLiteral("  ·  ") + tr("%1 queued").arg(queued);
     if (running && speed > 1)
         text += QStringLiteral("  ·  ") + formatSpeed(speed);
+    m_pauseAll->setText(running && paused == running ? tr("Resume all") : tr("Pause all"));
     m_pill->setState(text, running ? fraction : (problems ? 1.0 : 1.0), waiting > 0 || problems > 0);
     if (!m_expanded)
         reposition();

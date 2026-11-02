@@ -25,6 +25,7 @@ add_library(tandem_core STATIC
   src/core/Archive.h src/core/Archive.cpp
   src/core/Vfs.cpp
   src/core/MultiRename.h src/core/MultiRename.cpp
+  src/core/IoScheduler.h src/core/IoScheduler.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)
