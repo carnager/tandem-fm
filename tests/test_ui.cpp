@@ -20,6 +20,7 @@
 #include <QSignalSpy>
 
 #include <QApplication>
+#include <QSplitter>
 #include <QTabBar>
 #include <QToolButton>
 #include <QSettings>
@@ -813,6 +814,11 @@ private slots:
         ViewerWindow* qv = nullptr;
         QTRY_VERIFY((qv = m_window->findChild<ViewerWindow*>("quickView")) != nullptr);
         QVERIFY(m_right->isVisible());  // the copy/move target stays
+        // Default position: below the panels (vertical splitter), panels side by side above.
+        auto* vsplit = qobject_cast<QSplitter*>(qv->parentWidget());
+        QVERIFY(vsplit && vsplit->orientation() == Qt::Vertical);
+        QVERIFY(qv->geometry().top() > m_left->geometry().bottom() - 1 || qv->mapTo(m_window.get(), QPoint()).y() >
+                                                                           m_left->mapTo(m_window.get(), QPoint()).y());
         QTRY_COMPARE(qv->textEdit()->toPlainText(), QString("first file"));
         QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(m_left->view()));  // focus stays
 
@@ -830,6 +836,18 @@ private slots:
         QTRY_COMPARE(qv->currentPath(), L("qv/a.txt"));
         m_left->view()->setFocus();
         m_right->navigate(R());
+
+        // Switch to the right side while open: it moves right away.
+        QAction* right = nullptr;
+        for (QAction* a : m_window->findChildren<QAction*>())
+            if (a->text() == QObject::tr("Right of the panels"))
+                right = a;
+        QVERIFY(right);
+        right->trigger();
+        QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") &&
+                    qobject_cast<QSplitter*>(m_window->findChild<ViewerWindow*>("quickView")->parentWidget())
+                            ->orientation() == Qt::Horizontal);
+        QSettings().setValue("view/previewPosition", "bottom");
 
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") == nullptr);

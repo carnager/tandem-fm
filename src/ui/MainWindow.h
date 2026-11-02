@@ -89,7 +89,10 @@ private:
     Panel* m_left;
     Panel* m_right;
     Panel* m_active = nullptr;
-    QSplitter* m_splitter;
+    QSplitter* m_splitter;       // left | right (| preview when on the right)
+    QSplitter* m_vsplit;         // panels / preview when at the bottom
+    bool previewAtBottom() const;
+    void closePreview();
     JobManager* m_jobs;
     JobsPanel* m_jobsPanel;
     QAction* m_hiddenAction = nullptr;

@@ -855,8 +855,24 @@
         <translation>Symbolthema</translation>
     </message>
     <message>
-        <source>Preview column</source>
-        <translation>Vorschauspalte</translation>
+        <source>Preview</source>
+        <translation type="unfinished">Vorschau</translation>
+    </message>
+    <message>
+        <source>Preview position</source>
+        <translation>Position der Vorschau</translation>
+    </message>
+    <message>
+        <source>Below the panels</source>
+        <translation>Unter den Panels</translation>
+    </message>
+    <message>
+        <source>Right of the panels</source>
+        <translation>Rechts neben den Panels</translation>
+    </message>
+    <message>
+        <source>Preview of the file under the cursor, below or right of the panels (View menu)</source>
+        <translation>Vorschau der Datei unter dem Cursor, unter oder neben den Panels (Menü Ansicht)</translation>
     </message>
     <message>
         <source>Toggle menu bar</source>
@@ -1040,10 +1056,6 @@
     <message>
         <source>Context menu</source>
         <translation>Kontextmenü</translation>
-    </message>
-    <message>
-        <source>Preview column: shows the file under the cursor, both panels stay</source>
-        <translation>Vorschauspalte: zeigt die Datei unter dem Cursor, beide Panels bleiben sichtbar</translation>
     </message>
     <message>
         <source>Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder</source>
