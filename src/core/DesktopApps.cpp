@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QLocale>
 #include <QProcess>
+#include <QSaveFile>
 #include <QSet>
 #include <QUrl>
 #include <QStandardPaths>
@@ -227,6 +228,71 @@ DesktopApp DesktopApps::defaultFor(const QStringList& mimeChain) const
 {
     const QList<DesktopApp> apps = appsFor(mimeChain);
     return apps.isEmpty() ? DesktopApp{} : apps.first();
+}
+
+bool DesktopApps::setDefault(const QString& mime, const QString& appId, QString* error)
+{
+    QString path = configDirs().first() + QStringLiteral("/mimeapps.list");
+    const QFileInfo fi(path);
+    if (fi.isSymLink() && !fi.canonicalFilePath().isEmpty())
+        path = fi.canonicalFilePath();  // keep dotfile symlinks intact
+
+    QStringList lines;
+    {
+        QFile f(path);
+        if (f.open(QIODevice::ReadOnly | QIODevice::Text))
+            lines = QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'));
+        while (!lines.isEmpty() && lines.last().trimmed().isEmpty())
+            lines.removeLast();
+    }
+
+    const QString entry = mime + QLatin1Char('=') + appId + QLatin1Char(';');
+    int section = -1;
+    for (int i = 0; i < lines.size(); ++i)
+        if (lines[i].trimmed() == QLatin1String("[Default Applications]"))
+            section = i;
+    if (section < 0) {
+        if (!lines.isEmpty())
+            lines << QString();
+        lines << QStringLiteral("[Default Applications]") << entry;
+    } else {
+        int insertAt = section + 1;
+        bool replaced = false;
+        for (int i = section + 1; i < lines.size(); ++i) {
+            const QString t = lines[i].trimmed();
+            if (t.startsWith(QLatin1Char('[')))
+                break;
+            if (!t.isEmpty())
+                insertAt = i + 1;
+            if (t.section(QLatin1Char('='), 0, 0).trimmed() == mime) {
+                lines[i] = entry;
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced)
+            lines.insert(insertAt, entry);
+    }
+
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QSaveFile out(path);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (error)
+            *error = out.errorString();
+        return false;
+    }
+    out.write(lines.join(QLatin1Char('\n')).toUtf8() + '\n');
+    if (!out.commit()) {
+        if (error)
+            *error = out.errorString();
+        return false;
+    }
+
+    QMutexLocker lock(&m_mutex);
+    QStringList& ids = m_defaults[mime];
+    ids.removeAll(appId);
+    ids.prepend(appId);
+    return true;
 }
 
 QString DesktopApps::defaultTerminal() const

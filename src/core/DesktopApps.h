@@ -36,6 +36,11 @@ public:
     DesktopApp defaultFor(const QStringList& mimeChain) const;
     QString defaultTerminal() const;
 
+    // Makes appId the default for mime: updates [Default Applications] in
+    // $XDG_CONFIG_HOME/mimeapps.list, keeping everything else in the file.
+    // Blocking (file I/O): call from a worker. Returns false and sets error on failure.
+    bool setDefault(const QString& mime, const QString& appId, QString* error = nullptr);
+
     // Expands Exec field codes (%f %F %u %U ...) and starts the app detached.
     static bool launch(const DesktopApp& app, const QStringList& paths, const QString& workDir,
                        const QString& terminal);

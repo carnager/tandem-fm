@@ -661,17 +661,61 @@ void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)
     }
     const QString dir = active()->path();
     const QString terminal = registry.defaultTerminal();
+
+    // One file type across the selection? Then defaults can be shown and set.
+    static QMimeDatabase db;
+    QMimeType type;
+    for (const QString& p : paths) {
+        const QList<QMimeType> t = db.mimeTypesForFileName(baseName(p));
+        const QMimeType mt = t.isEmpty() ? db.mimeTypeForName(QStringLiteral("application/octet-stream")) : t.first();
+        if (!type.isValid())
+            type = mt;
+        else if (type != mt) {
+            type = QMimeType();
+            break;
+        }
+    }
+    const QString defaultId = type.isValid() ? registry.defaultFor(mimeChainFor(paths.first())).id : QString();
+
     int n = 0;
     for (const DesktopApp& app : std::as_const(apps)) {
         if (++n > 20)
             break;
-        sub->addAction(QIcon::fromTheme(app.icon), app.name, this, [this, app, paths, dir, terminal] {
+        const QString label = app.id == defaultId ? tr("%1 (default)").arg(app.name) : app.name;
+        sub->addAction(QIcon::fromTheme(app.icon), label, this, [this, app, paths, dir, terminal] {
             if (!DesktopApps::launch(app, paths, dir, terminal))
                 active()->showMessage(tr("Could not start %1").arg(app.name), true);
         });
     }
     if (apps.isEmpty())
         sub->addAction(tr("No registered applications"))->setEnabled(false);
+
+    if (type.isValid() && !apps.isEmpty()) {
+        sub->addSeparator();
+        QMenu* def = sub->addMenu(tr("Always open “%1” files with").arg(type.comment()));
+        const QString mime = type.name();
+        const QString what = type.comment();
+        for (const DesktopApp& app : std::as_const(apps)) {
+            QAction* a = def->addAction(QIcon::fromTheme(app.icon), app.name);
+            a->setCheckable(true);
+            a->setChecked(app.id == defaultId);
+            connect(a, &QAction::triggered, this, [this, mime, what, app] {
+                QPointer<MainWindow> self(this);
+                ioPool()->start([self, mime, what, app] {
+                    QString error;
+                    const bool ok = DesktopApps::instance().setDefault(mime, app.id, &error);
+                    postToUi([self, ok, error, what, app] {
+                        if (!self)
+                            return;
+                        if (ok)
+                            self->active()->showMessage(tr("“%1” files now open with %2").arg(what, app.name));
+                        else
+                            self->active()->showMessage(tr("Could not save default: %1").arg(error), true);
+                    });
+                });
+            });
+        }
+    }
     sub->addSeparator();
     sub->addAction(tr("Other command…"), this, [this, paths, dir] {
         bool ok = false;

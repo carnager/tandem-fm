@@ -281,6 +281,14 @@ private slots:
         QCOMPARE(all.size(), 2);  // "gone" was removed by the user
         QCOMPARE(all[1].id, QString("aaa.desktop"));
         QVERIFY(apps.defaultFor({"image/x-nothing"}).id.isEmpty());
+
+        // Setting a default rewrites only that line; other sections stay.
+        QVERIFY(apps.setDefault("text/plain", "aaa.desktop"));
+        QVERIFY(apps.setDefault("image/png", "zzz.desktop"));
+        QCOMPARE(apps.defaultFor({"text/plain"}).id, QString("aaa.desktop"));
+        QCOMPARE(readFile(tmp.filePath("config/mimeapps.list")),
+                 QByteArray("[Default Applications]\ntext/plain=aaa.desktop;\nimage/png=zzz.desktop;\n"
+                            "[Removed Associations]\ntext/plain=gone.desktop;\n"));
     }
 
     void helpers()
