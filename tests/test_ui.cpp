@@ -10,6 +10,8 @@
 #include "ui/Network.h"
 #include "ui/PathBar.h"
 #include "core/Remote.h"
+#include "TestBackend.h"
+#include "ui/viewer/ViewerWindow.h"
 #include "ui/FileView.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/KeyChordPopup.h"
@@ -1308,6 +1310,123 @@ private slots:
 
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void serverLocation()
+    {
+        QTemporaryDir serverDir;
+        const QString srv = serverDir.path();
+        QVERIFY(QDir().mkpath(srv + "/www"));
+        writeFile(srv + "/www/index.html", "<h1>hi</h1>");
+        writeFile(L("upload.txt"), "to the server");
+        auto backend = std::make_shared<TestBackend>(srv);
+        registerBackend("test", backend);
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+
+        // Typed into the path bar like any folder.
+        m_right->focusPathEdit();
+        auto* edit = qobject_cast<QLineEdit*>(QApplication::focusWidget());
+        QVERIFY(edit);
+        edit->setText("test://srv/www/");
+        QTest::keyClick(edit, Qt::Key_Return);
+        QTRY_COMPARE(rightModel()->path(), QString("test://srv/www"));
+        QVERIFY(m_right->isRemote());
+        QVERIFY(rightModel()->rowOf("index.html") >= 0);
+        auto crumbs = [&] {
+            QStringList t;
+            for (auto* b : m_right->findChild<PathBar*>()->findChildren<QToolButton*>())
+                if (b->isVisibleTo(m_right))
+                    t << b->text();
+            return t;
+        };
+        QTRY_VERIFY(crumbs().contains(QString::fromUtf8("⇄ test://srv")));
+        QCOMPARE(m_right->tab()->title(), QString("www"));
+
+        // F5 from local to the server panel; the panel updates without inotify.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "upload.txt");
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_left->view(), Qt::Key_F5);
+        QTRY_COMPARE(readFile(srv + "/www/upload.txt"), QByteArray("to the server"));
+        QTRY_VERIFY(rightModel()->rowOf("upload.txt") >= 0);
+
+        // F7 and rename on the server.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+        answerNextDialog([](QWidget* w) {
+            if (auto* d = qobject_cast<QInputDialog*>(w)) {
+                d->setTextValue("assets/css");
+                d->accept();
+            }
+        });
+        QTest::keyClick(m_right->view(), Qt::Key_F7);
+        QTRY_VERIFY(QFileInfo(srv + "/www/assets/css").isDir());
+        QTRY_VERIFY(rightModel()->rowOf("assets") >= 0);
+        m_right->doRename("upload.txt", "renamed.txt");
+        QTRY_VERIFY(QFile::exists(srv + "/www/renamed.txt"));
+        QTRY_VERIFY(rightModel()->rowOf("renamed.txt") >= 0);
+
+        // F3: downloaded to the cache, then shown.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+        moveCursorTo(m_right, "index.html");
+        QTest::keyClick(m_right->view(), Qt::Key_F3);
+        ViewerWindow* viewer = nullptr;
+        QTRY_VERIFY([&] {
+            for (QWidget* w : QApplication::topLevelWidgets())
+                if (auto* v = qobject_cast<ViewerWindow*>(w); v && v->isVisible())
+                    viewer = v;
+            return viewer != nullptr;
+        }());
+        QTRY_COMPARE(viewer->currentPath(), remoteCachePath("test://srv/www/index.html"));
+        QCOMPARE(readFile(viewer->currentPath()), QByteArray("<h1>hi</h1>"));
+        viewer->close();
+
+        // F4: edit a copy; saving uploads it again.
+        const QString editorScript = serverDir.filePath("fake-editor.sh");
+        writeFile(editorScript, "#!/bin/sh\nprintf edited > \"$1\"\n");
+        QFile::setPermissions(editorScript, QFile::permissions(editorScript) | QFile::ExeOwner);
+        QSettings().setValue("tools/editor", editorScript);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+        moveCursorTo(m_right, "renamed.txt");
+        QTest::keyClick(m_right->view(), Qt::Key_F4);
+        QTRY_COMPARE_WITH_TIMEOUT(readFile(srv + "/www/renamed.txt"), QByteArray("edited"), 10000);
+        QSettings().remove("tools/editor");
+
+        // F8 on a server: permanent (no trash), says so.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        QString info;
+        answerNextDialog([&](QWidget* w) {
+            if (auto* box = qobject_cast<QMessageBox*>(w)) {
+                info = box->informativeText();
+                box->button(QMessageBox::Yes)->click();
+            }
+        });
+        m_right->view()->setFocus();
+        moveCursorTo(m_right, "assets");
+        QTest::keyClick(m_right->view(), Qt::Key_F8);
+        QTRY_VERIFY(!QFile::exists(srv + "/www/assets"));
+        QVERIFY(info.contains("no trash"));
+        QTRY_COMPARE(rightModel()->rowOf("assets"), -1);
+
+        // Up to the server root, which can't go further.
+        m_right->goUp();
+        QTRY_COMPARE(rightModel()->path(), QString("test://srv/"));
+        m_right->goUp();
+        QTest::qWait(100);
+        QCOMPARE(rightModel()->path(), QString("test://srv/"));
+
+        m_right->navigate(R());
+        QTRY_COMPARE(rightModel()->path(), R());
+        registerBackend("test", nullptr);
     }
 
     void cleanupTestCase()

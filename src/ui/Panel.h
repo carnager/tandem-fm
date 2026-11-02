@@ -46,6 +46,7 @@ public:
 
     // Archive locations (read-only for now).
     bool inArchive() const;
+    bool isRemote() const;  // on a server through a native backend (sftp://, …)
     QString archivePath() const;
     QString innerPath(const QString& path) const;  // path inside the archive
     void goUp();
@@ -75,6 +76,7 @@ public:
     void computeCurrentSize();
     void computeAllSizes();
     void startRename();
+    void doRename(const QString& from, const QString& to);  // inside the current folder, off the UI thread
     void expectName(const QString& name);
     void focusPathEdit();
     void startFilter();
@@ -121,7 +123,6 @@ private:
     void quickSearchFind(int direction, bool includeCurrent);
     void endQuickSearch();
     void positionSearch();
-    void doRename(const QString& from, const QString& to);
     int tabIndexOf(DirTab* t) const;
     void updateTabTitles();
     int lowestFreeSlot() const;

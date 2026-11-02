@@ -1,5 +1,7 @@
 #include "core/MultiRename.h"
 
+#include "core/Backend.h"
+
 #include "core/FileOps.h"
 #include "core/Sorting.h"
 #include "core/Util.h"
@@ -305,7 +307,7 @@ QList<QPair<QString, QString>> executeRenamePlan(const QString& dir, const Renam
     for (int i = 0; i < viaTemp.size(); ++i) {
         Step& s = viaTemp[i];
         const QString temp = QStringLiteral(".tandem-rename-%1-%2").arg(tag).arg(i);
-        if (const int e = renameNoReplace(joinPath(dir, s.from), joinPath(dir, temp))) {
+        if (const int e = renameNoReplaceAt(joinPath(dir, s.from), joinPath(dir, temp))) {
             errors->append(QObject::tr("%1: %2").arg(s.from, errnoString(e)));
             s.to.clear();  // skip
             continue;
@@ -315,10 +317,10 @@ QList<QPair<QString, QString>> executeRenamePlan(const QString& dir, const Renam
     auto finish = [&](const Step& s) {
         if (s.to.isEmpty())
             return;
-        if (const int e = renameNoReplace(joinPath(dir, s.from), joinPath(dir, s.to))) {
+        if (const int e = renameNoReplaceAt(joinPath(dir, s.from), joinPath(dir, s.to))) {
             errors->append(QObject::tr("%1 → %2: %3").arg(s.original, s.to, errnoString(e)));
             if (s.from != s.original)  // put a temp-named file back
-                renameNoReplace(joinPath(dir, s.from), joinPath(dir, s.original));
+                renameNoReplaceAt(joinPath(dir, s.from), joinPath(dir, s.original));
             return;
         }
         done.append({s.to, s.original});

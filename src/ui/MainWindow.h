@@ -16,6 +16,9 @@ class QMenu;
 class QSplitter;
 class QVBoxLayout;
 
+class QFileSystemWatcher;
+class QTimer;
+
 namespace tandem {
 
 class JobManager;
@@ -60,6 +63,19 @@ private:
     void openTerminal(const QString& dir = {});
     void pasteInto(const QString& dir);
     bool refuseInArchive(Panel* p);
+    bool refuseOnServer(Panel* p, const QString& what);
+    // Archives: extract; servers: download (cached). Then fn(local path).
+    // `local` overrides where a server file is put (edit copies live apart
+    // from preview copies, so a preview never overwrites unsaved edits).
+    void withLocalCopy(Panel* p, const QString& path, std::function<void(const QString& local)> fn,
+                       const QString& local = {});
+    void editRemote(Panel* p, const QString& path);
+    void editedFileChanged(const QString& local);
+    void uploadEdited();
+    QFileSystemWatcher* m_editWatch = nullptr;
+    QTimer* m_uploadTimer = nullptr;
+    QSet<QString> m_changedEdits;
+    QHash<QString, QString> m_editedRemote;  // local copy -> server location
     // Extracts a file from the panel's archive to the cache (off-thread), then calls fn.
     void withExtracted(Panel* p, const QString& path, std::function<void(const QString& local)> fn);
     void openFrom(Panel* p, const QString& path);

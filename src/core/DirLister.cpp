@@ -1,5 +1,7 @@
 #include "core/DirLister.h"
 
+#include "core/Backend.h"
+
 #include "core/DirWatcher.h"
 #include "core/Util.h"
 
@@ -120,6 +122,30 @@ std::vector<EntryUpdate> statNames(const QString& dir, const QStringList& names,
 {
     std::vector<EntryUpdate> out;
     out.reserve(names.size());
+    if (isRemoteLocation(dir)) {
+        Backend* b = backendFor(dir);
+        for (const QString& name : names) {
+            if (!showHidden && name.startsWith(QLatin1Char('.')))
+                continue;
+            FileStat st;
+            if (!b || b->stat(joinPath(dir, name), st) != 0) {
+                out.emplace_back(name, std::nullopt);
+                continue;
+            }
+            FileEntry e;
+            e.name = name;
+            e.isDir = st.isDir;
+            e.isLink = st.isLink;
+            e.size = st.isDir ? -1 : st.size;
+            e.mtime = st.mtime;
+            e.mode = st.mode;
+            e.uid = st.uid;
+            e.gid = st.gid;
+            e.key = makeSortKey(e.name);
+            out.emplace_back(name, std::move(e));
+        }
+        return out;
+    }
     const QByteArray np = toNative(dir);
     const int dfd = ::open(np.constData(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     for (const QString& name : names) {

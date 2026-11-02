@@ -40,6 +40,7 @@ public:
     // Inside an archive: path() is archivePath() + "/" + the folder inside it.
     bool inArchive() const { return m_inArchive; }
     QString gitBranch() const { return m_gitBranch; }
+    bool isRemote() const { return m_remote; }  // listed through a Backend (sftp://, …)
 
     // Search results as a virtual folder: entries are paths relative to the
     // searched folder, so every file operation keeps working on them.
@@ -103,6 +104,7 @@ private:
     bool m_showHidden = false;
     bool m_inArchive = false;
     QString m_gitBranch;
+    bool m_remote = false;
     SearchSpec m_search;
     bool m_inSearch = false;
     bool m_searchRunning = false;

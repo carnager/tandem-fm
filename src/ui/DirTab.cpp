@@ -1,5 +1,6 @@
 #include "ui/DirTab.h"
 
+#include "core/Backend.h"
 #include "core/Remote.h"
 
 #include "core/DirWatcher.h"
@@ -239,6 +240,7 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
             }
             t->setWatch(result->watch);
             t->m_inArchive = result->inArchive;
+            t->m_remote = result->remote;
             t->m_archivePath = result->archivePath;
             t->m_free = result->freeBytes;
             t->m_total = result->totalBytes;
@@ -319,7 +321,7 @@ void DirTab::refreshGit()
 {
     const QString dir = m_model->path();
     const quint64 gen = ++m_gitGen;
-    if (!g_gitEnabled || m_inArchive || m_inSearch || dir.isEmpty() || isRemotePath(dir)) {
+    if (!g_gitEnabled || m_inArchive || m_inSearch || dir.isEmpty() || isRemotePath(dir) || isRemoteLocation(dir)) {
         m_model->setGitStatus({});
         if (!m_gitBranch.isEmpty()) {
             m_gitBranch.clear();
@@ -477,7 +479,7 @@ void DirTab::computeSizes(const QStringList& names)
         for (const QString& name : names) {
             if (cancel->load())
                 return;
-            const int64_t size = directorySize(joinPath(dir, name), cancel.get());
+            const int64_t size = directorySizeAt(joinPath(dir, name), cancel.get());
             if (size < 0)
                 continue;
             postToUi([self, dir, name, size] {

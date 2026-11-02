@@ -1,5 +1,6 @@
 #include "core/IoScheduler.h"
 
+#include "core/Backend.h"
 #include "core/Remote.h"
 #include "core/Util.h"
 
@@ -20,6 +21,8 @@ quint64 IoScheduler::deviceOf(const QString& path)
     // so a copy to one doesn't wait for a copy to another.
     if (const auto r = remoteRootOf(path))
         return (quint64(1) << 63) | quint64(qHash(r->root));
+    if (isRemoteLocation(path))  // native backends: one queue per server
+        return (quint64(1) << 63) | quint64(qHash(locationAuthority(path)));
     QString p = path;
     struct stat st;
     for (;;) {

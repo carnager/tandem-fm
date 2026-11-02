@@ -5,6 +5,7 @@
 #include "core/Search.h"
 #include "core/FolderCompare.h"
 #include "core/Remote.h"
+#include "TestBackend.h"
 #include "core/GitStatus.h"
 #include "core/Undo.h"
 #include "core/FolderHistory.h"
@@ -18,6 +19,7 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QSignalSpy>
+#include <QFileInfo>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -934,6 +936,147 @@ private slots:
         QCOMPARE(normalizeServerUri("file:///x"), QString());
         QCOMPARE(normalizeServerUri("plainname"), QString());
         QCOMPARE(normalizeServerUri("my file@2x.png"), QString());
+    }
+
+    void locationPaths()
+    {
+        QVERIFY(isRemoteLocation("sftp://bob@host/srv"));
+        QVERIFY(!isRemoteLocation("/home/x"));
+        QVERIFY(!isRemoteLocation("relative/x"));
+        QCOMPARE(parentPath("sftp://bob@host/srv/www"), QString("sftp://bob@host/srv"));
+        QCOMPARE(parentPath("sftp://bob@host/srv"), QString("sftp://bob@host/"));
+        QCOMPARE(parentPath("sftp://bob@host/"), QString("sftp://bob@host/"));
+        QCOMPARE(baseName("sftp://bob@host/srv/www"), QString("www"));
+        QCOMPARE(baseName("sftp://bob@host/"), QString("bob@host"));
+        QCOMPARE(joinPath(QString("sftp://h/"), QString("x")), QString("sftp://h/x"));
+        QCOMPARE(normalizeLocation("SFTP://h"), QString("sftp://h/"));
+        QCOMPARE(normalizeLocation("sftp://h//a/./b/../c/"), QString("sftp://h/a/c"));
+        QCOMPARE(expandUserPath("sftp://h/a/../b"), QString("sftp://h/b"));
+        QCOMPARE(locationPath("sftp://h/a/b"), QString("/a/b"));
+        QCOMPARE(locationAuthority("sftp://u@h:22/a"), QString("sftp://u@h:22"));
+    }
+
+    void backendJobs()
+    {
+        QTemporaryDir tmp;
+        const QString local = tmp.filePath("local"), server = tmp.filePath("server");
+        QVERIFY(QDir().mkpath(local + "/tree/sub"));
+        QVERIFY(QDir().mkpath(server + "/existing"));
+        writeFile(local + "/tree/a.txt", "alpha");
+        writeFile(local + "/tree/sub/b.bin", QByteArray(3 << 20, 'b'));  // more than one buffer
+        writeFile(local + "/single.txt", "single");
+        writeFile(server + "/remote.txt", "from server");
+        writeFile(server + "/existing/clash.txt", "old");
+        QVERIFY(QFile::link("a.txt", local + "/tree/link"));
+        auto backend = std::make_shared<TestBackend>(server);
+        registerBackend("test", backend);
+        const QString S = "test://srv";
+
+        // Listing goes through the backend.
+        ListOptions opt;
+        ListResult l = listLocation(S + "/", opt);
+        QVERIFY(l.remote);
+        QCOMPARE(l.error, 0);
+        QCOMPARE(l.entries.size(), size_t(2));
+        QCOMPARE(l.entries[0].name, QString("existing"));  // sorted, folders first
+        QCOMPARE(listLocation(S + "/missing", opt).error, ENOENT);
+        QCOMPARE(listLocation("nosuch://x/", opt).error, EPROTONOSUPPORT);
+
+        // Local → server, folders recursively, links kept.
+        CopyJob up(CopyJob::Mode::Copy, {local + "/tree", local + "/single.txt"}, S + "/up");
+        QVERIFY(runJob(up));
+        QVERIFY2(up.errors().isEmpty(), qPrintable(up.errors().join('\n')));
+        QCOMPARE(readFile(server + "/up/tree/a.txt"), QByteArray("alpha"));
+        QCOMPARE(readFile(server + "/up/tree/sub/b.bin").size(), 3 << 20);
+        QCOMPARE(readFile(server + "/up/single.txt"), QByteArray("single"));
+        QCOMPARE(QFileInfo(server + "/up/tree/link").symLinkTarget(), server + "/up/tree/a.txt");
+        QCOMPARE(QFileInfo(server + "/up/tree/a.txt").lastModified().toSecsSinceEpoch(),
+                 QFileInfo(local + "/tree/a.txt").lastModified().toSecsSinceEpoch());  // servers keep seconds
+        QCOMPARE(up.snapshot().bytesDone, int64_t(5 + 6 + (3 << 20)));
+
+        // Server → local.
+        CopyJob down(CopyJob::Mode::Copy, {S + "/remote.txt"}, local);
+        QVERIFY(runJob(down));
+        QCOMPARE(readFile(local + "/remote.txt"), QByteArray("from server"));
+        QCOMPARE(down.undoRecords().size(), 1);  // local results can be undone
+
+        // Conflict: the usual question; "rename" picks a free name on the server.
+        writeFile(local + "/clash.txt", "new");
+        CopyJob clash(CopyJob::Mode::Copy, {local + "/clash.txt"}, S + "/existing");
+        clash.setSyncPromptHandler([](const PromptRequest& r) {
+            return r.kind == PromptRequest::Kind::Conflict ? Answer::Rename : Answer::Cancel;
+        });
+        QVERIFY(runJob(clash));
+        QCOMPARE(readFile(server + "/existing/clash.txt"), QByteArray("old"));
+        QCOMPARE(readFile(server + "/existing/clash (2).txt"), QByteArray("new"));
+        CopyJob over(CopyJob::Mode::Copy, {local + "/clash.txt"}, S + "/existing");
+        over.setOverwriteExisting();
+        QVERIFY(runJob(over));
+        QCOMPARE(readFile(server + "/existing/clash.txt"), QByteArray("new"));
+
+        // Move on the server: a rename, no data copied.
+        const int before = backend->calls;
+        CopyJob mv(CopyJob::Mode::Move, {S + "/up/tree"}, S + "/moved");
+        QVERIFY(runJob(mv));
+        QVERIFY(QFile::exists(server + "/moved/sub/b.bin"));
+        QVERIFY(!QFile::exists(server + "/up/tree"));
+        QVERIFY(backend->calls - before < 10);
+        // Move server → local: copied, then removed there.
+        CopyJob mvDown(CopyJob::Mode::Move, {S + "/moved"}, local + "/back");
+        QVERIFY(runJob(mvDown));
+        QCOMPARE(readFile(local + "/back/a.txt"), QByteArray("alpha"));
+        QVERIFY(!QFile::exists(server + "/moved"));
+
+        // Cancelling mid-file leaves no half file behind.
+        backend->latencyMs = 30;
+        writeFile(local + "/big.bin", QByteArray(40 << 20, 'x'));
+        CopyJob slow(CopyJob::Mode::Copy, {local + "/big.bin"}, S + "/");
+        slow.start();
+        QTRY_VERIFY(slow.snapshot().state == Job::State::Running);
+        slow.cancel();
+        QTRY_VERIFY(slow.isFinished());
+        backend->latencyMs = 0;
+        QVERIFY(!QFile::exists(server + "/big.bin"));
+
+        // Delete on the server: permanent, recursive.
+        DeleteJob del({S + "/up", S + "/existing/clash (2).txt"}, true);
+        QVERIFY(runJob(del));
+        QVERIFY(!QFile::exists(server + "/up"));
+        QVERIFY(!QFile::exists(server + "/existing/clash (2).txt"));
+
+        // Helpers.
+        QCOMPARE(makeDirectoriesAt(S + "/a/b/c"), 0);
+        QVERIFY(QFileInfo(server + "/a/b/c").isDir());
+        QCOMPARE(makeDirectoriesAt(S + "/a/b"), EEXIST);
+        QCOMPARE(createEmptyFile(S + "/a/new.txt"), 0);
+        QCOMPARE(createEmptyFile(S + "/a/new.txt"), EEXIST);
+        QCOMPARE(renameNoReplaceAt(S + "/a/new.txt", S + "/a/renamed.txt"), 0);
+        QCOMPARE(renameNoReplaceAt(S + "/a/renamed.txt", local + "/x"), EXDEV);
+        QCOMPARE(directorySizeAt(S + "/existing", nullptr), int64_t(3));
+        QCOMPARE(downloadFile(S + "/remote.txt", tmp.filePath("cache/r.txt"), nullptr), 0);
+        QCOMPARE(readFile(tmp.filePath("cache/r.txt")), QByteArray("from server"));
+
+        // Compare and sync work across local and remote.
+        CompareOptions co;
+        co.contents = true;
+        CompareResult cmp = compareFolders(local + "/tree", S + "/cmp", co);
+        QVERIFY(!cmp.error.isEmpty());  // missing on the server
+        QVERIFY(QDir().mkpath(server + "/cmp"));
+        cmp = compareFolders(local + "/tree", S + "/cmp", co);
+        QVERIFY(cmp.error.isEmpty());
+        std::vector<SyncAction> actions;
+        for (const CompareItem& i : cmp.items)
+            actions.push_back(defaultAction(i.diff, SyncMode::MirrorToRight));
+        CopyJob sync(buildSyncPlan(local + "/tree", S + "/cmp", cmp.items, actions).copies);
+        sync.setOverwriteExisting();
+        QVERIFY(runJob(sync));
+        for (const CompareItem& i : compareFolders(local + "/tree", S + "/cmp", co).items)
+            QVERIFY2(i.diff == Diff::Equal, qPrintable(i.rel));
+        QVERIFY(*sameContents(local + "/tree/sub/b.bin", S + "/cmp/sub/b.bin"));
+        writeFile(server + "/cmp/sub/b.bin", QByteArray(3 << 20, 'c'));
+        QVERIFY(!*sameContents(local + "/tree/sub/b.bin", S + "/cmp/sub/b.bin"));
+
+        registerBackend("test", nullptr);
     }
 
     void helpers()

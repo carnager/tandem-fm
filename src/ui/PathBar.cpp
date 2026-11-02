@@ -1,5 +1,6 @@
 #include "ui/PathBar.h"
 
+#include "core/Backend.h"
 #include "core/Remote.h"
 
 #include "core/Util.h"
@@ -27,7 +28,17 @@ QList<Segment> segmentsOf(const QString& path)
     QList<Segment> out;
     const QString home = QDir::homePath();
     QString rest;
-    if (const auto r = remoteRootOf(path)) {
+    if (isRemoteLocation(path)) {  // sftp://bob@host/srv → "⇄ sftp://bob@host" › srv
+        const QString root = locationRoot(path);
+        out.append({QStringLiteral("⇄ ") + locationAuthority(path), root});
+        rest = locationPath(path);
+        QString acc = root;
+        for (const QString& part : rest.split(QLatin1Char('/'), Qt::SkipEmptyParts)) {
+            acc = joinPath(acc, part);
+            out.append({part, acc});
+        }
+        return out;
+    } else if (const auto r = remoteRootOf(path)) {
         out.append({QStringLiteral("⇄ ") + r->label, r->root});  // the GVfs folder name is unreadable
         rest = path.mid(r->root.size());
     } else if (path == home || path.startsWith(home + QLatin1Char('/'))) {

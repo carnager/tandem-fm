@@ -13,6 +13,9 @@ struct stat;
 
 namespace tandem {
 
+class Backend;
+struct FileStat;
+
 // F5 / F6. Destination semantics follow Total Commander:
 //  - existing directory          -> items are placed inside it
 //  - single source, other path   -> copied/moved *as* that path (rename)
@@ -41,6 +44,15 @@ private:
                                               const struct stat& dstSt);
     void scan(const QByteArray& path, int64_t& files, int64_t& bytes);
 
+    // Remote locations (sftp://, …): the same job, done through Backends
+    // with plain read/write streams. Implemented in BackendCopy.cpp.
+    bool needsBackends() const;
+    void runWithBackends();
+    bool backendItem(const QString& src, QString dst);
+    bool backendFile(Backend* sb, const QString& src, Backend* db, QString dst, const FileStat& st);
+    void backendScan(const QString& path, int64_t& files, int64_t& bytes);
+    static ConflictSide sideOf(const QString& path, const FileStat& st);
+
     Mode m_mode;
     QStringList m_sources;
     QString m_destination;
@@ -59,6 +71,8 @@ protected:
 
 private:
     bool removeTree(const QByteArray& path);
+    bool removeTreeAt(const QString& path);  // remote (BackendCopy.cpp)
+    void countAt(const QString& path, int64_t& files);
     void count(const QByteArray& path, int64_t& files);
 
     QStringList m_paths;

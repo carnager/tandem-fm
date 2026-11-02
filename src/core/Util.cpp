@@ -1,5 +1,7 @@
 #include "core/Util.h"
 
+#include "core/Backend.h"
+
 #include <QDir>
 
 #include <cstring>
@@ -106,6 +108,11 @@ QString parentPath(const QString& path)
 {
     if (path == QLatin1String("/"))
         return path;
+    if (isRemoteLocation(path)) {  // never above "scheme://host/"
+        const QString root = locationRoot(path);
+        const int i = int(path.lastIndexOf(QLatin1Char('/')));
+        return path.size() <= root.size() || i < root.size() ? root : path.left(i);
+    }
     const int i = path.lastIndexOf(QLatin1Char('/'));
     if (i <= 0)
         return QStringLiteral("/");
@@ -116,6 +123,8 @@ QString baseName(const QString& path)
 {
     if (path == QLatin1String("/"))
         return path;
+    if (isRemoteLocation(path) && path.size() <= locationRoot(path).size())
+        return locationAuthority(path).section(QStringLiteral("://"), 1);  // "bob@host"
     QString p = path;
     while (p.size() > 1 && p.endsWith(QLatin1Char('/')))
         p.chop(1);
@@ -131,6 +140,8 @@ QString expandUserPath(const QString& in)
         p = QDir::homePath() + p.mid(1);
     if (p.startsWith(QLatin1String("file://")))
         p = p.mid(7);
+    else if (isRemoteLocation(p))
+        return normalizeLocation(p);
     if (p.isEmpty())
         return p;
     return QDir::cleanPath(p);

@@ -1,6 +1,7 @@
 #include "ui/MainWindow.h"
 
 #include "core/Archive.h"
+#include "core/Backend.h"
 #include "core/DesktopApps.h"
 #include "core/FolderHistory.h"
 #include "core/MultiRename.h"
@@ -33,6 +34,8 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
+#include <QTimer>
+#include <QFileSystemWatcher>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
@@ -532,7 +535,7 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
         return;
 
     QString dest = text;
-    if (!dest.startsWith(QLatin1Char('/')) && !dest.startsWith(QLatin1Char('~')))
+    if (!dest.startsWith(QLatin1Char('/')) && !dest.startsWith(QLatin1Char('~')) && !isRemoteLocation(dest))
         dest = joinPath(src->path(), dest);
     const bool intoDir = text.endsWith(QLatin1Char('/'));
     dest = expandUserPath(dest);
@@ -553,13 +556,16 @@ void MainWindow::deleteSelected(bool permanent)
     const QStringList paths = p->selectedPaths();
     if (paths.isEmpty() || refuseInArchive(p))
         return;
+    if (p->isRemote())
+        permanent = true;  // servers have no trash
     QMessageBox box(this);
     box.setIcon(permanent ? QMessageBox::Warning : QMessageBox::Question);
     box.setWindowTitle(permanent ? tr("Delete permanently") : tr("Move to trash"));
     box.setText(permanent ? tr("Permanently delete %1?").arg(describeItems(paths))
                           : tr("Move %1 to the trash?").arg(describeItems(paths)));
     if (permanent)
-        box.setInformativeText(tr("This cannot be undone."));
+        box.setInformativeText(p->isRemote() ? tr("This is on a server, which has no trash. It cannot be undone.")
+                                             : tr("This cannot be undone."));
     box.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
     box.setDefaultButton(QMessageBox::Yes);
     if (box.exec() != QMessageBox::Yes)
@@ -580,21 +586,22 @@ void MainWindow::makeFolder()
                              .trimmed();
     if (!ok || name.isEmpty())
         return;
-    const QString full = name.startsWith(QLatin1Char('/')) ? name : joinPath(p->path(), name);
+    const QString full = name.startsWith(QLatin1Char('/')) && !p->isRemote() ? name : joinPath(p->path(), name);
     const QString first = name.section(QLatin1Char('/'), 0, 0, QString::SectionSkipEmpty);
     QPointer<Panel> panel(p);
     QPointer<MainWindow> self(this);
     ioPool()->start([self, panel, full, first] {
         // For undo: the topmost folder that didn't exist yet.
         QString topNew = full;
-        for (QString q = full; q != QLatin1String("/") && !q.isEmpty(); q = parentPath(q)) {
+        const bool remote = isRemoteLocation(full);
+        for (QString q = full; !remote && q != QLatin1String("/") && !q.isEmpty(); q = parentPath(q)) {
             if (QFileInfo::exists(q))
                 break;
             topNew = q;
         }
-        const int err = makeDirectories(full);
-        postToUi([self, panel, err, full, first, topNew] {
-            if (self && !err)
+        const int err = makeDirectoriesAt(full);
+        postToUi([self, panel, err, full, first, topNew, remote] {
+            if (self && !err && !remote)
                 self->pushUndo({UndoEntry::Kind::Create, tr("new folder %1").arg(baseName(topNew)), {}, {{topNew, {}}}});
             if (!panel)
                 return;
@@ -616,8 +623,8 @@ void MainWindow::viewCurrent()
         p->computeCurrentSize();
         return;
     }
-    if (p->inArchive()) {
-        withExtracted(p, p->currentPath(), [this](const QString& local) {
+    if (p->inArchive() || p->isRemote()) {
+        withLocalCopy(p, p->currentPath(), [this](const QString& local) {
             (new ViewerWindow({local}, 0, this))->show();
         });
         return;
@@ -646,6 +653,10 @@ void MainWindow::editCurrent()
         return;
     if (active()->inArchive()) {
         openFrom(active(), path);  // a read-only copy; archives can't be edited in place
+        return;
+    }
+    if (isRemoteLocation(path)) {
+        editRemote(active(), path);
         return;
     }
     const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
@@ -925,7 +936,37 @@ void MainWindow::updatePreviewFor(ViewerWindow* preview, Panel* p)
         preview->showNote(tr("Move the cursor onto a file"));
     } else if (p->inArchive()) {
         preview->showNote(tr("“%1” is inside an archive\n\nF3 opens it in the viewer").arg(e->name));
+    } else if (p->isRemote()) {
+        // On a server: small files are fetched (and cached) for the preview.
+        const QString remote = p->currentPath();
+        if (preview->property("remoteWanted").toString() == remote)
+            return;
+        preview->setProperty("remoteWanted", remote);
+        if (e->isDir) {
+            preview->showNote(tr("Folder on %1").arg(locationAuthority(remote)));
+            return;
+        }
+        if (e->size > 16 * 1024 * 1024) {
+            preview->showNote(tr("“%1” is on a server (%2)\n\nF3 downloads and opens it").arg(e->name, formatSize(e->size)));
+            return;
+        }
+        const QString local = remoteCachePath(remote);
+        QPointer<ViewerWindow> pv(preview);
+        const int64_t size = e->size, mtime = e->mtime;
+        preview->showNote(tr("Fetching “%1” …").arg(e->name));
+        mediaPool()->start([pv, remote, local, size, mtime] {
+            const int err = cachedCopyIsFresh(local, size, mtime) ? 0 : downloadFile(remote, local, nullptr);
+            postToUi([pv, remote, local, err] {
+                if (!pv || pv->property("remoteWanted").toString() != remote)
+                    return;
+                if (err)
+                    pv->showNote(tr("Cannot fetch: %1").arg(errnoString(err)));
+                else
+                    pv->showFile(local);
+            });
+        });
     } else if (preview->currentPath() != p->currentPath()) {
+        preview->setProperty("remoteWanted", QVariant());
         preview->setGitHint(p->tab()->model()->gitStatus(e->name));
         preview->showFile(p->currentPath());
         // Prepare the neighbours, so moving on is instant (like yazi's preloaders).
@@ -1092,10 +1133,121 @@ void MainWindow::withExtracted(Panel* p, const QString& path, std::function<void
 
 void MainWindow::openFrom(Panel* p, const QString& path)
 {
-    if (p->inArchive())
-        withExtracted(p, path, [this](const QString& local) { openFile(local); });
+    if (p->inArchive() || isRemoteLocation(path))
+        withLocalCopy(p, path, [this](const QString& local) { openFile(local); });
     else
         openFile(path);
+}
+
+bool MainWindow::refuseOnServer(Panel* p, const QString& what)
+{
+    if (!p->isRemote())
+        return false;
+    p->showMessage(tr("%1 doesn't work on servers yet").arg(what), true);
+    return true;
+}
+
+void MainWindow::withLocalCopy(Panel* p, const QString& path, std::function<void(const QString&)> fn,
+                               const QString& localOverride)
+{
+    if (p->inArchive()) {
+        withExtracted(p, path, std::move(fn));
+        return;
+    }
+    if (!isRemoteLocation(path)) {
+        fn(path);
+        return;
+    }
+    const QString local = localOverride.isEmpty() ? remoteCachePath(path) : localOverride;
+    p->showMessage(tr("Downloading %1 …").arg(baseName(path)));
+    QPointer<Panel> panel(p);
+    QPointer<MainWindow> self(this);
+    ioPool()->start([self, panel, path, local, fn] {
+        FileStat st;
+        int err = statAt(path, st);
+        if (err == 0 && !cachedCopyIsFresh(local, st.size, st.mtime))
+            err = downloadFile(path, local, nullptr);
+        postToUi([self, panel, path, local, err, fn] {
+            if (!self)
+                return;
+            if (err) {
+                if (panel)
+                    panel->showMessage(tr("Cannot download %1: %2").arg(baseName(path), errnoString(err)), true);
+                return;
+            }
+            if (panel)
+                panel->showMessage(QString());
+            fn(local);
+        });
+    });
+}
+
+void MainWindow::editedFileChanged(const QString& local)
+{
+    m_changedEdits.insert(local);
+    m_uploadTimer->start();
+}
+
+void MainWindow::uploadEdited()
+{
+    for (const QString& f : std::as_const(m_changedEdits)) {
+        if (!QFileInfo::exists(f))
+            continue;  // mid-save; the new file triggers again
+        if (!m_editWatch->files().contains(f))
+            m_editWatch->addPath(f);
+        const QString remote = m_editedRemote.value(f);
+        if (remote.isEmpty())
+            continue;
+        auto* job = new CopyJob(QList<QPair<QString, QString>>{{f, remote}});
+        job->setOverwriteExisting();
+        job->setStartImmediately(true);
+        m_jobs->add(job);
+        active()->showMessage(tr("Uploading %1 …").arg(baseName(remote)));
+    }
+    m_changedEdits.clear();
+}
+
+// F4 on a server: edit a downloaded copy; every save is uploaded again.
+void MainWindow::editRemote(Panel* p, const QString& path)
+{
+    const QString editCopy = remoteCachePath(path).replace(QStringLiteral("/tandem-fm/remote/"), QStringLiteral("/tandem-fm/edit/"));
+    if (m_editedRemote.value(editCopy) == path && QFileInfo::exists(editCopy)) {
+        // Already being edited: reopen that copy, don't fetch over changes.
+        const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
+        QStringList args = QProcess::splitCommand(editor);
+        if (args.isEmpty() || !QProcess::startDetached(args.takeFirst(), args << editCopy, parentPath(editCopy)))
+            openFile(editCopy);
+        return;
+    }
+    withLocalCopy(p, path, [this, path](const QString& local) {
+        if (!m_editWatch) {
+            m_editWatch = new QFileSystemWatcher(this);
+            m_uploadTimer = new QTimer(this);
+            m_uploadTimer->setSingleShot(true);
+            m_uploadTimer->setInterval(400);  // editors write in several steps
+            connect(m_editWatch, &QFileSystemWatcher::fileChanged, this, &MainWindow::editedFileChanged);
+            // Editors that save by writing a new file and renaming it drop the
+            // file watch; the folder watch catches those.
+            connect(m_editWatch, &QFileSystemWatcher::directoryChanged, this, [this](const QString& dir) {
+                for (auto it = m_editedRemote.cbegin(); it != m_editedRemote.cend(); ++it)
+                    if (parentPath(it.key()) == dir && !m_editWatch->files().contains(it.key()))
+                        editedFileChanged(it.key());
+            });
+            connect(m_uploadTimer, &QTimer::timeout, this, &MainWindow::uploadEdited);
+        }
+        m_editedRemote.insert(local, path);
+        m_editWatch->addPath(local);
+        m_editWatch->addPath(parentPath(local));
+        const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
+        if (!editor.isEmpty()) {
+            QStringList args = QProcess::splitCommand(editor);
+            const QString program = args.takeFirst();
+            args.append(local);
+            if (QProcess::startDetached(program, args, parentPath(local)))
+                return;
+        }
+        openFile(local);
+    }, editCopy);
 }
 
 void MainWindow::pack()
@@ -1108,6 +1260,8 @@ void MainWindow::pack()
         src->showMessage(tr("Extract first (F5), then pack."), true);
         return;
     }
+    if (refuseOnServer(src, tr("Packing")) || refuseOnServer(other(), tr("Packing")))
+        return;
     bool now = false;
     const QString base = paths.size() == 1 ? baseName(paths.first()) : baseName(src->path());
     const QString dir = other()->inArchive() ? src->path() : other()->path();
@@ -1135,6 +1289,8 @@ void MainWindow::unpack()
         refuseInArchive(dst);
         return;
     }
+    if (refuseOnServer(src, tr("Unpacking")) || refuseOnServer(dst, tr("Unpacking")))
+        return;
     bool now = false;
     QStringList archives;
     for (const QString& p : src->selectedPaths())
@@ -1334,7 +1490,7 @@ void MainWindow::synchronizeFolders()
 void MainWindow::openCommandBar()
 {
     Panel* p = active();
-    if (refuseInArchive(p))
+    if (refuseInArchive(p) || refuseOnServer(p, tr("Running commands")))
         return;
     const QStringList sel = p->selectedPaths();
     QString what = sel.isEmpty() ? tr("nothing selected")
@@ -1777,6 +1933,10 @@ void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)
 void MainWindow::openTerminal(const QString& dir)
 {
     QString where = dir.isEmpty() ? active()->path() : dir;
+    if (isRemoteLocation(where)) {
+        active()->showMessage(tr("A terminal on the server: use ssh (Tandem doesn't open one there yet)"), true);
+        return;
+    }
     if (active()->inArchive() && where.startsWith(active()->archivePath()))
         where = parentPath(active()->archivePath());  // the folder holding the archive
     QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
@@ -1810,12 +1970,9 @@ void MainWindow::makeFile()
     QPointer<Panel> panel(p);
     QPointer<MainWindow> self(this);
     ioPool()->start([self, panel, full, name] {
-        const int fd = ::open(toNative(full).constData(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
-        const int err = fd < 0 ? errno : 0;
-        if (fd >= 0)
-            ::close(fd);
+        const int err = createEmptyFile(full);
         postToUi([self, panel, err, full, name] {
-            if (self && !err)
+            if (self && !err && !isRemoteLocation(full))
                 self->pushUndo({UndoEntry::Kind::Create, tr("new file %1").arg(name), {}, {{full, {}}}});
             if (!panel)
                 return;

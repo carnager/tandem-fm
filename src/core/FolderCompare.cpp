@@ -1,5 +1,6 @@
 #include "core/FolderCompare.h"
 
+#include "core/Backend.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
 #include "core/Util.h"
@@ -41,8 +42,8 @@ struct Walker {
             progress(rel);
         ListOptions lo;
         lo.showHidden = opt.hidden;
-        const ListResult l = listDirectory(rel.isEmpty() ? leftRoot : joinPath(leftRoot, rel), lo);
-        const ListResult r = listDirectory(rel.isEmpty() ? rightRoot : joinPath(rightRoot, rel), lo);
+        const ListResult l = listLocation(rel.isEmpty() ? leftRoot : joinPath(leftRoot, rel), lo);
+        const ListResult r = listLocation(rel.isEmpty() ? rightRoot : joinPath(rightRoot, rel), lo);
         if (rel.isEmpty() && (l.error || r.error)) {
             out.error = errnoString(l.error ? l.error : r.error);
             return;
@@ -70,11 +71,11 @@ struct Walker {
             if (!b) {
                 item.diff = Diff::LeftOnly;
                 if (item.left.isDir)  // what copying it over would cost
-                    item.left.size = directorySize(joinPath(leftRoot, item.rel), cancel);
+                    item.left.size = directorySizeAt(joinPath(leftRoot, item.rel), cancel);
             } else if (!a) {
                 item.diff = Diff::RightOnly;
                 if (item.right.isDir)
-                    item.right.size = directorySize(joinPath(rightRoot, item.rel), cancel);
+                    item.right.size = directorySizeAt(joinPath(rightRoot, item.rel), cancel);
             } else if (item.left.isDir != item.right.isDir) {
                 item.diff = Diff::TypeMismatch;
             } else if (item.left.isDir) {
@@ -120,23 +121,45 @@ CompareResult compareFolders(const QString& left, const QString& right, const Co
 
 std::optional<bool> sameContents(const QString& a, const QString& b, const std::atomic<bool>* cancel)
 {
-    QFile fa(a), fb(b);
-    if (!fa.open(QIODevice::ReadOnly) || !fb.open(QIODevice::ReadOnly))
+    Backend* ba = anyBackendFor(a);
+    Backend* bb = anyBackendFor(b);
+    if (!ba || !bb)
         return std::nullopt;
-    if (fa.size() != fb.size())
+    FileStat sa, sb;
+    if (ba->stat(a, sa) || bb->stat(b, sb))
+        return std::nullopt;
+    if (sa.size != sb.size)
         return false;
-    QByteArray ba(1 << 20, Qt::Uninitialized), bb(1 << 20, Qt::Uninitialized);
+    int err = 0;
+    auto ra = ba->openRead(a, err);
+    auto rb = ra ? bb->openRead(b, err) : nullptr;
+    if (!ra || !rb)
+        return std::nullopt;
+    // Reads can come back short (network), so each side keeps its own window.
+    std::vector<char> bufA(1 << 20), bufB(1 << 20);
+    int64_t offA = 0, lenA = 0, offB = 0, lenB = 0;
     for (;;) {
         if (cancel && cancel->load())
             return std::nullopt;
-        const qint64 na = fa.read(ba.data(), ba.size());
-        const qint64 nb = fb.read(bb.data(), bb.size());
-        if (na < 0 || nb < 0)
-            return std::nullopt;
-        if (na != nb || memcmp(ba.constData(), bb.constData(), size_t(na)) != 0)
+        if (offA == lenA) {
+            offA = 0;
+            lenA = ra->read(bufA.data(), int64_t(bufA.size()));
+            if (lenA < 0)
+                return std::nullopt;
+        }
+        if (offB == lenB) {
+            offB = 0;
+            lenB = rb->read(bufB.data(), int64_t(bufB.size()));
+            if (lenB < 0)
+                return std::nullopt;
+        }
+        const int64_t n = qMin(lenA - offA, lenB - offB);
+        if (n == 0)
+            return lenA - offA == lenB - offB;  // both at the end
+        if (memcmp(bufA.data() + offA, bufB.data() + offB, size_t(n)) != 0)
             return false;
-        if (na == 0)
-            return true;
+        offA += n;
+        offB += n;
     }
 }
 

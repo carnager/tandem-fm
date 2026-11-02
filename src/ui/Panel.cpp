@@ -1,6 +1,7 @@
 #include "ui/Panel.h"
 
 #include "core/Archive.h"
+#include "core/Backend.h"
 #include "core/FileOps.h"
 #include "core/Mounts.h"
 #include "core/Remote.h"
@@ -210,6 +211,17 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
 
     connect(m_pathBar, &PathBar::pathEntered, this, [this](QString text) {
         text = text.trimmed();
+        if (isRemoteLocation(text) && hasBackend(text.section(QLatin1Char(':'), 0, 0))) {
+            navigate(normalizeLocation(text));  // native: a location like any other
+            m_view->setFocus();
+            return;
+        }
+        if (isRemoteLocation(path()) && !text.startsWith(QLatin1Char('/')) && !text.startsWith(QLatin1Char('~')) &&
+            !isRemoteLocation(text)) {
+            navigate(normalizeLocation(joinPath(path(), text)));  // relative, on the server
+            m_view->setFocus();
+            return;
+        }
         if (const QString uri = normalizeServerUri(text); !uri.isEmpty()) {
             connectTo(uri);
             m_view->setFocus();
@@ -327,6 +339,8 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_view, &FileView::dragPathsRequested, this, [this](QStringList& out) {
         if (inArchive())
             showMessage(tr("Dragging out of archives isn't supported yet. Use F5 to extract."), true);
+        else if (isRemote())
+            showMessage(tr("Dragging files off a server isn't supported yet. Use F5 to copy."), true);
         else
             out = selectedPaths();
     });
@@ -701,7 +715,7 @@ void Panel::openCurrent()
         return;
     if (e->isParent)
         goUp();
-    else if (e->isDir || (!inArchive() && isArchiveName(e->name)))
+    else if (e->isDir || (!inArchive() && !isRemote() && isArchiveName(e->name)))
         navigate(joinPath(path(), e->name));
     else
         emit openFileRequested(joinPath(path(), e->name));
@@ -713,6 +727,12 @@ void Panel::enterCurrent()
     if (!e || e->isParent)
         return;
     navigate(joinPath(path(), e->name));
+}
+
+bool Panel::isRemote() const
+{
+    DirTab* t = tab();
+    return t && t->isRemote();
 }
 
 bool Panel::inArchive() const
@@ -884,7 +904,7 @@ void Panel::doRename(const QString& from, const QString& to)
     QPointer<Panel> self(this);
     QPointer<DirTab> t(tab());
     ioPool()->start([self, t, dir, from, to] {
-        const int err = renameNoReplace(joinPath(dir, from), joinPath(dir, to));
+        const int err = renameNoReplaceAt(joinPath(dir, from), joinPath(dir, to));
         postToUi([self, t, err, dir, from, to] {
             if (!self)
                 return;
@@ -1019,8 +1039,9 @@ void Panel::updateHeader()
     m_branchLabel->setVisible(!t->gitBranch().isEmpty());
     m_branchLabel->setText(QStringLiteral("⎇ %1").arg(t->gitBranch()));
     m_branchLabel->setToolTip(tr("Git branch"));
-    m_mountButton->setIcon(t->inArchive() ? IconCache::themed("package-x-generic", "application-x-archive")
-                                          : IconCache::themed("drive-harddisk", "folder"));
+    m_mountButton->setIcon(t->inArchive()  ? IconCache::themed("package-x-generic", "application-x-archive")
+                           : t->isRemote() ? IconCache::themed("network-server", "folder-remote")
+                                           : IconCache::themed("drive-harddisk", "folder"));
     m_mountButton->setToolTip(t->inArchive() ? tr("Inside archive %1").arg(t->archivePath())
                                              : tr("Locations (Alt+F1 / Alt+F2)"));
     if (t->freeBytes() >= 0 && t->totalBytes() > 0) {  // GVfs/FUSE often report 0 of 0
@@ -1078,6 +1099,10 @@ void Panel::showMessage(const QString& text, bool error)
 
 void Panel::startSearchBar()
 {
+    if (isRemote()) {
+        showMessage(tr("Searching on servers isn't supported yet"), true);
+        return;
+    }
     if (inArchive()) {
         showMessage(tr("Searching inside archives isn't supported yet"), true);
         return;
@@ -1153,6 +1178,11 @@ void Panel::showMountMenu()
 
 void Panel::connectTo(const QString& uri)
 {
+    if (hasBackend(uri.section(QLatin1Char(':'), 0, 0))) {  // built in: just go there
+        Network::instance().rememberServer(uri);
+        navigate(normalizeLocation(uri));
+        return;
+    }
     if (!Network::available()) {
         showMessage(tr("Tandem was built without GIO: mount with sshfs/rclone and browse the folder"), true);
         return;

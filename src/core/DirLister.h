@@ -31,6 +31,7 @@ struct ListResult {
     QString errorText;  // set instead of errno for non-errno failures (archives)
     // Location kind: inside an archive, path = archivePath + "/" + innerPath.
     bool inArchive = false;
+    bool remote = false;  // listed through a Backend (no inotify, no trash)
     QString archivePath;
     QString innerPath;
 };

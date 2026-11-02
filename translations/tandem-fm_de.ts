@@ -59,6 +59,10 @@
         <translation>Nicht im Archiv gefunden</translation>
     </message>
     <message>
+        <source>Tandem can&apos;t open %1 locations</source>
+        <translation>Tandem kann %1-Orte nicht öffnen</translation>
+    </message>
+    <message>
         <source>Archives inside archives: extract it first (F5)</source>
         <translation>Archive in Archiven: zuerst entpacken (F5)</translation>
     </message>
@@ -492,6 +496,18 @@
     <message>
         <source>Error while writing</source>
         <translation>Fehler beim Schreiben</translation>
+    </message>
+    <message>
+        <source>Tandem can&apos;t open %1</source>
+        <translation>Tandem kann %1 nicht öffnen</translation>
+    </message>
+    <message>
+        <source>Skipped link %1 (%2)</source>
+        <translation>Verknüpfung %1 übersprungen (%2)</translation>
+    </message>
+    <message>
+        <source>Cannot write</source>
+        <translation>Schreiben nicht möglich</translation>
     </message>
 </context>
 <context>
@@ -1205,6 +1221,10 @@
         <translation>%1 in den Papierkorb verschieben?</translation>
     </message>
     <message>
+        <source>This is on a server, which has no trash. It cannot be undone.</source>
+        <translation>Das liegt auf einem Server, der keinen Papierkorb hat. Es kann nicht rückgängig gemacht werden.</translation>
+    </message>
+    <message>
         <source>This cannot be undone.</source>
         <translation>Dies kann nicht rückgängig gemacht werden.</translation>
     </message>
@@ -1388,6 +1408,26 @@ F3 opens it in the viewer</source>
 F3 öffnet es im Betrachter</translation>
     </message>
     <message>
+        <source>Folder on %1</source>
+        <translation>Ordner auf %1</translation>
+    </message>
+    <message>
+        <source>“%1” is on a server (%2)
+
+F3 downloads and opens it</source>
+        <translation>„%1“ liegt auf einem Server (%2)
+
+F3 lädt es herunter und öffnet es</translation>
+    </message>
+    <message>
+        <source>Fetching “%1” …</source>
+        <translation>Hole „%1“ …</translation>
+    </message>
+    <message>
+        <source>Cannot fetch: %1</source>
+        <translation>Abrufen nicht möglich: %1</translation>
+    </message>
+    <message>
         <source>  (on)</source>
         <translation>  (an)</translation>
     </message>
@@ -1432,8 +1472,28 @@ F3 öffnet es im Betrachter</translation>
         <translation>Entpacken nicht möglich: %1</translation>
     </message>
     <message>
+        <source>%1 doesn&apos;t work on servers yet</source>
+        <translation>%1 funktioniert auf Servern noch nicht</translation>
+    </message>
+    <message>
+        <source>Downloading %1 …</source>
+        <translation>Lade %1 herunter …</translation>
+    </message>
+    <message>
+        <source>Cannot download %1: %2</source>
+        <translation>%1 kann nicht heruntergeladen werden: %2</translation>
+    </message>
+    <message>
+        <source>Uploading %1 …</source>
+        <translation>Lade %1 hoch …</translation>
+    </message>
+    <message>
         <source>Extract first (F5), then pack.</source>
         <translation>Zuerst entpacken (F5), dann packen.</translation>
+    </message>
+    <message>
+        <source>Packing</source>
+        <translation>Packen</translation>
     </message>
     <message>
         <source>Pack</source>
@@ -1442,6 +1502,10 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>Pack %1 into (the extension picks the format: .zip .7z .tar.gz .tar.xz .tar.zst .tar):</source>
         <translation>%1 packen nach (die Endung bestimmt das Format: .zip .7z .tar.gz .tar.xz .tar.zst .tar):</translation>
+    </message>
+    <message>
+        <source>Unpacking</source>
+        <translation>Entpacken</translation>
     </message>
     <message>
         <source>Select one or more archives to unpack.</source>
@@ -1499,6 +1563,10 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>Both panels show the same folder</source>
         <translation>Beide Panels zeigen denselben Ordner</translation>
+    </message>
+    <message>
+        <source>Running commands</source>
+        <translation>Befehle ausführen</translation>
     </message>
     <message>
         <source>nothing selected</source>
@@ -1672,6 +1740,10 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>No terminal found. Set tools/terminal in the config.</source>
         <translation>Kein Terminal gefunden. tools/terminal in der Konfiguration setzen.</translation>
+    </message>
+    <message>
+        <source>A terminal on the server: use ssh (Tandem doesn&apos;t open one there yet)</source>
+        <translation>Ein Terminal auf dem Server: ssh benutzen (Tandem öffnet dort noch keins)</translation>
     </message>
     <message>
         <source>New file</source>
@@ -1978,6 +2050,10 @@ F3 öffnet es im Betrachter</translation>
         <translation>Ziehen aus Archiven wird noch nicht unterstützt. Mit F5 entpacken.</translation>
     </message>
     <message>
+        <source>Dragging files off a server isn&apos;t supported yet. Use F5 to copy.</source>
+        <translation>Dateien von einem Server zu ziehen geht noch nicht. F5 kopiert.</translation>
+    </message>
+    <message>
         <source>Cannot open %1: %2</source>
         <translation>%1 kann nicht geöffnet werden: %2</translation>
     </message>
@@ -2048,6 +2124,10 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>%1 files, %2 folders   ·   %3</source>
         <translation>%1 Dateien, %2 Ordner   ·   %3</translation>
+    </message>
+    <message>
+        <source>Searching on servers isn&apos;t supported yet</source>
+        <translation>Suchen auf Servern wird noch nicht unterstützt</translation>
     </message>
     <message>
         <source>Searching inside archives isn&apos;t supported yet</source>

@@ -1,5 +1,7 @@
 #include "core/FileOps.h"
 
+#include "core/Backend.h"
+
 #include "core/Util.h"
 
 #include <QCoreApplication>
@@ -75,10 +77,10 @@ QByteArray uniqueName(const QByteArray& path)
         dot = name.size();
     const QByteArray stem = name.left(dot);
     const QByteArray ext = name.mid(dot);
-    struct stat st;
     for (int i = 2;; ++i) {
         QByteArray candidate = dir + stem + " (" + QByteArray::number(i) + ")" + ext;
-        if (lstat(candidate.constData(), &st) != 0)
+        FileStat st;
+        if (statAt(fromNative(candidate), st) != 0)  // local or remote
             return candidate;
     }
 }
@@ -98,9 +100,26 @@ CopyJob::CopyJob(QList<QPair<QString, QString>> pairs)
 {
 }
 
+bool CopyJob::needsBackends() const
+{
+    if (isRemoteLocation(m_destination))
+        return true;
+    for (const QString& s : m_sources)
+        if (isRemoteLocation(s))
+            return true;
+    for (const auto& [from, to] : m_pairs)
+        if (isRemoteLocation(from) || isRemoteLocation(to))
+            return true;
+    return false;
+}
+
 void CopyJob::run()
 {
     setState(State::Scanning);
+    if (needsBackends()) {
+        runWithBackends();
+        return;
+    }
     for (const auto& [from, to] : std::as_const(m_pairs)) {
         const QString parent = parentPath(to);
         for (int e; (e = makeDirectories(parent)) != 0 && e != EEXIST;) {
@@ -614,13 +633,20 @@ void DeleteJob::count(const QByteArray& path, int64_t& files)
 
 void DeleteJob::run()
 {
+    for (const QString& p : std::as_const(m_paths))
+        if (isRemoteLocation(p))
+            m_toTrash = false;  // no trash on servers: count it as permanent
     if (m_toTrash) {
         m_filesTotal = m_paths.size();
     } else {
         setState(State::Scanning);
         int64_t files = 0;
-        for (const QString& p : std::as_const(m_paths))
-            count(toNative(p), files);
+        for (const QString& p : std::as_const(m_paths)) {
+            if (isRemoteLocation(p))
+                countAt(p, files);
+            else
+                count(toNative(p), files);
+        }
         m_filesTotal = files;
     }
     setState(State::Running);
@@ -629,6 +655,11 @@ void DeleteJob::run()
         if (checkpoint())
             return;
         setCurrent(p);
+        if (isRemoteLocation(p)) {
+            // Servers have no trash; the UI asks for "permanently" up front.
+            removeTreeAt(p);
+            continue;
+        }
         if (!m_toTrash) {
             removeTree(toNative(p));
             continue;

@@ -33,6 +33,8 @@ add_library(tandem_core STATIC
   src/core/Search.h src/core/Search.cpp
   src/core/FolderCompare.h src/core/FolderCompare.cpp
   src/core/Remote.h src/core/Remote.cpp
+  src/core/Backend.h src/core/Backend.cpp
+  src/core/BackendCopy.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)

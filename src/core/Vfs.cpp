@@ -1,6 +1,7 @@
 // Resolves a path to a backend: local folder, or a folder inside an archive.
 
 #include "core/Archive.h"
+#include "core/Backend.h"
 #include "core/DirLister.h"
 #include "core/Util.h"
 
@@ -13,6 +14,30 @@ namespace tandem {
 
 ListResult listLocation(const QString& path, const ListOptions& opt, const std::atomic<bool>* cancel)
 {
+    if (isRemoteLocation(path)) {
+        QElapsedTimer timer;
+        timer.start();
+        Backend* b = backendFor(path);
+        ListResult r;
+        if (!b) {
+            r.path = path;
+            r.error = EPROTONOSUPPORT;
+            r.errorText = QObject::tr("Tandem can't open %1 locations").arg(path.section(QLatin1Char(':'), 0, 0));
+        } else {
+            ListOptions o = opt;
+            o.watch = false;
+            r = b->list(path, o, cancel);
+            r.path = path;
+            for (FileEntry& e : r.entries)
+                if (!e.key)
+                    e.key = makeSortKey(e.name);
+            sortEntries(r.entries, opt.sort);
+            r.sortedBy = opt.sort;
+        }
+        r.remote = true;
+        r.elapsedMs = timer.elapsed();
+        return r;
+    }
     ListResult local = listDirectory(path, opt, cancel);
     if (local.error != ENOTDIR && local.error != ENOENT)
         return local;
