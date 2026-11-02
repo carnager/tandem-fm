@@ -52,14 +52,16 @@ public:
     void forward();
     void cancelLoading();
 
-    // position -1: right after the current tab
-    void addTab(const QString& path, bool activate = true, int position = -1);
+    // Tabs have fixed numbers (like yazi): slot 0 takes the lowest free one.
+    // Asking for a slot that exists just switches to it.
+    void addTab(const QString& path, bool activate = true, int slot = 0);
     void closeCurrentTab();
     void cycleTab(int step);
-    void selectTab(int index);  // Alt+1…9
+    void selectSlot(int slot);  // Alt+1…9: go to tab N, creating it here if needed
     QStringList tabPaths() const;
+    QList<int> tabSlots() const;
     int currentTabIndex() const { return m_current; }
-    void restoreTabs(const QStringList& paths, int current);
+    void restoreTabs(const QStringList& paths, int current, const QList<int>& numbers = {});
 
     void sortBy(SortColumn column);
     SortSpec sortSpec() const;
@@ -115,6 +117,7 @@ private:
     void doRename(const QString& from, const QString& to);
     int tabIndexOf(DirTab* t) const;
     void updateTabTitles();
+    int lowestFreeSlot() const;
 
     std::vector<DirTab*> m_tabs;
     int m_current = -1;

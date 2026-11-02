@@ -8,8 +8,8 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets DBus Pdf Test)
-qt_standard_project_setup()
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets DBus Pdf Test OPTIONAL_COMPONENTS LinguistTools)
+qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES de)
 
 # Core engine: filesystem access, jobs, watching. QtCore only, no UI.
 add_library(tandem_core STATIC
@@ -74,6 +74,21 @@ target_compile_options(tandem_ui PRIVATE -Wall -Wextra)
 
 add_executable(tandem-fm src/main.cpp)
 target_link_libraries(tandem-fm PRIVATE tandem_ui)
+
+# Translations (needs qt6-tools): `cmake --build build --target update_translations`
+# refreshes translations/*.ts from the sources; the .qm files are compiled into
+# the binary under :/i18n.
+if(Qt6LinguistTools_FOUND)
+  qt_add_translations(TARGETS tandem-fm
+    SOURCE_TARGETS tandem_core tandem_ui tandem-fm
+    TS_FILE_BASE tandem-fm
+    TS_FILE_DIR translations
+    RESOURCE_PREFIX /i18n
+    LUPDATE_OPTIONS -no-obsolete -locations none)
+  message(STATUS "Translations: enabled")
+else()
+  message(STATUS "Translations: disabled (install qt6-tools)")
+endif()
 
 add_executable(tandem-bench bench/bench_list.cpp)
 target_link_libraries(tandem-bench PRIVATE tandem_core)

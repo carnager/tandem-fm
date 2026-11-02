@@ -314,7 +314,21 @@ private slots:
         QTRY_COMPARE(m_left->path(), L());
         QTest::keyClick(m_left->view(), Qt::Key_2, Qt::AltModifier);
         QTRY_COMPARE(m_left->path(), L("sub"));
-        QTest::keyClick(m_left->view(), Qt::Key_W, Qt::ControlModifier);
+
+        // Alt+5 creates tab 5 here; numbers stay put and sorted.
+        QTest::keyClick(m_left->view(), Qt::Key_5, Qt::AltModifier);
+        QTRY_COMPARE(m_left->tabSlots(), QList<int>({1, 2, 5}));
+        QCOMPARE(m_left->path(), L("sub"));
+        QCOMPARE(bar->tabText(2), QString("5  sub"));
+        QTest::keyClick(m_left->view(), Qt::Key_2, Qt::AltModifier);
+        QTest::keyClick(m_left->view(), Qt::Key_W, Qt::ControlModifier);  // close tab 2
+        QTRY_COMPARE(m_left->tabSlots(), QList<int>({1, 5}));
+        QTest::keyClick(m_left->view(), Qt::Key_T, Qt::ControlModifier);   // takes the free 2
+        QTRY_COMPARE(m_left->tabSlots(), QList<int>({1, 2, 5}));
+        for (int n : {5, 2}) {
+            m_left->selectSlot(n);
+            QTest::keyClick(m_left->view(), Qt::Key_W, Qt::ControlModifier);
+        }
         QTRY_COMPARE(m_left->tabPaths(), QStringList({L()}));
     }
 

@@ -326,7 +326,7 @@ void MainWindow::createMenus()
     });
     addCommand(tabs, tr("Close tab"), {K(Qt::CTRL | Qt::Key_W)}, [this] { active()->closeCurrentTab(); });
     for (int i = 1; i <= 9; ++i)
-        addCommand(tabs, tr("Tab %1").arg(i), {K(Qt::ALT | (Qt::Key_0 + i))}, [this, i] { active()->selectTab(i - 1); });
+        addCommand(tabs, tr("Tab %1").arg(i), {K(Qt::ALT | (Qt::Key_0 + i))}, [this, i] { active()->selectSlot(i); });
     addCommand(tabs, tr("Next tab"), {K(Qt::CTRL | Qt::Key_Tab)}, [this] { active()->cycleTab(1); });
     addCommand(tabs, tr("Previous tab"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab), K(Qt::CTRL | Qt::Key_Backtab)},
                [this] { active()->cycleTab(-1); });
@@ -688,39 +688,39 @@ void MainWindow::openInPanel(Panel* target)
 void MainWindow::showShortcuts()
 {
     static const char* rows[][2] = {
-        {"Tab", "Switch panel"},
-        {"Enter / Backspace", "Open / parent folder"},
-        {"Type letters", "Quick search (Up/Down: next match)"},
-        {"Insert, Space, Shift+↑↓", "Mark (Space also sizes folders)"},
-        {"Num + / Num - / Num *", "Mark group / unmark group / invert"},
-        {"F3 / F4", "Viewer (Esc closes, N/P next file, 1/3/4 modes) / edit"},
-        {"F5 / F6", "Copy / move to other panel"},
-        {"Shift+F6 / Ctrl+M / Ctrl+E", "Rename in place / multi-rename / in your text editor"},
-        {"F7 / Shift+F4", "New folder / new file"},
-        {"F8, Del / Shift+F8", "Trash / delete permanently"},
-        {"Ctrl+T / Ctrl+W / Ctrl+Tab", "New / close / next tab"},
-        {"Alt+1 … Alt+9", "Go to tab 1 … 9 (tabs are numbered)"},
-        {"Alt+← / Alt+→", "History back / forward"},
-        {"Ctrl+PgUp / Ctrl+\\ / Ctrl+`", "Parent / root / home"},
-        {"Ctrl+L", "Type a path"},
-        {"Alt+F1 / Alt+F2", "Locations for left / right panel"},
-        {"Ctrl+← / Ctrl+→", "Show folder in left / right panel"},
-        {"Ctrl+U", "Swap panels"},
-        {"Ctrl+F3…F6", "Sort by name / ext / date / size"},
-        {"Ctrl+H", "Show hidden files"},
-        {"Ctrl+C / X / V", "Clipboard (works with other apps)"},
-        {"Alt+Shift+Enter", "Calculate all folder sizes"},
-        {"Ctrl+Z", "Undo the last operation (move, copy, trash, rename, new folder)"},
-        {"Ctrl+Alt+T", "Open terminal here"},
-        {"Alt+F5 / Alt+F9", "Pack / unpack archives"},
-        {"Ctrl+PgDn", "Enter folder, or browse any file as archive"},
-        {"Menu key, Shift+F10", "Context menu"},
-        {"Ctrl+Q", "Preview column: shows the file under the cursor, both panels stay"},
-        {"Alt+F4", "Quit"},
-        {"Ctrl+D / Ctrl+Shift+D", "Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder"},
-        {"Ctrl+J", "Jump to any visited folder (fuzzy)"},
-        {"Vim keys (View menu)", "j k move · h l out/in · gg G top/bottom · Ctrl+D/U half page · / n N search · v mark · : palette · ' or g<key> bookmarks · m set bookmark"},
-        {"Esc", "Cancel a slow folder load"},
+        {"Tab", QT_TR_NOOP("Switch panel")},
+        {"Enter / Backspace", QT_TR_NOOP("Open / parent folder")},
+        {"Type letters", QT_TR_NOOP("Quick search (Up/Down: next match)")},
+        {"Insert, Space, Shift+↑↓", QT_TR_NOOP("Mark (Space also sizes folders)")},
+        {"Num + / Num - / Num *", QT_TR_NOOP("Mark group / unmark group / invert")},
+        {"F3 / F4", QT_TR_NOOP("Viewer (Esc closes, N/P next file, 1/3/4 modes) / edit")},
+        {"F5 / F6", QT_TR_NOOP("Copy / move to other panel")},
+        {"Shift+F6 / Ctrl+M / Ctrl+E", QT_TR_NOOP("Rename in place / multi-rename / in your text editor")},
+        {"F7 / Shift+F4", QT_TR_NOOP("New folder / new file")},
+        {"F8, Del / Shift+F8", QT_TR_NOOP("Trash / delete permanently")},
+        {"Ctrl+T / Ctrl+W / Ctrl+Tab", QT_TR_NOOP("New / close / next tab")},
+        {"Alt+1 … Alt+9", QT_TR_NOOP("Go to tab 1 … 9, creating it here if it doesn't exist")},
+        {"Alt+← / Alt+→", QT_TR_NOOP("History back / forward")},
+        {"Ctrl+PgUp / Ctrl+\\ / Ctrl+`", QT_TR_NOOP("Parent / root / home")},
+        {"Ctrl+L", QT_TR_NOOP("Type a path")},
+        {"Alt+F1 / Alt+F2", QT_TR_NOOP("Locations for left / right panel")},
+        {"Ctrl+← / Ctrl+→", QT_TR_NOOP("Show folder in left / right panel")},
+        {"Ctrl+U", QT_TR_NOOP("Swap panels")},
+        {"Ctrl+F3…F6", QT_TR_NOOP("Sort by name / ext / date / size")},
+        {"Ctrl+H", QT_TR_NOOP("Show hidden files")},
+        {"Ctrl+C / X / V", QT_TR_NOOP("Clipboard (works with other apps)")},
+        {"Alt+Shift+Enter", QT_TR_NOOP("Calculate all folder sizes")},
+        {"Ctrl+Z", QT_TR_NOOP("Undo the last operation (move, copy, trash, rename, new folder)")},
+        {"Ctrl+Alt+T", QT_TR_NOOP("Open terminal here")},
+        {"Alt+F5 / Alt+F9", QT_TR_NOOP("Pack / unpack archives")},
+        {"Ctrl+PgDn", QT_TR_NOOP("Enter folder, or browse any file as archive")},
+        {"Menu key, Shift+F10", QT_TR_NOOP("Context menu")},
+        {"Ctrl+Q", QT_TR_NOOP("Preview column: shows the file under the cursor, both panels stay")},
+        {"Alt+F4", QT_TR_NOOP("Quit")},
+        {"Ctrl+D / Ctrl+Shift+D", QT_TR_NOOP("Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder")},
+        {"Ctrl+J", QT_TR_NOOP("Jump to any visited folder (fuzzy)")},
+        {"Vim keys (View menu)", QT_TR_NOOP("j k move · h l out/in · gg G top/bottom · Ctrl+D/U half page · / n N search · v mark · : palette · ' or g<key> bookmarks · m set bookmark")},
+        {"Esc", QT_TR_NOOP("Cancel a slow folder load")},
     };
     QString html = QStringLiteral("<table cellspacing='0' cellpadding='4'>");
     for (const auto& r : rows)
@@ -1571,11 +1571,14 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         p.panel->restoreHeaderState(s.value(QStringLiteral("header")).toByteArray());
         QStringList tabs = s.value(QStringLiteral("tabs")).toStringList();
         int current = s.value(QStringLiteral("currentTab"), 0).toInt();
+        QList<int> numbers;  // ("slots" is a Qt macro)
+        for (const QVariant& v : s.value(QStringLiteral("tabSlots")).toList())
+            numbers.append(v.toInt());
         if (p.argIndex < startPaths.size()) {
             tabs = {expandUserPath(QDir::current().absoluteFilePath(startPaths[p.argIndex]))};
             current = 0;
         }
-        p.panel->restoreTabs(tabs, current);
+        p.panel->restoreTabs(tabs, current, numbers);
         s.endGroup();
     }
     Panel* act = s.value(QStringLiteral("window/active")).toString() == QLatin1String("right") ? m_right : m_left;
@@ -1603,6 +1606,10 @@ void MainWindow::saveSettings()
         s.beginGroup(QLatin1String(key));
         s.setValue(QStringLiteral("tabs"), panel->tabPaths());
         s.setValue(QStringLiteral("currentTab"), panel->currentTabIndex());
+        QVariantList numbers;
+        for (int n : panel->tabSlots())
+            numbers.append(n);
+        s.setValue(QStringLiteral("tabSlots"), numbers);
         s.setValue(QStringLiteral("sortColumn"), int(panel->sortSpec().column));
         s.setValue(QStringLiteral("sortDescending"), panel->sortSpec().descending);
         s.setValue(QStringLiteral("header"), panel->headerState());

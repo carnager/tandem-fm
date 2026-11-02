@@ -62,7 +62,7 @@ Visual check without a display:
 | F7 / Shift+F4 | New folder (`a/b/c` creates nested folders) / new file |
 | F8, Del / Shift+F8, Shift+Del | Move to trash / delete permanently |
 | Ctrl+T / Ctrl+W / Ctrl+Tab | New / close / next tab (double-click a tab closes it) |
-| Alt+1 … Alt+9 | Go to tab 1 … 9; tabs show their number, like yazi |
+| Alt+1 … Alt+9 | Go to tab N, or create it in the current folder; tabs keep their numbers and stay sorted by them, like yazi |
 | Alt+← / Alt+→ | History back / forward (mouse back/forward buttons too) |
 | Ctrl+PgUp, Ctrl+\\, Ctrl+\` | Parent, root, home |
 | Ctrl+L | Type a path (the path bar shows clickable segments; middle-click opens a tab) |

@@ -61,6 +61,7 @@ public:
 
     QString savedCursor;
     int savedScroll = 0;
+    int slot = 0;  // the tab's fixed number (Alt+slot); tabs are ordered by it
 
 signals:
     void loadingChanged(bool loading);

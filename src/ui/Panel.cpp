@@ -39,7 +39,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_tabBar = new QTabBar(this);
     m_tabBar->setDocumentMode(true);
     m_tabBar->setExpanding(false);
-    m_tabBar->setMovable(true);
+    m_tabBar->setMovable(false);  // order is the tab numbers
     m_tabBar->setFocusPolicy(Qt::NoFocus);
     m_tabBar->setElideMode(Qt::ElideMiddle);
     m_tabBar->setStyleSheet(t.css(QStringLiteral(
@@ -137,14 +137,6 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_tabBar, &QTabBar::currentChanged, this, [this](int i) {
         if (i >= 0 && i != m_current)
             showTab(i);
-    });
-    connect(m_tabBar, &QTabBar::tabMoved, this, [this](int from, int to) {
-        DirTab* moved = m_tabs[size_t(from)];
-        m_tabs.erase(m_tabs.begin() + from);
-        m_tabs.insert(m_tabs.begin() + to, moved);
-        m_current = m_tabBar->currentIndex();
-        updateTabTitles();
-        emit stateChanged();
     });
     connect(m_tabBar, &QTabBar::tabBarDoubleClicked, this, [this](int i) {
         if (i >= 0) {
@@ -310,13 +302,36 @@ void Panel::bindTab(DirTab* t)
     });
 }
 
-void Panel::addTab(const QString& path, bool activate, int position)
+int Panel::lowestFreeSlot() const
 {
+    for (int n = 1;; ++n) {
+        bool used = false;
+        for (DirTab* t : m_tabs)
+            used |= t->slot == n;
+        if (!used)
+            return n;
+    }
+}
+
+void Panel::addTab(const QString& path, bool activate, int slot)
+{
+    if (slot <= 0)
+        slot = lowestFreeSlot();
+    for (int i = 0; i < int(m_tabs.size()); ++i) {
+        if (m_tabs[size_t(i)]->slot == slot) {
+            if (activate)
+                showTab(i);
+            return;
+        }
+    }
     auto* t = new DirTab(this);
+    t->slot = slot;
     t->setShowHidden(m_showHidden);
     t->model()->setSortSpec(m_sort);
     bindTab(t);
-    const int index = position >= 0 ? qMin(position, int(m_tabs.size())) : (m_current < 0 ? 0 : m_current + 1);
+    int index = 0;
+    while (index < int(m_tabs.size()) && m_tabs[size_t(index)]->slot < slot)
+        ++index;  // always in number order
     m_tabs.insert(m_tabs.begin() + index, t);
     {
         QSignalBlocker block(m_tabBar);
@@ -352,18 +367,25 @@ void Panel::closeCurrentTab()
     emit stateChanged();
 }
 
-void Panel::selectTab(int index)
+void Panel::selectSlot(int slot)
 {
-    if (index >= 0 && index < int(m_tabs.size()))
-        showTab(index);
+    addTab(path(), true, slot);  // existing: switch; missing: create here
+}
+
+QList<int> Panel::tabSlots() const
+{
+    QList<int> out;
+    for (DirTab* t : m_tabs)
+        out.append(t->slot);
+    return out;
 }
 
 // "1  src", "2  Downloads": the number is the Alt+number shortcut (like yazi).
 void Panel::updateTabTitles()
 {
     for (int i = 0; i < int(m_tabs.size()); ++i) {
-        const QString title = m_tabs[size_t(i)]->title();
-        m_tabBar->setTabText(i, i < 9 ? QStringLiteral("%1  %2").arg(i + 1).arg(title) : title);
+        const DirTab* t = m_tabs[size_t(i)];
+        m_tabBar->setTabText(i, QStringLiteral("%1  %2").arg(t->slot).arg(t->title()));
         m_tabBar->setTabToolTip(i, m_tabs[size_t(i)]->path());
     }
 }
@@ -384,10 +406,10 @@ QStringList Panel::tabPaths() const
     return out;
 }
 
-void Panel::restoreTabs(const QStringList& paths, int current)
+void Panel::restoreTabs(const QStringList& paths, int current, const QList<int>& numbers)
 {
-    for (const QString& p : paths)
-        addTab(p, false, int(m_tabs.size()));
+    for (int i = 0; i < paths.size(); ++i)
+        addTab(paths[i], false, numbers.value(i, 0));
     if (m_tabs.empty())
         addTab(QDir::homePath(), true);
     showTab(std::clamp(current, 0, int(m_tabs.size()) - 1));
