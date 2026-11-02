@@ -22,6 +22,8 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QClipboard>
+#include <QDBusConnection>
+#include <QDBusInterface>
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDialog>
@@ -163,6 +165,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
                         handleDrop(urls, dir, action);
                 });
         connect(p, &Panel::contextMenuRequested, this, &MainWindow::showContextMenu);
+        connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
         connect(p, &Panel::renamed, this, [this](const QString& dir, const QString& from, const QString& to) {
             pushUndo({UndoEntry::Kind::Rename, tr("rename of %1").arg(from), dir, {{to, from}}});
         });
@@ -172,6 +175,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
     connect(m_jobs, &JobManager::jobFinished, this, [this](Job* job) {
         if (!job->property("isUndo").toBool())
             recordJobUndo(job);
+        notifyFinished(job);
         for (Panel* p : {m_left, m_right})
             if (p->tab() && !p->tab()->isWatched())
                 p->refresh();
@@ -326,6 +330,22 @@ void MainWindow::createMenus()
         m_right->setShowHidden(m_hiddenAction->isChecked());
     });
     m_hiddenAction->setCheckable(true);
+    view->addSeparator();
+    QAction* vim = addCommand(view, tr("Vim keys (j k h l gg G / n N : v)"), {}, [this] {
+        const bool on = m_actions.value(QStringLiteral("vim"))->isChecked();
+        QSettings().setValue(QStringLiteral("input/vimKeys"), on);
+        m_left->setVimKeys(on);
+        m_right->setVimKeys(on);
+        active()->showMessage(on ? tr("Vim keys on: letters are commands; / searches") : tr("Vim keys off"));
+    });
+    vim->setCheckable(true);
+    m_actions[QStringLiteral("vim")] = vim;
+    QAction* notes = addCommand(view, tr("Notify when long operations finish"), {}, [this] {
+        QSettings().setValue(QStringLiteral("view/notifications"),
+                             m_actions.value(QStringLiteral("notifications"))->isChecked());
+    });
+    notes->setCheckable(true);
+    m_actions[QStringLiteral("notifications")] = notes;
     QMenu* icons = view->addMenu(tr("Icon theme"));
     connect(icons, &QMenu::aboutToShow, this, [this, icons] { populateIconThemeMenu(icons); });
     addCommand(view, tr("Quick view in the other panel"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
@@ -674,6 +694,7 @@ void MainWindow::showShortcuts()
         {"Menu key, Shift+F10", "Context menu"},
         {"Ctrl+Q", "Quick view of the file under the cursor in the other panel"},
         {"Alt+F4", "Quit"},
+        {"Vim keys (View menu)", "j k move · h l out/in · gg G top/bottom · Ctrl+D/U half page · / n N search · v mark · : palette"},
         {"Esc", "Cancel a slow folder load"},
     };
     QString html = QStringLiteral("<table cellspacing='0' cellpadding='4'>");
@@ -1043,6 +1064,37 @@ void MainWindow::runRenamePlan(Panel* p, const RenamePlan& plan)
             panel->unmarkAll();
         });
     });
+}
+
+// ------------------------------------------------------------ notifications
+
+// Long operations that finish while you're in another window get a desktop
+// notification (freedesktop Notifications over D-Bus, non-blocking).
+void MainWindow::notifyFinished(Job* job)
+{
+    const qint64 took = QDateTime::currentMSecsSinceEpoch() - job->property("startedAt").toLongLong();
+    if (isActiveWindow() || took < 5000 || !QSettings().value(QStringLiteral("view/notifications"), true).toBool())
+        return;
+    const Job::Snapshot s = job->snapshot();
+    QString summary, body;
+    if (s.state == Job::State::Cancelled) {
+        summary = tr("%1 cancelled").arg(job->title());
+    } else if (s.errorCount) {
+        summary = tr("%1 finished with %n problem(s)", nullptr, s.errorCount).arg(job->title());
+        body = job->errors().constFirst();
+    } else {
+        summary = tr("%1 finished").arg(job->title());
+        body = tr("%n item(s)", nullptr, int(s.filesDone));
+        if (s.bytesDone > 0)
+            body += QStringLiteral(" · ") + formatSize(s.bytesDone);
+        body += QStringLiteral(" · ") + formatDuration(took / 1000);
+    }
+    QDBusInterface notify(QStringLiteral("org.freedesktop.Notifications"), QStringLiteral("/org/freedesktop/Notifications"),
+                          QStringLiteral("org.freedesktop.Notifications"), QDBusConnection::sessionBus());
+    if (!notify.isValid())
+        return;
+    notify.asyncCall(QStringLiteral("Notify"), QStringLiteral("Tandem"), uint(0), QStringLiteral("system-file-manager"),
+                     summary, body, QStringList(), QVariantMap(), int(-1));
 }
 
 // --------------------------------------------------------------------- undo
@@ -1452,6 +1504,11 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     const QString iconTheme = s.value(QStringLiteral("view/iconTheme")).toString();
     if (!iconTheme.isEmpty())
         IconCache::setTheme(iconTheme);
+    const bool vimKeys = s.value(QStringLiteral("input/vimKeys"), false).toBool();
+    m_actions.value(QStringLiteral("vim"))->setChecked(vimKeys);
+    m_left->setVimKeys(vimKeys);
+    m_right->setVimKeys(vimKeys);
+    m_actions.value(QStringLiteral("notifications"))->setChecked(s.value(QStringLiteral("view/notifications"), true).toBool());
     const bool hidden = s.value(QStringLiteral("view/showHidden"), false).toBool();
     m_hiddenAction->setChecked(hidden);
 

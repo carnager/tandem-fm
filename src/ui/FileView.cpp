@@ -5,6 +5,7 @@
 #include "ui/Theme.h"
 
 #include <QApplication>
+#include <QDateTime>
 #include <QDrag>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -185,6 +186,14 @@ void FileView::moveCursorBy(int delta)
 
 bool FileView::event(QEvent* e)
 {
+    if (m_vim && e->type() == QEvent::ShortcutOverride) {
+        // Vim's Ctrl+D / Ctrl+U scroll instead of running window commands.
+        auto* ke = static_cast<QKeyEvent*>(e);
+        if ((ke->modifiers() & Qt::ControlModifier) && (ke->key() == Qt::Key_D || ke->key() == Qt::Key_U)) {
+            e->accept();
+            return true;
+        }
+    }
     if (e->type() == QEvent::KeyPress) {
         auto* ke = static_cast<QKeyEvent*>(e);
         if ((ke->key() == Qt::Key_Tab || ke->key() == Qt::Key_Backtab) &&
@@ -263,6 +272,44 @@ void FileView::keyPressEvent(QKeyEvent* e)
         break;
     default:
         break;
+    }
+
+    if (m_vim) {
+        const int page = qMax(1, viewport()->height() / qMax(1, sizeHintForRow(0)));
+        if (mods == Qt::ControlModifier && (e->key() == Qt::Key_D || e->key() == Qt::Key_U)) {
+            moveCursorBy(e->key() == Qt::Key_D ? page / 2 : -page / 2);
+            return;
+        }
+        if (!(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
+            const QString t = e->text();
+            if (t == QLatin1String("j")) { moveCursorBy(1); return; }
+            if (t == QLatin1String("k")) { moveCursorBy(-1); return; }
+            if (t == QLatin1String("h")) { emit parentRequested(); return; }
+            if (t == QLatin1String("l")) { emit openRequested(); return; }
+            if (t == QLatin1String("G")) { setCurrentRow(model() ? model()->rowCount() - 1 : 0); return; }
+            if (t == QLatin1String("g")) {
+                const qint64 now = QDateTime::currentMSecsSinceEpoch();
+                if (now - m_lastG < 600) {
+                    setCurrentRow(0);
+                    m_lastG = 0;
+                } else {
+                    m_lastG = now;
+                }
+                return;
+            }
+            if (t == QLatin1String("/")) { emit quickSearchRequested(QString()); return; }
+            if (t == QLatin1String("n")) { emit searchNextRequested(1); return; }
+            if (t == QLatin1String("N")) { emit searchNextRequested(-1); return; }
+            if (t == QLatin1String(":")) { emit paletteRequested(); return; }
+            if (t == QLatin1String("v")) {
+                if (FileModel* fm = fileModel())
+                    fm->toggleMarked(currentRow());
+                moveCursorBy(1);
+                return;
+            }
+            if (!t.isEmpty() && t.at(0).isPrint() && t != QLatin1String(" "))
+                return;  // in vim mode letters are commands, not quick search
+        }
     }
 
     const QString text = e->text();

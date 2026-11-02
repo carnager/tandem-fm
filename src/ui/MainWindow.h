@@ -73,6 +73,7 @@ private:
     void pushUndo(UndoEntry entry);
     void updateUndoAction();
     void recordJobUndo(Job* job);
+    void notifyFinished(Job* job);
     void unpack();
     void populateIconThemeMenu(QMenu* menu);
     void commandPalette();

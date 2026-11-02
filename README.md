@@ -87,6 +87,14 @@ Visual check without a display:
 
 Drag and drop works within Tandem and with other applications (Shift = move).
 
+**Vim keys** (View → Vim keys, off by default): `j`/`k` move, `h`/`l` parent
+/ open, `gg`/`G` top / bottom, `Ctrl+D`/`Ctrl+U` half a page, `/` search
+then `n`/`N`, `v` mark, `:` command palette. The viewer understands
+`j`/`k`/`gg`/`G`/`/` as well.
+
+**Notifications**: operations longer than 5 s that finish while Tandem isn't
+focused send a desktop notification (View menu to turn off).
+
 Right-click menus: on files (Open with…, clipboard, copy/move to other panel,
 rename, terminal, trash…), on empty space (new folder/file, paste, sort,
 hidden files) and on the column header (show/hide columns). Right-clicking a

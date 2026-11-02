@@ -31,6 +31,7 @@ public:
     void setActive(bool active);
     bool isActive() const { return m_active; }
     int currentRow() const { return currentIndex().row(); }
+    void setVimKeys(bool on) { m_vim = on; }
     void setCurrentRow(int row, bool center = false);
 
 signals:
@@ -44,6 +45,8 @@ signals:
     void historyRequested(int step);    // mouse back/forward buttons
     void focused();
     void cursorMoved();
+    void searchNextRequested(int direction);  // vim n / N
+    void paletteRequested();                  // vim :
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void dragPathsRequested(QStringList& out);  // panel fills marked/current paths
     void contextMenuRequested(const QPoint& globalPos, int row);  // row -1: empty area
@@ -75,6 +78,8 @@ private:
     int m_dropRow = -1;
     QPoint m_pressPos;
     bool m_maybeDrag = false;
+    bool m_vim = false;
+    qint64 m_lastG = 0;  // for "gg"
 };
 
 }  // namespace tandem

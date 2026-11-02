@@ -843,6 +843,65 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void vimKeys()
+    {
+        QVERIFY(QDir().mkpath(L("vim/inner")));
+        for (const char* n : {"a1.txt", "b2.txt", "c3.txt", "d4.txt"})
+            writeFile(L(QString("vim/") + n), n);
+        m_left->navigate(L("vim"));
+        QTRY_COMPARE(leftModel()->path(), L("vim"));
+        QAction* vim = nullptr;
+        for (QAction* a : m_window->actions())
+            if (a->text().startsWith(QObject::tr("Vim keys")))
+                vim = a;
+        QVERIFY(vim);
+        vim->trigger();
+        QVERIFY(vim->isChecked());
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        FileView* v = m_left->view();
+        v->setFocus();
+        v->setCurrentRow(0);
+
+        QTest::keyClicks(v, "jj");
+        QCOMPARE(m_left->currentName(), QString("a1.txt"));  // .., inner, a1
+        QTest::keyClicks(v, "k");
+        QCOMPARE(m_left->currentName(), QString("inner"));
+        QTest::keyClicks(v, "G");
+        QCOMPARE(m_left->currentName(), QString("d4.txt"));
+        QTest::keyClicks(v, "gg");
+        QCOMPARE(m_left->currentName(), QString(".."));
+        QTest::keyClicks(v, "x");  // letters don't start quick search in vim mode
+        QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(v));
+
+        // / search, Enter, then n jumps to the next match.
+        QTest::keyClicks(v, "/");
+        QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()));
+        QTest::keyClicks(QApplication::focusWidget(), "txt");
+        QTRY_COMPARE(m_left->currentName(), QString("a1.txt"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+        QTRY_COMPARE(QApplication::focusWidget(), static_cast<QWidget*>(v));
+        QTest::keyClicks(v, "n");
+        QCOMPARE(m_left->currentName(), QString("b2.txt"));
+        QTest::keyClicks(v, "N");
+        QCOMPARE(m_left->currentName(), QString("a1.txt"));
+
+        // v marks, l enters, h leaves.
+        QTest::keyClicks(v, "v");
+        QCOMPARE(leftModel()->markedNames(), QStringList({"a1.txt"}));
+        leftModel()->markAll(false);
+        moveCursorTo(m_left, "inner");
+        QTest::keyClicks(v, "l");
+        QTRY_COMPARE(leftModel()->path(), L("vim/inner"));
+        QTest::keyClicks(v, "h");
+        QTRY_COMPARE(leftModel()->path(), L("vim"));
+
+        vim->trigger();
+        QVERIFY(!vim->isChecked());
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
     void cleanupTestCase()
     {
         m_window->close();

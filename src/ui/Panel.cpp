@@ -191,6 +191,13 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
 
     connect(m_view, &FileView::focused, this, [this] { emit activated(this); });
     connect(m_view, &FileView::cursorMoved, this, [this] { emit cursorChanged(this); });
+    connect(m_view, &FileView::paletteRequested, this, &Panel::paletteRequested);
+    connect(m_view, &FileView::searchNextRequested, this, [this](int dir) {
+        if (m_lastSearch.isEmpty())
+            return;
+        m_search->setText(m_lastSearch);
+        quickSearchFind(dir, false);
+    });
     connect(m_view, &FileView::openRequested, this, &Panel::openCurrent);
     connect(m_view, &FileView::parentRequested, this, &Panel::goUp);
     connect(m_view, &FileView::switchPanelRequested, this, &Panel::switchRequested);
@@ -706,6 +713,11 @@ void Panel::doRename(const QString& from, const QString& to)
 
 // ---------------------------------------------------------- quick search
 
+void Panel::setVimKeys(bool on)
+{
+    m_view->setVimKeys(on);
+}
+
 void Panel::startQuickSearch(const QString& text)
 {
     m_search->setText(text);
@@ -760,6 +772,8 @@ void Panel::endQuickSearch()
 {
     if (!m_search->isVisible())
         return;
+    if (!m_search->text().isEmpty())
+        m_lastSearch = m_search->text();  // for vim's n / N
     m_search->hide();
     m_view->setFocus();
 }

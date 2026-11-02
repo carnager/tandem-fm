@@ -2,6 +2,7 @@
 
 #include "ui/Dialogs.h"
 
+#include <QDateTime>
 #include <QWidget>
 
 namespace tandem {
@@ -17,6 +18,7 @@ JobManager::~JobManager()
 void JobManager::add(Job* job)
 {
     job->setParent(nullptr);
+    job->setProperty("startedAt", QDateTime::currentMSecsSinceEpoch());
     m_jobs.append(job);
     job->setPromptHandler([this, job](const PromptRequest& req, std::function<void(Answer)> reply) {
         m_prompts.enqueue({QPointer<Job>(job), req, std::move(reply)});

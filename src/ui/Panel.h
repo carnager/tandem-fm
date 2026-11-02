@@ -78,6 +78,7 @@ public:
     void showMountMenu();
     void showMessage(const QString& text, bool error = false);
 
+    void setVimKeys(bool on);
     QByteArray headerState() const;
     void restoreHeaderState(const QByteArray& state);
 
@@ -90,6 +91,7 @@ signals:
     void contextMenuRequested(Panel* panel, const QPoint& globalPos, bool onItem);
     void renamed(const QString& dir, const QString& from, const QString& to);
     void cursorChanged(Panel* panel);
+    void paletteRequested();
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;
@@ -134,6 +136,7 @@ private:
     bool m_messageError = false;
     QByteArray m_headerState;
     QStringList m_override;
+    QString m_lastSearch;
     QString m_pathBeforeReset;
     int m_scrollBeforeReset = 0;
 };

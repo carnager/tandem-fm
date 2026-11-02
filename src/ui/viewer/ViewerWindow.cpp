@@ -8,6 +8,8 @@
 #include "ui/viewer/ImageView.h"
 
 #include <QCloseEvent>
+#include <QCoreApplication>
+#include <QKeyEvent>
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QImageReader>
@@ -255,6 +257,18 @@ void ViewerWindow::setupShortcuts()
     add(Qt::Key_Equal, [this] { zoom(1); });
     add(Qt::Key_Minus, [this] { zoom(-1); });
     add(Qt::Key_0, [this] { zoom(0); });
+    if (QSettings().value(QStringLiteral("input/vimKeys"), false).toBool()) {
+        auto sendKey = [this](Qt::Key key, Qt::KeyboardModifiers mods = Qt::NoModifier) {
+            QWidget* w = m_stack->currentWidget();
+            QKeyEvent press(QEvent::KeyPress, key, mods);
+            QCoreApplication::sendEvent(w, &press);
+        };
+        add(Qt::Key_J, [sendKey] { sendKey(Qt::Key_Down); });
+        add(Qt::Key_K, [sendKey] { sendKey(Qt::Key_Up); });
+        add(QKeySequence(Qt::SHIFT | Qt::Key_G), [sendKey] { sendKey(Qt::Key_End, Qt::ControlModifier); });
+        add(QKeySequence(Qt::Key_G, Qt::Key_G), [sendKey] { sendKey(Qt::Key_Home, Qt::ControlModifier); });
+        add(Qt::Key_Slash, [this] { showSearch(); });
+    }
 }
 
 void ViewerWindow::showFile(const QString& path)
