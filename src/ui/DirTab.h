@@ -3,6 +3,7 @@
 #include "core/DirLister.h"
 
 #include <QObject>
+#include <QTimer>
 #include <QHash>
 #include <QSet>
 #include <QStringList>
@@ -37,6 +38,9 @@ public:
     bool isWatched() const { return m_watch >= 0; }
     // Inside an archive: path() is archivePath() + "/" + the folder inside it.
     bool inArchive() const { return m_inArchive; }
+    QString gitBranch() const { return m_gitBranch; }
+    static void setGitEnabled(bool on);
+    void refreshGit();
     QString archivePath() const { return m_archivePath; }
 
     void navigate(const QString& path, const QString& focusName = {});
@@ -85,6 +89,9 @@ private:
     int64_t m_free = -1, m_total = -1;
     bool m_showHidden = false;
     bool m_inArchive = false;
+    QString m_gitBranch;
+    quint64 m_gitGen = 0;
+    QTimer* m_gitTimer = nullptr;
     QString m_archivePath;
     QStringList m_back, m_forward;
     // Cursor and marks per folder, restored when coming back to it.

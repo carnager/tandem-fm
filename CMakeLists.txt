@@ -29,6 +29,7 @@ add_library(tandem_core STATIC
   src/core/Fuzzy.h src/core/Fuzzy.cpp
   src/core/FolderHistory.h src/core/FolderHistory.cpp
   src/core/Undo.h src/core/Undo.cpp
+  src/core/GitStatus.h src/core/GitStatus.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)
@@ -81,6 +82,7 @@ target_link_libraries(test_core PRIVATE tandem_core Qt6::Test)
 add_test(NAME test_core COMMAND test_core)
 add_executable(test_ui tests/test_ui.cpp)
 target_link_libraries(test_ui PRIVATE tandem_ui Qt6::Test)
+target_compile_definitions(test_ui PRIVATE TANDEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 add_test(NAME test_ui COMMAND test_ui)
 set_tests_properties(test_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_executable(test_viewer tests/test_viewer.cpp)

@@ -12,6 +12,7 @@ struct Theme {
     QColor window, base, altBase, text, dimText, accent, accentText;
     QColor mark, markBg, cursorActive, cursorInactive, dropTarget;
     QColor border, header, headerActive, error, success;
+    QColor gitModified, gitAdded, gitUntracked;
     QFont listFont;     // file list
     QFont numberFont;   // tabular digits for sizes and dates
 

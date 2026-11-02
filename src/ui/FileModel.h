@@ -66,6 +66,9 @@ public:
     QString filter() const { return m_filter; }
     int hiddenByFilter() const { return int(m_hidden.size()); }
 
+    void setGitStatus(const QHash<QString, char>& status);
+    char gitStatus(const QString& name) const { return m_git.value(name, 0); }
+
     static QString displayName(const FileEntry& e);
     static QString displayExt(const FileEntry& e);
 
@@ -87,6 +90,7 @@ private:
     std::vector<FileEntry> m_entries;  // ".." first when not at "/"
     std::vector<FileEntry> m_hidden;   // filtered out
     QString m_filter;
+    QHash<QString, char> m_git;
     QList<QRegularExpression> m_filterTerms;
     SortSpec m_sort;
     Stats m_stats;

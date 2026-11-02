@@ -239,6 +239,8 @@ void FileModel::setFilter(const QString& text)
 void FileModel::setListing(const QString& path, std::vector<FileEntry>&& entries)
 {
     beginResetModel();
+    if (path != m_path)
+        m_git.clear();
     m_path = path;
     partition(entries);
     m_stats = {};
@@ -314,6 +316,15 @@ void FileModel::applyUpdates(std::vector<EntryUpdate>&& updates)
         }
     }
     emit statsChanged();
+}
+
+void FileModel::setGitStatus(const QHash<QString, char>& status)
+{
+    if (status == m_git)
+        return;
+    m_git = status;
+    if (!m_entries.empty())
+        emit dataChanged(index(0, ColName), index(int(m_entries.size()) - 1, ColName));
 }
 
 void FileModel::setDirSize(const QString& name, int64_t size)

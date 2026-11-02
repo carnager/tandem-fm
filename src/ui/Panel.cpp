@@ -66,8 +66,12 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     if (auto* edit = m_pathBar->findChild<QLineEdit*>())
         edit->installEventFilter(this);
     m_freeLabel = new QLabel(m_header);
+    m_branchLabel = new QLabel(m_header);
+    m_branchLabel->setObjectName(QStringLiteral("branch"));
+    m_branchLabel->hide();
     hl->addWidget(m_mountButton);
     hl->addWidget(m_pathBar, 1);
+    hl->addWidget(m_branchLabel);
     hl->addWidget(m_freeLabel);
     layout->addWidget(m_header);
 
@@ -798,13 +802,15 @@ void Panel::updateActiveStyle()
         "QLineEdit { background: transparent; color: @text; font-weight: 600; }"
         "QToolButton#crumb { color: @text; border: none; padding: 1px 4px; border-radius: 4px; }"
         "QToolButton#crumb:hover { background: @border; }"
-        "QLabel { color: @dimText; }")
+        "QLabel { color: @dimText; }"
+        "QLabel#branch { color: @accent; padding-right: 8px; }")
                                            : QStringLiteral(
         "#panelHeader { background: @header; border-top-left-radius: 7px; border-top-right-radius: 7px; }"
         "QLineEdit { background: transparent; color: @dimText; font-weight: 600; }"
         "QToolButton#crumb { color: @dimText; border: none; padding: 1px 4px; border-radius: 4px; }"
         "QToolButton#crumb:hover { background: @border; color: @text; }"
-        "QLabel { color: @dimText; }")));
+        "QLabel { color: @dimText; }"
+        "QLabel#branch { color: @dimText; padding-right: 8px; }")));
 }
 
 void Panel::paintEvent(QPaintEvent*)
@@ -823,6 +829,9 @@ void Panel::updateHeader()
     if (!t)
         return;
     m_pathBar->setPath(t->path());
+    m_branchLabel->setVisible(!t->gitBranch().isEmpty());
+    m_branchLabel->setText(QStringLiteral("⎇ %1").arg(t->gitBranch()));
+    m_branchLabel->setToolTip(tr("Git branch"));
     m_mountButton->setIcon(t->inArchive() ? IconCache::themed("package-x-generic", "application-x-archive")
                                           : IconCache::themed("drive-harddisk", "folder"));
     m_mountButton->setToolTip(t->inArchive() ? tr("Inside archive %1").arg(t->archivePath())

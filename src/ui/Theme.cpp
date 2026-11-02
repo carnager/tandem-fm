@@ -83,6 +83,9 @@ void applyTheme(QApplication& app)
         t.headerActive = QColor(0x27, 0x2f, 0x45);
         t.error = QColor(0xff, 0x6b, 0x6b);
         t.success = QColor(0x5f, 0xd3, 0x8d);
+        t.gitModified = QColor(0xe5, 0xc0, 0x7b);
+        t.gitAdded = QColor(0x98, 0xc3, 0x79);
+        t.gitUntracked = QColor(0x56, 0xb6, 0xc2);
     } else {
         t.window = QColor(0xee, 0xf0, 0xf3);
         t.base = QColor(0xff, 0xff, 0xff);
@@ -101,6 +104,9 @@ void applyTheme(QApplication& app)
         t.headerActive = QColor(0xdc, 0xe6, 0xfb);
         t.error = QColor(0xd9, 0x2d, 0x20);
         t.success = QColor(0x16, 0x8a, 0x4a);
+        t.gitModified = QColor(0xb0, 0x6d, 0x00);
+        t.gitAdded = QColor(0x2e, 0x7d, 0x32);
+        t.gitUntracked = QColor(0x00, 0x7c, 0x89);
     }
 
     // Fusion + our palette: consistent, fast to paint, no theme engine quirks.

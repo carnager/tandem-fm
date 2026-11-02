@@ -63,6 +63,30 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
             p->restore();
         }
         r.setLeft(iconRect.right() + 7);
+        // Git badge at the right end of the name.
+        const char git = model->gitStatus(e->name);
+        if (git == '!' && !e->marked) {
+            fg = t.dimText;
+        } else if (git) {
+            QColor c = git == 'U' ? t.error : git == 'M' ? t.gitModified : git == 'A' ? t.gitAdded : t.gitUntracked;
+            const int s = opt.fontMetrics.height() - 2;
+            const QRect badge(r.right() - s, r.top() + (r.height() - s) / 2, s, s);
+            p->save();
+            p->setRenderHint(QPainter::Antialiasing);
+            QColor bg = c;
+            bg.setAlpha(45);
+            p->setPen(Qt::NoPen);
+            p->setBrush(bg);
+            p->drawRoundedRect(badge, 3, 3);
+            QFont bf = t.listFont;
+            bf.setPointSizeF(bf.pointSizeF() * 0.78);
+            bf.setWeight(QFont::Bold);
+            p->setFont(bf);
+            p->setPen(c);
+            p->drawText(badge, Qt::AlignCenter, QString(QChar(git == 'A' ? '+' : git)));
+            p->restore();
+            r.setRight(badge.left() - 4);
+        }
     }
 
     QFont f = (col == FileModel::ColSize || col == FileModel::ColTime) ? t.numberFont : t.listFont;

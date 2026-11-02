@@ -3,6 +3,7 @@
 #include "core/DirWatcher.h"
 #include "core/FileOps.h"
 #include "core/FolderHistory.h"
+#include "core/GitStatus.h"
 #include "core/Util.h"
 #include "ui/FileModel.h"
 
@@ -18,8 +19,21 @@ namespace {
 constexpr int kMaxIncrementalUpdates = 400;  // above this a re-list is cheaper
 }
 
+namespace {
+bool g_gitEnabled = true;
+}
+
+void DirTab::setGitEnabled(bool on)
+{
+    g_gitEnabled = on;
+}
+
 DirTab::DirTab(QObject* parent) : QObject(parent), m_model(new FileModel(this))
 {
+    m_gitTimer = new QTimer(this);
+    m_gitTimer->setSingleShot(true);
+    m_gitTimer->setInterval(600);  // changes come in bursts; one git run per burst
+    connect(m_gitTimer, &QTimer::timeout, this, &DirTab::refreshGit);
     auto* w = DirWatcher::instance();
     connect(w, &DirWatcher::changed, this, &DirTab::onWatchChanged);
     connect(w, &DirWatcher::gone, this, &DirTab::onDirectoryGone);
@@ -198,6 +212,9 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
                 sortEntries(result->entries, t->m_model->sortSpec());
             t->m_model->setListing(result->path, std::move(result->entries));
             t->m_model->restoreMarks(restore);
+            if (old != result->path)
+                t->m_gitBranch.clear();
+            t->refreshGit();
             emit t->listingReady(focusName);
             emit t->infoChanged();
         });
@@ -250,12 +267,40 @@ void DirTab::flushUpdates()
             if (gen != t->m_gen)
                 return;  // a new listing replaced this directory
             t->m_model->applyUpdates(std::move(*updates));
+            t->m_gitTimer->start();
             if (!t->m_pendingFocus.isEmpty() && t->m_model->rowOf(t->m_pendingFocus) >= 0) {
                 emit t->focusRequested(t->m_pendingFocus);
                 t->m_pendingFocus.clear();
             }
             if (!t->m_pendingNames.isEmpty())
                 t->flushUpdates();
+        });
+    });
+}
+
+void DirTab::refreshGit()
+{
+    const QString dir = m_model->path();
+    const quint64 gen = ++m_gitGen;
+    if (!g_gitEnabled || m_inArchive || dir.isEmpty()) {
+        m_model->setGitStatus({});
+        if (!m_gitBranch.isEmpty()) {
+            m_gitBranch.clear();
+            emit infoChanged();
+        }
+        return;
+    }
+    QPointer<DirTab> self(this);
+    ioPool()->start([self, dir, gen] {
+        auto info = std::make_shared<GitInfo>(gitStatusFor(dir));
+        postToUi([self, dir, gen, info] {
+            if (!self || gen != self->m_gitGen || self->m_model->path() != dir)
+                return;
+            self->m_model->setGitStatus(info->status);
+            if (self->m_gitBranch != info->branch) {
+                self->m_gitBranch = info->branch;
+                emit self->infoChanged();
+            }
         });
     });
 }

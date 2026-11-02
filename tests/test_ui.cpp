@@ -902,6 +902,20 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void gitBadges()
+    {
+        // This repository itself: the panel shows the branch and model statuses.
+        const QString repo = QStringLiteral(TANDEM_SOURCE_DIR);
+        if (!QFileInfo::exists(repo + "/.git") || QStandardPaths::findExecutable("git").isEmpty())
+            QSKIP("no git checkout");
+        m_right->navigate(repo);
+        QTRY_COMPARE(rightModel()->path(), repo);
+        QTRY_VERIFY(!m_right->tab()->gitBranch().isEmpty());
+        QTRY_COMPARE(rightModel()->gitStatus("build"), '!');  // ignored by .gitignore
+        m_right->navigate(R());
+        QTRY_COMPARE(rightModel()->path(), R());
+    }
+
     void cleanupTestCase()
     {
         m_window->close();

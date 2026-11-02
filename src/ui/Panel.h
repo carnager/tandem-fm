@@ -123,6 +123,7 @@ private:
     QToolButton* m_mountButton;
     PathBar* m_pathBar;
     QLabel* m_freeLabel;
+    QLabel* m_branchLabel;
     FileView* m_view;
     QLabel* m_status;
     QLineEdit* m_search;

@@ -2,6 +2,7 @@
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
+#include "core/GitStatus.h"
 #include "core/Undo.h"
 #include "core/FolderHistory.h"
 #include "core/Fuzzy.h"
@@ -677,6 +678,75 @@ private slots:
         QCOMPARE(errors.size(), 1);
         QVERIFY(!QFile::exists(tmp.filePath("new")));
         QVERIFY(QFile::exists(tmp.filePath("full/keep")));
+    }
+
+    void gitParse()
+    {
+        const char raw[] = "## main...origin/main [ahead 1]\0"
+                           " M src/a.cpp\0"
+                           "A  src/new.h\0"
+                           "R  src/moved.cpp\0src/old.cpp\0"
+                           "UU conflict.txt\0"
+                           "?? notes.md\0"
+                           "!! build/\0"
+                           "!! src/gen/x.o\0"
+                           "?? docs/draft/\0";
+        const QByteArray out(raw, sizeof(raw) - 1);
+        GitInfo root = parseGitStatus(out, "/r", "/r");
+        QCOMPARE(root.branch, QString("main"));
+        QCOMPARE(root.status.value("src"), 'M');      // strongest inside wins
+        QCOMPARE(root.status.value("conflict.txt"), 'U');
+        QCOMPARE(root.status.value("notes.md"), '?');
+        QCOMPARE(root.status.value("build"), '!');
+        QCOMPARE(root.status.value("docs"), '?');
+        GitInfo src = parseGitStatus(out, "/r", "/r/src");
+        QCOMPARE(src.status.value("a.cpp"), 'M');
+        QCOMPARE(src.status.value("new.h"), 'A');
+        QCOMPARE(src.status.value("moved.cpp"), 'M');
+        QVERIFY(!src.status.contains("old.cpp"));
+        QVERIFY(!src.status.contains("gen"));       // an ignored file doesn't mark its folder
+        QCOMPARE(parseGitStatus("## No commits yet on dev\0", "/r", "/r").branch, QString("dev"));
+    }
+
+    void gitRealRepo()
+    {
+        const QString git = QStandardPaths::findExecutable("git");
+        if (git.isEmpty())
+            QSKIP("git not installed");
+        QTemporaryDir tmp;
+        auto run = [&](const QStringList& args) {
+            QProcess p;
+            p.setWorkingDirectory(tmp.path());
+            p.start(git, QStringList{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=trunk"} + args);
+            p.waitForFinished();
+            return p.exitCode();
+        };
+        QCOMPARE(run({"init", "-q"}), 0);
+        QVERIFY(QDir().mkpath(tmp.filePath("sub")));
+        writeFile(tmp.filePath("tracked.txt"), "v1");
+        writeFile(tmp.filePath("sub/inner.txt"), "v1");
+        writeFile(tmp.filePath(".gitignore"), "*.log\n");
+        QCOMPARE(run({"add", "."}), 0);
+        QCOMPARE(run({"commit", "-q", "-m", "init"}), 0);
+        writeFile(tmp.filePath("tracked.txt"), "v2");
+        writeFile(tmp.filePath("sub/inner.txt"), "v2");
+        writeFile(tmp.filePath("fresh.txt"), "new");
+        writeFile(tmp.filePath("debug.log"), "x");
+        writeFile(tmp.filePath("staged.txt"), "s");
+        QCOMPARE(run({"add", "staged.txt"}), 0);
+
+        const GitInfo info = gitStatusFor(tmp.path());
+        QVERIFY(info.inRepo);
+        QCOMPARE(info.branch, QString("trunk"));
+        QCOMPARE(info.status.value("tracked.txt"), 'M');
+        QCOMPARE(info.status.value("sub"), 'M');
+        QCOMPARE(info.status.value("fresh.txt"), '?');
+        QCOMPARE(info.status.value("debug.log"), '!');
+        QCOMPARE(info.status.value("staged.txt"), 'A');
+        QVERIFY(!info.status.contains(".gitignore"));
+        const GitInfo sub = gitStatusFor(tmp.filePath("sub"));
+        QCOMPARE(sub.status.value("inner.txt"), 'M');
+        QVERIFY(!gitStatusFor(QDir::rootPath()).inRepo);
     }
 
     void helpers()

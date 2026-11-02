@@ -340,6 +340,16 @@ void MainWindow::createMenus()
     });
     vim->setCheckable(true);
     m_actions[QStringLiteral("vim")] = vim;
+    QAction* git = addCommand(view, tr("Show Git status"), {}, [this] {
+        const bool on = m_actions.value(QStringLiteral("git"))->isChecked();
+        QSettings().setValue(QStringLiteral("view/gitStatus"), on);
+        DirTab::setGitEnabled(on);
+        for (Panel* p : {m_left, m_right})
+            if (p->tab())
+                p->tab()->refreshGit();
+    });
+    git->setCheckable(true);
+    m_actions[QStringLiteral("git")] = git;
     QAction* notes = addCommand(view, tr("Notify when long operations finish"), {}, [this] {
         QSettings().setValue(QStringLiteral("view/notifications"),
                              m_actions.value(QStringLiteral("notifications"))->isChecked());
@@ -1504,6 +1514,9 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     const QString iconTheme = s.value(QStringLiteral("view/iconTheme")).toString();
     if (!iconTheme.isEmpty())
         IconCache::setTheme(iconTheme);
+    const bool gitOn = s.value(QStringLiteral("view/gitStatus"), true).toBool();
+    m_actions.value(QStringLiteral("git"))->setChecked(gitOn);
+    DirTab::setGitEnabled(gitOn);
     const bool vimKeys = s.value(QStringLiteral("input/vimKeys"), false).toBool();
     m_actions.value(QStringLiteral("vim"))->setChecked(vimKeys);
     m_left->setVimKeys(vimKeys);

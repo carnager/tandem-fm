@@ -92,6 +92,11 @@ Drag and drop works within Tandem and with other applications (Shift = move).
 then `n`/`N`, `v` mark, `:` command palette. The viewer understands
 `j`/`k`/`gg`/`G`/`/` as well.
 
+**Git**: inside a repository the header shows the branch and names get a
+badge: M modified, + staged new, ? untracked, ! conflict; ignored entries
+are dimmed, folders show the strongest status inside. `git status` runs in
+the background (after listing and after changes), never delaying the list.
+
 **Notifications**: operations longer than 5 s that finish while Tandem isn't
 focused send a desktop notification (View menu to turn off).
 
