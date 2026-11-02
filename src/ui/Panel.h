@@ -99,6 +99,7 @@ signals:
     void paletteRequested();
     void bookmarkJumpRequested(const QString& keys);
     void bookmarkAssignRequested();
+    void commandRequested();
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;

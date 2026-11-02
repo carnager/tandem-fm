@@ -53,6 +53,7 @@ Visual check without a display:
 | Tab | Switch panel |
 | Enter / Backspace | Open / parent folder |
 | Type letters | Quick search (↑/↓ next match, Esc close) |
+| Ctrl+; (vim: `!`) | Run a shell command: `%s` marked files (quoted), `%f` file, `%n` name, `%d` folder, `%D` other panel's folder. Enter runs it in the background (output in a window), Ctrl+Enter in your terminal. ↑↓ history |
 | Alt+F7 | Search names (`fd`) or contents (`rg`) from here down; Tab flips names/contents. Results show up as a folder (relative paths) where preview, F3, copy, move, delete, rename work; Esc/Backspace leaves. Without `fd` a built-in name search is used (it doesn't read `.gitignore`); without `rg`, `grep` |
 | Ctrl+F | Filter as you type: words must all appear, `*`/`?` wildcards; Esc clears |
 | Insert, Space, Shift+↑/↓ | Mark (Space also computes folder size) |

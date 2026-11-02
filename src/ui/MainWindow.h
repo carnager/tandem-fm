@@ -96,6 +96,9 @@ private:
     QString previewMode() const;  // "each" (default), "bottom", "right"
     void closePreview();
     void updatePreviewFor(ViewerWindow* preview, Panel* panel);
+    void openCommandBar();
+    void runCommand(const QString& command, bool inTerminal);
+    class CommandBar* m_commandBar = nullptr;
     JobManager* m_jobs;
     JobsPanel* m_jobsPanel;
     QAction* m_hiddenAction = nullptr;

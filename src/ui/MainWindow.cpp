@@ -11,6 +11,7 @@
 #include "ui/FileView.h"
 #include "ui/IconCache.h"
 #include "ui/JobManager.h"
+#include "ui/CommandBar.h"
 #include "ui/JobsPanel.h"
 #include "ui/KeyChordPopup.h"
 #include "ui/EditNames.h"
@@ -41,6 +42,7 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QPointer>
+#include <QPlainTextEdit>
 #include <QProcess>
 #include <QScrollArea>
 #include <QSettings>
@@ -190,6 +192,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
         connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
         connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
+        connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
         connect(p, &Panel::renamed, this, [this](const QString& dir, const QString& from, const QString& to) {
             pushUndo({UndoEntry::Kind::Rename, tr("rename of %1").arg(from), dir, {{to, from}}});
         });
@@ -210,6 +213,8 @@ MainWindow::MainWindow(const QStringList& startPaths)
     DesktopApps::instance().loadAsync();
     FolderHistory::instance().loadAsync();
     m_popup = new FuzzyPopup(this);
+    m_commandBar = new CommandBar(this);
+    connect(m_commandBar, &CommandBar::runRequested, this, &MainWindow::runCommand);
     m_chords = new KeyChordPopup(this);
     connect(m_chords, &KeyChordPopup::jumpRequested, this, [this](const QString& p) { active()->navigate(p); });
     connect(m_chords, &KeyChordPopup::fuzzyRequested, this, &MainWindow::jumpToFolder);
@@ -298,6 +303,8 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("pack")] = addCommand(files, tr("Pack…"), {K(Qt::ALT | Qt::Key_F5)}, [this] { pack(); });
     m_actions[QStringLiteral("unpack")] =
         addCommand(files, tr("Unpack to other panel…"), {K(Qt::ALT | Qt::Key_F9)}, [this] { unpack(); });
+    m_actions[QStringLiteral("command")] =
+        addCommand(files, tr("Run command…"), {K(Qt::CTRL | Qt::Key_Semicolon)}, [this] { openCommandBar(); });
     m_actions[QStringLiteral("terminal")] =
         addCommand(files, tr("Open terminal here"), {K(Qt::CTRL | Qt::ALT | Qt::Key_T)}, [this] { openTerminal(); });
     files->addSeparator();
@@ -785,6 +792,7 @@ void MainWindow::showShortcuts()
         {"Ctrl+PgDn", QT_TR_NOOP("Enter folder, or browse any file as archive")},
         {"Menu key, Shift+F10", QT_TR_NOOP("Context menu")},
         {"Ctrl+Q", QT_TR_NOOP("Preview: below each panel, below both or on the right (View > Preview position)")},
+        {"Ctrl+;", QT_TR_NOOP("Run a shell command: %s marked files, %f file, %d folder, %D other panel; Ctrl+Enter in a terminal")},
         {"Alt+F7", QT_TR_NOOP("Search names (fd) or contents (rg) here and below; results are a folder you can work in")},
         {"Ctrl+I", QT_TR_NOOP("Previews show details: type, dates, permissions, owner, checksum…")},
         {"Alt+F4", QT_TR_NOOP("Quit")},
@@ -1230,6 +1238,80 @@ void MainWindow::runRenamePlan(Panel* p, const RenamePlan& plan)
             panel->unmarkAll();
         });
     });
+}
+
+// ------------------------------------------------------------ run command
+
+void MainWindow::openCommandBar()
+{
+    Panel* p = active();
+    if (refuseInArchive(p))
+        return;
+    const QStringList sel = p->selectedPaths();
+    QString what = sel.isEmpty() ? tr("nothing selected")
+                                 : (sel.size() == 1 ? baseName(sel.first())
+                                                    : plural(tr("%n item(s)", nullptr, int(sel.size())), sel.size()));
+    m_commandBar->open(tr("Run in %1  ·  %s = %2").arg(p->path(), what));
+}
+
+void MainWindow::runCommand(const QString& command, bool inTerminal)
+{
+    Panel* p = active();
+    CommandContext ctx;
+    ctx.selection = p->selectedPaths();
+    ctx.current = p->currentPath();
+    ctx.dir = p->path();
+    ctx.otherDir = other()->path();
+    const QString expanded = expandCommand(command, ctx);
+
+    if (inTerminal) {
+        QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
+        if (terminal.isEmpty())
+            terminal = DesktopApps::instance().defaultTerminal();
+        if (terminal.isEmpty()) {
+            p->showMessage(tr("No terminal found. Set tools/terminal in the config."), true);
+            return;
+        }
+        // Keep the window open afterwards so the output can be read.
+        const QString wrapped = expanded + QStringLiteral("; printf '\n[exit %s] Enter closes ' \"$?\"; read _");
+        QStringList argv = DesktopApps::terminalCommand(terminal, {QStringLiteral("sh"), QStringLiteral("-c"), wrapped});
+        const QString program = argv.takeFirst();
+        if (!QProcess::startDetached(program, argv, ctx.dir))
+            p->showMessage(tr("Could not start %1").arg(program), true);
+        return;
+    }
+
+    auto* proc = new QProcess(this);
+    proc->setWorkingDirectory(ctx.dir);
+    proc->setProcessChannelMode(QProcess::MergedChannels);
+    QPointer<Panel> panel(p);
+    p->showMessage(tr("Running: %1").arg(command));
+    connect(proc, &QProcess::finished, this, [this, proc, panel, command](int code, QProcess::ExitStatus status) {
+        const QString out = QString::fromLocal8Bit(proc->readAll());
+        proc->deleteLater();
+        const bool ok = status == QProcess::NormalExit && code == 0;
+        if (out.trimmed().isEmpty()) {
+            if (panel)
+                panel->showMessage(ok ? tr("Done: %1").arg(command) : tr("“%1” failed (exit %2)").arg(command).arg(code), !ok);
+            return;
+        }
+        // Output: show it in a small window (non-modal; panels stay usable).
+        auto* dlg = new QDialog(this);
+        dlg->setAttribute(Qt::WA_DeleteOnClose);
+        dlg->setWindowTitle(command);
+        dlg->resize(760, 460);
+        auto* l = new QVBoxLayout(dlg);
+        auto* text = new QPlainTextEdit(out, dlg);
+        text->setReadOnly(true);
+        text->setFont(monoFont());
+        text->setLineWrapMode(QPlainTextEdit::NoWrap);
+        auto* status2 = new QLabel(ok ? tr("Finished") : tr("Exit code %1").arg(code), dlg);
+        status2->setStyleSheet(theme().css(ok ? QStringLiteral("color: @dimText;") : QStringLiteral("color: @error;")));
+        l->addWidget(text, 1);
+        l->addWidget(status2);
+        dlg->show();
+    });
+    proc->start(QStringLiteral("/bin/sh"), {QStringLiteral("-c"), expanded});
 }
 
 // ------------------------------------------------------------ notifications

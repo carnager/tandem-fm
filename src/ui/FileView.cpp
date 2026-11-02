@@ -314,6 +314,7 @@ void FileView::keyPressEvent(QKeyEvent* e)
                 return;
             }
             if (t == QLatin1String("'")) { emit bookmarkJumpRequested(QString()); return; }
+            if (t == QLatin1String("!")) { emit commandRequested(); return; }
             if (t == QLatin1String("m")) { emit bookmarkAssignRequested(); return; }
             if (t == QLatin1String("j")) { moveCursorBy(1); return; }
             if (t == QLatin1String("k")) { moveCursorBy(-1); return; }

@@ -242,6 +242,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_view, &FileView::paletteRequested, this, &Panel::paletteRequested);
     connect(m_view, &FileView::bookmarkJumpRequested, this, &Panel::bookmarkJumpRequested);
     connect(m_view, &FileView::bookmarkAssignRequested, this, &Panel::bookmarkAssignRequested);
+    connect(m_view, &FileView::commandRequested, this, &Panel::commandRequested);
     connect(m_view, &FileView::searchNextRequested, this, [this](int dir) {
         if (m_lastSearch.isEmpty())
             return;

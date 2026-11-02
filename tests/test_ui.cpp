@@ -5,6 +5,7 @@
 #include "core/FolderHistory.h"
 #include "ui/DirTab.h"
 #include "ui/FileModel.h"
+#include "ui/CommandBar.h"
 #include "ui/FileView.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/KeyChordPopup.h"
@@ -20,6 +21,7 @@
 #include <QSignalSpy>
 
 #include <QApplication>
+#include <QPlainTextEdit>
 #include <QSplitter>
 #include <QTabBar>
 #include <QToolButton>
@@ -1116,6 +1118,60 @@ private slots:
         QVERIFY(leftModel()->rowOf("a") >= 0);
 
         m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void runCommandOnSelection()
+    {
+        CommandContext ctx;
+        ctx.selection = {"/a b/it's.txt", "/c"};
+        ctx.current = "/a b/it's.txt";
+        ctx.dir = "/a b";
+        ctx.otherDir = "/x";
+        QCOMPARE(expandCommand("cp %s %D", ctx), QString(R"(cp '/a b/it'\''s.txt' '/c' '/x')"));
+        QCOMPARE(expandCommand("echo %n in %d, 100%%", ctx), QString(R"(echo 'it'\''s.txt' in '/a b', 100%)"));
+        QCOMPARE(expandCommand("ls", ctx), QString("ls"));
+
+        QVERIFY(QDir().mkpath(L("cmd")));
+        QVERIFY(QDir().mkpath(R("cmd-target")));
+        writeFile(L("cmd/one file.txt"), "1");
+        writeFile(L("cmd/it's.txt"), "2");
+        m_left->navigate(L("cmd"));
+        m_right->navigate(R("cmd-target"));
+        QTRY_COMPARE(leftModel()->path(), L("cmd"));
+        QTRY_COMPARE(rightModel()->path(), R("cmd-target"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        leftModel()->markAll(true);
+
+        QTest::keyClick(m_left->view(), Qt::Key_Semicolon, Qt::ControlModifier);
+        QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()));
+        QTest::keyClicks(QApplication::focusWidget(), "cp %s %D");
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_VERIFY(QFile::exists(R("cmd-target/one file.txt")));
+        QTRY_VERIFY(QFile::exists(R("cmd-target/it's.txt")));
+        QTRY_VERIFY(rightModel()->rowOf("it's.txt") >= 0);  // panels update by themselves
+        leftModel()->markAll(false);
+
+        // Output goes to a window.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_Semicolon, Qt::ControlModifier);
+        QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()));
+        QTest::keyClicks(QApplication::focusWidget(), "echo hello from %d");
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QPlainTextEdit* out = nullptr;
+        QTRY_VERIFY([&] {
+            for (QWidget* w : QApplication::topLevelWidgets())
+                if (auto* t = w->findChild<QPlainTextEdit*>(); t && w->isVisible() && t->toPlainText().startsWith("hello"))
+                    out = t;
+            return out != nullptr;
+        }());
+        QCOMPARE(out->toPlainText().trimmed(), QString("hello from ") + L("cmd"));
+        out->window()->close();
+
+        m_left->navigate(L());
+        m_right->navigate(R());
         QTRY_COMPARE(leftModel()->path(), L());
     }
 

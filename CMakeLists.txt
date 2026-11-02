@@ -54,6 +54,7 @@ add_library(tandem_ui STATIC
   src/ui/FuzzyPopup.h src/ui/FuzzyPopup.cpp
   src/ui/PathBar.h src/ui/PathBar.cpp
   src/ui/KeyChordPopup.h src/ui/KeyChordPopup.cpp
+  src/ui/CommandBar.h src/ui/CommandBar.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp

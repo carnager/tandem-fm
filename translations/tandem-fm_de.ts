@@ -365,6 +365,21 @@
     </message>
 </context>
 <context>
+    <name>tandem::CommandBar</name>
+    <message>
+        <source>in terminal</source>
+        <translation>im Terminal</translation>
+    </message>
+    <message>
+        <source>Run in a terminal window, for interactive commands (Ctrl+Enter)</source>
+        <translation>In einem Terminalfenster ausführen, für interaktive Befehle (Strg+Enter)</translation>
+    </message>
+    <message>
+        <source>%s marked files · %f file · %n name · %d this folder · %D other panel   ·   Enter: run in background · Ctrl+Enter: in terminal · ↑↓ history</source>
+        <translation>%s markierte Dateien · %f Datei · %n Name · %d dieser Ordner · %D anderes Panel   ·   Enter: im Hintergrund · Ctrl+Enter: im Terminal · ↑↓ Verlauf</translation>
+    </message>
+</context>
+<context>
     <name>tandem::CopyJob</name>
     <message>
         <source>Copy</source>
@@ -1066,6 +1081,10 @@
         <translation>Unter jedem Panel</translation>
     </message>
     <message>
+        <source>Run command…</source>
+        <translation>Befehl ausführen…</translation>
+    </message>
+    <message>
         <source>Search files (names or contents)…</source>
         <translation>Dateien suchen (Namen oder Inhalt)…</translation>
     </message>
@@ -1265,6 +1284,10 @@
         <translation>Vorschau: unter jedem Panel, unter beiden oder rechts (Ansicht &gt; Position der Vorschau)</translation>
     </message>
     <message>
+        <source>Run a shell command: %s marked files, %f file, %d folder, %D other panel; Ctrl+Enter in a terminal</source>
+        <translation>Shell-Befehl ausführen: %s markierte Dateien, %f Datei, %d Ordner, %D anderes Panel; Ctrl+Enter im Terminal</translation>
+    </message>
+    <message>
         <source>Search names (fd) or contents (rg) here and below; results are a folder you can work in</source>
         <translation>Namen (fd) oder Inhalte (rg) ab hier suchen; die Treffer sind ein Ordner, in dem man arbeiten kann</translation>
     </message>
@@ -1392,6 +1415,34 @@ F3 öffnet es im Betrachter</translation>
             <numerusform>%n Element umbenannt. Ctrl+Z macht es rückgängig.</numerusform>
             <numerusform>%n Elemente umbenannt. Ctrl+Z macht es rückgängig.</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>nothing selected</source>
+        <translation>nichts ausgewählt</translation>
+    </message>
+    <message>
+        <source>Run in %1  ·  %s = %2</source>
+        <translation>Ausführen in %1  ·  %s = %2</translation>
+    </message>
+    <message>
+        <source>Running: %1</source>
+        <translation>Läuft: %1</translation>
+    </message>
+    <message>
+        <source>Done: %1</source>
+        <translation>Fertig: %1</translation>
+    </message>
+    <message>
+        <source>“%1” failed (exit %2)</source>
+        <translation>„%1“ fehlgeschlagen (Exit %2)</translation>
+    </message>
+    <message>
+        <source>Finished</source>
+        <translation>Beendet</translation>
+    </message>
+    <message>
+        <source>Exit code %1</source>
+        <translation>Exit-Code %1</translation>
     </message>
     <message>
         <source>%1 cancelled</source>
