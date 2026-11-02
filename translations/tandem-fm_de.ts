@@ -863,16 +863,16 @@
         <translation>Position der Vorschau</translation>
     </message>
     <message>
-        <source>Below the panels</source>
-        <translation>Unter den Panels</translation>
-    </message>
-    <message>
         <source>Right of the panels</source>
         <translation>Rechts neben den Panels</translation>
     </message>
     <message>
-        <source>Preview of the file under the cursor, below or right of the panels (View menu)</source>
-        <translation>Vorschau der Datei unter dem Cursor, unter oder neben den Panels (Menü Ansicht)</translation>
+        <source>Below each panel</source>
+        <translation>Unter jedem Panel</translation>
+    </message>
+    <message>
+        <source>Below both panels</source>
+        <translation>Unter beiden Panels</translation>
     </message>
     <message>
         <source>Toggle menu bar</source>
@@ -1056,6 +1056,10 @@
     <message>
         <source>Context menu</source>
         <translation>Kontextmenü</translation>
+    </message>
+    <message>
+        <source>Preview: below each panel, below both or on the right (View &gt; Preview position)</source>
+        <translation>Vorschau: unter jedem Panel, unter beiden oder rechts (Ansicht > Position der Vorschau)</translation>
     </message>
     <message>
         <source>Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder</source>

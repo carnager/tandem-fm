@@ -83,7 +83,7 @@ Visual check without a display:
 | Right click, Menu key, Shift+F10 | Context menu |
 | Alt+F5 / Alt+F9 | Pack into a new archive / unpack archives to the other panel |
 | Ctrl+PgDn | Enter folder, or browse any file as an archive |
-| Ctrl+Q | Preview of the file under the cursor, below the panels (or on the right: View → Preview position) |
+| Ctrl+Q | Previews: one below each panel, each showing its own cursor (or one below both / on the right: View → Preview position) |
 | Alt+F4 | Quit |
 | Esc | Cancel a slow folder load |
 

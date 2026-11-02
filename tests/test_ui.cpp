@@ -141,6 +141,7 @@ private slots:
         applyTheme(*qApp);
         DirWatcher::instance();
         FolderHistory::instance().setStoragePath(m_tmp.filePath("folders.tsv"));
+        QSettings().clear();  // test mode keeps settings in ~/.qttest across runs: start clean
 
         QVERIFY(QDir().mkpath(L("sub/deep")));
         QVERIFY(QDir().mkpath(R()));
@@ -809,16 +810,19 @@ private slots:
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_left->view()->setFocus();
         moveCursorTo(m_left, "a.txt");
+        // Settings live in ~/.qttest in test mode and survive runs: be explicit.
+        QSettings().setValue("view/previewPosition", "each");
 
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         ViewerWindow* qv = nullptr;
         QTRY_VERIFY((qv = m_window->findChild<ViewerWindow*>("quickView")) != nullptr);
         QVERIFY(m_right->isVisible());  // the copy/move target stays
-        // Default position: below the panels (vertical splitter), panels side by side above.
-        auto* vsplit = qobject_cast<QSplitter*>(qv->parentWidget());
-        QVERIFY(vsplit && vsplit->orientation() == Qt::Vertical);
-        QVERIFY(qv->geometry().top() > m_left->geometry().bottom() - 1 || qv->mapTo(m_window.get(), QPoint()).y() >
-                                                                           m_left->mapTo(m_window.get(), QPoint()).y());
+        // Default: one preview below each panel, in that panel's column.
+        ViewerWindow* qv2 = m_window->findChild<ViewerWindow*>("quickViewRight");
+        QVERIFY(qv2);
+        QVERIFY(qv->parentWidget() == m_left->parentWidget());
+        QVERIFY(qv2->parentWidget() == m_right->parentWidget());
+        QVERIFY(qv->mapTo(m_window.get(), QPoint()).y() > m_left->mapTo(m_window.get(), QPoint()).y());
         QTRY_COMPARE(qv->textEdit()->toPlainText(), QString("first file"));
         QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(m_left->view()));  // focus stays
 
@@ -827,27 +831,33 @@ private slots:
         QTRY_COMPARE(qv->textEdit()->toPlainText(), QString("second file"));
         QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(m_left->view()));
 
-        // It follows the active panel.
+        // The right preview shows the right panel's cursor; the left one stays.
         m_right->navigate(L("qv"));
         QTRY_COMPARE(rightModel()->path(), L("qv"));
-        m_right->view()->setFocus();
-        QTRY_VERIFY(m_right->isActive());
         moveCursorTo(m_right, "a.txt");
-        QTRY_COMPARE(qv->currentPath(), L("qv/a.txt"));
-        m_left->view()->setFocus();
+        QTRY_COMPARE(qv2->currentPath(), L("qv/a.txt"));
+        QCOMPARE(qv->currentPath(), L("qv/b.txt"));
         m_right->navigate(R());
 
-        // Switch to the right side while open: it moves right away.
-        QAction* right = nullptr;
-        for (QAction* a : m_window->findChildren<QAction*>())
-            if (a->text() == QObject::tr("Right of the panels"))
-                right = a;
-        QVERIFY(right);
-        right->trigger();
+        // One shared preview below both: follows the active panel.
+        auto pick = [this](const QString& label) {
+            for (QAction* a : m_window->findChildren<QAction*>())
+                if (a->text() == label)
+                    a->trigger();
+        };
+        pick(QObject::tr("Below both panels"));
+        QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickViewRight") == nullptr);
+        QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") != nullptr);
+        auto* shared = m_window->findChild<ViewerWindow*>("quickView");
+        QCOMPARE(qobject_cast<QSplitter*>(shared->parentWidget())->orientation(), Qt::Vertical);
+        QVERIFY(shared->parentWidget() != m_left->parentWidget());
+
+        // On the right: a third column.
+        pick(QObject::tr("Right of the panels"));
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") &&
                     qobject_cast<QSplitter*>(m_window->findChild<ViewerWindow*>("quickView")->parentWidget())
                             ->orientation() == Qt::Horizontal);
-        QSettings().setValue("view/previewPosition", "bottom");
+        QSettings().setValue("view/previewPosition", "each");
 
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") == nullptr);

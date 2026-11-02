@@ -90,16 +90,20 @@ private:
     Panel* m_right;
     Panel* m_active = nullptr;
     QSplitter* m_splitter;       // left | right (| preview when on the right)
-    QSplitter* m_vsplit;         // panels / preview when at the bottom
-    bool previewAtBottom() const;
+    QSplitter* m_vsplit;         // panels / preview when below both
+    QSplitter* m_leftCol;        // left panel / its own preview
+    QSplitter* m_rightCol;       // right panel / its own preview
+    QString previewMode() const;  // "each" (default), "bottom", "right"
     void closePreview();
+    void updatePreviewFor(ViewerWindow* preview, Panel* panel);
     JobManager* m_jobs;
     JobsPanel* m_jobsPanel;
     QAction* m_hiddenAction = nullptr;
     QHash<QString, QAction*> m_actions;
     FuzzyPopup* m_popup = nullptr;
     class KeyChordPopup* m_chords = nullptr;
-    ViewerWindow* m_quickView = nullptr;  // preview column right of the panels (Ctrl+Q)
+    ViewerWindow* m_quickView = nullptr;   // the preview (left one in "each" mode)
+    ViewerWindow* m_quickView2 = nullptr;  // the right panel's own preview in "each" mode
     QTimer* m_quickTimer = nullptr;
     double m_panelRatio = 0.5;  // left panel's share of the two panels
     QList<IconTheme> m_iconThemes;
