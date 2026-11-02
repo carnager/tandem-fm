@@ -1,5 +1,6 @@
 #include "ui/MainWindow.h"
 
+#include "core/Archive.h"
 #include "core/DesktopApps.h"
 #include "core/Util.h"
 #include "ui/DirTab.h"
@@ -140,8 +141,12 @@ MainWindow::MainWindow(const QStringList& startPaths)
     for (Panel* p : {m_left, m_right}) {
         connect(p, &Panel::activated, this, &MainWindow::setActive);
         connect(p, &Panel::switchRequested, this, [this] { other()->view()->setFocus(); });
-        connect(p, &Panel::openFileRequested, this, &MainWindow::openFile);
-        connect(p, &Panel::dropRequested, this, &MainWindow::handleDrop);
+        connect(p, &Panel::openFileRequested, this, [this, p](const QString& path) { openFrom(p, path); });
+        connect(p, &Panel::dropRequested, this,
+                [this, p](const QList<QUrl>& urls, const QString& dir, Qt::DropAction action) {
+                    if (!refuseInArchive(p))
+                        handleDrop(urls, dir, action);
+                });
         connect(p, &Panel::contextMenuRequested, this, &MainWindow::showContextMenu);
     }
     // Directories without inotify (some FUSE/network mounts) need a manual
@@ -155,6 +160,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
     createMenus();
     loadSettings(startPaths);
     DesktopApps::instance().loadAsync();
+    ioPool()->start([] { pruneExtractCache(); });
     QPointer<MainWindow> self(this);
     ioPool()->start([self] {
         auto themes = std::make_shared<QList<IconTheme>>(scanIconThemes());
@@ -220,6 +226,10 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("paste")] = addCommand(files, tr("Paste"), {K(Qt::CTRL | Qt::Key_V)}, [this] { paste(); });
     m_actions[QStringLiteral("copyPath")] = addCommand(files, tr("Copy full paths as text"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_C)},
                [this] { copyPathsAsText(); });
+    files->addSeparator();
+    m_actions[QStringLiteral("pack")] = addCommand(files, tr("Pack…"), {K(Qt::ALT | Qt::Key_F5)}, [this] { pack(); });
+    m_actions[QStringLiteral("unpack")] =
+        addCommand(files, tr("Unpack to other panel…"), {K(Qt::ALT | Qt::Key_F9)}, [this] { unpack(); });
     m_actions[QStringLiteral("terminal")] =
         addCommand(files, tr("Open terminal here"), {K(Qt::CTRL | Qt::ALT | Qt::Key_T)}, [this] { openTerminal(); });
     files->addSeparator();
@@ -239,7 +249,7 @@ void MainWindow::createMenus()
     addCommand(go, tr("Back"), {K(Qt::ALT | Qt::Key_Left)}, [this] { active()->back(); });
     addCommand(go, tr("Forward"), {K(Qt::ALT | Qt::Key_Right)}, [this] { active()->forward(); });
     addCommand(go, tr("Parent folder"), {K(Qt::CTRL | Qt::Key_PageUp)}, [this] { active()->goUp(); });
-    addCommand(go, tr("Enter folder"), {K(Qt::CTRL | Qt::Key_PageDown)}, [this] { active()->openCurrent(); });
+    addCommand(go, tr("Enter folder or archive"), {K(Qt::CTRL | Qt::Key_PageDown)}, [this] { active()->enterCurrent(); });
     addCommand(go, tr("Root"), {K(Qt::CTRL | Qt::Key_Backslash)}, [this] { active()->navigate(QStringLiteral("/")); });
     addCommand(go, tr("Home"), {K(Qt::CTRL | Qt::Key_QuoteLeft)}, [this] { active()->navigate(QDir::homePath()); });
     addCommand(go, tr("Go to path…"), {K(Qt::CTRL | Qt::Key_L)}, [this] { active()->focusPathEdit(); });
@@ -322,6 +332,27 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
     const QStringList paths = src->selectedPaths();
     if (paths.isEmpty())
         return;
+    if (dst->inArchive()) {
+        dst->showMessage(tr("Adding to an existing archive isn't supported yet. Alt+F5 packs into a new one."), true);
+        return;
+    }
+    if (src->inArchive()) {
+        if (mode == CopyJob::Mode::Move) {
+            refuseInArchive(src);
+            return;
+        }
+        const QString dest = askDestination(this, tr("Extract"),
+                                            tr("Extract %1 to:").arg(describeItems(paths)), dst->path());
+        if (dest.isEmpty())
+            return;
+        QStringList inner;
+        for (const QString& p : paths)
+            inner.append(src->innerPath(p));
+        m_jobs->add(new ExtractJob(src->archivePath(), inner, expandUserPath(dest)));
+        if (!src->hasSelectionOverride())
+            src->unmarkAll();
+        return;
+    }
     const QString title = mode == CopyJob::Mode::Copy ? tr("Copy") : tr("Move");
     QString initial = dst->path();
     if (!initial.endsWith(QLatin1Char('/')))
@@ -348,7 +379,7 @@ void MainWindow::deleteSelected(bool permanent)
 {
     Panel* p = active();
     const QStringList paths = p->selectedPaths();
-    if (paths.isEmpty())
+    if (paths.isEmpty() || refuseInArchive(p))
         return;
     QMessageBox box(this);
     box.setIcon(permanent ? QMessageBox::Warning : QMessageBox::Question);
@@ -369,6 +400,8 @@ void MainWindow::deleteSelected(bool permanent)
 void MainWindow::makeFolder()
 {
     Panel* p = active();
+    if (refuseInArchive(p))
+        return;
     bool ok = false;
     const QString name = QInputDialog::getText(this, tr("New folder"), tr("Name (use / for nested folders):"),
                                                QLineEdit::Normal, QString(), &ok)
@@ -401,6 +434,12 @@ void MainWindow::viewCurrent()
         p->computeCurrentSize();
         return;
     }
+    if (p->inArchive()) {
+        withExtracted(p, p->currentPath(), [this](const QString& local) {
+            (new ViewerWindow({local}, 0, this))->show();
+        });
+        return;
+    }
     // The viewer can step through all files of the folder with N / P.
     QStringList files;
     int index = 0;
@@ -423,6 +462,10 @@ void MainWindow::editCurrent()
     const FileEntry* e = active()->currentEntry();
     if (path.isEmpty() || !e || e->isDir)
         return;
+    if (active()->inArchive()) {
+        openFrom(active(), path);  // a read-only copy; archives can't be edited in place
+        return;
+    }
     const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
     if (!editor.isEmpty()) {
         QStringList args = QProcess::splitCommand(editor);
@@ -478,6 +521,10 @@ void MainWindow::copyToClipboard(bool cut)
     const QStringList paths = active()->selectedPaths();
     if (paths.isEmpty())
         return;
+    if (active()->inArchive()) {
+        active()->showMessage(tr("The clipboard can't hold archive contents yet. Use F5 to extract."), true);
+        return;
+    }
     auto* mime = new QMimeData;
     QList<QUrl> urls;
     QByteArray gnome = cut ? "cut" : "copy";
@@ -505,7 +552,8 @@ void MainWindow::copyPathsAsText()
 
 void MainWindow::paste()
 {
-    pasteInto(active()->path());
+    if (!refuseInArchive(active()))
+        pasteInto(active()->path());
 }
 
 void MainWindow::pasteInto(const QString& dir)
@@ -563,6 +611,8 @@ void MainWindow::showShortcuts()
         {"Ctrl+C / X / V", "Clipboard (works with other apps)"},
         {"Alt+Shift+Enter", "Calculate all folder sizes"},
         {"Ctrl+Alt+T", "Open terminal here"},
+        {"Alt+F5 / Alt+F9", "Pack / unpack archives"},
+        {"Ctrl+PgDn", "Enter folder, or browse any file as archive"},
         {"Menu key, Shift+F10", "Context menu"},
         {"Esc", "Cancel a slow folder load"},
     };
@@ -613,6 +663,103 @@ void MainWindow::setIconTheme(const QString& id)
     update();
 }
 
+// ----------------------------------------------------------------- archives
+
+bool MainWindow::refuseInArchive(Panel* p)
+{
+    if (!p->inArchive())
+        return false;
+    p->showMessage(tr("Archives are read-only in Tandem for now. F5 extracts, Alt+F5 packs."), true);
+    return true;
+}
+
+void MainWindow::withExtracted(Panel* p, const QString& path, std::function<void(const QString&)> fn)
+{
+    const QString archive = p->archivePath();
+    const QString inner = p->innerPath(path);
+    p->showMessage(tr("Extracting %1 …").arg(baseName(path)));
+    QPointer<Panel> panel(p);
+    QPointer<MainWindow> self(this);
+    ioPool()->start([self, panel, archive, inner, fn] {
+        QString error;
+        const QString local = extractToCache(archive, inner, &error);
+        postToUi([self, panel, local, error, fn] {
+            if (!self)
+                return;
+            if (local.isEmpty()) {
+                if (panel)
+                    panel->showMessage(tr("Cannot extract: %1").arg(error), true);
+                return;
+            }
+            if (panel)
+                panel->showMessage(QString());
+            fn(local);
+        });
+    });
+}
+
+void MainWindow::openFrom(Panel* p, const QString& path)
+{
+    if (p->inArchive())
+        withExtracted(p, path, [this](const QString& local) { openFile(local); });
+    else
+        openFile(path);
+}
+
+void MainWindow::pack()
+{
+    Panel* src = active();
+    const QStringList paths = src->selectedPaths();
+    if (paths.isEmpty())
+        return;
+    if (src->inArchive()) {
+        src->showMessage(tr("Extract first (F5), then pack."), true);
+        return;
+    }
+    const QString base = paths.size() == 1 ? baseName(paths.first()) : baseName(src->path());
+    const QString dir = other()->inArchive() ? src->path() : other()->path();
+    const QString text = askDestination(
+        this, tr("Pack"),
+        tr("Pack %1 into (the extension picks the format: .zip .7z .tar.gz .tar.xz .tar.zst .tar):")
+            .arg(describeItems(paths)),
+        joinPath(dir, base + QStringLiteral(".zip")));
+    if (text.isEmpty())
+        return;
+    QString target = text.startsWith(QLatin1Char('/')) || text.startsWith(QLatin1Char('~')) ? text
+                                                                                             : joinPath(src->path(), text);
+    m_jobs->add(new PackJob(paths, expandUserPath(target)));
+    if (!src->hasSelectionOverride())
+        src->unmarkAll();
+}
+
+void MainWindow::unpack()
+{
+    Panel* src = active();
+    Panel* dst = other();
+    if (dst->inArchive()) {
+        refuseInArchive(dst);
+        return;
+    }
+    QStringList archives;
+    for (const QString& p : src->selectedPaths())
+        if (isArchiveName(baseName(p)))
+            archives.append(p);
+    if (src->inArchive() || archives.isEmpty()) {
+        src->showMessage(tr("Select one or more archives to unpack."), true);
+        return;
+    }
+    const QString dest = askDestination(
+        this, tr("Unpack"),
+        tr("Unpack %1 to (archives with several top-level items get their own folder):").arg(describeItems(archives)),
+        dst->path());
+    if (dest.isEmpty())
+        return;
+    for (const QString& a : std::as_const(archives))
+        m_jobs->add(new ExtractJob(a, {QString()}, expandUserPath(dest), true));
+    if (!src->hasSelectionOverride())
+        src->unmarkAll();
+}
+
 // ---------------------------------------------------------- context menus
 
 void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
@@ -622,6 +769,15 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     auto act = [this](const char* id) { return m_actions.value(QLatin1String(id)); };
     const bool canPaste = QApplication::clipboard()->mimeData() && QApplication::clipboard()->mimeData()->hasUrls();
 
+    if (!onItem && panel->inArchive()) {
+        menu.addAction(act("refresh"));
+        QMenu* sort = menu.addMenu(tr("Sort by"));
+        for (const char* id : {"sortName", "sortExt", "sortDate", "sortSize"})
+            sort->addAction(act(id));
+        menu.addAction(m_hiddenAction);
+        menu.exec(pos);
+        return;
+    }
     if (!onItem) {
         menu.addAction(act("mkdir"));
         menu.addAction(act("mkfile"));
@@ -649,6 +805,24 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     const bool single = paths.size() == 1;
     const bool dir = single && e && e->isDir;
 
+    if (panel->inArchive()) {
+        QAction* open = menu.addAction(IconCache::themed(dir ? "folder-open" : "document-open"), tr("Open"), this,
+                                       [panel] { panel->openCurrent(); });
+        QFont bold = open->font();
+        bold.setBold(true);
+        open->setFont(bold);
+        if (single && !dir)
+            menu.addAction(IconCache::themed("document-preview"), tr("View"), this, [this] { viewCurrent(); });
+        menu.addSeparator();
+        act("copy")->setText(tr("Extract to other panel…"));
+        menu.addAction(act("copy"));
+        menu.addAction(act("copyPath"));
+        menu.exec(pos);
+        act("copy")->setText(tr("Copy…"));
+        return;
+    }
+    const bool archiveFile = single && e && !e->isDir && isArchiveName(e->name);
+
     if (paths.size() > 1) {
         QAction* title = menu.addAction(tr("%n items", nullptr, int(paths.size())));
         title->setEnabled(false);
@@ -675,6 +849,14 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         const QString p = paths.first();
         menu.addAction(IconCache::themed("edit-paste"), tr("Paste into folder"), this, [this, p] { pasteInto(p); });
     }
+    menu.addSeparator();
+    if (archiveFile) {
+        const QString p = paths.first();
+        menu.addAction(IconCache::themed("archive-extract", "package-x-generic"), tr("Browse archive"), this,
+                       [panel, p] { panel->navigate(p); });
+        menu.addAction(act("unpack"));
+    }
+    menu.addAction(act("pack"));
     menu.addSeparator();
     act("copy")->setText(tr("Copy to other panel…"));
     act("move")->setText(tr("Move to other panel…"));
@@ -798,7 +980,9 @@ void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)
 
 void MainWindow::openTerminal(const QString& dir)
 {
-    const QString where = dir.isEmpty() ? active()->path() : dir;
+    QString where = dir.isEmpty() ? active()->path() : dir;
+    if (active()->inArchive() && where.startsWith(active()->archivePath()))
+        where = parentPath(active()->archivePath());  // the folder holding the archive
     QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
     if (terminal.isEmpty())
         terminal = DesktopApps::instance().defaultTerminal();
@@ -815,6 +999,8 @@ void MainWindow::openTerminal(const QString& dir)
 void MainWindow::makeFile()
 {
     Panel* p = active();
+    if (refuseInArchive(p))
+        return;
     bool ok = false;
     const QString name =
         QInputDialog::getText(this, tr("New file"), tr("File name:"), QLineEdit::Normal, QString(), &ok).trimmed();

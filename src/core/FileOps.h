@@ -29,9 +29,6 @@ protected:
     void run() override;
 
 private:
-    enum class Policy { Ask, OverwriteAll, OverwriteOlder, SkipAll, RenameAll };
-    enum class Resolution { Overwrite, Skip, Rename };
-
     bool processItem(const QByteArray& src, const QByteArray& dst);
     bool copyDirectory(const QByteArray& src, QByteArray dst, const struct stat& st);
     bool copySymlink(const QByteArray& src, QByteArray dst, const struct stat& st);
@@ -44,7 +41,6 @@ private:
     Mode m_mode;
     QStringList m_sources;
     QString m_destination;
-    Policy m_policy = Policy::Ask;
     bool m_crossDevice = false;
     std::vector<char> m_buffer;
 };

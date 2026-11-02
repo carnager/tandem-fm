@@ -35,6 +35,9 @@ public:
     bool canGoBack() const { return !m_back.isEmpty(); }
     bool canGoForward() const { return !m_forward.isEmpty(); }
     bool isWatched() const { return m_watch >= 0; }
+    // Inside an archive: path() is archivePath() + "/" + the folder inside it.
+    bool inArchive() const { return m_inArchive; }
+    QString archivePath() const { return m_archivePath; }
 
     void navigate(const QString& path, const QString& focusName = {});
     void refresh();
@@ -81,6 +84,8 @@ private:
     int m_watch = -1;
     int64_t m_free = -1, m_total = -1;
     bool m_showHidden = false;
+    bool m_inArchive = false;
+    QString m_archivePath;
     QStringList m_back, m_forward;
     // Cursor and marks per folder, restored when coming back to it.
     struct FolderMemory {

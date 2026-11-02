@@ -69,6 +69,8 @@ Visual check without a display:
 | Alt+Shift+Enter | Compute all folder sizes |
 | Ctrl+Alt+T | Open terminal here (`$TERMINAL`, or `tools/terminal` in the config) |
 | Right click, Menu key, Shift+F10 | Context menu |
+| Alt+F5 / Alt+F9 | Pack into a new archive / unpack archives to the other panel |
+| Ctrl+PgDn | Enter folder, or browse any file as an archive |
 | Esc | Cancel a slow folder load |
 
 Drag and drop works within Tandem and with other applications (Shift = move).
@@ -79,6 +81,22 @@ hidden files) and on the column header (show/hide columns). Right-clicking a
 marked file acts on all marked files; an unmarked file is acted on alone and
 your marks stay. Each tab remembers cursor and marks per folder, so Back,
 Forward and re-entering a folder put you where you were.
+
+## Archives
+
+Enter on an archive browses into it like a folder; the path shows where you
+are (`…/photos.tar.gz/2024/summer`), Backspace climbs back out. Formats are
+whatever libarchive reads: zip, 7z, rar, tar (gz/bz2/xz/zst/lz4…), iso, cab,
+cpio, deb, rpm, xar and single compressed files. The table of contents is
+read once off the UI thread and cached, so moving around inside is instant.
+
+Inside an archive: F3 and Enter work on a cached extracted copy, F5 extracts
+(conflict prompts as usual), and folder sizes are shown right away.
+Alt+F9 unpacks whole archives (into their own folder unless the archive has
+a single top-level folder); Alt+F5 packs into a new archive whose format
+follows the extension. Archives are read-only for now: deleting, renaming or
+adding inside an existing archive comes later. Member paths with `..` and
+writes through links the archive itself created are refused.
 
 ## Viewer (F3)
 
@@ -109,6 +127,6 @@ bench/      tandem-bench
 ## Roadmap
 
 1. ✅ Dual panels, tabs, keyboard flow, quick search, background F5–F8, watcher, benchmarks
-2. ✅ Built-in viewer (F3) · VFS layer + archives as folders (libarchive), multi-rename, compare/sync folders
+2. ✅ Built-in viewer (F3) · ✅ archives as folders (libarchive) · multi-rename, compare/sync folders
 3. Network backends (SFTP, SMB, WebDAV, S3), connection manager, button bar, command line
 4. Plugins, themes, configurable keys

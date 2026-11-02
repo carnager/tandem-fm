@@ -50,6 +50,10 @@ QStringView extensionOf(const QString& name)
     const qsizetype dot = name.lastIndexOf(QLatin1Char('.'));
     if (dot <= 0 || dot == name.size() - 1)
         return {};
+    // Compressed tarballs: "tar.gz" is one extension.
+    const qsizetype prev = name.lastIndexOf(QLatin1Char('.'), dot - 1);
+    if (prev > 0 && QStringView(name).mid(prev + 1, dot - prev - 1).compare(QLatin1String("tar"), Qt::CaseInsensitive) == 0)
+        return QStringView(name).mid(prev + 1);
     return QStringView(name).mid(dot + 1);
 }
 

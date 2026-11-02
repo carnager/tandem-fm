@@ -1,5 +1,6 @@
 #include "ui/Panel.h"
 
+#include "core/Archive.h"
 #include "core/FileOps.h"
 #include "core/Mounts.h"
 #include "core/Util.h"
@@ -153,7 +154,12 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_view, &FileView::markGroupRequested, this, &Panel::markGroup);
     connect(m_view, &FileView::historyRequested, this, [this](int step) { step < 0 ? back() : forward(); });
     connect(m_view, &FileView::dropRequested, this, &Panel::dropRequested);
-    connect(m_view, &FileView::dragPathsRequested, this, [this](QStringList& out) { out = selectedPaths(); });
+    connect(m_view, &FileView::dragPathsRequested, this, [this](QStringList& out) {
+        if (inArchive())
+            showMessage(tr("Dragging out of archives isn't supported yet. Use F5 to extract."), true);
+        else
+            out = selectedPaths();
+    });
     connect(m_view, &FileView::spaceMarkRequested, this, [this](int row) {
         DirTab* t = tab();
         const FileEntry* e = t ? t->model()->entry(row) : nullptr;
@@ -463,10 +469,38 @@ void Panel::openCurrent()
         return;
     if (e->isParent)
         goUp();
-    else if (e->isDir)
+    else if (e->isDir || (!inArchive() && isArchiveName(e->name)))
         navigate(joinPath(path(), e->name));
     else
         emit openFileRequested(joinPath(path(), e->name));
+}
+
+void Panel::enterCurrent()
+{
+    const FileEntry* e = currentEntry();
+    if (!e || e->isParent)
+        return;
+    navigate(joinPath(path(), e->name));
+}
+
+bool Panel::inArchive() const
+{
+    DirTab* t = tab();
+    return t && t->inArchive();
+}
+
+QString Panel::archivePath() const
+{
+    DirTab* t = tab();
+    return t ? t->archivePath() : QString();
+}
+
+QString Panel::innerPath(const QString& p) const
+{
+    const QString a = archivePath();
+    if (a.isEmpty() || !p.startsWith(a))
+        return {};
+    return p.mid(a.size() + 1);
 }
 
 void Panel::goUp()
@@ -578,6 +612,10 @@ void Panel::computeAllSizes()
 
 void Panel::startRename()
 {
+    if (inArchive()) {
+        showMessage(tr("Archives are read-only in Tandem for now."), true);
+        return;
+    }
     const FileEntry* e = currentEntry();
     if (!e || e->isParent)
         return;
@@ -714,6 +752,10 @@ void Panel::updateHeader()
         return;
     if (!m_pathEdit->hasFocus())
         m_pathEdit->setText(t->path());
+    m_mountButton->setIcon(t->inArchive() ? IconCache::themed("package-x-generic", "application-x-archive")
+                                          : IconCache::themed("drive-harddisk", "folder"));
+    m_mountButton->setToolTip(t->inArchive() ? tr("Inside archive %1").arg(t->archivePath())
+                                             : tr("Locations (Alt+F1 / Alt+F2)"));
     if (t->freeBytes() >= 0) {
         m_freeLabel->setText(tr("%1 free").arg(formatSize(t->freeBytes())));
         m_freeLabel->setToolTip(tr("%1 free of %2").arg(formatSize(t->freeBytes()), formatSize(t->totalBytes())));

@@ -55,6 +55,12 @@ private:
     void makeFile();
     void openTerminal(const QString& dir = {});
     void pasteInto(const QString& dir);
+    bool refuseInArchive(Panel* p);
+    // Extracts a file from the panel's archive to the cache (off-thread), then calls fn.
+    void withExtracted(Panel* p, const QString& path, std::function<void(const QString& local)> fn);
+    void openFrom(Panel* p, const QString& path);
+    void pack();
+    void unpack();
     void populateIconThemeMenu(QMenu* menu);
     void setIconTheme(const QString& id);
 

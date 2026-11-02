@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <thread>
 
 namespace tandem {
@@ -90,6 +91,18 @@ protected:
     Answer prompt(PromptRequest req);
     // Error prompt honoring "skip all". Returns Retry, Skip or Cancel.
     Answer askError(const QString& message, const QString& path, int err);
+    Answer askErrorText(const QString& message, const QString& path, const QString& detail);
+
+    // Target exists: ask (or apply a remembered "for all" choice). On Rename,
+    // dst is changed to a free name. nullopt means the user cancelled.
+    enum class Resolution { Overwrite, Skip, Rename };
+    struct ConflictSide {
+        QString path;
+        int64_t size = -1;  // -1 for folders
+        int64_t mtime = 0;
+    };
+    std::optional<Resolution> resolveConflict(const ConflictSide& src, QByteArray& dst, const ConflictSide& existing,
+                                              bool sameFile = false);
 
     void setState(State s) { m_state.store(s); }
     void setCurrent(const QString& s);
@@ -112,6 +125,8 @@ private:
     QString m_current;
     QStringList m_errors;
     bool m_skipAllErrors = false;
+    enum class ConflictPolicy { Ask, OverwriteAll, OverwriteOlder, SkipAll, RenameAll };
+    ConflictPolicy m_conflictPolicy = ConflictPolicy::Ask;
     AsyncPrompt m_promptHandler;
     SyncPrompt m_syncPrompt;
 };

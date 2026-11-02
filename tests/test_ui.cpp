@@ -1,5 +1,6 @@
 // Drives the real main window with keystrokes (run with QT_QPA_PLATFORM=offscreen).
 
+#include "core/Archive.h"
 #include "core/DirWatcher.h"
 #include "ui/DirTab.h"
 #include "ui/FileModel.h"
@@ -8,6 +9,10 @@
 #include "ui/MainWindow.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
+#include "ui/viewer/ViewerWindow.h"
+
+#include <QPlainTextEdit>
+#include <QSignalSpy>
 
 #include <QApplication>
 #include <QImage>
@@ -412,6 +417,82 @@ private slots:
         QCOMPARE(got.pixelColor(8, 8), QColor(Qt::red));
         IconCache::setTheme({});  // back to the system theme
         QCOMPARE(QIcon::themeName(), before);
+    }
+
+    void archives()
+    {
+        // Pack with Alt+F5 into the right panel.
+        moveCursorTo(m_left, "sub");
+        answerNextDialog([this](QWidget* w) {
+            auto* edit = w->findChild<QLineEdit*>();
+            QVERIFY(edit);
+            edit->setText(R("pack.zip"));
+            acceptDialog(w);
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_F5, Qt::AltModifier);
+        QTRY_VERIFY(QFileInfo(R("pack.zip")).size() > 0);
+        QTRY_VERIFY(rightModel()->rowOf("pack.zip") >= 0);
+
+        // Enter it like a folder, then a folder inside it.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+        QTRY_VERIFY(m_right->isActive());
+        moveCursorTo(m_right, "pack.zip");
+        QTest::keyClick(m_right->view(), Qt::Key_Return);
+        QTRY_COMPARE(rightModel()->path(), R("pack.zip"));
+        QVERIFY(m_right->inArchive());
+        QVERIFY(rightModel()->rowOf("sub") >= 0);
+        moveCursorTo(m_right, "sub");
+        QTest::keyClick(m_right->view(), Qt::Key_Return);
+        QTRY_COMPARE(rightModel()->path(), R("pack.zip/sub"));
+        QVERIFY(rightModel()->rowOf("inner.txt") >= 0);
+
+        // F3 views a member (extracted to the cache behind the scenes).
+        moveCursorTo(m_right, "inner.txt");
+        QTest::keyClick(m_right->view(), Qt::Key_F3);
+        ViewerWindow* viewer = nullptr;
+        QTRY_VERIFY((viewer = m_window->findChild<ViewerWindow*>()) != nullptr);
+        QTRY_COMPARE(viewer->textEdit()->toPlainText(), QString("inner"));
+        viewer->close();
+        QTRY_VERIFY(m_window->findChild<ViewerWindow*>() == nullptr);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+
+        // Read-only: delete is refused, nothing disappears.
+        QTest::keyClick(m_right->view(), Qt::Key_F8);
+        QTest::qWait(100);
+        QVERIFY(QApplication::activeModalWidget() == nullptr);
+        QVERIFY(rightModel()->rowOf("inner.txt") >= 0);
+
+        // F5 extracts into the other panel.
+        QVERIFY(QDir().mkpath(L("unpacked")));
+        m_left->navigate(L("unpacked"));
+        QTRY_COMPARE(leftModel()->path(), L("unpacked"));
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_right->view(), Qt::Key_F5);
+        QTRY_VERIFY(QFile::exists(L("unpacked/inner.txt")));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+
+        // Backspace climbs out of the archive and lands on it.
+        QTest::keyClick(m_right->view(), Qt::Key_Backspace);
+        QTRY_COMPARE(rightModel()->path(), R("pack.zip"));
+        QTest::keyClick(m_right->view(), Qt::Key_Backspace);
+        QTRY_COMPARE(rightModel()->path(), R());
+        QCOMPARE(m_right->currentName(), QString("pack.zip"));
+        QVERIFY(!m_right->inArchive());
+
+        // Alt+F9 unpacks the whole archive into the other panel.
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_right->view(), Qt::Key_F9, Qt::AltModifier);
+        QTRY_VERIFY(QFile::exists(L("unpacked/sub/deep")));  // single top folder: no extra level
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_left->view()->setFocus();
     }
 
     void cleanupTestCase()

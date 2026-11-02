@@ -20,7 +20,8 @@ struct SortSpec {
 // Uses a per-thread collator, so it is safe to call from workers.
 QCollatorSortKey makeSortKey(const QString& name);
 
-// Extension without the dot; empty for dirs-by-convention and dotfiles like ".bashrc".
+// Extension without the dot; empty for dotfiles like ".bashrc". Compressed
+// tarballs keep both parts ("tar.gz").
 QStringView extensionOf(const QString& name);
 
 // Directories (and "..") always come first; ".." is always the very first row.

@@ -40,6 +40,12 @@ public:
     void navigate(const QString& path, const QString& focus = {});
     void refresh();
     void openCurrent();
+    void enterCurrent();  // Ctrl+PgDn: also browses into files of any type as archives
+
+    // Archive locations (read-only for now).
+    bool inArchive() const;
+    QString archivePath() const;
+    QString innerPath(const QString& path) const;  // path inside the archive
     void goUp();
     void back();
     void forward();

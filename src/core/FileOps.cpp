@@ -255,51 +255,62 @@ bool CopyJob::processItem(const QByteArray& src, const QByteArray& dst)
 std::optional<CopyJob::Resolution> CopyJob::resolveConflict(const QByteArray& src, const struct stat& srcSt,
                                                             QByteArray& dst, const struct stat& dstSt)
 {
-    if (srcSt.st_dev == dstSt.st_dev && srcSt.st_ino == dstSt.st_ino) {
-        addError(tr("Source and target are the same file: %1").arg(fromNative(src)));
+    auto side = [](const QByteArray& p, const struct stat& st) {
+        return ConflictSide{fromNative(p), S_ISDIR(st.st_mode) ? -1 : int64_t(st.st_size), int64_t(st.st_mtime)};
+    };
+    const bool same = srcSt.st_dev == dstSt.st_dev && srcSt.st_ino == dstSt.st_ino;
+    return Job::resolveConflict(side(src, srcSt), dst, side(dst, dstSt), same);
+}
+
+// Shared by every job that writes files (copy, extract, pack).
+std::optional<Job::Resolution> Job::resolveConflict(const ConflictSide& src, QByteArray& dst,
+                                                    const ConflictSide& existing, bool sameFile)
+{
+    if (sameFile) {
+        addError(tr("Source and target are the same file: %1").arg(src.path));
         return Resolution::Skip;
     }
-    auto olderRule = [&] { return dstSt.st_mtime < srcSt.st_mtime ? Resolution::Overwrite : Resolution::Skip; };
-    switch (m_policy) {
-    case Policy::OverwriteAll:
+    auto olderRule = [&] { return existing.mtime < src.mtime ? Resolution::Overwrite : Resolution::Skip; };
+    switch (m_conflictPolicy) {
+    case ConflictPolicy::OverwriteAll:
         return Resolution::Overwrite;
-    case Policy::SkipAll:
+    case ConflictPolicy::SkipAll:
         return Resolution::Skip;
-    case Policy::OverwriteOlder:
+    case ConflictPolicy::OverwriteOlder:
         return olderRule();
-    case Policy::RenameAll:
+    case ConflictPolicy::RenameAll:
         dst = uniqueName(dst);
         return Resolution::Rename;
-    case Policy::Ask:
+    case ConflictPolicy::Ask:
         break;
     }
 
     PromptRequest req;
     req.kind = PromptRequest::Kind::Conflict;
     req.message = tr("The target already exists.");
-    req.srcPath = fromNative(src);
+    req.srcPath = src.path;
     req.dstPath = fromNative(dst);
-    req.srcSize = S_ISDIR(srcSt.st_mode) ? -1 : srcSt.st_size;
-    req.dstSize = S_ISDIR(dstSt.st_mode) ? -1 : dstSt.st_size;
-    req.srcTime = srcSt.st_mtime;
-    req.dstTime = dstSt.st_mtime;
+    req.srcSize = src.size;
+    req.dstSize = existing.size;
+    req.srcTime = src.mtime;
+    req.dstTime = existing.mtime;
 
     switch (prompt(req)) {
     case Answer::Overwrite:
         return Resolution::Overwrite;
     case Answer::OverwriteAll:
-        m_policy = Policy::OverwriteAll;
+        m_conflictPolicy = ConflictPolicy::OverwriteAll;
         return Resolution::Overwrite;
     case Answer::OverwriteOlderAll:
-        m_policy = Policy::OverwriteOlder;
+        m_conflictPolicy = ConflictPolicy::OverwriteOlder;
         return olderRule();
     case Answer::Skip:
         return Resolution::Skip;
     case Answer::SkipAll:
-        m_policy = Policy::SkipAll;
+        m_conflictPolicy = ConflictPolicy::SkipAll;
         return Resolution::Skip;
     case Answer::RenameAll:
-        m_policy = Policy::RenameAll;
+        m_conflictPolicy = ConflictPolicy::RenameAll;
         [[fallthrough]];
     case Answer::Rename:
         dst = uniqueName(dst);

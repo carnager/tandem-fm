@@ -1,5 +1,6 @@
 #include "ui/FileView.h"
 
+#include "core/Sorting.h"
 #include "ui/FileModel.h"
 #include "ui/Theme.h"
 
@@ -102,7 +103,8 @@ void FileDelegate::setEditorData(QWidget* editor, const QModelIndex& idx) const
     // Select the name without extension, like every good file manager.
     const auto* model = static_cast<const FileModel*>(idx.model());
     const FileEntry* e = model->entry(idx.row());
-    const int dot = (e && !e->isDir) ? int(name.lastIndexOf(QLatin1Char('.'))) : -1;
+    const int extLen = (e && !e->isDir) ? int(extensionOf(name).size()) : 0;
+    const int dot = extLen > 0 ? int(name.size()) - extLen - 1 : -1;
     if (dot > 0)
         ed->setSelection(0, dot);
     else

@@ -126,7 +126,12 @@ Answer Job::prompt(PromptRequest req)
 
 Answer Job::askError(const QString& message, const QString& path, int err)
 {
-    const QString line = QStringLiteral("%1: %2 (%3)").arg(message, path, errnoString(err));
+    return askErrorText(message, path, errnoString(err));
+}
+
+Answer Job::askErrorText(const QString& message, const QString& path, const QString& detail)
+{
+    const QString line = QStringLiteral("%1: %2 (%3)").arg(message, path, detail);
     if (m_skipAllErrors) {
         addError(line);
         return Answer::Skip;
@@ -135,7 +140,7 @@ Answer Job::askError(const QString& message, const QString& path, int err)
     req.kind = PromptRequest::Kind::Error;
     req.message = message;
     req.srcPath = path;
-    req.detail = errnoString(err);
+    req.detail = detail;
     Answer a = prompt(req);
     if (a == Answer::SkipAll) {
         m_skipAllErrors = true;

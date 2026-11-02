@@ -132,7 +132,7 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
     QPointer<DirTab> self(this);
     auto cancel = m_cancel;
     ioPool()->start([self, gen, path, focus, history, marks, opt, cancel] {
-        auto result = std::make_shared<ListResult>(listDirectory(path, opt, cancel.get()));
+        auto result = std::make_shared<ListResult>(listLocation(path, opt, cancel.get()));
         postToUi([self, gen, focus, history, marks, result] {
             if (!self || gen != self->m_gen) {
                 DirWatcher::instance()->removeWatch(result->watch);
@@ -145,7 +145,8 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
             if (result->error) {
                 DirWatcher::instance()->removeWatch(result->watch);
                 if (result->error != ECANCELED)
-                    emit t->listingFailed(result->path, errnoString(result->error));
+                    emit t->listingFailed(result->path, result->errorText.isEmpty() ? errnoString(result->error)
+                                                                                    : result->errorText);
                 return;
             }
             const QString old = t->m_model->path();
@@ -181,6 +182,8 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
                 }
             }
             t->setWatch(result->watch);
+            t->m_inArchive = result->inArchive;
+            t->m_archivePath = result->archivePath;
             t->m_free = result->freeBytes;
             t->m_total = result->totalBytes;
             t->m_pendingNames.clear();
@@ -311,7 +314,7 @@ void DirTab::computeAllSizes()
 
 void DirTab::computeSizes(const QStringList& names)
 {
-    if (names.isEmpty())
+    if (names.isEmpty() || m_inArchive)  // archive folders come with their sizes
         return;
     const QString dir = path();
     QPointer<DirTab> self(this);

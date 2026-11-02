@@ -28,12 +28,21 @@ struct ListResult {
     int watch = -1;
     int64_t elapsedMs = 0;
     SortSpec sortedBy;
+    QString errorText;  // set instead of errno for non-errno failures (archives)
+    // Location kind: inside an archive, path = archivePath + "/" + innerPath.
+    bool inArchive = false;
+    QString archivePath;
+    QString innerPath;
 };
 
 // Blocking. Call from a worker thread only. Returns entries already sorted
 // and with sort keys, so the UI thread only has to swap the vector in.
 ListResult listDirectory(const QString& path, const ListOptions& opt,
                          const std::atomic<bool>* cancel = nullptr);
+
+// Like listDirectory, but a path that runs through a file is treated as a
+// location inside that archive ("/x/photos.zip/2024"). Blocking.
+ListResult listLocation(const QString& path, const ListOptions& opt, const std::atomic<bool>* cancel = nullptr);
 
 using EntryUpdate = std::pair<QString, std::optional<FileEntry>>;  // nullopt = gone
 

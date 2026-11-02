@@ -1,9 +1,12 @@
+#include "core/Archive.h"
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
 #include "core/Sorting.h"
 
 #include <QFile>
+#include <QProcess>
+#include <QStandardPaths>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -68,7 +71,9 @@ private slots:
 
     void extension()
     {
-        QCOMPARE(extensionOf("archive.tar.gz").toString(), QString("gz"));
+        QCOMPARE(extensionOf("archive.tar.gz").toString(), QString("tar.gz"));
+        QCOMPARE(extensionOf("v1.2.gz").toString(), QString("gz"));
+        QCOMPARE(extensionOf(".tar.gz").toString(), QString("gz"));
         QCOMPARE(extensionOf(".bashrc").toString(), QString());
         QCOMPARE(extensionOf("noext").toString(), QString());
         QCOMPARE(extensionOf("trailing.").toString(), QString());
@@ -289,6 +294,127 @@ private slots:
         QCOMPARE(readFile(tmp.filePath("config/mimeapps.list")),
                  QByteArray("[Default Applications]\ntext/plain=aaa.desktop;\nimage/png=zzz.desktop;\n"
                             "[Removed Associations]\ntext/plain=gone.desktop;\n"));
+    }
+
+    void archiveRoundTrip_data()
+    {
+        QTest::addColumn<QString>("ext");
+        QTest::newRow("zip") << ".zip";
+        QTest::newRow("7z") << ".7z";
+        QTest::newRow("tar.gz") << ".tar.gz";
+        QTest::newRow("tar.zst") << ".tar.zst";
+    }
+
+    void archiveRoundTrip()
+    {
+        QFETCH(QString, ext);
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("src/docs/deep")));
+        writeFile(tmp.filePath("src/readme.txt"), "hello");
+        writeFile(tmp.filePath("src/docs/a.txt"), "aaa");
+        writeFile(tmp.filePath("src/docs/deep/b.bin"), QByteArray(200000, 'b'));
+        QVERIFY(::symlink("readme.txt", QFile::encodeName(tmp.filePath("src/link")).constData()) == 0);
+
+        const QString arc = tmp.filePath("out" + ext);
+        PackJob pack({tmp.filePath("src")}, arc);
+        QVERIFY(runJob(pack));
+        QVERIFY2(pack.errors().isEmpty(), qPrintable(pack.errors().join('\n')));
+        QVERIFY(QFileInfo(arc).size() > 0);
+        QVERIFY(!QFile::exists(arc + ".part"));
+
+        // Browse: root, then a folder inside.
+        ListResult root = listLocation(arc, {});
+        QCOMPARE(root.error, 0);
+        QVERIFY(root.inArchive);
+        QCOMPARE(root.archivePath, arc);
+        QCOMPARE(int(root.entries.size()), 1);
+        QCOMPARE(root.entries[0].name, QString("src"));
+        QCOMPARE(root.entries[0].size, int64_t(5 + 3 + 200000));  // folder total (links count 0)
+        ListResult docs = listLocation(arc + "/src/docs", {});
+        QCOMPARE(docs.error, 0);
+        QCOMPARE(docs.innerPath, QString("src/docs"));
+        QStringList names;
+        for (auto& e : docs.entries)
+            names << e.name;
+        QCOMPARE(names, QStringList({"deep", "a.txt"}));
+        QCOMPARE(listLocation(arc + "/src/nope", {}).error, ENOENT);
+
+        // Extract a subfolder somewhere else.
+        QVERIFY(QDir().mkdir(tmp.filePath("x")));
+        ExtractJob ex(arc, {"src/docs"}, tmp.filePath("x"));
+        QVERIFY(runJob(ex));
+        QVERIFY2(ex.errors().isEmpty(), qPrintable(ex.errors().join('\n')));
+        QCOMPARE(readFile(tmp.filePath("x/docs/a.txt")), QByteArray("aaa"));
+        QCOMPARE(readFile(tmp.filePath("x/docs/deep/b.bin")), QByteArray(200000, 'b'));
+        QVERIFY(!QFile::exists(tmp.filePath("x/readme.txt")));
+
+        // Single file into the cache (viewer / open).
+        QString err;
+        const QString cached = extractToCache(arc, "src/readme.txt", &err);
+        QVERIFY2(!cached.isEmpty(), qPrintable(err));
+        QCOMPARE(readFile(cached), QByteArray("hello"));
+    }
+
+    void extractConflictsAndSmartFolder()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("one")));
+        writeFile(tmp.filePath("one/f.txt"), "new");
+        writeFile(tmp.filePath("loose.txt"), "loose");
+        const QString single = tmp.filePath("single.zip");
+        const QString multi = tmp.filePath("multi.tar.xz");
+        PackJob p1({tmp.filePath("one")}, single);
+        PackJob p2({tmp.filePath("one"), tmp.filePath("loose.txt")}, multi);
+        QVERIFY(runJob(p1));
+        QVERIFY(runJob(p2));
+
+        QVERIFY(QDir().mkdir(tmp.filePath("dest")));
+        ExtractJob s1(single, {""}, tmp.filePath("dest"), true);  // one top folder: no extra level
+        QVERIFY(runJob(s1));
+        QCOMPARE(readFile(tmp.filePath("dest/one/f.txt")), QByteArray("new"));
+        ExtractJob s2(multi, {""}, tmp.filePath("dest"), true);  // several: folder named after it
+        QVERIFY(runJob(s2));
+        QCOMPARE(readFile(tmp.filePath("dest/multi/loose.txt")), QByteArray("loose"));
+
+        writeFile(tmp.filePath("dest/one/f.txt"), "edited");
+        int prompts = 0;
+        ExtractJob again(single, {"one/f.txt"}, tmp.filePath("dest/one"));
+        again.setSyncPromptHandler([&](const PromptRequest& r) {
+            ++prompts;
+            return r.kind == PromptRequest::Kind::Conflict ? Answer::Skip : Answer::Cancel;
+        });
+        QVERIFY(runJob(again));
+        QCOMPARE(prompts, 1);
+        QCOMPARE(readFile(tmp.filePath("dest/one/f.txt")), QByteArray("edited"));
+    }
+
+    void archiveWithoutFolderEntries()
+    {
+        const QString bsdtar = QStandardPaths::findExecutable("bsdtar");
+        if (bsdtar.isEmpty())
+            QSKIP("bsdtar not installed");
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("a/b")));
+        writeFile(tmp.filePath("a/b/c.txt"), "c");
+        // Only the file is stored; "a" and "a/b" exist implicitly.
+        QCOMPARE(QProcess::execute(bsdtar, {"-C", tmp.path(), "-cf", tmp.filePath("t.tar"), "a/b/c.txt"}), 0);
+        ListResult r = listLocation(tmp.filePath("t.tar") + "/a", {});
+        QCOMPARE(r.error, 0);
+        QCOMPARE(int(r.entries.size()), 1);
+        QVERIFY(r.entries[0].isDir);
+        QCOMPARE(r.entries[0].size, int64_t(1));
+    }
+
+    void archivePathSafety()
+    {
+        QCOMPARE(normalizeArchivePath("./a//b/"), QString("a/b"));
+        QCOMPARE(normalizeArchivePath("/etc/passwd"), QString("etc/passwd"));
+        QCOMPARE(normalizeArchivePath("a/../../x"), QString());
+        QVERIFY(isArchiveName("x.tar.gz"));
+        QVERIFY(isArchiveName("X.ZIP"));
+        QVERIFY(!isArchiveName("doc.odt"));
+        QVERIFY(!isArchiveName(".zip"));
+        QCOMPARE(archiveStem("photos.tar.gz"), QString("photos"));
     }
 
     void helpers()

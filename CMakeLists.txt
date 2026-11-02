@@ -22,9 +22,12 @@ add_library(tandem_core STATIC
   src/core/Job.h src/core/Job.cpp
   src/core/FileOps.h src/core/FileOps.cpp
   src/core/DesktopApps.h src/core/DesktopApps.cpp
+  src/core/Archive.h src/core/Archive.cpp
+  src/core/Vfs.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
-target_link_libraries(tandem_core PUBLIC Qt6::Core)
+find_package(LibArchive 3.3 REQUIRED)
+target_link_libraries(tandem_core PUBLIC Qt6::Core PRIVATE LibArchive::LibArchive)
 target_compile_options(tandem_core PRIVATE -Wall -Wextra)
 
 # Widgets UI, as a library so tests can drive the real window.
