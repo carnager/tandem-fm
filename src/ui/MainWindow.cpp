@@ -2,6 +2,7 @@
 
 #include "core/Archive.h"
 #include "core/DesktopApps.h"
+#include "core/MultiRename.h"
 #include "core/Util.h"
 #include "ui/DirTab.h"
 #include "ui/Dialogs.h"
@@ -10,6 +11,7 @@
 #include "ui/IconCache.h"
 #include "ui/JobManager.h"
 #include "ui/JobsPanel.h"
+#include "ui/MultiRenameDialog.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ViewerWindow.h"
@@ -214,6 +216,11 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("copy")] = addCommand(files, tr("Copy…"), {K(Qt::Key_F5)}, [this] { copyOrMove(CopyJob::Mode::Copy); });
     m_actions[QStringLiteral("move")] = addCommand(files, tr("Move…"), {K(Qt::Key_F6)}, [this] { copyOrMove(CopyJob::Mode::Move); });
     m_actions[QStringLiteral("rename")] = addCommand(files, tr("Rename"), {K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
+    m_actions[QStringLiteral("multiRename")] =
+        addCommand(files, tr("Multi-rename…"), {K(Qt::CTRL | Qt::Key_M)}, [this] { multiRename(); });
+    m_actions[QStringLiteral("undoRename")] =
+        addCommand(files, tr("Undo last multi-rename"), {}, [this] { undoMultiRename(); });
+    m_actions[QStringLiteral("undoRename")]->setEnabled(false);
     m_actions[QStringLiteral("mkfile")] =
         addCommand(files, tr("New file…"), {K(Qt::SHIFT | Qt::Key_F4)}, [this] { makeFile(); });
     m_actions[QStringLiteral("mkdir")] = addCommand(files, tr("New folder…"), {K(Qt::Key_F7)}, [this] { makeFolder(); });
@@ -290,7 +297,7 @@ void MainWindow::createMenus()
     m_hiddenAction->setCheckable(true);
     QMenu* icons = view->addMenu(tr("Icon theme"));
     connect(icons, &QMenu::aboutToShow, this, [this, icons] { populateIconThemeMenu(icons); });
-    addCommand(view, tr("Toggle menu bar"), {K(Qt::CTRL | Qt::Key_M)},
+    addCommand(view, tr("Toggle menu bar"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_M)},
                [this] { menuBar()->setVisible(!menuBar()->isVisible()); });
 
     QMenu* help = bar->addMenu(tr("&Help"));
@@ -596,7 +603,7 @@ void MainWindow::showShortcuts()
         {"Num + / Num - / Num *", "Mark group / unmark group / invert"},
         {"F3 / F4", "Viewer (Esc closes, N/P next file, 1/3/4 modes) / edit"},
         {"F5 / F6", "Copy / move to other panel"},
-        {"Shift+F6", "Rename in place"},
+        {"Shift+F6 / Ctrl+M", "Rename in place / multi-rename"},
         {"F7 / Shift+F4", "New folder / new file"},
         {"F8, Del / Shift+F8", "Trash / delete permanently"},
         {"Ctrl+T / Ctrl+W / Ctrl+Tab", "New / close / next tab"},
@@ -760,6 +767,81 @@ void MainWindow::unpack()
         src->unmarkAll();
 }
 
+// ------------------------------------------------------------ multi-rename
+
+void MainWindow::multiRename()
+{
+    Panel* p = active();
+    if (refuseInArchive(p))
+        return;
+    const FileModel* m = p->tab()->model();
+    QList<RenameItem> items;
+    for (const QString& path : p->selectedPaths()) {
+        const FileEntry* e = m->entry(m->rowOf(baseName(path)));
+        if (e)
+            items.append({e->name, e->isDir, e->mtime});
+    }
+    if (items.isEmpty())
+        return;
+    QSet<QString> existing;
+    for (int r = 0; r < m->count(); ++r)
+        if (!m->entry(r)->isParent)
+            existing.insert(m->entry(r)->name);
+
+    MultiRenameDialog dlg(items, baseName(p->path()), existing, this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    const RenamePlan plan = dlg.plan();
+    const QString dir = p->path();
+    QPointer<Panel> panel(p);
+    QPointer<MainWindow> self(this);
+    ioPool()->start([self, panel, plan, dir] {
+        QStringList errors;
+        const auto done = executeRenamePlan(dir, plan, &errors);
+        postToUi([self, panel, done, errors, dir] {
+            if (!self)
+                return;
+            self->m_lastRename = {dir, done};
+            self->m_actions.value(QStringLiteral("undoRename"))->setEnabled(!done.isEmpty());
+            if (!panel)
+                return;
+            if (!errors.isEmpty())
+                panel->showMessage(tr("%n rename(s) failed: %1", nullptr, int(errors.size())).arg(errors.first()), true);
+            else
+                panel->showMessage(tr("Renamed %n item(s). Undo: Files → Undo last multi-rename", nullptr,
+                                      int(done.size())));
+            if (!done.isEmpty())
+                panel->expectName(done.first().first);
+            panel->unmarkAll();
+        });
+    });
+}
+
+void MainWindow::undoMultiRename()
+{
+    if (m_lastRename.pairs.isEmpty())
+        return;
+    RenamePlan plan;
+    for (const auto& [now, before] : std::as_const(m_lastRename.pairs))
+        plan.rows.append({now, before, RenameRow::Status::Ok, {}});
+    const QString dir = m_lastRename.dir;
+    m_lastRename = {};
+    m_actions.value(QStringLiteral("undoRename"))->setEnabled(false);
+    QPointer<MainWindow> self(this);
+    ioPool()->start([self, plan, dir] {
+        QStringList errors;
+        const auto done = executeRenamePlan(dir, plan, &errors);
+        postToUi([self, done, errors] {
+            if (!self)
+                return;
+            if (errors.isEmpty())
+                self->active()->showMessage(tr("Undid %n rename(s)", nullptr, int(done.size())));
+            else
+                self->active()->showMessage(tr("Undo incomplete: %1").arg(errors.first()), true);
+        });
+    });
+}
+
 // ---------------------------------------------------------- context menus
 
 void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
@@ -864,6 +946,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     menu.addAction(act("move"));
     if (single)
         menu.addAction(act("rename"));
+    menu.addAction(act("multiRename"));
     menu.addAction(act("copyPath"));
     menu.addSeparator();
     if (e && e->isDir)

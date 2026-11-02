@@ -60,6 +60,8 @@ private:
     void withExtracted(Panel* p, const QString& path, std::function<void(const QString& local)> fn);
     void openFrom(Panel* p, const QString& path);
     void pack();
+    void multiRename();
+    void undoMultiRename();
     void unpack();
     void populateIconThemeMenu(QMenu* menu);
     void setIconTheme(const QString& id);
@@ -77,6 +79,10 @@ private:
     QHash<QString, QAction*> m_actions;
     QList<IconTheme> m_iconThemes;
     bool m_iconThemesLoaded = false;
+    struct LastRename {
+        QString dir;
+        QList<QPair<QString, QString>> pairs;  // (current name, previous name)
+    } m_lastRename;
 };
 
 }  // namespace tandem

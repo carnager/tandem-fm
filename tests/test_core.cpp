@@ -2,8 +2,10 @@
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
+#include "core/MultiRename.h"
 #include "core/Sorting.h"
 
+#include <QDateTime>
 #include <QFile>
 #include <QProcess>
 #include <QStandardPaths>
@@ -415,6 +417,100 @@ private slots:
         QVERIFY(!isArchiveName("doc.odt"));
         QVERIFY(!isArchiveName(".zip"));
         QCOMPARE(archiveStem("photos.tar.gz"), QString("photos"));
+    }
+
+    void renameMasks()
+    {
+        const QList<RenameItem> items = {{"IMG_0042.JPG", false, 1700000000}, {"notes.tar.gz", false, 0},
+                                         {"Folder.v2", true, 0}};
+        auto names = [&](const RenameOptions& o) {
+            const RenamePlan p = buildRenamePlan(items, "Trip", o, {});
+            QStringList out;
+            for (const auto& r : p.rows)
+                out << r.newName;
+            return p.error.isEmpty() ? out : QStringList{p.error};
+        };
+        RenameOptions o;
+        QCOMPARE(names(o), QStringList({"IMG_0042.JPG", "notes.tar.gz", "Folder.v2"}));  // unchanged
+        o.nameMask = "[P]_[C]";
+        o.counterDigits = 3;
+        QCOMPARE(names(o), QStringList({"Trip_001.JPG", "Trip_002.tar.gz", "Trip_003"}));  // folders have no ext
+        o = {};
+        o.nameMask = "[N5-]_[N1,3]";
+        o.extMask = "[E1]";
+        QCOMPARE(names(o).first(), QString("0042_IMG.J"));
+        o = {};
+        o.nameMask = "[N-4-][[][C10+5:2][]]";
+        QCOMPARE(names(o), QStringList({"0042[10].JPG", "otes[15].tar.gz", "r.v2[20]"}));
+        o = {};
+        o.nameMask = "[YMD]-[N]";
+        o.extMask = "[E]";
+        QVERIFY(names(o).first().startsWith(QDateTime::fromSecsSinceEpoch(1700000000).toString("yyyyMMdd") + "-IMG"));
+        o = {};
+        o.search = "img_(\\d+)";
+        o.replace = "photo-$1";
+        o.regex = true;
+        QCOMPARE(names(o).first(), QString("photo-0042.JPG"));
+        o.regex = false;
+        o.search = ".";
+        o.replace = "\\1";  // plain text: no regex magic
+        QCOMPARE(names(o).at(1), QString("notes\\1tar\\1gz"));
+        o = {};
+        o.caseMode = RenameOptions::Case::Lower;
+        QCOMPARE(names(o).first(), QString("img_0042.jpg"));
+        o.caseMode = RenameOptions::Case::Title;
+        QCOMPARE(names({.nameMask = "my holiday's best", .caseMode = RenameOptions::Case::Title}).first(),
+                 QString("My Holiday's Best.JPG"));
+        o = {};
+        o.nameMask = "[Q]";
+        QCOMPARE(names(o), QStringList({"Unknown placeholder [Q]"}));
+        o.nameMask = "[N";
+        QCOMPARE(names(o), QStringList({"Missing ] in the mask"}));
+    }
+
+    void renameConflictsAndSwap()
+    {
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("a"), "A");
+        writeFile(tmp.filePath("b"), "B");
+        writeFile(tmp.filePath("c"), "C");
+        writeFile(tmp.filePath("other"), "O");
+        const QSet<QString> existing = {"a", "b", "c", "other"};
+
+        // a -> other collides with a file that stays.
+        RenameOptions o;
+        o.search = "a";
+        o.replace = "other";
+        RenamePlan p = buildRenamePlan({{"a", false, 0}}, "", o, existing);
+        QCOMPARE(p.problems, 1);
+        QVERIFY(!p.canRun());
+        // Two files to the same name.
+        o.nameMask = "x";
+        o.search.clear();
+        p = buildRenamePlan({{"a", false, 0}, {"b", false, 0}}, "", o, existing);
+        QCOMPARE(p.problems, 2);
+
+        // Rotate a->b, b->c, c->a: needs temporary names, must not lose data.
+        RenamePlan rot;
+        rot.rows = {{"a", "b", RenameRow::Status::Ok, {}}, {"b", "c", RenameRow::Status::Ok, {}},
+                    {"c", "a", RenameRow::Status::Ok, {}}};
+        QStringList errors;
+        const auto done = executeRenamePlan(tmp.path(), rot, &errors);
+        QVERIFY2(errors.isEmpty(), qPrintable(errors.join('\n')));
+        QCOMPARE(done.size(), 3);
+        QCOMPARE(readFile(tmp.filePath("b")), QByteArray("A"));
+        QCOMPARE(readFile(tmp.filePath("c")), QByteArray("B"));
+        QCOMPARE(readFile(tmp.filePath("a")), QByteArray("C"));
+        QCOMPARE(QDir(tmp.path()).entryList(QDir::Files | QDir::Hidden).size(), 4);  // no temp leftovers
+
+        // Undo = the reverse plan.
+        RenamePlan undo;
+        for (const auto& [now, before] : done)
+            undo.rows.append({now, before, RenameRow::Status::Ok, {}});
+        executeRenamePlan(tmp.path(), undo, &errors);
+        QVERIFY(errors.isEmpty());
+        QCOMPARE(readFile(tmp.filePath("a")), QByteArray("A"));
+        QCOMPARE(readFile(tmp.filePath("c")), QByteArray("C"));
     }
 
     void helpers()

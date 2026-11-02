@@ -24,6 +24,7 @@ add_library(tandem_core STATIC
   src/core/DesktopApps.h src/core/DesktopApps.cpp
   src/core/Archive.h src/core/Archive.cpp
   src/core/Vfs.cpp
+  src/core/MultiRename.h src/core/MultiRename.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)
@@ -42,6 +43,7 @@ add_library(tandem_ui STATIC
   src/ui/JobManager.h src/ui/JobManager.cpp
   src/ui/JobsPanel.h src/ui/JobsPanel.cpp
   src/ui/MainWindow.h src/ui/MainWindow.cpp
+  src/ui/MultiRenameDialog.h src/ui/MultiRenameDialog.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp

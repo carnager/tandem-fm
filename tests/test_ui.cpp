@@ -7,6 +7,7 @@
 #include "ui/FileView.h"
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
+#include "ui/MultiRenameDialog.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ViewerWindow.h"
@@ -84,6 +85,12 @@ void rightClick(QAbstractItemView* view, int row)
     const QPoint pos = view->visualRect(view->model()->index(row, 0)).center();
     QContextMenuEvent ev(QContextMenuEvent::Mouse, pos, view->viewport()->mapToGlobal(pos));
     QApplication::sendEvent(view->viewport(), &ev);
+}
+
+QByteArray readName(const QString& path)
+{
+    QFile f(path);
+    return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
 }
 
 void acceptDialog(QWidget* w)
@@ -493,6 +500,59 @@ private slots:
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
         m_left->view()->setFocus();
+    }
+
+    void multiRenameAndUndo()
+    {
+        QVERIFY(QDir().mkpath(L("mr")));
+        for (const char* n : {"b.txt", "a.txt", "c.txt", "keep.md"})
+            writeFile(L(QString("mr/") + n), n);
+        m_left->navigate(L("mr"));
+        QTRY_COMPARE(leftModel()->path(), L("mr"));
+        QVERIFY(leftModel()->markByPattern("*.txt", true) == 3);
+
+        answerNextDialog([](QWidget* w) {
+            auto* dlg = qobject_cast<MultiRenameDialog*>(w);
+            QVERIFY(dlg);
+            dlg->nameMaskEdit()->setText("img_[C]");
+            QTRY_VERIFY(dlg->renameButton()->isEnabled());
+            dlg->renameButton()->click();
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_M, Qt::ControlModifier);
+        QTRY_VERIFY(QFile::exists(L("mr/img_1.txt")));
+        QCOMPARE(readName(L("mr/img_1.txt")), QByteArray("a.txt"));  // listing order: a, b, c
+        QCOMPARE(readName(L("mr/img_3.txt")), QByteArray("c.txt"));
+        QVERIFY(QFile::exists(L("mr/keep.md")));
+        QTRY_VERIFY(leftModel()->rowOf("img_2.txt") >= 0);
+
+        // A mask producing a clash keeps the Rename button disabled.
+        leftModel()->markByPattern("*", true);
+        answerNextDialog([](QWidget* w) {
+            auto* dlg = qobject_cast<MultiRenameDialog*>(w);
+            dlg->nameMaskEdit()->setText("same");
+            QTest::qWait(100);
+            QVERIFY(!dlg->renameButton()->isEnabled());
+            dlg->reject();
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_M, Qt::ControlModifier);
+        QTRY_VERIFY(QApplication::activeModalWidget() == nullptr);
+        leftModel()->markAll(false);
+
+        // Undo restores the old names.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        QAction* undo = nullptr;
+        for (QAction* a : m_window->actions())
+            if (a->text() == QObject::tr("Undo last multi-rename"))
+                undo = a;
+        QVERIFY(undo && undo->isEnabled());
+        undo->trigger();
+        QTRY_VERIFY(QFile::exists(L("mr/a.txt")));
+        QVERIFY(QFile::exists(L("mr/c.txt")));
+        QVERIFY(!QFile::exists(L("mr/img_1.txt")));
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
     }
 
     void cleanupTestCase()

@@ -52,7 +52,7 @@ Visual check without a display:
 | Num + / Num − / Num * | Mark group / unmark group / invert |
 | F3 / F4 | Built-in viewer / edit (default app; set `tools/editor` in the config for F4) |
 | F5 / F6 | Copy / move to the other panel (`name/` = into that folder) |
-| Shift+F6 | Rename in place |
+| Shift+F6 / Ctrl+M | Rename in place / multi-rename tool |
 | F7 / Shift+F4 | New folder (`a/b/c` creates nested folders) / new file |
 | F8, Del / Shift+F8, Shift+Del | Move to trash / delete permanently |
 | Ctrl+T / Ctrl+W / Ctrl+Tab | New / close / next tab (double-click a tab closes it) |
@@ -63,7 +63,7 @@ Visual check without a display:
 | Ctrl+← / Ctrl+→ | Show folder under cursor in left / right panel |
 | Ctrl+U, Alt+= | Swap panels, same folder in other panel |
 | Ctrl+F3…F6 | Sort by name / extension / date / size |
-| Ctrl+H, Ctrl+M | Hidden files, menu bar |
+| Ctrl+H, Ctrl+Shift+M | Hidden files, menu bar |
 | Ctrl+C / X / V | Clipboard, interoperable with other file managers |
 | Ctrl+Shift+C | Copy full paths as text |
 | Alt+Shift+Enter | Compute all folder sizes |
