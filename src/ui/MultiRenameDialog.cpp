@@ -1,5 +1,6 @@
 #include "ui/MultiRenameDialog.h"
 
+#include "core/Util.h"
 #include "ui/Theme.h"
 
 #include <QCheckBox>
@@ -113,9 +114,9 @@ RenameConfirmDialog::RenameConfirmDialog(const RenamePlan& plan, QWidget* parent
     auto* bottom = new QHBoxLayout;
     auto* summary = new QLabel(this);
     if (plan.problems)
-        summary->setText(tr("%n name(s) can't be used. Edit again to fix them.", nullptr, plan.problems));
+        summary->setText(plural(tr("%n name(s) can't be used. Edit again to fix them.", nullptr, plan.problems), plan.problems));
     else
-        summary->setText(tr("%n item(s) will be renamed", nullptr, plan.changes));
+        summary->setText(plural(tr("%n item(s) will be renamed", nullptr, plan.changes), plan.changes));
     QPalette pal = summary->palette();
     pal.setColor(QPalette::WindowText, plan.problems ? t.error : t.text);
     summary->setPalette(pal);
@@ -145,7 +146,7 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString parentFold
     : QDialog(parent), m_items(std::move(items)), m_parentName(std::move(parentFolderName)),
       m_existing(std::move(existing))
 {
-    setWindowTitle(tr("Multi-rename %n item(s)", nullptr, int(m_items.size())));
+    setWindowTitle(plural(tr("Multi-rename %n item(s)", nullptr, int(m_items.size())), int(m_items.size())));
     resize(900, 620);
 
     auto* layout = new QVBoxLayout(this);
@@ -326,12 +327,12 @@ void MultiRenameDialog::recompute()
         text = m_plan.error;
         color = t.error;
     } else if (m_plan.problems) {
-        text = tr("%n name(s) can't be used — fix the mask or search/replace", nullptr, m_plan.problems);
+        text = plural(tr("%n name(s) can't be used — fix the mask or search/replace", nullptr, m_plan.problems), m_plan.problems);
         color = t.error;
     } else if (m_plan.changes == 0) {
         text = tr("Nothing changes yet");
     } else {
-        text = tr("%n item(s) will be renamed", nullptr, m_plan.changes);
+        text = plural(tr("%n item(s) will be renamed", nullptr, m_plan.changes), m_plan.changes);
         color = t.text;
     }
     m_summary->setText(text);

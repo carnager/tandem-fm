@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/viewer/Previewers.h"
+
 #include <QStringList>
 #include <QWidget>
 
@@ -10,7 +12,9 @@ class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
 class QStackedWidget;
+class QTextBrowser;
 class QToolButton;
+class QTreeWidget;
 
 namespace KSyntaxHighlighting {
 class SyntaxHighlighter;
@@ -43,6 +47,13 @@ public:
     bool isLoading() const { return m_loading; }
     bool usesLargeTextView() const;  // for tests
 
+    PreviewKind kind() const { return m_kind; }
+    QString richInfo() const { return m_richInfo; }
+    QTreeWidget* contentsList() const { return m_list; }
+    QTextBrowser* documentView() const { return m_doc; }
+    // Prepare rich previews of these files in the background (preview column).
+    void preload(const QStringList& paths);
+
     QPlainTextEdit* textEdit() const { return m_text; }
     TextScrollView* largeTextView() const { return m_big; }
     HexView* hexView() const { return m_hex; }
@@ -61,7 +72,9 @@ protected:
 private:
     void setupShortcuts();
     void loadText();
-    void loadImage();
+    void loadRich();
+    void showRich(const RichPreview& r);
+    QSize richMaxSize() const;
     void showMessage(const QString& text);
     void updateStatus();
     void updateModeButtons();
@@ -76,7 +89,9 @@ private:
     QString m_path;
     qint64 m_size = 0;
     QString m_mimeComment;
-    bool m_isImage = false;
+    PreviewKind m_kind = PreviewKind::Text;
+    qint64 m_mtime = 0;
+    QString m_richInfo;
     bool m_binary = false;
     bool m_textLoaded = false;
     bool m_imageLoaded = false;
@@ -93,6 +108,10 @@ private:
     TextScrollView* m_big;
     HexView* m_hex;
     ImageView* m_image;
+    QWidget* m_mediaPage;
+    QLabel* m_info;
+    QTextBrowser* m_doc;
+    QTreeWidget* m_list;
     QLabel* m_message;
     QLabel* m_title;
     QLabel* m_status;

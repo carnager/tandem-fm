@@ -6,6 +6,14 @@
 #include "ui/viewer/ViewerWindow.h"
 
 #include <QApplication>
+#include <QDirIterator>
+#include <QPainter>
+#include <QPdfWriter>
+#include <QProcess>
+#include <QTextBrowser>
+#include <QTreeWidget>
+#include "core/FileOps.h"
+#include "core/Archive.h"
 #include <QImage>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -158,6 +166,99 @@ private slots:
         QVERIFY(::mkfifo(QFile::encodeName(P("pipe")).constData(), 0600) == 0);
         auto w = open({P("pipe")});
         QTRY_VERIFY(!w->isLoading());
+    }
+
+    void jsonIsPrettyPrinted()
+    {
+        writeFile(P("min.json"), R"({"name":"tandem","tags":["fast","files"],"n":3})");
+        auto w = open({P("min.json")});
+        QCOMPARE(w->kind(), PreviewKind::Json);
+        QCOMPARE(w->mode(), ViewerWindow::Mode::Text);
+        QTRY_VERIFY(w->textEdit()->toPlainText().contains("\n    \"tags\": ["));
+    }
+
+    void markdownIsRendered()
+    {
+        writeFile(P("notes.md"), "# Title\n\nSome *emphasis* and a list:\n\n- one\n- two\n");
+        auto w = open({P("notes.md")});
+        QCOMPARE(w->kind(), PreviewKind::Markdown);
+        QCOMPARE(w->mode(), ViewerWindow::Mode::Image);
+        QTRY_VERIFY(w->documentView()->toPlainText().startsWith("Title"));
+        QTest::keyClick(w.get(), Qt::Key_1);  // the source is still there
+        QTRY_VERIFY(w->textEdit()->toPlainText().startsWith("# Title"));
+    }
+
+    void folderAndArchiveContents()
+    {
+        QVERIFY(QDir().mkpath(P("box/inner")));
+        writeFile(P("box/a.txt"), "a");
+        writeFile(P("box/b.txt"), "bb");
+        auto w = open({P("box")});
+        QCOMPARE(w->kind(), PreviewKind::Folder);
+        QTRY_COMPARE(w->contentsList()->topLevelItemCount(), 3);
+        QCOMPARE(w->contentsList()->topLevelItem(0)->text(0), QString("inner"));  // folders first
+        QVERIFY(w->richInfo().contains("1 folders, 2 files"));
+
+        PackJob pack({P("box")}, P("box.zip"));
+        QSignalSpy done(&pack, &Job::finished);
+        pack.start();
+        QVERIFY(done.wait(5000));
+        auto z = open({P("box.zip")});
+        QCOMPARE(z->kind(), PreviewKind::Archive);
+        QTRY_COMPARE(z->contentsList()->topLevelItemCount(), 1);
+        QCOMPARE(z->contentsList()->topLevelItem(0)->text(0), QString("box"));
+        QVERIFY(z->richInfo().contains("2 files"));
+    }
+
+    void pdfFirstPage()
+    {
+        {
+            QPdfWriter pdf(P("doc.pdf"));
+            pdf.setTitle("Tandem test");
+            QPainter p(&pdf);
+            p.drawText(100, 100, "page one");
+            pdf.newPage();
+            p.drawText(100, 100, "page two");
+        }
+        auto w = open({P("doc.pdf")});
+        QCOMPARE(w->kind(), PreviewKind::Pdf);
+        QTRY_VERIFY(!w->imageView()->image().isNull());
+        QVERIFY(w->richInfo().contains("2 pages"));
+        QVERIFY(w->richInfo().contains("Tandem test"));
+    }
+
+    void videoAndAudio()
+    {
+        if (QStandardPaths::findExecutable("ffmpeg").isEmpty() || QStandardPaths::findExecutable("ffprobe").isEmpty())
+            QSKIP("ffmpeg not installed");
+        QCOMPARE(QProcess::execute("ffmpeg", {"-v", "error", "-y", "-f", "lavfi", "-i",
+                                              "testsrc=duration=2:size=320x240:rate=10", "-pix_fmt", "yuv420p",
+                                              P("clip.mp4")}), 0);
+        QCOMPARE(QProcess::execute("ffmpeg", {"-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+                                              "-metadata", "title=Tone", "-metadata", "artist=Tandem", P("tone.mp3")}), 0);
+        auto v = open({P("clip.mp4")});
+        QCOMPARE(v->kind(), PreviewKind::Video);
+        QTRY_VERIFY_WITH_TIMEOUT(!v->imageView()->image().isNull(), 15000);
+        QCOMPARE(v->imageView()->image().size(), QSize(320, 240));
+        QVERIFY(v->richInfo().contains("320 × 240"));
+        auto a = open({P("tone.mp3")});
+        QCOMPARE(a->kind(), PreviewKind::Audio);
+        QTRY_VERIFY_WITH_TIMEOUT(a->richInfo().contains("Tandem — Tone"), 15000);
+    }
+
+    void fontSample()
+    {
+        QString font;
+        QDirIterator it("/usr/share/fonts", {"*.ttf", "*.otf"}, QDir::Files, QDirIterator::Subdirectories);
+        if (it.hasNext())
+            font = it.next();
+        if (font.isEmpty())
+            QSKIP("no font files found");
+        QFile::copy(font, P("sample") + font.mid(font.lastIndexOf('.')));
+        auto w = open({P("sample") + font.mid(font.lastIndexOf('.'))});
+        QCOMPARE(w->kind(), PreviewKind::Font);
+        QTRY_VERIFY(!w->imageView()->image().isNull());
+        QVERIFY(!w->richInfo().isEmpty());  // family name
     }
 
     void escapeCloses()

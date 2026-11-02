@@ -8,7 +8,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets DBus Test)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets DBus Pdf Test)
 qt_standard_project_setup()
 
 # Core engine: filesystem access, jobs, watching. QtCore only, no UI.
@@ -57,8 +57,9 @@ add_library(tandem_ui STATIC
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp
   src/ui/viewer/ViewerWindow.h src/ui/viewer/ViewerWindow.cpp
+  src/ui/viewer/Previewers.h src/ui/viewer/Previewers.cpp
 )
-target_link_libraries(tandem_ui PUBLIC tandem_core Qt6::Widgets Qt6::DBus)
+target_link_libraries(tandem_ui PUBLIC tandem_core Qt6::Widgets Qt6::DBus Qt6::Pdf)
 
 # Optional: syntax highlighting in the viewer (KDE's KSyntaxHighlighting).
 find_package(KF6SyntaxHighlighting QUIET)

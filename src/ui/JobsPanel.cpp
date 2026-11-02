@@ -130,7 +130,7 @@ void JobRow::refresh()
         state = s.paused ? tr("paused") : QString();
         break;
     case Job::State::Done:
-        state = s.errorCount ? tr("finished with %n problem(s)", nullptr, s.errorCount) : tr("done");
+        state = s.errorCount ? plural(tr("finished with %n problem(s)", nullptr, s.errorCount), s.errorCount) : tr("done");
         break;
     case Job::State::Failed:
         state = tr("failed");
@@ -423,7 +423,7 @@ void JobsPanel::updatePill()
     else if (running > 1)
         text = tr("%1 operations  %2%").arg(running).arg(int(fraction * 100));
     else if (problems)
-        text = tr("%n problem(s): click to see", nullptr, problems);
+        text = plural(tr("%n problem(s): click to see", nullptr, problems), problems);
     else
         text = tr("Done");
     if (queued)

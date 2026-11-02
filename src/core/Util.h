@@ -24,6 +24,12 @@ void postToUi(F&& f)
 QThreadPool* ioPool();
 
 QString formatSize(int64_t bytes);
+// "%n item(s)" strings: there are no translation files, so Qt leaves "(s)"
+// in place; this picks the English plural instead.
+inline QString plural(QString text, qint64 n)
+{
+    return text.replace(QLatin1String("(s)"), n == 1 ? QString() : QStringLiteral("s"));
+}
 QString formatSpeed(double bytesPerSec);
 QString formatDuration(int64_t seconds);
 QString errnoString(int err);

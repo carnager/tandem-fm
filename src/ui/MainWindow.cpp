@@ -644,7 +644,7 @@ void MainWindow::copyPathsAsText()
     if (paths.isEmpty())
         return;
     QApplication::clipboard()->setText(paths.join(QLatin1Char('\n')));
-    active()->showMessage(tr("Copied %n path(s)", nullptr, int(paths.size())));
+    active()->showMessage(plural(tr("Copied %n path(s)", nullptr, int(paths.size())), int(paths.size())));
 }
 
 void MainWindow::paste()
@@ -771,12 +771,20 @@ void MainWindow::updateQuickView()
     const FileEntry* e = p->currentEntry();
     if (!e || e->isParent) {
         m_quickView->showNote(tr("Preview: move the cursor onto a file"));
-    } else if (e->isDir) {
-        m_quickView->showNote(tr("Folder “%1”\n\nSpace calculates its size").arg(e->name));
     } else if (p->inArchive()) {
         m_quickView->showNote(tr("“%1” is inside an archive\n\nF3 opens it in the viewer").arg(e->name));
     } else if (m_quickView->currentPath() != p->currentPath()) {
         m_quickView->showFile(p->currentPath());
+        // Prepare the neighbours, so moving on is instant (like yazi's preloaders).
+        const FileModel* m = p->tab()->model();
+        const int row = p->view()->currentRow();
+        QStringList around;
+        for (int r : {row + 1, row + 2, row - 1, row + 3}) {
+            const FileEntry* n = m->entry(r);
+            if (n && !n->isDir && !n->isParent)
+                around.append(m->filePath(r));
+        }
+        m_quickView->preload(around);
     }
 }
 
@@ -1074,14 +1082,14 @@ void MainWindow::runRenamePlan(Panel* p, const RenamePlan& plan)
             undo.kind = UndoEntry::Kind::Rename;
             undo.dir = dir;
             undo.pairs = done;
-            undo.description = tr("rename of %n item(s)", nullptr, int(done.size()));
+            undo.description = plural(tr("rename of %n item(s)", nullptr, int(done.size())), int(done.size()));
             self->pushUndo(undo);
             if (!panel)
                 return;
             if (!errors.isEmpty())
-                panel->showMessage(tr("%n rename(s) failed: %1", nullptr, int(errors.size())).arg(errors.first()), true);
+                panel->showMessage(plural(tr("%n rename(s) failed: %1", nullptr, int(errors.size())), int(errors.size())).arg(errors.first()), true);
             else
-                panel->showMessage(tr("Renamed %n item(s). Ctrl+Z undoes it.", nullptr, int(done.size())));
+                panel->showMessage(plural(tr("Renamed %n item(s). Ctrl+Z undoes it.", nullptr, int(done.size())), int(done.size())));
             if (!done.isEmpty())
                 panel->expectName(done.first().first);
             panel->unmarkAll();
@@ -1103,11 +1111,11 @@ void MainWindow::notifyFinished(Job* job)
     if (s.state == Job::State::Cancelled) {
         summary = tr("%1 cancelled").arg(job->title());
     } else if (s.errorCount) {
-        summary = tr("%1 finished with %n problem(s)", nullptr, s.errorCount).arg(job->title());
+        summary = plural(tr("%1 finished with %n problem(s)", nullptr, s.errorCount), s.errorCount).arg(job->title());
         body = job->errors().constFirst();
     } else {
         summary = tr("%1 finished").arg(job->title());
-        body = tr("%n item(s)", nullptr, int(s.filesDone));
+        body = plural(tr("%n item(s)", nullptr, int(s.filesDone)), int(s.filesDone));
         if (s.bytesDone > 0)
             body += QStringLiteral(" · ") + formatSize(s.bytesDone);
         body += QStringLiteral(" · ") + formatDuration(took / 1000);
@@ -1148,7 +1156,7 @@ void MainWindow::recordJobUndo(Job* job)
         return;
     UndoEntry e;
     e.pairs = records;
-    const QString what = tr("%n item(s)", nullptr, int(records.size()));
+    const QString what = plural(tr("%n item(s)", nullptr, int(records.size())), int(records.size()));
     if (auto* c = dynamic_cast<CopyJob*>(job)) {
         e.kind = c->mode() == CopyJob::Mode::Move ? UndoEntry::Kind::Move : UndoEntry::Kind::Copy;
         e.description = (c->mode() == CopyJob::Mode::Move ? tr("move %1") : tr("copy %1")).arg(what);
@@ -1604,7 +1612,7 @@ void MainWindow::closeEvent(QCloseEvent* e)
     if (m_jobs->runningCount() > 0) {
         const auto answer = QMessageBox::question(
             this, tr("Operations running"),
-            tr("%n operation(s) still running. Cancel them and quit?", nullptr, m_jobs->runningCount()));
+            plural(tr("%n operation(s) still running. Cancel them and quit?", nullptr, m_jobs->runningCount()), m_jobs->runningCount()));
         if (answer != QMessageBox::Yes) {
             e->ignore();
             return;

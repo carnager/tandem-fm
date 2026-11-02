@@ -1,5 +1,6 @@
 #include "ui/EditNames.h"
 
+#include "core/Util.h"
 #include "core/DesktopApps.h"
 #include "ui/MultiRenameDialog.h"
 
@@ -101,7 +102,7 @@ void EditNamesSession::openEditor()
         emit message(tr("Could not start %1").arg(argv.first()), true);
         finish();
     });
-    emit message(tr("Editing %n name(s) in %1 — save and quit to continue", nullptr, int(m_items.size()))
+    emit message(plural(tr("Editing %n name(s) in %1 — save and quit to continue", nullptr, int(m_items.size())), int(m_items.size()))
                      .arg(QFileInfo(argv.first()).fileName()),
                  false);
     m_clock.start();

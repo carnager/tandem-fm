@@ -22,7 +22,11 @@
 #include <QShortcut>
 #include <QStackedWidget>
 #include <QStringDecoder>
+#include <QHeaderView>
+#include <QJsonDocument>
 #include <QTextBlock>
+#include <QTextBrowser>
+#include <QTreeWidget>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -49,6 +53,7 @@ struct Head {
     QString mimeComment;
     bool isDir = false;
     bool isSpecial = false;
+    qint64 mtime = 0;
 };
 
 Head readHead(const QString& path)
@@ -64,6 +69,7 @@ Head readHead(const QString& path)
     struct stat st;
     if (::fstat(fd, &st) == 0) {
         h.size = st.st_size;
+        h.mtime = st.st_mtime;
         h.isDir = S_ISDIR(st.st_mode);
         h.isSpecial = !S_ISREG(st.st_mode) && !h.isDir;
     }
@@ -85,11 +91,18 @@ Head readHead(const QString& path)
     return h;
 }
 
-bool looksBinary(const QByteArray& head)
-{
-    // NUL bytes are the classic tell; UTF-16 text is rare enough to ignore.
-    return head.contains('\0');
-}
+// Markdown without fetching images: loading them would read files on the
+// UI thread (and remote ones not at all). Alt text shows instead.
+class DocBrowser : public QTextBrowser {
+public:
+    using QTextBrowser::QTextBrowser;
+    QVariant loadResource(int type, const QUrl& name) override
+    {
+        if (type == QTextDocument::ImageResource)
+            return {};
+        return QTextBrowser::loadResource(type, name);
+    }
+};
 
 #ifdef TANDEM_HAVE_KSYNTAXHIGHLIGHTING
 KSyntaxHighlighting::Repository& repository()
@@ -141,7 +154,7 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     };
     m_textButton = makeButton(tr("Text"), tr("Text (1)"));
     m_hexButton = makeButton(tr("Hex"), tr("Hex (3)"));
-    m_imageButton = makeButton(tr("Image"), tr("Image (4)"));
+    m_imageButton = makeButton(tr("Image"), tr("Image, page, frame, contents… (4)"));
     tl->addSpacing(8);
     m_wrapButton = makeButton(tr("Wrap"), tr("Wrap long lines (W)"));
     connect(m_textButton, &QToolButton::clicked, this, [this] { setMode(Mode::Text); });
@@ -164,12 +177,40 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_text->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
     m_big = new TextScrollView(m_stack);
     m_hex = new HexView(m_stack);
-    m_image = new ImageView(m_stack);
+    m_mediaPage = new QWidget(m_stack);
+    auto* ml = new QVBoxLayout(m_mediaPage);
+    ml->setContentsMargins(0, 0, 0, 0);
+    ml->setSpacing(0);
+    m_image = new ImageView(m_mediaPage);
+    m_info = new QLabel(m_mediaPage);
+    m_info->setWordWrap(true);
+    m_info->setTextFormat(Qt::PlainText);
+    m_info->setContentsMargins(12, 8, 12, 8);
+    m_info->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_info->setStyleSheet(t.css(QStringLiteral("color: @text; background: @header; border-top: 1px solid @border;")));
+    ml->addWidget(m_image, 1);
+    ml->addWidget(m_info);
+    m_doc = new DocBrowser(m_stack);
+    m_doc->setFrameShape(QFrame::NoFrame);
+    m_doc->setOpenExternalLinks(true);
+    m_doc->document()->setDocumentMargin(16);
+    m_list = new QTreeWidget(m_stack);
+    m_list->setColumnCount(2);
+    m_list->setHeaderHidden(true);
+    m_list->setRootIsDecorated(false);
+    m_list->setFrameShape(QFrame::NoFrame);
+    m_list->setFocusPolicy(Qt::NoFocus);
+    m_list->setUniformRowHeights(true);
+    m_list->setSelectionMode(QAbstractItemView::NoSelection);
+    m_list->header()->setStretchLastSection(false);
+    m_list->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     m_message = new QLabel(m_stack);
     m_message->setAlignment(Qt::AlignCenter);
     m_message->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
     for (QWidget* w : {static_cast<QWidget*>(m_text), static_cast<QWidget*>(m_big), static_cast<QWidget*>(m_hex),
-                       static_cast<QWidget*>(m_image), static_cast<QWidget*>(m_message)})
+                       m_mediaPage, static_cast<QWidget*>(m_doc), static_cast<QWidget*>(m_list),
+                       static_cast<QWidget*>(m_message)})
         m_stack->addWidget(w);
     layout->addWidget(m_stack, 1);
 
@@ -341,27 +382,30 @@ void ViewerWindow::openIndex(int index)
                 emit w->loaded();
                 return;
             }
-            if (head->isDir || head->isSpecial) {
+            w->m_kind = classifyPreview(w->m_path, head->mimeName, head->isDir, head->isSpecial, head->bytes);
+            if (w->m_kind == PreviewKind::Special) {
                 w->m_loading = false;
-                w->showMessage(head->isDir ? tr("This is a folder.") : tr("This is a device, pipe or socket."));
+                w->showMessage(tr("This is a device, pipe or socket."));
                 emit w->loaded();
                 return;
             }
             w->m_size = head->size;
-            w->m_mimeComment = head->mimeComment;
-            w->m_isImage = QImageReader::supportedMimeTypes().contains(head->mimeName.toLatin1());
-            w->m_binary = looksBinary(head->bytes);
-            w->m_cache = new BlockCache(w->m_path, w->m_size, w);
-            connect(w->m_cache, &BlockCache::failed, w,
-                    [w](const QString& err) { w->showMessage(tr("Read error: %1").arg(err)); });
-            w->setMode(w->m_isImage ? Mode::Image : (w->m_binary ? Mode::Hex : Mode::Text));
+            w->m_mtime = head->mtime;
+            w->m_mimeComment = head->isDir ? tr("Folder") : head->mimeComment;
+            w->m_binary = w->m_kind == PreviewKind::Binary;
+            if (w->m_kind != PreviewKind::Folder) {
+                w->m_cache = new BlockCache(w->m_path, w->m_size, w);
+                connect(w->m_cache, &BlockCache::failed, w,
+                        [w](const QString& err) { w->showMessage(tr("Read error: %1").arg(err)); });
+            }
+            w->setMode(hasRichView(w->m_kind) ? Mode::Image : (w->m_binary ? Mode::Hex : Mode::Text));
         });
     });
 }
 
 void ViewerWindow::setMode(Mode mode)
 {
-    if (!m_cache || (mode == Mode::Image && !m_isImage))
+    if (mode == Mode::Image ? !hasRichView(m_kind) : !m_cache)
         return;
     m_mode = mode;
     updateModeButtons();
@@ -392,13 +436,7 @@ void ViewerWindow::setMode(Mode mode)
         emit loaded();
         break;
     case Mode::Image:
-        if (m_imageLoaded) {
-            m_stack->setCurrentWidget(m_image);
-            if (!m_embedded)
-                m_image->setFocus();
-        } else {
-            loadImage();
-        }
+        loadRich();
         break;
     case Mode::None:
         break;
@@ -412,13 +450,19 @@ void ViewerWindow::loadText()
     m_loading = true;
     const quint64 gen = m_gen;
     const QString path = m_path;
+    const bool json = m_kind == PreviewKind::Json;
     QPointer<ViewerWindow> self(this);
-    ioPool()->start([self, gen, path] {
+    ioPool()->start([self, gen, path, json] {
         QFile f(path);
         QString text, encoding = QStringLiteral("UTF-8");
         QString error;
         if (f.open(QIODevice::ReadOnly)) {
-            const QByteArray data = f.read(kSmallText + 1);
+            QByteArray data = f.read(kSmallText + 1);
+            if (json && data.size() <= kSmallText) {
+                const QJsonDocument doc = QJsonDocument::fromJson(data);
+                if (!doc.isNull())
+                    data = doc.toJson(QJsonDocument::Indented);  // minified JSON becomes readable
+            }
             QStringDecoder utf8(QStringDecoder::Utf8);
             text = utf8.decode(data);
             if (utf8.hasError()) {
@@ -446,7 +490,9 @@ void ViewerWindow::loadText()
             w->m_text->setPlainText(text);
 #ifdef TANDEM_HAVE_KSYNTAXHIGHLIGHTING
             if (w->m_size <= kHighlightMax) {
-                const auto def = repository().definitionForFileName(w->m_path);
+                auto def = repository().definitionForFileName(w->m_path);
+                if (!def.isValid() && w->m_kind == PreviewKind::Json)
+                    def = repository().definitionForName(QStringLiteral("JSON"));
                 if (def.isValid()) {
                     w->m_highlighter = new KSyntaxHighlighting::SyntaxHighlighter(w->m_text->document());
                     w->m_highlighter->setTheme(repository().defaultTheme(
@@ -468,40 +514,123 @@ void ViewerWindow::loadText()
     });
 }
 
-void ViewerWindow::loadImage()
+QSize ViewerWindow::richMaxSize() const
 {
-    showMessage(tr("Loading…"));
+    // The preview column never needs more than this; F3 shows images in full.
+    return m_embedded ? QSize(1600, 1600) : QSize();
+}
+
+void ViewerWindow::loadRich()
+{
+    const QString key = PreviewCache::key(m_path, m_mtime, m_size, richMaxSize());
+    if (auto cached = PreviewCache::instance().get(key)) {
+        showRich(*cached);
+        return;
+    }
+    showMessage(m_kind == PreviewKind::Video || m_kind == PreviewKind::Audio ? tr("Reading media…") : tr("Loading…"));
     m_loading = true;
     const quint64 gen = m_gen;
     const QString path = m_path;
+    const PreviewKind kind = m_kind;
+    const QSize maxSize = richMaxSize();
     QPointer<ViewerWindow> self(this);
-    ioPool()->start([self, gen, path] {
-        QImageReader reader(path);
-        reader.setAutoTransform(true);  // EXIF rotation
-        reader.setAllocationLimit(1024);  // MiB
-        const QImage img = reader.read();
-        const QString error = img.isNull() ? reader.errorString() : QString();
-        postToUi([self, gen, img, error] {
-            if (!self || gen != self->m_gen)
-                return;
-            ViewerWindow* w = self.data();
-            w->m_loading = false;
-            if (img.isNull()) {
-                w->showMessage(tr("Cannot show image: %1").arg(error));
-                emit w->loaded();
-                return;
-            }
-            w->m_imageLoaded = true;
-            w->m_image->setImage(img);
-            if (w->m_mode == Mode::Image) {
-                w->m_stack->setCurrentWidget(w->m_image);
-                if (!w->m_embedded)
-                    w->m_image->setFocus();
-            }
-            w->updateStatus();
-            emit w->loaded();
+    PreviewCache::instance().beginLoad(key);
+    mediaPool()->start([self, gen, path, kind, maxSize, key] {
+        auto result = std::make_shared<RichPreview>(produceRichPreview(path, kind, maxSize));
+        postToUi([self, gen, key, result] {
+            PreviewCache::instance().endLoad(key);
+            if (result->error.isEmpty())
+                PreviewCache::instance().put(key, result);
+            if (self && gen == self->m_gen && self->m_mode == Mode::Image)
+                self->showRich(*result);
         });
     });
+}
+
+void ViewerWindow::showRich(const RichPreview& r)
+{
+    m_loading = false;
+    m_imageLoaded = true;
+    if (!r.error.isEmpty()) {
+        showMessage(r.error);
+        emit loaded();
+        return;
+    }
+    m_richInfo = r.info;
+    QWidget* page = m_mediaPage;
+    switch (m_kind) {
+    case PreviewKind::Markdown:
+        m_doc->setMarkdown(r.markdown);
+        page = m_doc;
+        break;
+    case PreviewKind::Folder:
+    case PreviewKind::Archive: {
+        m_list->clear();
+        QList<QTreeWidgetItem*> items;
+        for (const RichPreview::Item& it : r.items) {
+            FileEntry e;
+            e.name = it.name;
+            e.isDir = it.isDir;
+            e.mode = it.mode;
+            auto* row = new QTreeWidgetItem({it.name, it.isDir ? QString() : formatSize(it.size)});
+            row->setIcon(0, IconCache::forEntry(e));
+            row->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+            items.append(row);
+        }
+        m_list->addTopLevelItems(items);
+        if (r.items.isEmpty())
+            m_list->addTopLevelItem(new QTreeWidgetItem({tr("(empty)")}));
+        page = m_list;
+        break;
+    }
+    case PreviewKind::Font: {
+        QString family;
+        m_image->setImage(renderFontSample(r.fontData, &family));
+        m_richInfo = family;
+        m_info->setText(family);
+        m_info->setVisible(!family.isEmpty());
+        break;
+    }
+    default:
+        m_image->setImage(r.image);
+        m_info->setText(r.info);
+        m_info->setVisible(!r.info.isEmpty());
+        if (r.image.isNull() && !r.info.isEmpty() && m_kind != PreviewKind::Image)
+            m_image->setImage({});  // audio without cover: just the details
+        break;
+    }
+    if (m_mode == Mode::Image) {
+        m_stack->setCurrentWidget(page);
+        if (!m_embedded)
+            page->setFocus();
+    }
+    updateStatus();
+    emit loaded();
+}
+
+void ViewerWindow::preload(const QStringList& paths)
+{
+    const QSize maxSize = richMaxSize();
+    for (const QString& path : paths) {
+        QPointer<ViewerWindow> self(this);
+        mediaPool()->start([self, path, maxSize] {
+            const Head head = readHead(path);
+            if (head.error || head.isDir)
+                return;
+            const PreviewKind kind = classifyPreview(path, head.mimeName, false, head.isSpecial, head.bytes);
+            // Only what's slow to make is worth preparing ahead.
+            if (kind != PreviewKind::Image && kind != PreviewKind::Pdf && kind != PreviewKind::Video &&
+                kind != PreviewKind::Audio)
+                return;
+            const QString key = PreviewCache::key(path, head.mtime, head.size, maxSize);
+            if (!PreviewCache::instance().beginLoad(key))
+                return;
+            auto result = std::make_shared<RichPreview>(produceRichPreview(path, kind, maxSize));
+            if (result->error.isEmpty())
+                PreviewCache::instance().put(key, result);
+            PreviewCache::instance().endLoad(key);
+        });
+    }
 }
 
 void ViewerWindow::showMessage(const QString& text)
@@ -522,14 +651,18 @@ void ViewerWindow::updateModeButtons()
     m_textButton->setChecked(m_mode == Mode::Text);
     m_hexButton->setChecked(m_mode == Mode::Hex);
     m_imageButton->setChecked(m_mode == Mode::Image);
-    m_imageButton->setVisible(m_isImage);
+    m_imageButton->setVisible(hasRichView(m_kind));
+    m_imageButton->setText(richViewLabel(m_kind));
+    m_textButton->setVisible(m_cache != nullptr);
+    m_hexButton->setVisible(m_cache != nullptr);
     m_wrapButton->setVisible(m_mode == Mode::Text);
 }
 
 void ViewerWindow::updateStatus()
 {
     QStringList parts;
-    parts << formatSize(m_size);
+    if (m_kind != PreviewKind::Folder)
+        parts << formatSize(m_size);
     if (!m_mimeComment.isEmpty())
         parts << m_mimeComment;
     switch (m_mode) {
@@ -544,9 +677,13 @@ void ViewerWindow::updateStatus()
         parts << tr("offset %1").arg(m_hex->topOffset(), 0, 16) << tr("%1%").arg(int(m_hex->position() * 100));
         break;
     case Mode::Image:
-        if (!m_image->image().isNull())
-            parts << QStringLiteral("%1 × %2").arg(m_image->image().width()).arg(m_image->image().height())
-                  << tr("%1%").arg(qRound(m_image->scale() * 100));
+        if (m_kind == PreviewKind::Image) {
+            if (!m_richInfo.isEmpty())
+                parts << m_richInfo;  // original dimensions, even when decoded smaller
+            parts << tr("%1%").arg(qRound(m_image->scale() * 100));
+        } else if (m_kind == PreviewKind::Folder || m_kind == PreviewKind::Archive) {
+            parts << m_richInfo;
+        }
         break;
     case Mode::None:
         break;

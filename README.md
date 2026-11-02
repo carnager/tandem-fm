@@ -125,12 +125,17 @@ follows the extension. Archives are read-only for now: deleting, renaming or
 adding inside an existing archive comes later. Member paths with `..` and
 writes through links the archive itself created are refused.
 
-## Viewer (F3)
+## Viewer (F3) and preview column (Ctrl+Q)
 
-Text with syntax highlighting (KSyntaxHighlighting, optional; files up to 1 MiB),
+Both show the same things: text with syntax highlighting (KSyntaxHighlighting, optional; files up to 1 MiB),
 text of any size (only the visible part is read, so multi-GB logs open
 instantly), hex, and images (every format Qt and kimageformats support: AVIF,
-HEIF, JXL, WebP, RAW, PSD…). All reads happen off the UI thread.
+HEIF, JXL, WebP, RAW, PSD…), PDFs (first page, page count, title; QtPdf),
+video (a frame 10 % in, resolution, codec, length; ffmpeg), audio (tags,
+cover art, format; ffmpeg), fonts (a sample sheet), Markdown (rendered),
+JSON (pretty-printed), folders and archives (their contents). Media previews
+run on their own small pool; the preview column prepares the next files
+ahead and caches the results. All reads happen off the UI thread.
 
 | Key | Action |
 |---|---|
