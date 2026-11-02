@@ -137,6 +137,7 @@ void CopyJob::run()
                 const int e = moveNoReplace(it.first, it.second);
                 if (e == 0) {
                     m_filesDone += 1;
+                    recordUndo(fromNative(it.second), fromNative(it.first));
                 } else if (e == EXDEV || e == EEXIST) {
                     if (e == EXDEV)
                         m_crossDevice = true;
@@ -173,7 +174,17 @@ void CopyJob::run()
     setState(State::Running);
 
     for (const auto& it : items) {
-        processItem(it.first, it.second);
+        // Only things that didn't exist before are undoable: undoing a merge
+        // or an overwrite could destroy data that was there first.
+        struct stat st;
+        const bool existed = ::lstat(it.second.constData(), &st) == 0;
+        const bool ok = processItem(it.first, it.second);
+        if (!existed && ::lstat(it.second.constData(), &st) == 0) {
+            if (m_mode == Mode::Copy)
+                recordUndo(fromNative(it.second));
+            else if (ok)
+                recordUndo(fromNative(it.second), fromNative(it.first));
+        }
         if (isCancelled())
             return;
     }
@@ -606,7 +617,9 @@ void DeleteJob::run()
             removeTree(toNative(p));
             continue;
         }
-        if (QFile::moveToTrash(p)) {
+        QString inTrash;
+        if (QFile::moveToTrash(p, &inTrash)) {
+            recordUndo(inTrash, p);
             m_filesDone += 1;
             continue;
         }

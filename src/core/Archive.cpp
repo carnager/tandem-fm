@@ -721,10 +721,13 @@ void PackJob::run()
             setState(State::Failed);
         return;
     }
+    const bool replaced = ::lstat(target.constData(), &existing) == 0;
     if (::rename(part.constData(), target.constData()) != 0) {
         askError(tr("Cannot create archive"), m_archive, errno);
         ::unlink(part.constData());
         setState(State::Failed);
+    } else if (!replaced) {
+        recordUndo(fromNative(target));
     }
 }
 

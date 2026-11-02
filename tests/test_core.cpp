@@ -2,6 +2,7 @@
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
+#include "core/Undo.h"
 #include "core/FolderHistory.h"
 #include "core/Fuzzy.h"
 #include "core/IoScheduler.h"
@@ -632,6 +633,50 @@ private slots:
         h.forget("/a");
         QCOMPARE(h.items().size(), 1);
         QVERIFY(FolderHistory::frecency(10, 0, 30) > FolderHistory::frecency(10, 0, 30 * 86400));
+    }
+
+    void undoRecords()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("src/d")));
+        QVERIFY(QDir().mkpath(tmp.filePath("dst/d")));  // merge target: not undoable
+        writeFile(tmp.filePath("src/f"), "f");
+        writeFile(tmp.filePath("src/d/x"), "x");
+
+        CopyJob copy(CopyJob::Mode::Copy, {tmp.filePath("src/f"), tmp.filePath("src/d")}, tmp.filePath("dst"));
+        QVERIFY(runJob(copy));
+        QCOMPARE(copy.undoRecords(), (QList<QPair<QString, QString>>{{tmp.filePath("dst/f"), QString()}}));
+
+        QVERIFY(QDir().mkdir(tmp.filePath("moved")));
+        CopyJob move(CopyJob::Mode::Move, {tmp.filePath("src/f")}, tmp.filePath("moved"));
+        QVERIFY(runJob(move));
+        QCOMPARE(move.undoRecords(),
+                 (QList<QPair<QString, QString>>{{tmp.filePath("moved/f"), tmp.filePath("src/f")}}));
+
+        // Trash and restore, inside a private XDG_DATA_HOME on the same filesystem.
+        const QByteArray oldData = qgetenv("XDG_DATA_HOME");
+        qputenv("XDG_DATA_HOME", QFile::encodeName(tmp.filePath("data")));
+        QVERIFY(QDir().mkpath(tmp.filePath("data")));
+        writeFile(tmp.filePath("trashme"), "t");
+        DeleteJob trash({tmp.filePath("trashme")}, true);
+        QVERIFY(runJob(trash));
+        const auto recs = trash.undoRecords();
+        QCOMPARE(recs.size(), 1);
+        QVERIFY(!QFile::exists(tmp.filePath("trashme")));
+        QVERIFY(QFile::exists(recs.first().first));
+        QVERIFY(restoreFromTrash(recs).isEmpty());
+        QCOMPARE(readFile(tmp.filePath("trashme")), QByteArray("t"));
+        QVERIFY(!QFile::exists(recs.first().first));
+        qputenv("XDG_DATA_HOME", oldData);
+
+        // New folders go away only while empty.
+        QVERIFY(QDir().mkpath(tmp.filePath("new/a/b")));
+        QVERIFY(QDir().mkpath(tmp.filePath("full")));
+        writeFile(tmp.filePath("full/keep"), "k");
+        const QStringList errors = removeIfStillEmpty({tmp.filePath("new"), tmp.filePath("full")});
+        QCOMPARE(errors.size(), 1);
+        QVERIFY(!QFile::exists(tmp.filePath("new")));
+        QVERIFY(QFile::exists(tmp.filePath("full/keep")));
     }
 
     void helpers()

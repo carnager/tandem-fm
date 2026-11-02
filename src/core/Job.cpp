@@ -109,6 +109,18 @@ void Job::setCurrent(const QString& s)
     m_current = s;
 }
 
+QList<QPair<QString, QString>> Job::undoRecords() const
+{
+    QMutexLocker lock(&m_textMutex);
+    return m_undo;
+}
+
+void Job::recordUndo(const QString& now, const QString& before)
+{
+    QMutexLocker lock(&m_textMutex);
+    m_undo.append({now, before});
+}
+
 void Job::addError(const QString& e)
 {
     QMutexLocker lock(&m_textMutex);

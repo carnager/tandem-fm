@@ -27,6 +27,7 @@
 #include <QDialog>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
@@ -155,10 +156,15 @@ MainWindow::MainWindow(const QStringList& startPaths)
                         handleDrop(urls, dir, action);
                 });
         connect(p, &Panel::contextMenuRequested, this, &MainWindow::showContextMenu);
+        connect(p, &Panel::renamed, this, [this](const QString& dir, const QString& from, const QString& to) {
+            pushUndo({UndoEntry::Kind::Rename, tr("rename of %1").arg(from), dir, {{to, from}}});
+        });
     }
     // Directories without inotify (some FUSE/network mounts) need a manual
     // refresh once an operation that touched them is done.
-    connect(m_jobs, &JobManager::jobFinished, this, [this] {
+    connect(m_jobs, &JobManager::jobFinished, this, [this](Job* job) {
+        if (!job->property("isUndo").toBool())
+            recordJobUndo(job);
         for (Panel* p : {m_left, m_right})
             if (p->tab() && !p->tab()->isWatched())
                 p->refresh();
@@ -228,9 +234,8 @@ void MainWindow::createMenus()
         addCommand(files, tr("Multi-rename…"), {K(Qt::CTRL | Qt::Key_M)}, [this] { multiRename(); });
     m_actions[QStringLiteral("editorRename")] =
         addCommand(files, tr("Rename in text editor…"), {K(Qt::CTRL | Qt::Key_E)}, [this] { renameInEditor(); });
-    m_actions[QStringLiteral("undoRename")] =
-        addCommand(files, tr("Undo last multi-rename"), {}, [this] { undoMultiRename(); });
-    m_actions[QStringLiteral("undoRename")]->setEnabled(false);
+    m_actions[QStringLiteral("undo")] = addCommand(files, tr("Undo"), {K(Qt::CTRL | Qt::Key_Z)}, [this] { undo(); });
+    m_actions[QStringLiteral("undo")]->setEnabled(false);
     m_actions[QStringLiteral("mkfile")] =
         addCommand(files, tr("New file…"), {K(Qt::SHIFT | Qt::Key_F4)}, [this] { makeFile(); });
     m_actions[QStringLiteral("mkdir")] = addCommand(files, tr("New folder…"), {K(Qt::Key_F7)}, [this] { makeFolder(); });
@@ -439,9 +444,19 @@ void MainWindow::makeFolder()
     const QString full = name.startsWith(QLatin1Char('/')) ? name : joinPath(p->path(), name);
     const QString first = name.section(QLatin1Char('/'), 0, 0, QString::SectionSkipEmpty);
     QPointer<Panel> panel(p);
-    ioPool()->start([panel, full, first] {
+    QPointer<MainWindow> self(this);
+    ioPool()->start([self, panel, full, first] {
+        // For undo: the topmost folder that didn't exist yet.
+        QString topNew = full;
+        for (QString q = full; q != QLatin1String("/") && !q.isEmpty(); q = parentPath(q)) {
+            if (QFileInfo::exists(q))
+                break;
+            topNew = q;
+        }
         const int err = makeDirectories(full);
-        postToUi([panel, err, full, first] {
+        postToUi([self, panel, err, full, first, topNew] {
+            if (self && !err)
+                self->pushUndo({UndoEntry::Kind::Create, tr("new folder %1").arg(baseName(topNew)), {}, {{topNew, {}}}});
             if (!panel)
                 return;
             if (err)
@@ -638,6 +653,7 @@ void MainWindow::showShortcuts()
         {"Ctrl+H", "Show hidden files"},
         {"Ctrl+C / X / V", "Clipboard (works with other apps)"},
         {"Alt+Shift+Enter", "Calculate all folder sizes"},
+        {"Ctrl+Z", "Undo the last operation (move, copy, trash, rename, new folder)"},
         {"Ctrl+Alt+T", "Open terminal here"},
         {"Alt+F5 / Alt+F9", "Pack / unpack archives"},
         {"Ctrl+PgDn", "Enter folder, or browse any file as archive"},
@@ -954,15 +970,18 @@ void MainWindow::runRenamePlan(Panel* p, const RenamePlan& plan)
         postToUi([self, panel, done, errors, dir] {
             if (!self)
                 return;
-            self->m_lastRename = {dir, done};
-            self->m_actions.value(QStringLiteral("undoRename"))->setEnabled(!done.isEmpty());
+            UndoEntry undo;
+            undo.kind = UndoEntry::Kind::Rename;
+            undo.dir = dir;
+            undo.pairs = done;
+            undo.description = tr("rename of %n item(s)", nullptr, int(done.size()));
+            self->pushUndo(undo);
             if (!panel)
                 return;
             if (!errors.isEmpty())
                 panel->showMessage(tr("%n rename(s) failed: %1", nullptr, int(errors.size())).arg(errors.first()), true);
             else
-                panel->showMessage(tr("Renamed %n item(s). Undo: Files → Undo last multi-rename", nullptr,
-                                      int(done.size())));
+                panel->showMessage(tr("Renamed %n item(s). Ctrl+Z undoes it.", nullptr, int(done.size())));
             if (!done.isEmpty())
                 panel->expectName(done.first().first);
             panel->unmarkAll();
@@ -970,29 +989,124 @@ void MainWindow::runRenamePlan(Panel* p, const RenamePlan& plan)
     });
 }
 
-void MainWindow::undoMultiRename()
+// --------------------------------------------------------------------- undo
+
+void MainWindow::pushUndo(UndoEntry entry)
 {
-    if (m_lastRename.pairs.isEmpty())
+    if (entry.pairs.isEmpty())
         return;
-    RenamePlan plan;
-    for (const auto& [now, before] : std::as_const(m_lastRename.pairs))
-        plan.rows.append({now, before, RenameRow::Status::Ok, {}});
-    const QString dir = m_lastRename.dir;
-    m_lastRename = {};
-    m_actions.value(QStringLiteral("undoRename"))->setEnabled(false);
+    m_undo.append(std::move(entry));
+    while (m_undo.size() > 50)
+        m_undo.removeFirst();
+    updateUndoAction();
+}
+
+void MainWindow::updateUndoAction()
+{
+    QAction* a = m_actions.value(QStringLiteral("undo"));
+    if (!a)
+        return;
+    a->setEnabled(!m_undo.isEmpty());
+    a->setText(m_undo.isEmpty() ? tr("Undo") : tr("Undo: %1").arg(m_undo.last().description));
+}
+
+void MainWindow::recordJobUndo(Job* job)
+{
+    const auto records = job->undoRecords();
+    if (records.isEmpty())
+        return;
+    UndoEntry e;
+    e.pairs = records;
+    const QString what = tr("%n item(s)", nullptr, int(records.size()));
+    if (auto* c = dynamic_cast<CopyJob*>(job)) {
+        e.kind = c->mode() == CopyJob::Mode::Move ? UndoEntry::Kind::Move : UndoEntry::Kind::Copy;
+        e.description = (c->mode() == CopyJob::Mode::Move ? tr("move %1") : tr("copy %1")).arg(what);
+    } else if (dynamic_cast<DeleteJob*>(job)) {
+        e.kind = UndoEntry::Kind::Trash;
+        e.description = tr("move %1 to trash").arg(what);
+    } else if (dynamic_cast<PackJob*>(job)) {
+        e.kind = UndoEntry::Kind::Copy;
+        e.description = tr("pack %1").arg(baseName(records.first().first));
+    } else {
+        return;
+    }
+    pushUndo(e);
+}
+
+void MainWindow::undo()
+{
+    if (m_undo.isEmpty())
+        return;
+    const UndoEntry e = m_undo.takeLast();
+    updateUndoAction();
+    Panel* p = active();
+    p->showMessage(tr("Undoing %1 …").arg(e.description));
+    QPointer<Panel> panel(p);
     QPointer<MainWindow> self(this);
-    ioPool()->start([self, plan, dir] {
-        QStringList errors;
-        const auto done = executeRenamePlan(dir, plan, &errors);
-        postToUi([self, done, errors] {
-            if (!self)
-                return;
-            if (errors.isEmpty())
-                self->active()->showMessage(tr("Undid %n rename(s)", nullptr, int(done.size())));
-            else
-                self->active()->showMessage(tr("Undo incomplete: %1").arg(errors.first()), true);
+    auto report = [self, panel, e](const QStringList& errors) {
+        if (!self || !panel)
+            return;
+        if (errors.isEmpty())
+            panel->showMessage(tr("Undid %1").arg(e.description));
+        else
+            panel->showMessage(tr("Undo of %1 incomplete: %2").arg(e.description, errors.first()), true);
+    };
+
+    switch (e.kind) {
+    case UndoEntry::Kind::Rename: {
+        RenamePlan plan;
+        for (const auto& [now, before] : e.pairs)
+            plan.rows.append({now, before, RenameRow::Status::Ok, {}});
+        ioPool()->start([plan, dir = e.dir, report] {
+            QStringList errors;
+            executeRenamePlan(dir, plan, &errors);
+            postToUi([report, errors] { report(errors); });
         });
-    });
+        break;
+    }
+    case UndoEntry::Kind::Move: {
+        // Back where they came from; one job per original folder.
+        QMap<QString, QStringList> byFolder;
+        for (const auto& [now, before] : e.pairs) {
+            if (baseName(now) == baseName(before))
+                byFolder[parentPath(before)].append(now);
+            else
+                m_jobs->add(new CopyJob(CopyJob::Mode::Move, {now}, before));
+        }
+        for (auto it = byFolder.cbegin(); it != byFolder.cend(); ++it) {
+            auto* job = new CopyJob(CopyJob::Mode::Move, it.value(), it.key());
+            job->setProperty("isUndo", true);
+            m_jobs->add(job);
+        }
+        p->showMessage(tr("Undoing %1 (see the operations list)").arg(e.description));
+        break;
+    }
+    case UndoEntry::Kind::Copy: {
+        QStringList created;
+        for (const auto& pair : e.pairs)
+            created.append(pair.first);
+        auto* job = new DeleteJob(created, true);
+        job->setProperty("isUndo", true);
+        m_jobs->add(job);
+        break;
+    }
+    case UndoEntry::Kind::Trash:
+        ioPool()->start([pairs = e.pairs, report] {
+            const QStringList errors = restoreFromTrash(pairs);
+            postToUi([report, errors] { report(errors); });
+        });
+        break;
+    case UndoEntry::Kind::Create: {
+        QStringList created;
+        for (const auto& pair : e.pairs)
+            created.append(pair.first);
+        ioPool()->start([created, report] {
+            const QStringList errors = removeIfStillEmpty(created);
+            postToUi([report, errors] { report(errors); });
+        });
+        break;
+    }
+    }
 }
 
 // ---------------------------------------------------------- context menus
@@ -1249,12 +1363,15 @@ void MainWindow::makeFile()
     }
     const QString full = joinPath(p->path(), name);
     QPointer<Panel> panel(p);
-    ioPool()->start([panel, full, name] {
+    QPointer<MainWindow> self(this);
+    ioPool()->start([self, panel, full, name] {
         const int fd = ::open(toNative(full).constData(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
         const int err = fd < 0 ? errno : 0;
         if (fd >= 0)
             ::close(fd);
-        postToUi([panel, err, full, name] {
+        postToUi([self, panel, err, full, name] {
+            if (self && !err)
+                self->pushUndo({UndoEntry::Kind::Create, tr("new file %1").arg(name), {}, {{full, {}}}});
             if (!panel)
                 return;
             if (err)

@@ -551,12 +551,7 @@ private slots:
         // Undo restores the old names.
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
-        QAction* undo = nullptr;
-        for (QAction* a : m_window->actions())
-            if (a->text() == QObject::tr("Undo last multi-rename"))
-                undo = a;
-        QVERIFY(undo && undo->isEnabled());
-        undo->trigger();
+        QTest::keyClick(m_left->view(), Qt::Key_Z, Qt::ControlModifier);
         QTRY_VERIFY(QFile::exists(L("mr/a.txt")));
         QVERIFY(QFile::exists(L("mr/c.txt")));
         QVERIFY(!QFile::exists(L("mr/img_1.txt")));
@@ -658,6 +653,63 @@ private slots:
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
         FolderHistory::instance().setPinned(L("sub/deep"), false);
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void undoWithCtrlZ()
+    {
+        qputenv("XDG_DATA_HOME", QFile::encodeName(m_tmp.filePath("data")));  // private trash
+        QVERIFY(QDir().mkpath(m_tmp.filePath("data")));
+        QVERIFY(QDir().mkpath(L("u")));
+        writeFile(L("u/doc.txt"), "doc");
+        m_left->navigate(L("u"));
+        QTRY_COMPARE(leftModel()->path(), L("u"));
+        auto focusLeft = [this] {
+            m_window->activateWindow();
+            QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+            m_left->view()->setFocus();
+        };
+
+        // Move to the right panel, then undo: it comes back.
+        moveCursorTo(m_left, "doc.txt");
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_left->view(), Qt::Key_F6);
+        QTRY_VERIFY(QFile::exists(R("doc.txt")));
+        QTRY_VERIFY(!QFile::exists(L("u/doc.txt")));
+        focusLeft();
+        QTest::qWait(100);
+        QTest::keyClick(m_left->view(), Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY(QFile::exists(L("u/doc.txt")));
+        QTRY_VERIFY(!QFile::exists(R("doc.txt")));
+
+        // Trash, then undo: restored.
+        QTRY_VERIFY(leftModel()->rowOf("doc.txt") >= 0);
+        focusLeft();
+        moveCursorTo(m_left, "doc.txt");
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_left->view(), Qt::Key_F8);
+        QTRY_VERIFY(!QFile::exists(L("u/doc.txt")));
+        focusLeft();
+        QTest::qWait(100);
+        QTest::keyClick(m_left->view(), Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY(QFile::exists(L("u/doc.txt")));
+        QCOMPARE(readName(L("u/doc.txt")), QByteArray("doc"));
+
+        // New folder, then undo: gone (it's empty).
+        focusLeft();
+        answerNextDialog([](QWidget* w) {
+            auto* dlg = qobject_cast<QInputDialog*>(w);
+            QVERIFY(dlg);
+            dlg->setTextValue("fresh/inner");
+            dlg->accept();
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_F7);
+        QTRY_VERIFY(QFileInfo(L("u/fresh/inner")).isDir());
+        focusLeft();
+        QTest::keyClick(m_left->view(), Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY(!QFile::exists(L("u/fresh")));
+
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
     }

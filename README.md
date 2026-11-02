@@ -66,6 +66,7 @@ Visual check without a display:
 | Ctrl+L | Type a path |
 | Ctrl+J, Ctrl+D | Jump to a folder: fuzzy search over pinned and frequently used folders (zoxide-style) |
 | Ctrl+Shift+D | Pin / unpin the current folder |
+| Ctrl+Z | Undo the last operation: moves go back, copies go to the trash, trashed items come back, renames revert, new empty folders/files disappear |
 | Ctrl+Shift+P | Command palette: every command, fuzzy searchable, with its shortcut |
 | Alt+F1 / Alt+F2 | Locations (mounts) for left / right panel |
 | Ctrl+← / Ctrl+→ | Show folder under cursor in left / right panel |

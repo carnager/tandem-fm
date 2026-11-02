@@ -639,12 +639,15 @@ void Panel::doRename(const QString& from, const QString& to)
     QPointer<DirTab> t(tab());
     ioPool()->start([self, t, dir, from, to] {
         const int err = renameNoReplace(joinPath(dir, from), joinPath(dir, to));
-        postToUi([self, t, err, from, to] {
+        postToUi([self, t, err, dir, from, to] {
             if (!self)
                 return;
-            if (err)
+            if (err) {
                 self->showMessage(tr("Cannot rename %1: %2").arg(from, errnoString(err)), true);
-            else if (t)
+                return;
+            }
+            emit self->renamed(dir, from, to);
+            if (t)
                 t->expectName(to);
         });
     });

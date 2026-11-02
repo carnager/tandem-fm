@@ -2,6 +2,7 @@
 
 #include "core/FileOps.h"
 #include "core/MultiRename.h"
+#include "core/Undo.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/IconCache.h"
 
@@ -67,7 +68,10 @@ private:
     bool collectRenameItems(Panel* p, QList<RenameItem>& items, QSet<QString>& existing);
     void startEditorRename(Panel* p, const QList<RenameItem>& items, const QSet<QString>& existing);
     void runRenamePlan(Panel* p, const RenamePlan& plan);
-    void undoMultiRename();
+    void undo();
+    void pushUndo(UndoEntry entry);
+    void updateUndoAction();
+    void recordJobUndo(Job* job);
     void unpack();
     void populateIconThemeMenu(QMenu* menu);
     void commandPalette();
@@ -90,10 +94,7 @@ private:
     FuzzyPopup* m_popup = nullptr;
     QList<IconTheme> m_iconThemes;
     bool m_iconThemesLoaded = false;
-    struct LastRename {
-        QString dir;
-        QList<QPair<QString, QString>> pairs;  // (current name, previous name)
-    } m_lastRename;
+    QList<UndoEntry> m_undo;
 };
 
 }  // namespace tandem

@@ -2,6 +2,7 @@
 
 #include <QMutex>
 #include <QObject>
+#include <QPair>
 #include <QPointer>
 #include <QString>
 #include <QStringList>
@@ -77,6 +78,9 @@ public:
     Snapshot snapshot() const;
     bool isFinished() const { return m_finished.load(); }
     QStringList errors() const;
+    // What this job created or moved, as (path now, path before) pairs;
+    // "before" is empty for things it created. Used for undo.
+    QList<QPair<QString, QString>> undoRecords() const;
 
     // UI-thread prompt handler (dialogs). Called on the UI thread.
     void setPromptHandler(AsyncPrompt h) { m_promptHandler = std::move(h); }
@@ -114,6 +118,7 @@ protected:
     void setState(State s) { m_state.store(s); }
     void setCurrent(const QString& s);
     void addError(const QString& e);
+    void recordUndo(const QString& now, const QString& before = {});
 
     std::atomic<int64_t> m_bytesDone{0}, m_bytesTotal{0};
     std::atomic<int64_t> m_filesDone{0}, m_filesTotal{0};
@@ -132,6 +137,7 @@ private:
     mutable QMutex m_textMutex;
     QString m_current;
     QStringList m_errors;
+    QList<QPair<QString, QString>> m_undo;
     bool m_skipAllErrors = false;
     enum class ConflictPolicy { Ask, OverwriteAll, OverwriteOlder, SkipAll, RenameAll };
     ConflictPolicy m_conflictPolicy = ConflictPolicy::Ask;

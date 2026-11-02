@@ -85,6 +85,7 @@ signals:
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void stateChanged();
     void contextMenuRequested(Panel* panel, const QPoint& globalPos, bool onItem);
+    void renamed(const QString& dir, const QString& from, const QString& to);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;
