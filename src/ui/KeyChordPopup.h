@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QFrame>
+#include <QPointer>
 
 class QGridLayout;
 class QLabel;
@@ -32,12 +33,14 @@ protected:
 
 private:
     void type(const QString& keys);
+    void close();  // hand focus back first, so the right panel stays active
     void refresh();
     void place();
 
     enum class Mode { Jump, Assign } m_mode = Mode::Jump;
     QString m_typed;
     QString m_assignPath;
+    QPointer<QWidget> m_returnFocus;
     QLabel* m_title;
     QWidget* m_grid;
     QGridLayout* m_gridLayout;

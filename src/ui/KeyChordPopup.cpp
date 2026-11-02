@@ -3,6 +3,7 @@
 #include "core/FolderHistory.h"
 #include "ui/Theme.h"
 
+#include <QApplication>
 #include <QDir>
 #include <QGraphicsDropShadowEffect>
 #include <QGridLayout>
@@ -65,8 +66,17 @@ KeyChordPopup::KeyChordPopup(QWidget* window) : QFrame(window)
     hide();
 }
 
+void KeyChordPopup::close()
+{
+    if (m_returnFocus)
+        m_returnFocus->setFocus();
+    hide();
+}
+
 void KeyChordPopup::openJump(const QString& initialKeys)
 {
+    if (!isVisible())
+        m_returnFocus = QApplication::focusWidget();
     m_mode = Mode::Jump;
     m_typed.clear();
     show();
@@ -79,6 +89,8 @@ void KeyChordPopup::openJump(const QString& initialKeys)
 
 void KeyChordPopup::openAssign(const QString& path)
 {
+    if (!isVisible())
+        m_returnFocus = QApplication::focusWidget();
     m_mode = Mode::Assign;
     m_assignPath = path;
     m_typed = FolderHistory::instance().bookmarkKey(path);
@@ -126,7 +138,7 @@ void KeyChordPopup::type(const QString& keys)
     // one waits; Enter takes the exact one.)
     if (matches.size() == 1 && matches.first().key == m_typed) {
         const QString path = matches.first().path;
-        hide();
+        close();
         emit jumpRequested(path);
         return;
     }
@@ -138,11 +150,13 @@ void KeyChordPopup::keyPressEvent(QKeyEvent* e)
     const QString text = e->text();
     switch (e->key()) {
     case Qt::Key_Escape:
-        hide();
+        close();
         return;
     case Qt::Key_Backspace:
-        if (m_typed.isEmpty() && m_mode == Mode::Jump)
-            hide();
+        if (m_typed.isEmpty() && m_mode == Mode::Jump) {
+            close();
+            return;
+        }
         m_typed.chop(1);
         refresh();
         return;
@@ -153,9 +167,9 @@ void KeyChordPopup::keyPressEvent(QKeyEvent* e)
             emit message(m_typed.isEmpty() ? tr("Pinned %1").arg(pretty(m_assignPath))
                                            : tr("Bookmarked %1 as “%2”").arg(pretty(m_assignPath), m_typed),
                          false);
-            hide();
+            close();
         } else if (const QString p = FolderHistory::instance().pathForKey(m_typed); !p.isEmpty()) {
-            hide();
+            close();
             emit jumpRequested(p);
         }
         return;
@@ -163,13 +177,13 @@ void KeyChordPopup::keyPressEvent(QKeyEvent* e)
         if (m_mode == Mode::Assign) {
             FolderHistory::instance().setPinned(m_assignPath, false);
             emit message(tr("Removed bookmark for %1").arg(pretty(m_assignPath)), false);
-            hide();
+            close();
             return;
         }
         break;
     case Qt::Key_Space:
         if (m_mode == Mode::Jump) {
-            hide();
+            close();
             emit fuzzyRequested();
             return;
         }

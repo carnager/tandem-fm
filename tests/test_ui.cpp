@@ -1005,6 +1005,31 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
         m_left->setVimKeys(false);
 
+        // Regression: with the right panel focused, the jump goes to the right panel.
+        h.setBookmark(L("sub"), "q");
+        m_right->view()->setFocus();
+        QTRY_VERIFY(m_right->isActive());
+        const QString leftBefore = leftModel()->path();
+        QTest::keyClick(m_right->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(chords->isVisible());
+        QTest::keyClicks(chords, "q");
+        QTRY_COMPARE(rightModel()->path(), L("sub"));
+        QCOMPARE(leftModel()->path(), leftBefore);
+        QVERIFY(m_right->isActive());
+        // …and the same for the fuzzy jump.
+        auto* popup = m_window->findChild<FuzzyPopup*>();
+        QTest::keyClick(m_right->view(), Qt::Key_J, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "sub dee");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("sub/deep"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_COMPARE(rightModel()->path(), L("sub/deep"));
+        QCOMPARE(leftModel()->path(), leftBefore);
+        h.setPinned(L("sub"), false);
+        m_right->navigate(R());
+        QTRY_COMPARE(rightModel()->path(), R());
+        m_left->view()->setFocus();
+
         for (const QString& p : {L("sub"), L("sub/deep"), R()})
             h.setPinned(p, false);
         m_left->navigate(L());

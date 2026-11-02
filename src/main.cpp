@@ -6,6 +6,7 @@
 #include <QIcon>
 #include <QLibraryInfo>
 #include <QLocale>
+#include <QSettings>
 #include <QTranslator>
 #include <QTimer>
 
@@ -18,8 +19,10 @@ int main(int argc, char** argv)
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
     QGuiApplication::setDesktopFileName(QStringLiteral("tandem-fm"));
 
-    // UI language: the system's (LANG / LC_MESSAGES), or TANDEM_LANG=de etc.
-    const QString lang = qEnvironmentVariable("TANDEM_LANG");
+    // UI language: TANDEM_LANG=de, else View > Language, else the system's.
+    QString lang = qEnvironmentVariable("TANDEM_LANG");
+    if (lang.isEmpty())
+        lang = QSettings().value(QStringLiteral("view/language")).toString();
     const QLocale locale = lang.isEmpty() ? QLocale() : QLocale(lang);
     QTranslator qtTranslator, appTranslator;
     if (qtTranslator.load(locale, QStringLiteral("qtbase"), QStringLiteral("_"),

@@ -147,6 +147,13 @@ ahead and caches the results. All reads happen off the UI thread.
 | F7, Ctrl+F / F3, Shift+F3 | Find (case-insensitive) / next / previous |
 | + / − / 0, Ctrl+wheel | Zoom (text size or image) / reset (image: fit) |
 
+## Translations
+
+German is included. View → Language picks it (or `TANDEM_LANG=de`); the
+default follows the system. With `qt6-tools` installed,
+`cmake --build build --target update_translations` refreshes
+`translations/*.ts` after source changes; edit them in Qt Linguist or by hand.
+
 ## Layout
 
 ```

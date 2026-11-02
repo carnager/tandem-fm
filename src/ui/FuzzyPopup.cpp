@@ -192,8 +192,17 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
     window->installEventFilter(this);
 }
 
+void FuzzyPopup::close()
+{
+    if (m_returnFocus)
+        m_returnFocus->setFocus();
+    hide();
+}
+
 void FuzzyPopup::open(const QString& placeholder, const QList<PopupItem>& items, const QString& footer)
 {
+    if (!isVisible())
+        m_returnFocus = QApplication::focusWidget();
     m_items = items;
     m_edit->setPlaceholderText(placeholder);
     m_footer->setText(footer);
@@ -277,7 +286,7 @@ void FuzzyPopup::activate()
 {
     const PopupItem* it = currentItem();
     auto run = it ? it->run : std::function<void()>{};
-    hide();
+    close();
     if (run)
         run();
 }
@@ -319,7 +328,7 @@ bool FuzzyPopup::eventFilter(QObject* obj, QEvent* e)
     const bool ctrl = ke->modifiers() & Qt::ControlModifier;
     switch (ke->key()) {
     case Qt::Key_Escape:
-        hide();
+        close();
         return true;
     case Qt::Key_Return:
     case Qt::Key_Enter:

@@ -2,6 +2,7 @@
 
 #include <QAbstractListModel>
 #include <QFrame>
+#include <QPointer>
 #include <QIcon>
 #include <QStyledItemDelegate>
 
@@ -72,12 +73,14 @@ private:
     void refilter();
     void place();
     void activate();
+    void close();  // hand focus back first, so the right panel stays active
 
     QLineEdit* m_edit;
     QListView* m_list;
     QLabel* m_footer;
     PopupModel* m_model;
     QList<PopupItem> m_items;
+    QPointer<QWidget> m_returnFocus;
 };
 
 }  // namespace tandem

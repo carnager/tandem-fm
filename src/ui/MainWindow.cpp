@@ -368,6 +368,23 @@ void MainWindow::createMenus()
     });
     notes->setCheckable(true);
     m_actions[QStringLiteral("notifications")] = notes;
+    QMenu* language = view->addMenu(tr("Language"));
+    {
+        auto* group = new QActionGroup(language);
+        const QString current = QSettings().value(QStringLiteral("view/language")).toString();
+        for (const auto& [code, name] : {std::pair{QString(), tr("System default")},
+                                         std::pair{QStringLiteral("en"), QStringLiteral("English")},
+                                         std::pair{QStringLiteral("de"), QStringLiteral("Deutsch")}}) {
+            QAction* a = language->addAction(name);
+            a->setCheckable(true);
+            a->setChecked(code == current);
+            group->addAction(a);
+            connect(a, &QAction::triggered, this, [this, code] {
+                QSettings().setValue(QStringLiteral("view/language"), code);
+                active()->showMessage(tr("The language changes the next time Tandem starts"));
+            });
+        }
+    }
     QMenu* icons = view->addMenu(tr("Icon theme"));
     connect(icons, &QMenu::aboutToShow, this, [this, icons] { populateIconThemeMenu(icons); });
     addCommand(view, tr("Preview column"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
