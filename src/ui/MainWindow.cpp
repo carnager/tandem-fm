@@ -2,6 +2,7 @@
 
 #include "core/Archive.h"
 #include "core/DesktopApps.h"
+#include "core/FolderHistory.h"
 #include "core/MultiRename.h"
 #include "core/Util.h"
 #include "ui/DirTab.h"
@@ -42,6 +43,7 @@
 #include <QSplitter>
 #include <QVBoxLayout>
 
+#include <cmath>
 #include <cstdlib>
 #include <fcntl.h>
 #include <unistd.h>
@@ -165,6 +167,8 @@ MainWindow::MainWindow(const QStringList& startPaths)
     createMenus();
     loadSettings(startPaths);
     DesktopApps::instance().loadAsync();
+    FolderHistory::instance().loadAsync();
+    m_popup = new FuzzyPopup(this);
     ioPool()->start([] { pruneExtractCache(); });
     QPointer<MainWindow> self(this);
     ioPool()->start([self] {
@@ -200,6 +204,7 @@ QAction* MainWindow::addCommand(QMenu* menu, const QString& text, const QList<QK
 {
     QAction* a = menu->addAction(text);
     a->setShortcuts(keys);
+    a->setProperty("category", menu->title().remove(QLatin1Char('&')));
     a->setShortcutContext(Qt::WindowShortcut);
     connect(a, &QAction::triggered, this, [fn = std::move(fn)] { fn(); });
     addAction(a);  // shortcuts work even with the menu bar hidden
@@ -265,6 +270,9 @@ void MainWindow::createMenus()
     addCommand(go, tr("Root"), {K(Qt::CTRL | Qt::Key_Backslash)}, [this] { active()->navigate(QStringLiteral("/")); });
     addCommand(go, tr("Home"), {K(Qt::CTRL | Qt::Key_QuoteLeft)}, [this] { active()->navigate(QDir::homePath()); });
     addCommand(go, tr("Go to path…"), {K(Qt::CTRL | Qt::Key_L)}, [this] { active()->focusPathEdit(); });
+    addCommand(go, tr("Jump to folder…"), {K(Qt::CTRL | Qt::Key_J), K(Qt::CTRL | Qt::Key_D)},
+               [this] { jumpToFolder(); });
+    addCommand(go, tr("Pin / unpin this folder"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)}, [this] { togglePin(); });
     go->addSeparator();
     addCommand(go, tr("Locations (left)"), {K(Qt::ALT | Qt::Key_F1)}, [this] { m_left->showMountMenu(); });
     addCommand(go, tr("Locations (right)"), {K(Qt::ALT | Qt::Key_F2)}, [this] { m_right->showMountMenu(); });
@@ -306,6 +314,7 @@ void MainWindow::createMenus()
                [this] { menuBar()->setVisible(!menuBar()->isVisible()); });
 
     QMenu* help = bar->addMenu(tr("&Help"));
+    addCommand(help, tr("Command palette…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_P)}, [this] { commandPalette(); });
     addCommand(help, tr("Keyboard shortcuts"), {K(Qt::Key_F1)}, [this] { showShortcuts(); });
 }
 
@@ -645,6 +654,93 @@ void MainWindow::showShortcuts()
     box.setTextFormat(Qt::RichText);
     box.setText(html);
     box.exec();
+}
+
+// ------------------------------------------------- command palette & jump
+
+void MainWindow::commandPalette()
+{
+    QList<PopupItem> items;
+    for (QAction* a : actions()) {
+        if (a->text().isEmpty() || !a->isEnabled() || a->menu())
+            continue;
+        QString title = a->text().remove(QLatin1Char('&'));
+        QString hint = a->shortcut().toString(QKeySequence::NativeText);
+        if (const int tab = int(title.indexOf(QLatin1Char('\t'))); tab >= 0) {
+            hint = title.mid(tab + 1);
+            title.truncate(tab);
+        }
+        if (a->isCheckable())
+            title += a->isChecked() ? tr("  (on)") : tr("  (off)");
+        PopupItem it;
+        it.title = title;
+        it.subtitle = a->property("category").toString();
+        it.hint = hint;
+        it.icon = a->icon();
+        QPointer<QAction> action(a);
+        it.run = [action] {
+            if (action)
+                action->trigger();
+        };
+        items.append(it);
+    }
+    std::sort(items.begin(), items.end(), [](const PopupItem& a, const PopupItem& b) {
+        return QString::compare(a.title, b.title, Qt::CaseInsensitive) < 0;
+    });
+    m_popup->keyHandler = nullptr;
+    m_popup->open(tr("Type a command…"), items);
+}
+
+QList<PopupItem> MainWindow::folderItems() const
+{
+    static const QIcon pin = IconCache::themed("pin", "emblem-favorite");
+    static const QIcon folder = IconCache::themed("folder");
+    const QString home = QDir::homePath();
+    QList<PopupItem> items;
+    for (const FolderHistory::Item& f : FolderHistory::instance().items()) {
+        PopupItem it;
+        it.key = f.path;
+        it.title = f.path == QLatin1String("/") ? f.path : baseName(f.path);
+        it.subtitle = f.path.startsWith(home) ? QLatin1Char('~') + f.path.mid(home.size()) : f.path;
+        it.matchSubtitle = true;
+        it.icon = f.pinned ? pin : folder;
+        // Pins on top; otherwise frecency nudges the fuzzy ranking (zoxide-like).
+        it.bonus = f.pinned ? 1000 : int(12 * std::log2(1 + f.frecency));
+        it.hint = f.pinned ? tr("pinned") : QString();
+        const QString path = f.path;
+        it.run = [this, path] { active()->navigate(path); };
+        items.append(it);
+    }
+    return items;
+}
+
+void MainWindow::jumpToFolder()
+{
+    m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
+        if (!it)
+            return false;
+        if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_P) {
+            FolderHistory::instance().setPinned(it->key, !FolderHistory::instance().isPinned(it->key));
+            m_popup->setItems(folderItems());
+            return true;
+        }
+        if ((e->modifiers() & Qt::ShiftModifier) && e->key() == Qt::Key_Delete) {
+            FolderHistory::instance().forget(it->key);
+            m_popup->setItems(folderItems());
+            return true;
+        }
+        return false;
+    };
+    m_popup->open(tr("Jump to a folder: type parts of its path"), folderItems(),
+                  tr("Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   Ctrl+Shift+D: pin current"));
+}
+
+void MainWindow::togglePin()
+{
+    const QString p = active()->path();
+    const bool pin = !FolderHistory::instance().isPinned(p);
+    FolderHistory::instance().setPinned(p, pin);
+    active()->showMessage(pin ? tr("Pinned %1 (Ctrl+J to jump)").arg(p) : tr("Unpinned %1").arg(p));
 }
 
 // ------------------------------------------------------------ icon themes
@@ -1244,6 +1340,8 @@ void MainWindow::closeEvent(QCloseEvent* e)
         }
     }
     saveSettings();
+    if (FolderHistory::instance().isLoaded())
+        FolderHistory::instance().saveNow();
     m_jobs->cancelAll();
     // Give jobs a moment to stop. A job stuck in the kernel on a dead network
     // mount can't be interrupted; don't let it hold the app hostage.

@@ -2,6 +2,7 @@
 
 #include "core/DirWatcher.h"
 #include "core/FileOps.h"
+#include "core/FolderHistory.h"
 #include "core/Util.h"
 #include "ui/FileModel.h"
 
@@ -144,12 +145,16 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
             emit t->loadingChanged(false);
             if (result->error) {
                 DirWatcher::instance()->removeWatch(result->watch);
+                if (result->error == ENOENT)
+                    FolderHistory::instance().forget(result->path);
                 if (result->error != ECANCELED)
                     emit t->listingFailed(result->path, result->errorText.isEmpty() ? errnoString(result->error)
                                                                                     : result->errorText);
                 return;
             }
             const QString old = t->m_model->path();
+            if (old != result->path)
+                FolderHistory::instance().visit(result->path);
             if (!old.isEmpty() && old != result->path) {
                 switch (history) {
                 case History::Push:

@@ -26,6 +26,8 @@ add_library(tandem_core STATIC
   src/core/Vfs.cpp
   src/core/MultiRename.h src/core/MultiRename.cpp
   src/core/IoScheduler.h src/core/IoScheduler.cpp
+  src/core/Fuzzy.h src/core/Fuzzy.cpp
+  src/core/FolderHistory.h src/core/FolderHistory.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)
@@ -46,6 +48,7 @@ add_library(tandem_ui STATIC
   src/ui/MainWindow.h src/ui/MainWindow.cpp
   src/ui/MultiRenameDialog.h src/ui/MultiRenameDialog.cpp
   src/ui/EditNames.h src/ui/EditNames.cpp
+  src/ui/FuzzyPopup.h src/ui/FuzzyPopup.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp

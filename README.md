@@ -64,6 +64,9 @@ Visual check without a display:
 | Alt+← / Alt+→ | History back / forward (mouse back/forward buttons too) |
 | Ctrl+PgUp, Ctrl+\\, Ctrl+\` | Parent, root, home |
 | Ctrl+L | Type a path |
+| Ctrl+J, Ctrl+D | Jump to a folder: fuzzy search over pinned and frequently used folders (zoxide-style) |
+| Ctrl+Shift+D | Pin / unpin the current folder |
+| Ctrl+Shift+P | Command palette: every command, fuzzy searchable, with its shortcut |
 | Alt+F1 / Alt+F2 | Locations (mounts) for left / right panel |
 | Ctrl+← / Ctrl+→ | Show folder under cursor in left / right panel |
 | Ctrl+U, Alt+= | Swap panels, same folder in other panel |

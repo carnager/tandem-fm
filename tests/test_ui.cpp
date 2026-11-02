@@ -2,9 +2,11 @@
 
 #include "core/Archive.h"
 #include "core/DirWatcher.h"
+#include "core/FolderHistory.h"
 #include "ui/DirTab.h"
 #include "ui/FileModel.h"
 #include "ui/FileView.h"
+#include "ui/FuzzyPopup.h"
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
 #include "ui/MultiRenameDialog.h"
@@ -133,6 +135,7 @@ private slots:
         qputenv("XDG_CONFIG_HOME", QFile::encodeName(m_tmp.filePath("config")));
         applyTheme(*qApp);
         DirWatcher::instance();
+        FolderHistory::instance().setStoragePath(m_tmp.filePath("folders.tsv"));
 
         QVERIFY(QDir().mkpath(L("sub/deep")));
         QVERIFY(QDir().mkpath(R()));
@@ -614,6 +617,47 @@ private slots:
 
         QSettings().remove("tools/nameEditor");
         leftModel()->markAll(false);
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void commandPaletteAndJump()
+    {
+        auto* popup = m_window->findChild<FuzzyPopup*>();
+        QVERIFY(popup);
+
+        // Palette: run "Show hidden files" by typing a few letters.
+        QAction* hidden = nullptr;
+        for (QAction* a : m_window->actions())
+            if (a->text() == QObject::tr("Show hidden files"))
+                hidden = a;
+        QVERIFY(hidden);
+        const bool before = hidden->isChecked();
+        QTest::keyClick(m_left->view(), Qt::Key_P, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "shw hid");
+        QTRY_COMPARE(popup->currentItem()->title.startsWith(QObject::tr("Show hidden files")), true);
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_VERIFY(!popup->isVisible());
+        QCOMPARE(hidden->isChecked(), !before);
+        hidden->trigger();  // back to how it was
+        QTRY_COMPARE(hidden->isChecked(), before);
+
+        // Jump: visited folders are offered; Enter goes there.
+        m_left->navigate(L("sub/deep"));
+        QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_J, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "sub dee");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("sub/deep"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_P, Qt::ControlModifier);  // pin it
+        QVERIFY(FolderHistory::instance().isPinned(L("sub/deep")));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+        FolderHistory::instance().setPinned(L("sub/deep"), false);
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
     }

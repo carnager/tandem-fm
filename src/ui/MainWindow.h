@@ -2,6 +2,7 @@
 
 #include "core/FileOps.h"
 #include "core/MultiRename.h"
+#include "ui/FuzzyPopup.h"
 #include "ui/IconCache.h"
 
 #include <QHash>
@@ -69,6 +70,10 @@ private:
     void undoMultiRename();
     void unpack();
     void populateIconThemeMenu(QMenu* menu);
+    void commandPalette();
+    void jumpToFolder();
+    QList<PopupItem> folderItems() const;
+    void togglePin();
     void setIconTheme(const QString& id);
 
     void loadSettings(const QStringList& startPaths);
@@ -82,6 +87,7 @@ private:
     JobsPanel* m_jobsPanel;
     QAction* m_hiddenAction = nullptr;
     QHash<QString, QAction*> m_actions;
+    FuzzyPopup* m_popup = nullptr;
     QList<IconTheme> m_iconThemes;
     bool m_iconThemesLoaded = false;
     struct LastRename {

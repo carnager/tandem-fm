@@ -2,6 +2,8 @@
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
+#include "core/FolderHistory.h"
+#include "core/Fuzzy.h"
 #include "core/IoScheduler.h"
 #include "core/MultiRename.h"
 #include "core/Sorting.h"
@@ -591,6 +593,45 @@ private slots:
         QVERIFY(runJob(second));  // not blocked by the paused job on the other drive
         first.setPaused(false);
         QVERIFY(firstDone.wait(5000));
+    }
+
+    void fuzzy()
+    {
+        QVERIFY(fuzzyScore(u"copy", u"Copy…") >= 0);
+        QVERIFY(fuzzyScore(u"cfp", u"Copy full paths as text") >= 0);
+        QCOMPARE(fuzzyScore(u"xyz", u"Copy"), -1);
+        QVERIFY(fuzzyScore(u"copy", u"Copy…") > fuzzyScore(u"copy", u"Copy full paths as text"));
+        QVERIFY(fuzzyScore(u"mr", u"Multi-rename") > fuzzyScore(u"mr", u"Mirror"));
+        QVERIFY(fuzzyScore(u"code tan", u"~/Code/tandem-fm") >= 0);
+        QCOMPARE(fuzzyScore(u"tan code", u"~/Code/tandem-fm"), -1);  // terms keep their order
+        QList<int> pos;
+        fuzzyScore(u"tf", u"tandem-fm", &pos);
+        QCOMPARE(pos, QList<int>({0, 7}));  // word starts preferred over the first 'f'… there is only one
+    }
+
+    void folderHistory()
+    {
+        QTemporaryDir tmp;
+        FolderHistory& h = FolderHistory::instance();
+        h.setStoragePath(tmp.filePath("folders.tsv"));
+        h.visit("/a");
+        h.visit("/a");
+        h.visit("/b");
+        QList<FolderHistory::Item> items = h.items();
+        QCOMPARE(items.size(), 2);
+        QCOMPARE(items[0].path, QString("/a"));
+        h.setPinned("/b", true);
+        QCOMPARE(h.items().first().path, QString("/b"));
+        QVERIFY(h.items().first().pinned);
+        h.saveNow();
+        h.setStoragePath(tmp.filePath("folders.tsv"));  // clears memory
+        QVERIFY(h.items().isEmpty());
+        h.loadAsync();
+        QTRY_COMPARE(h.items().size(), 2);
+        QVERIFY(h.isPinned("/b"));
+        h.forget("/a");
+        QCOMPARE(h.items().size(), 1);
+        QVERIFY(FolderHistory::frecency(10, 0, 30) > FolderHistory::frecency(10, 0, 30 * 86400));
     }
 
     void helpers()
