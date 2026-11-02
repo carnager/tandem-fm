@@ -50,6 +50,8 @@ signals:
     void cursorMoved();
     void searchNextRequested(int direction);  // vim n / N
     void paletteRequested();                  // vim :
+    void bookmarkJumpRequested(const QString& keys);  // vim ' and g<key>
+    void bookmarkAssignRequested();                   // vim m
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void dragPathsRequested(QStringList& out);  // panel fills marked/current paths
     void contextMenuRequested(const QPoint& globalPos, int row);  // row -1: empty area

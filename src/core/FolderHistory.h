@@ -19,6 +19,11 @@ public:
         QString path;
         double frecency = 0;
         bool pinned = false;
+        QString key;  // bookmark key chain ("h", "cp"), may be empty for a plain pin
+    };
+    struct Bookmark {
+        QString key;
+        QString path;
     };
 
     static FolderHistory& instance();
@@ -31,6 +36,12 @@ public:
     void forget(const QString& path);
     void setPinned(const QString& path, bool pinned);
     bool isPinned(const QString& path) const;
+    // Bookmarks are pins with a key. Keys are unique: assigning a used key
+    // moves it. An empty key keeps (or makes) a plain pin.
+    void setBookmark(const QString& path, const QString& key);
+    QString bookmarkKey(const QString& path) const;
+    QString pathForKey(const QString& key) const;
+    QList<Bookmark> bookmarks() const;  // with keys, sorted by key
     QList<Item> items() const;  // pinned first (in pin order), then by frecency
 
     static double frecency(double count, qint64 lastVisit, qint64 now);
@@ -41,6 +52,7 @@ private:
     FolderHistory() = default;
     void load();
     void scheduleSave();
+    QString pathForKeyLocked(const QString& key) const;
     struct Entry {
         double count = 0;
         qint64 last = 0;
@@ -49,6 +61,7 @@ private:
     mutable QMutex m_mutex;
     QHash<QString, Entry> m_entries;
     QStringList m_pinned;
+    QHash<QString, QString> m_keys;  // path -> key
     QString m_storage;
     std::atomic<bool> m_loaded{false};
     std::atomic<bool> m_saveScheduled{false};

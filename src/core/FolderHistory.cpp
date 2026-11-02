@@ -39,6 +39,7 @@ void FolderHistory::setStoragePath(const QString& path)
     m_storage = path;
     m_entries.clear();
     m_pinned.clear();
+    m_keys.clear();
 }
 
 double FolderHistory::frecency(double count, qint64 lastVisit, qint64 now)
@@ -63,16 +64,36 @@ void FolderHistory::load()
     QFile f(storagePath());
     QHash<QString, Entry> entries;
     QStringList pinned;
-    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    QHash<QString, QString> keys;
+    const bool exists = f.open(QIODevice::ReadOnly | QIODevice::Text);
+    if (exists) {
+        bool v2 = false;
         while (!f.atEnd()) {
             const QString line = QString::fromUtf8(f.readLine()).chopped(1);
-            const QStringList parts = line.split(QLatin1Char('\t'));
-            if (parts.size() < 4)
+            if (line.startsWith(QLatin1String("#tandem-folders"))) {
+                v2 = true;
                 continue;
-            const QString path = parts.mid(3).join(QLatin1Char('\t'));
+            }
+            const QStringList parts = line.split(QLatin1Char('\t'));
+            const int pathField = v2 ? 4 : 3;
+            if (parts.size() <= pathField)
+                continue;
+            const QString path = parts.mid(pathField).join(QLatin1Char('\t'));
             entries.insert(path, {parts[0].toDouble(), parts[1].toLongLong()});
             if (parts[2] == QLatin1String("1"))
                 pinned.append(path);
+            if (v2 && !parts[3].isEmpty())
+                keys.insert(path, parts[3]);
+        }
+    } else {
+        // First start: yazi-like defaults.
+        const QString home = QDir::homePath();
+        for (const auto& [key, path] : {std::pair{QStringLiteral("h"), home},
+                                        std::pair{QStringLiteral("d"), home + QStringLiteral("/Downloads")},
+                                        std::pair{QStringLiteral("c"), home + QStringLiteral("/.config")},
+                                        std::pair{QStringLiteral("/"), QStringLiteral("/")}}) {
+            pinned.append(path);
+            keys.insert(path, key);
         }
     }
     QMutexLocker lock(&m_mutex);
@@ -85,6 +106,9 @@ void FolderHistory::load()
     for (const QString& p : pinned)
         if (!m_pinned.contains(p))
             m_pinned.append(p);
+    for (auto it = keys.cbegin(); it != keys.cend(); ++it)
+        if (!m_keys.contains(it.key()) && pathForKeyLocked(it.value()).isEmpty())
+            m_keys.insert(it.key(), it.value());
     m_loaded.store(true);
 }
 
@@ -92,10 +116,12 @@ void FolderHistory::saveNow()
 {
     QHash<QString, Entry> entries;
     QStringList pinned;
+    QHash<QString, QString> keys;
     {
         QMutexLocker lock(&m_mutex);
         entries = m_entries;
         pinned = m_pinned;
+        keys = m_keys;
     }
     const QString path = storagePath();
     QDir().mkpath(QFileInfo(path).absolutePath());
@@ -103,12 +129,13 @@ void FolderHistory::saveNow()
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
         return;
     QSet<QString> written;
+    f.write("#tandem-folders 2\n");
     auto line = [&](const QString& p, const Entry& e) {
-        f.write(QStringLiteral("%1\t%2\t%3\t%4\n")
+        f.write(QStringLiteral("%1\t%2\t%3\t%4\t%5\n")
                     .arg(e.count)
                     .arg(e.last)
                     .arg(pinned.contains(p) ? 1 : 0)
-                    .arg(p)
+                    .arg(keys.value(p), p)
                     .toUtf8());
         written.insert(p);
     };
@@ -163,6 +190,7 @@ void FolderHistory::forget(const QString& path)
         QMutexLocker lock(&m_mutex);
         m_entries.remove(path);
         m_pinned.removeAll(path);
+        m_keys.remove(path);
     }
     scheduleSave();
 }
@@ -174,8 +202,58 @@ void FolderHistory::setPinned(const QString& path, bool pinned)
         m_pinned.removeAll(path);
         if (pinned)
             m_pinned.append(path);
+        else
+            m_keys.remove(path);
     }
     scheduleSave();
+}
+
+QString FolderHistory::pathForKeyLocked(const QString& key) const
+{
+    for (auto it = m_keys.cbegin(); it != m_keys.cend(); ++it)
+        if (it.value() == key)
+            return it.key();
+    return {};
+}
+
+void FolderHistory::setBookmark(const QString& path, const QString& key)
+{
+    {
+        QMutexLocker lock(&m_mutex);
+        if (!key.isEmpty()) {
+            const QString old = pathForKeyLocked(key);
+            if (!old.isEmpty())
+                m_keys.remove(old);
+            m_keys.insert(path, key);
+        } else {
+            m_keys.remove(path);
+        }
+        if (!m_pinned.contains(path))
+            m_pinned.append(path);
+    }
+    scheduleSave();
+}
+
+QString FolderHistory::bookmarkKey(const QString& path) const
+{
+    QMutexLocker lock(&m_mutex);
+    return m_keys.value(path);
+}
+
+QString FolderHistory::pathForKey(const QString& key) const
+{
+    QMutexLocker lock(&m_mutex);
+    return pathForKeyLocked(key);
+}
+
+QList<FolderHistory::Bookmark> FolderHistory::bookmarks() const
+{
+    QMutexLocker lock(&m_mutex);
+    QList<Bookmark> out;
+    for (auto it = m_keys.cbegin(); it != m_keys.cend(); ++it)
+        out.append({it.value(), it.key()});
+    std::sort(out.begin(), out.end(), [](const Bookmark& a, const Bookmark& b) { return a.key < b.key; });
+    return out;
 }
 
 bool FolderHistory::isPinned(const QString& path) const
@@ -191,12 +269,12 @@ QList<FolderHistory::Item> FolderHistory::items() const
     QList<Item> out;
     for (const QString& p : m_pinned) {
         const Entry e = m_entries.value(p);
-        out.append({p, frecency(e.count, e.last, now), true});
+        out.append({p, frecency(e.count, e.last, now), true, m_keys.value(p)});
     }
     QList<Item> rest;
     for (auto it = m_entries.cbegin(); it != m_entries.cend(); ++it)
         if (!m_pinned.contains(it.key()))
-            rest.append({it.key(), frecency(it->count, it->last, now), false});
+            rest.append({it.key(), frecency(it->count, it->last, now), false, {}});
     std::sort(rest.begin(), rest.end(), [](const Item& a, const Item& b) { return a.frecency > b.frecency; });
     out.append(rest);
     return out;

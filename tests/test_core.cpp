@@ -634,6 +634,33 @@ private slots:
         h.forget("/a");
         QCOMPARE(h.items().size(), 1);
         QVERIFY(FolderHistory::frecency(10, 0, 30) > FolderHistory::frecency(10, 0, 30 * 86400));
+
+        // Bookmarks: unique keys, chains, persistence.
+        h.setBookmark("/proj", "cp");
+        h.setBookmark("/docs", "cd");
+        QCOMPARE(h.pathForKey("cp"), QString("/proj"));
+        h.setBookmark("/other", "cp");  // a used key moves
+        QCOMPARE(h.pathForKey("cp"), QString("/other"));
+        QCOMPARE(h.bookmarkKey("/proj"), QString());
+        QVERIFY(h.isPinned("/proj"));   // still pinned, just without a key
+        h.saveNow();
+        h.setStoragePath(tmp.filePath("folders.tsv"));
+        h.loadAsync();
+        QTRY_COMPARE(h.pathForKey("cd"), QString("/docs"));
+        QCOMPARE(h.bookmarks().size(), 2);
+        h.setPinned("/docs", false);    // unpinning drops the key
+        QCOMPARE(h.pathForKey("cd"), QString());
+
+        // Old (v1) files still load; a missing file gets the defaults.
+        writeFile(tmp.filePath("old.tsv"), "3\t100\t1\t/pinned old\n1\t50\t0\t/seen\n");
+        h.setStoragePath(tmp.filePath("old.tsv"));
+        h.loadAsync();
+        QTRY_COMPARE(h.items().size(), 2);
+        QVERIFY(h.isPinned("/pinned old"));
+        h.setStoragePath(tmp.filePath("missing.tsv"));
+        h.loadAsync();
+        QTRY_COMPARE(h.pathForKey("h"), QDir::homePath());
+        QCOMPARE(h.pathForKey("/"), QString("/"));
     }
 
     void undoRecords()

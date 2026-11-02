@@ -12,6 +12,7 @@
 #include "ui/IconCache.h"
 #include "ui/JobManager.h"
 #include "ui/JobsPanel.h"
+#include "ui/KeyChordPopup.h"
 #include "ui/EditNames.h"
 #include "ui/MultiRenameDialog.h"
 #include "ui/Panel.h"
@@ -165,6 +166,8 @@ MainWindow::MainWindow(const QStringList& startPaths)
                 });
         connect(p, &Panel::contextMenuRequested, this, &MainWindow::showContextMenu);
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
+        connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
+        connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
         connect(p, &Panel::renamed, this, [this](const QString& dir, const QString& from, const QString& to) {
             pushUndo({UndoEntry::Kind::Rename, tr("rename of %1").arg(from), dir, {{to, from}}});
         });
@@ -185,6 +188,11 @@ MainWindow::MainWindow(const QStringList& startPaths)
     DesktopApps::instance().loadAsync();
     FolderHistory::instance().loadAsync();
     m_popup = new FuzzyPopup(this);
+    m_chords = new KeyChordPopup(this);
+    connect(m_chords, &KeyChordPopup::jumpRequested, this, [this](const QString& p) { active()->navigate(p); });
+    connect(m_chords, &KeyChordPopup::fuzzyRequested, this, &MainWindow::jumpToFolder);
+    connect(m_chords, &KeyChordPopup::message, this,
+            [this](const QString& text, bool error) { active()->showMessage(text, error); });
     m_quickTimer = new QTimer(this);
     m_quickTimer->setSingleShot(true);
     m_quickTimer->setInterval(120);  // holding an arrow key doesn't decode every file
@@ -293,9 +301,10 @@ void MainWindow::createMenus()
     addCommand(go, tr("Root"), {K(Qt::CTRL | Qt::Key_Backslash)}, [this] { active()->navigate(QStringLiteral("/")); });
     addCommand(go, tr("Home"), {K(Qt::CTRL | Qt::Key_QuoteLeft)}, [this] { active()->navigate(QDir::homePath()); });
     addCommand(go, tr("Go to path…"), {K(Qt::CTRL | Qt::Key_L)}, [this] { active()->focusPathEdit(); });
-    addCommand(go, tr("Jump to folder…"), {K(Qt::CTRL | Qt::Key_J), K(Qt::CTRL | Qt::Key_D)},
-               [this] { jumpToFolder(); });
-    addCommand(go, tr("Pin / unpin this folder"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)}, [this] { togglePin(); });
+    addCommand(go, tr("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { m_chords->openJump(); });
+    addCommand(go, tr("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
+               [this] { m_chords->openAssign(active()->path()); });
+    addCommand(go, tr("Jump to folder (search)…"), {K(Qt::CTRL | Qt::Key_J)}, [this] { jumpToFolder(); });
     go->addSeparator();
     addCommand(go, tr("Locations (left)"), {K(Qt::ALT | Qt::Key_F1)}, [this] { m_left->showMountMenu(); });
     addCommand(go, tr("Locations (right)"), {K(Qt::ALT | Qt::Key_F2)}, [this] { m_right->showMountMenu(); });
@@ -705,7 +714,9 @@ void MainWindow::showShortcuts()
         {"Menu key, Shift+F10", "Context menu"},
         {"Ctrl+Q", "Preview column: shows the file under the cursor, both panels stay"},
         {"Alt+F4", "Quit"},
-        {"Vim keys (View menu)", "j k move · h l out/in · gg G top/bottom · Ctrl+D/U half page · / n N search · v mark · : palette"},
+        {"Ctrl+D / Ctrl+Shift+D", "Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder"},
+        {"Ctrl+J", "Jump to any visited folder (fuzzy)"},
+        {"Vim keys (View menu)", "j k move · h l out/in · gg G top/bottom · Ctrl+D/U half page · / n N search · v mark · : palette · ' or g<key> bookmarks · m set bookmark"},
         {"Esc", "Cancel a slow folder load"},
     };
     QString html = QStringLiteral("<table cellspacing='0' cellpadding='4'>");
@@ -819,7 +830,7 @@ QList<PopupItem> MainWindow::folderItems() const
         it.icon = f.pinned ? pin : folder;
         // Pins on top; otherwise frecency nudges the fuzzy ranking (zoxide-like).
         it.bonus = f.pinned ? 1000 : int(12 * std::log2(1 + f.frecency));
-        it.hint = f.pinned ? tr("pinned") : QString();
+        it.hint = !f.key.isEmpty() ? f.key : (f.pinned ? tr("pinned") : QString());
         const QString path = f.path;
         it.run = [this, path] { active()->navigate(path); };
         items.append(it);
@@ -845,15 +856,7 @@ void MainWindow::jumpToFolder()
         return false;
     };
     m_popup->open(tr("Jump to a folder: type parts of its path"), folderItems(),
-                  tr("Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   Ctrl+Shift+D: pin current"));
-}
-
-void MainWindow::togglePin()
-{
-    const QString p = active()->path();
-    const bool pin = !FolderHistory::instance().isPinned(p);
-    FolderHistory::instance().setPinned(p, pin);
-    active()->showMessage(pin ? tr("Pinned %1 (Ctrl+J to jump)").arg(p) : tr("Unpinned %1").arg(p));
+                  tr("Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   Ctrl+D: bookmark keys"));
 }
 
 // ------------------------------------------------------------ icon themes

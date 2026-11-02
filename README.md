@@ -65,8 +65,9 @@ Visual check without a display:
 | Alt+← / Alt+→ | History back / forward (mouse back/forward buttons too) |
 | Ctrl+PgUp, Ctrl+\\, Ctrl+\` | Parent, root, home |
 | Ctrl+L | Type a path (the path bar shows clickable segments; middle-click opens a tab) |
-| Ctrl+J, Ctrl+D | Jump to a folder: fuzzy search over pinned and frequently used folders (zoxide-style) |
-| Ctrl+Shift+D | Pin / unpin the current folder |
+| Ctrl+D | Bookmarks by key, yazi-style: `h` home, `d` Downloads, chains like `cp`; the list narrows as you type, Space switches to search |
+| Ctrl+Shift+D | Give the current folder a bookmark key (Delete removes it) |
+| Ctrl+J | Jump to any visited folder: fuzzy search, ranked zoxide-style |
 | Ctrl+Z | Undo the last operation: moves go back, copies go to the trash, trashed items come back, renames revert, new empty folders/files disappear |
 | Ctrl+Shift+P | Command palette: every command, fuzzy searchable, with its shortcut |
 | Alt+F1 / Alt+F2 | Locations (mounts) for left / right panel |
@@ -89,7 +90,8 @@ Drag and drop works within Tandem and with other applications (Shift = move).
 
 **Vim keys** (View → Vim keys, off by default): `j`/`k` move, `h`/`l` parent
 / open, `gg`/`G` top / bottom, `Ctrl+D`/`Ctrl+U` half a page, `/` search
-then `n`/`N`, `v` mark, `:` command palette. The viewer understands
+then `n`/`N`, `v` mark, `:` command palette, `'` or `g`+key for bookmarks
+(`gh` home), `m` to set one. The viewer understands
 `j`/`k`/`gg`/`G`/`/` as well.
 
 **Git**: inside a repository the header shows the branch and names get a

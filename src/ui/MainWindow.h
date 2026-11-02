@@ -79,7 +79,6 @@ private:
     void commandPalette();
     void jumpToFolder();
     QList<PopupItem> folderItems() const;
-    void togglePin();
     void toggleQuickView();
     void updateQuickView();
     void setIconTheme(const QString& id);
@@ -96,6 +95,7 @@ private:
     QAction* m_hiddenAction = nullptr;
     QHash<QString, QAction*> m_actions;
     FuzzyPopup* m_popup = nullptr;
+    class KeyChordPopup* m_chords = nullptr;
     ViewerWindow* m_quickView = nullptr;  // preview column right of the panels (Ctrl+Q)
     QTimer* m_quickTimer = nullptr;
     double m_panelRatio = 0.5;  // left panel's share of the two panels

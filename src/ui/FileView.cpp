@@ -306,6 +306,15 @@ void FileView::keyPressEvent(QKeyEvent* e)
         }
         if (!(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
             const QString t = e->text();
+            // g followed by anything but g: a bookmark chain (gh = home…), like yazi.
+            if (m_lastG && QDateTime::currentMSecsSinceEpoch() - m_lastG < 600 && !t.isEmpty() &&
+                t != QLatin1String("g") && t.at(0).isPrint()) {
+                m_lastG = 0;
+                emit bookmarkJumpRequested(t);
+                return;
+            }
+            if (t == QLatin1String("'")) { emit bookmarkJumpRequested(QString()); return; }
+            if (t == QLatin1String("m")) { emit bookmarkAssignRequested(); return; }
             if (t == QLatin1String("j")) { moveCursorBy(1); return; }
             if (t == QLatin1String("k")) { moveCursorBy(-1); return; }
             if (t == QLatin1String("h")) { emit parentRequested(); return; }

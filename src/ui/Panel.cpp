@@ -196,6 +196,8 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_view, &FileView::focused, this, [this] { emit activated(this); });
     connect(m_view, &FileView::cursorMoved, this, [this] { emit cursorChanged(this); });
     connect(m_view, &FileView::paletteRequested, this, &Panel::paletteRequested);
+    connect(m_view, &FileView::bookmarkJumpRequested, this, &Panel::bookmarkJumpRequested);
+    connect(m_view, &FileView::bookmarkAssignRequested, this, &Panel::bookmarkAssignRequested);
     connect(m_view, &FileView::searchNextRequested, this, [this](int dir) {
         if (m_lastSearch.isEmpty())
             return;

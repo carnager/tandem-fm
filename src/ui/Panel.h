@@ -92,6 +92,8 @@ signals:
     void renamed(const QString& dir, const QString& from, const QString& to);
     void cursorChanged(Panel* panel);
     void paletteRequested();
+    void bookmarkJumpRequested(const QString& keys);
+    void bookmarkAssignRequested();
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;

@@ -7,6 +7,7 @@
 #include "ui/FileModel.h"
 #include "ui/FileView.h"
 #include "ui/FuzzyPopup.h"
+#include "ui/KeyChordPopup.h"
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
 #include "ui/MultiRenameDialog.h"
@@ -925,6 +926,65 @@ private slots:
         QTRY_COMPARE(rightModel()->gitStatus("build"), '!');  // ignored by .gitignore
         m_right->navigate(R());
         QTRY_COMPARE(rightModel()->path(), R());
+    }
+
+    void bookmarkChords()
+    {
+        FolderHistory& h = FolderHistory::instance();
+        QTRY_VERIFY(h.isLoaded());
+        h.setBookmark(L("sub"), "cp");
+        h.setBookmark(L("sub/deep"), "cd");
+        h.setBookmark(R(), "c");  // also a prefix of the two above
+        auto* chords = m_window->findChild<KeyChordPopup*>();
+        QVERIFY(chords);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+
+        // A chain: "c" waits (cp, cd and c exist), "p" jumps.
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(chords->isVisible());
+        QTest::keyClicks(chords, "c");
+        QVERIFY(chords->isVisible());
+        QTest::keyClicks(chords, "p");
+        QTRY_VERIFY(!chords->isVisible());
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+
+        // Enter takes the exact key even though longer ones start with it.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(chords->isVisible());
+        QTest::keyClicks(chords, "c");
+        QTest::keyClick(chords, Qt::Key_Return);
+        QTRY_COMPARE(leftModel()->path(), R());
+
+        // Assign a new chain to the current folder.
+        m_left->navigate(L("sub/deep"));
+        QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(chords->isVisible());
+        for (int i = 0; i < 3; ++i)
+            QTest::keyClick(chords, Qt::Key_Backspace);  // clear the existing "cd"
+        QTest::keyClicks(chords, "zz");
+        QTest::keyClick(chords, Qt::Key_Return);
+        QTRY_COMPARE(h.pathForKey("zz"), L("sub/deep"));
+
+        // Vim: g + key.
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_left->setVimKeys(true);
+        m_left->view()->setFocus();
+        QTest::keyClicks(m_left->view(), "gz");
+        QTRY_VERIFY(chords->isVisible());
+        QTest::keyClicks(chords, "z");
+        QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+        m_left->setVimKeys(false);
+
+        for (const QString& p : {L("sub"), L("sub/deep"), R()})
+            h.setPinned(p, false);
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
     }
 
     void cleanupTestCase()
