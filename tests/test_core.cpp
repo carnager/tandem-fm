@@ -2,6 +2,7 @@
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
+#include "core/Search.h"
 #include "core/GitStatus.h"
 #include "core/Undo.h"
 #include "core/FolderHistory.h"
@@ -774,6 +775,44 @@ private slots:
         const GitInfo sub = gitStatusFor(tmp.filePath("sub"));
         QCOMPARE(sub.status.value("inner.txt"), 'M');
         QVERIFY(!gitStatusFor(QDir::rootPath()).inRepo);
+    }
+
+    void search()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("src/deep")));
+        QVERIFY(QDir().mkpath(tmp.filePath(".hidden")));
+        QVERIFY(QDir().mkpath(tmp.filePath("build")));
+        writeFile(tmp.filePath("src/Fuzzy.cpp"), "int needle = 1;");
+        writeFile(tmp.filePath("src/deep/fuzzy.h"), "// nothing");
+        writeFile(tmp.filePath(".hidden/fuzzy.txt"), "needle");
+        writeFile(tmp.filePath("build/fuzzy.o"), "needle");
+        writeFile(tmp.filePath(".gitignore"), "build/\n");
+        QVERIFY(QDir().mkdir(tmp.filePath(".git")));  // fd/rg honour .gitignore inside repos
+        auto run = [&](SearchSpec s, int limit = 1000) {
+            s.root = tmp.path();
+            QStringList all;
+            const QString err = runSearch(s, nullptr, limit, [&](const QStringList& b) { all << b; });
+            all.sort();
+            return err.isEmpty() ? all : QStringList{"ERROR " + err};
+        };
+        QCOMPARE(run({{}, "fuzzy", false, false}), QStringList({"src/Fuzzy.cpp", "src/deep/fuzzy.h"}));
+        QCOMPARE(run({{}, "*.h", false, false}), QStringList({"src/deep/fuzzy.h"}));
+        QCOMPARE(run({{}, "needle", true, false}), QStringList({"src/Fuzzy.cpp"}));
+        QCOMPARE(run({{}, "needle", true, true}),
+                 QStringList({".hidden/fuzzy.txt", "build/fuzzy.o", "src/Fuzzy.cpp"}));
+        QCOMPARE(run({{}, "fuzzy", false, true}, 2).size(), 2);  // limit
+        QCOMPARE(run({{}, "", false, false}), QStringList());
+
+        // Without fd/rg/grep: names still work (built-in walk), contents explain why not.
+        const QByteArray oldPath = qgetenv("PATH");
+        qputenv("PATH", QFile::encodeName(tmp.filePath("no-tools")));
+        QStringList names = run({{}, "fuzzy", false, false});
+        // Hidden skipped; the fallback doesn't read .gitignore, so build/ shows up.
+        QCOMPARE(names, QStringList({"build/fuzzy.o", "src/Fuzzy.cpp", "src/deep/fuzzy.h"}));
+        QCOMPARE(run({{}, "fuzzy", false, true}).size(), 4);                // incl. hidden & build
+        QVERIFY(run({{}, "needle", true, false}).first().startsWith("ERROR"));
+        qputenv("PATH", oldPath);
     }
 
     void helpers()

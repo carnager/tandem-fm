@@ -11,6 +11,7 @@
 #include "ui/PathBar.h"
 #include "ui/Theme.h"
 
+#include <QCheckBox>
 #include <QDir>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -69,8 +70,20 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_branchLabel = new QLabel(m_header);
     m_branchLabel->setObjectName(QStringLiteral("branch"));
     m_branchLabel->hide();
+    m_searchChip = new QToolButton(m_header);
+    m_searchChip->setObjectName(QStringLiteral("searchChip"));
+    m_searchChip->setFocusPolicy(Qt::NoFocus);
+    m_searchChip->setCursor(Qt::PointingHandCursor);
+    m_searchChip->setToolTip(tr("Search results — click (or Esc) to leave"));
+    m_searchChip->hide();
+    connect(m_searchChip, &QToolButton::clicked, this, [this] {
+        if (DirTab* t = tab(); t && t->isSearch())
+            t->goUp();
+        m_view->setFocus();
+    });
     hl->addWidget(m_mountButton);
     hl->addWidget(m_pathBar, 1);
+    hl->addWidget(m_searchChip);
     hl->addWidget(m_branchLabel);
     hl->addWidget(m_freeLabel);
     layout->addWidget(m_header);
@@ -110,6 +123,44 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
         m_view->setCurrentRow(row);
         updateStatus();
     });
+
+    m_searchBar = new QWidget(this);
+    m_searchBar->setObjectName(QStringLiteral("searchBarPanel"));
+    m_searchBar->setAttribute(Qt::WA_StyledBackground);
+    m_searchBar->setStyleSheet(t.css(QStringLiteral(
+        "#searchBarPanel { background: @header; border-top: 1px solid @border; }"
+        "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 6px; padding: 2px 8px; }"
+        "QToolButton { color: @dimText; border: none; padding: 2px 8px; border-radius: 9px; }"
+        "QToolButton:checked { color: @text; background: @border; }"
+        "QLabel, QCheckBox { color: @dimText; }")));
+    auto* sbl = new QHBoxLayout(m_searchBar);
+    sbl->setContentsMargins(8, 4, 8, 4);
+    sbl->setSpacing(6);
+    m_searchNames = new QToolButton(m_searchBar);
+    m_searchNames->setText(tr("Names"));
+    m_searchContents = new QToolButton(m_searchBar);
+    m_searchContents->setText(tr("Contents"));
+    for (QToolButton* b : {m_searchNames, m_searchContents}) {
+        b->setCheckable(true);
+        b->setAutoExclusive(true);
+        b->setFocusPolicy(Qt::NoFocus);
+    }
+    m_searchNames->setChecked(true);
+    m_searchEdit = new QLineEdit(m_searchBar);
+    m_searchEdit->setPlaceholderText(tr("search here and below — Enter starts, Esc closes"));
+    m_searchEdit->installEventFilter(this);
+    m_searchAll = new QCheckBox(tr("hidden && ignored"), m_searchBar);
+    m_searchAll->setFocusPolicy(Qt::NoFocus);
+    m_searchAll->setToolTip(tr("Also search hidden files and files excluded by .gitignore"));
+    m_searchInfo = new QLabel(m_searchBar);
+    sbl->addWidget(m_searchNames);
+    sbl->addWidget(m_searchContents);
+    sbl->addWidget(m_searchEdit, 1);
+    sbl->addWidget(m_searchAll);
+    sbl->addWidget(m_searchInfo);
+    m_searchBar->hide();
+    layout->addWidget(m_searchBar);
+    connect(m_searchEdit, &QLineEdit::returnPressed, this, &Panel::runSearch);
 
     m_status = new QLabel(this);
     m_status->setContentsMargins(10, 4, 10, 5);
@@ -287,6 +338,15 @@ void Panel::bindTab(DirTab* t)
     connect(t, &DirTab::infoChanged, this, [this, t] {
         if (t == tab())
             updateHeader();
+    });
+    connect(t, &DirTab::searchChanged, this, [this, t] {
+        const int ti = tabIndexOf(t);
+        if (ti >= 0)
+            updateTabTitles();
+        if (t == tab()) {
+            updateSearchUi();
+            updateStatus();
+        }
     });
     FileModel* m = t->model();
     connect(m, &FileModel::statsChanged, this, [this, t] {
@@ -628,6 +688,15 @@ void Panel::forward()
 void Panel::cancelLoading()
 {
     DirTab* t = tab();
+    if (t && t->isSearch()) {
+        if (t->isSearching()) {
+            t->cancelSearch();
+            showMessage(tr("Search stopped"));
+        } else {
+            t->goUp();  // leave the results
+        }
+        return;
+    }
     if (t && t->isLoading()) {
         t->cancelLoading();
         showMessage(tr("Cancelled"));
@@ -734,8 +803,13 @@ void Panel::expectName(const QString& name)
 
 void Panel::doRename(const QString& from, const QString& to)
 {
-    if (to.contains(QLatin1Char('/'))) {
+    if (to.contains(QLatin1Char('/')) && !(tab() && tab()->isSearch())) {
         showMessage(tr("A name cannot contain '/'"), true);
+        return;
+    }
+    if (from.contains(QLatin1Char('/')) && !to.contains(QLatin1Char('/'))) {
+        // In search results names are relative paths: keep the folder part.
+        doRename(from, from.left(from.lastIndexOf(QLatin1Char('/')) + 1) + to);
         return;
     }
     const QString dir = path();
@@ -845,14 +919,16 @@ void Panel::updateActiveStyle()
         "QToolButton#crumb { color: @text; border: none; padding: 1px 4px; border-radius: 4px; }"
         "QToolButton#crumb:hover { background: @border; }"
         "QLabel { color: @dimText; }"
-        "QLabel#branch { color: @accent; padding-right: 8px; }")
+        "QLabel#branch { color: @accent; padding-right: 8px; }"
+        "QToolButton#searchChip { color: @accentText; background: @accent; border: none; border-radius: 9px; padding: 1px 8px; }")
                                            : QStringLiteral(
         "#panelHeader { background: @header; border-top-left-radius: 7px; border-top-right-radius: 7px; }"
         "QLineEdit { background: transparent; color: @dimText; font-weight: 600; }"
         "QToolButton#crumb { color: @dimText; border: none; padding: 1px 4px; border-radius: 4px; }"
         "QToolButton#crumb:hover { background: @border; color: @text; }"
         "QLabel { color: @dimText; }"
-        "QLabel#branch { color: @dimText; padding-right: 8px; }")));
+        "QLabel#branch { color: @dimText; padding-right: 8px; }"
+        "QToolButton#searchChip { color: @text; background: @border; border: none; border-radius: 9px; padding: 1px 8px; }")));
 }
 
 void Panel::paintEvent(QPaintEvent*)
@@ -871,6 +947,7 @@ void Panel::updateHeader()
     if (!t)
         return;
     m_pathBar->setPath(t->path());
+    updateSearchUi();
     m_branchLabel->setVisible(!t->gitBranch().isEmpty());
     m_branchLabel->setText(QStringLiteral("⎇ %1").arg(t->gitBranch()));
     m_branchLabel->setToolTip(tr("Git branch"));
@@ -896,6 +973,11 @@ void Panel::updateStatus()
     if (!m_message.isEmpty()) {
         text = m_message;
         color = m_messageError ? t.error : t.text;
+    } else if (tb && tb->isSearch() && tb->isSearching()) {
+        text = tr("Searching %1 for “%2” …  %3 found   (Esc stops)")
+                   .arg(tb->searchSpec().root, tb->searchSpec().query)
+                   .arg(tb->searchFound());
+        color = t.accent;
     } else if (tb && tb->isLoading() && !m_loadingTimer.isActive()) {
         text = tr("Loading %1 …   (Esc to cancel)").arg(tb->loadingPath());
         color = t.accent;
@@ -924,6 +1006,55 @@ void Panel::showMessage(const QString& text, bool error)
     m_messageError = error;
     m_messageTimer.start(error ? 6000 : 2500);
     updateStatus();
+}
+
+void Panel::startSearchBar()
+{
+    if (inArchive()) {
+        showMessage(tr("Searching inside archives isn't supported yet"), true);
+        return;
+    }
+    DirTab* t = tab();
+    if (t && t->isSearch()) {
+        m_searchEdit->setText(t->searchSpec().query);
+        m_searchContents->setChecked(t->searchSpec().contents);
+        m_searchNames->setChecked(!t->searchSpec().contents);
+        m_searchAll->setChecked(t->searchSpec().all);
+    }
+    m_searchBar->show();
+    m_searchEdit->setFocus();
+    m_searchEdit->selectAll();
+    updateSearchUi();
+}
+
+void Panel::runSearch()
+{
+    DirTab* t = tab();
+    const QString q = m_searchEdit->text().trimmed();
+    if (!t || q.isEmpty())
+        return;
+    SearchSpec spec;
+    spec.root = t->isSearch() ? t->searchSpec().root : path();
+    spec.query = q;
+    spec.contents = m_searchContents->isChecked();
+    spec.all = m_searchAll->isChecked();
+    t->startSearch(spec);
+    m_view->setFocus();
+}
+
+void Panel::updateSearchUi()
+{
+    DirTab* t = tab();
+    const bool search = t && t->isSearch();
+    m_searchChip->setVisible(search);
+    if (!search) {
+        m_searchInfo->clear();
+        return;
+    }
+    const SearchSpec& s = t->searchSpec();
+    const QString count = t->isSearching() ? tr("%1 found…").arg(t->searchFound()) : tr("%1 found").arg(t->searchFound());
+    m_searchChip->setText(QStringLiteral("⌕ “%1”  ·  %2  ✕").arg(s.query, count));
+    m_searchInfo->setText(t->searchError().isEmpty() ? count : t->searchError());
 }
 
 void Panel::startFilter()
@@ -957,6 +1088,23 @@ bool Panel::eventFilter(QObject* obj, QEvent* e)
     if (e->type() == QEvent::KeyPress && static_cast<QKeyEvent*>(e)->key() == Qt::Key_Escape &&
         qobject_cast<QLineEdit*>(obj) && obj->parent() == m_pathBar) {
         m_view->setFocus();
+        return false;
+    }
+    if (obj == m_searchEdit && e->type() == QEvent::KeyPress) {
+        auto* ke = static_cast<QKeyEvent*>(e);
+        if (ke->key() == Qt::Key_Escape) {
+            m_searchBar->hide();
+            m_view->setFocus();
+            return true;
+        }
+        if (ke->key() == Qt::Key_Tab) {  // Tab flips names / contents
+            (m_searchNames->isChecked() ? m_searchContents : m_searchNames)->setChecked(true);
+            return true;
+        }
+        if (ke->key() == Qt::Key_Down) {
+            m_view->setFocus();
+            return true;
+        }
         return false;
     }
     if (obj == m_filterEdit && e->type() == QEvent::KeyPress) {

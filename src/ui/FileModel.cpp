@@ -327,6 +327,20 @@ void FileModel::setGitStatus(const QHash<QString, char>& status)
         emit dataChanged(index(0, ColName), index(int(m_entries.size()) - 1, ColName));
 }
 
+void FileModel::appendEntries(std::vector<FileEntry>&& add)
+{
+    if (add.empty())
+        return;
+    const int first = int(m_entries.size());
+    beginInsertRows({}, first, first + int(add.size()) - 1);
+    for (auto& e : add) {
+        account(e, +1);
+        m_entries.push_back(std::move(e));
+    }
+    endInsertRows();
+    emit statsChanged();
+}
+
 void FileModel::setDirSize(const QString& name, int64_t size)
 {
     const int row = rowOf(name);

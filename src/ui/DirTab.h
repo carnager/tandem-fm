@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/DirLister.h"
+#include "core/Search.h"
 
 #include <QObject>
 #include <QTimer>
@@ -39,6 +40,16 @@ public:
     // Inside an archive: path() is archivePath() + "/" + the folder inside it.
     bool inArchive() const { return m_inArchive; }
     QString gitBranch() const { return m_gitBranch; }
+
+    // Search results as a virtual folder: entries are paths relative to the
+    // searched folder, so every file operation keeps working on them.
+    void startSearch(const SearchSpec& spec);
+    bool isSearch() const { return m_inSearch; }
+    bool isSearching() const { return m_searchRunning; }
+    const SearchSpec& searchSpec() const { return m_search; }
+    int searchFound() const { return m_searchFound; }
+    QString searchError() const { return m_searchError; }
+    void cancelSearch();
     static void setGitEnabled(bool on);
     void refreshGit();
     QString archivePath() const { return m_archivePath; }
@@ -69,6 +80,7 @@ signals:
     void listingFailed(const QString& path, const QString& message);
     void focusRequested(const QString& name);
     void infoChanged();
+    void searchChanged();
 
 private:
     enum class History { Push, Back, Forward, None };
@@ -91,6 +103,12 @@ private:
     bool m_showHidden = false;
     bool m_inArchive = false;
     QString m_gitBranch;
+    SearchSpec m_search;
+    bool m_inSearch = false;
+    bool m_searchRunning = false;
+    int m_searchFound = 0;
+    QString m_searchError;
+    std::shared_ptr<std::atomic<bool>> m_searchCancel;
     quint64 m_gitGen = 0;
     QTimer* m_gitTimer = nullptr;
     QString m_archivePath;

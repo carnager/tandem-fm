@@ -1064,6 +1064,61 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void searchAsFolder()
+    {
+        QVERIFY(QDir().mkpath(L("srch/a/b")));
+        writeFile(L("srch/a/report.txt"), "quarterly numbers");
+        writeFile(L("srch/a/b/report-old.txt"), "old");
+        writeFile(L("srch/other.md"), "numbers here too");
+        m_left->navigate(L("srch"));
+        QTRY_COMPARE(leftModel()->path(), L("srch"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+
+        QTest::keyClick(m_left->view(), Qt::Key_F7, Qt::AltModifier);
+        QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()));
+        QTest::keyClicks(QApplication::focusWidget(), "report");
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_VERIFY(m_left->tab()->isSearch());
+        QTRY_VERIFY(!m_left->tab()->isSearching());
+        QTRY_VERIFY(leftModel()->rowOf("a/report.txt") >= 0);
+        QVERIFY(leftModel()->rowOf("a/b/report-old.txt") >= 0);
+        QCOMPARE(leftModel()->rowOf("other.md"), -1);
+
+        // Results behave like files: the full path is right, delete works.
+        moveCursorTo(m_left, "a/b/report-old.txt");
+        QCOMPARE(m_left->currentPath(), L("srch/a/b/report-old.txt"));
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_left->view(), Qt::Key_F8, Qt::ShiftModifier);
+        QTRY_VERIFY(!QFile::exists(L("srch/a/b/report-old.txt")));
+        QTRY_COMPARE(leftModel()->rowOf("a/b/report-old.txt"), -1);
+
+        // Contents search (Tab flips the mode).
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_F7, Qt::AltModifier);
+        QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab);
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_A, Qt::ControlModifier);
+        QTest::keyClicks(QApplication::focusWidget(), "numbers");
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_VERIFY(!m_left->tab()->isSearching());
+        QTRY_COMPARE(m_left->tab()->searchFound(), 2);
+        QVERIFY(leftModel()->rowOf("other.md") >= 0);
+
+        // Esc leaves the results, back in the folder searched.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_Escape);
+        QTRY_VERIFY(!m_left->tab()->isSearch());
+        QTRY_COMPARE(leftModel()->path(), L("srch"));
+        QVERIFY(leftModel()->rowOf("a") >= 0);
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
     void cleanupTestCase()
     {
         m_window->close();

@@ -305,6 +305,8 @@ void MainWindow::createMenus()
 
     QMenu* mark = bar->addMenu(tr("&Mark"));
     addCommand(mark, tr("Filter as you type…"), {K(Qt::CTRL | Qt::Key_F)}, [this] { active()->startFilter(); });
+    addCommand(mark, tr("Search files (names or contents)…"), {K(Qt::ALT | Qt::Key_F7), K(Qt::CTRL | Qt::SHIFT | Qt::Key_F)},
+               [this] { active()->startSearchBar(); });
     mark->addSeparator();
     addCommand(mark, tr("Mark group…\tNum +"), {}, [this] { active()->markGroup(1); });
     addCommand(mark, tr("Unmark group…\tNum -"), {}, [this] { active()->markGroup(-1); });
@@ -783,6 +785,7 @@ void MainWindow::showShortcuts()
         {"Ctrl+PgDn", QT_TR_NOOP("Enter folder, or browse any file as archive")},
         {"Menu key, Shift+F10", QT_TR_NOOP("Context menu")},
         {"Ctrl+Q", QT_TR_NOOP("Preview: below each panel, below both or on the right (View > Preview position)")},
+        {"Alt+F7", QT_TR_NOOP("Search names (fd) or contents (rg) here and below; results are a folder you can work in")},
         {"Ctrl+I", QT_TR_NOOP("Previews show details: type, dates, permissions, owner, checksum…")},
         {"Alt+F4", QT_TR_NOOP("Quit")},
         {"Ctrl+D / Ctrl+Shift+D", QT_TR_NOOP("Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder")},

@@ -11,6 +11,7 @@
 
 class QLabel;
 class QLineEdit;
+class QCheckBox;
 class QTabBar;
 class QToolButton;
 
@@ -77,6 +78,7 @@ public:
     void expectName(const QString& name);
     void focusPathEdit();
     void startFilter();
+    void startSearchBar();  // Alt+F7
     void clearFilter();
     void showMountMenu();
     void showMessage(const QString& text, bool error = false);
@@ -131,6 +133,15 @@ private:
     PathBar* m_pathBar;
     QLabel* m_freeLabel;
     QLabel* m_branchLabel;
+    QToolButton* m_searchChip;
+    QWidget* m_searchBar;
+    QLineEdit* m_searchEdit;
+    QToolButton* m_searchNames;
+    QToolButton* m_searchContents;
+    QCheckBox* m_searchAll;
+    QLabel* m_searchInfo;
+    void runSearch();
+    void updateSearchUi();
     FileView* m_view;
     QLabel* m_status;
     QLineEdit* m_search;

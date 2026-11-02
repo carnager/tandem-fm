@@ -56,6 +56,8 @@ QString DirTab::path() const
 
 QString DirTab::title() const
 {
+    if (m_inSearch)
+        return QStringLiteral("⌕ %1").arg(m_search.query);
     const QString p = path();
     if (p == QDir::homePath())
         return QStringLiteral("~");
@@ -79,11 +81,32 @@ void DirTab::refresh()
 {
     if (path().isEmpty())
         return;
+    if (m_inSearch) {
+        // Re-check the results (after a delete/move) instead of searching again.
+        QStringList names;
+        for (int r = 0; r < m_model->count(); ++r)
+            if (!m_model->entry(r)->isParent)
+                names << m_model->entry(r)->name;
+        QPointer<DirTab> self(this);
+        const QString root = m_search.root;
+        ioPool()->start([self, root, names] {
+            auto updates = std::make_shared<std::vector<EntryUpdate>>(statNames(root, names, true));
+            postToUi([self, updates] {
+                if (self && self->m_inSearch)
+                    self->m_model->applyUpdates(std::move(*updates));
+            });
+        });
+        return;
+    }
     startListing(path(), cursorName(), History::None, true);
 }
 
 void DirTab::goUp()
 {
+    if (m_inSearch) {  // leave the results: back to where the search started
+        startListing(m_search.root, {}, History::None, false);
+        return;
+    }
     const QString p = path();
     if (p == QLatin1String("/") || p.isEmpty())
         return;
@@ -92,6 +115,10 @@ void DirTab::goUp()
 
 void DirTab::back()
 {
+    if (m_inSearch) {
+        goUp();
+        return;
+    }
     if (m_back.isEmpty())
         return;
     startListing(m_back.last(), {}, History::Back, false);
@@ -126,6 +153,12 @@ void DirTab::setShowHidden(bool on)
 
 void DirTab::startListing(const QString& path, const QString& focus, History history, bool keepMarks)
 {
+    if (m_inSearch) {
+        cancelSearch();
+        m_inSearch = false;
+        m_model->setListing(QString(), {});  // forget the results; the real listing follows
+        emit searchChanged();
+    }
     if (m_cancel)
         m_cancel->store(true);
     if (m_sizeCancel && path != this->path())
@@ -282,7 +315,7 @@ void DirTab::refreshGit()
 {
     const QString dir = m_model->path();
     const quint64 gen = ++m_gitGen;
-    if (!g_gitEnabled || m_inArchive || dir.isEmpty()) {
+    if (!g_gitEnabled || m_inArchive || m_inSearch || dir.isEmpty()) {
         m_model->setGitStatus({});
         if (!m_gitBranch.isEmpty()) {
             m_gitBranch.clear();
@@ -301,6 +334,69 @@ void DirTab::refreshGit()
                 self->m_gitBranch = info->branch;
                 emit self->infoChanged();
             }
+        });
+    });
+}
+
+void DirTab::cancelSearch()
+{
+    if (m_searchCancel)
+        m_searchCancel->store(true);
+    if (m_searchRunning) {
+        m_searchRunning = false;
+        emit searchChanged();
+    }
+}
+
+void DirTab::startSearch(const SearchSpec& spec)
+{
+    if (m_cancel)
+        m_cancel->store(true);
+    cancelSearch();
+    ++m_gen;  // results of an older listing are ignored
+    if (m_loading) {
+        m_loading = false;
+        emit loadingChanged(false);
+    }
+    setWatch(-1);
+    m_search = spec;
+    m_inSearch = true;
+    m_searchRunning = true;
+    m_searchFound = 0;
+    m_searchError.clear();
+    m_model->setGitStatus({});
+    if (!m_model->filter().isEmpty())
+        m_model->setFilter({});
+    m_model->setListing(spec.root, {});
+    emit listingReady(QString());
+    emit searchChanged();
+
+    m_searchCancel = std::make_shared<std::atomic<bool>>(false);
+    auto cancel = m_searchCancel;
+    const quint64 gen = m_gen;
+    QPointer<DirTab> self(this);
+    ioPool()->start([self, spec, cancel, gen] {
+        const QString error = runSearch(spec, cancel.get(), 20000, [&](const QStringList& batch) {
+            auto found = std::make_shared<std::vector<EntryUpdate>>(statNames(spec.root, batch, true));
+            postToUi([self, gen, found] {
+                if (!self || gen != self->m_gen || !self->m_inSearch)
+                    return;
+                std::vector<FileEntry> entries;
+                for (auto& [name, e] : *found)
+                    if (e)
+                        entries.push_back(std::move(*e));
+                self->m_searchFound += int(entries.size());
+                self->m_model->appendEntries(std::move(entries));
+                emit self->searchChanged();
+            });
+        });
+        postToUi([self, gen, error, cancel] {
+            if (!self || gen != self->m_gen || cancel->load())
+                return;
+            self->m_searchRunning = false;
+            self->m_searchError = error;
+            self->m_model->setSortSpec(self->m_model->sortSpec());  // results arrive unsorted
+            emit self->searchChanged();
         });
     });
 }

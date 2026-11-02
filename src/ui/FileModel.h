@@ -38,6 +38,8 @@ public:
 
     void setListing(const QString& path, std::vector<FileEntry>&& entries);
     void applyUpdates(std::vector<EntryUpdate>&& updates);
+    // Search results arriving: appended as they come (sorted at the end).
+    void appendEntries(std::vector<FileEntry>&& entries);
     void setDirSize(const QString& name, int64_t size);
 
     QString path() const { return m_path; }

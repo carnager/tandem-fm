@@ -30,6 +30,7 @@ add_library(tandem_core STATIC
   src/core/FolderHistory.h src/core/FolderHistory.cpp
   src/core/Undo.h src/core/Undo.cpp
   src/core/GitStatus.h src/core/GitStatus.cpp
+  src/core/Search.h src/core/Search.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)

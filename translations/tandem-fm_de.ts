@@ -351,6 +351,18 @@
         <source>Camera</source>
         <translation>Kamera</translation>
     </message>
+    <message>
+        <source>Could not start %1</source>
+        <translation>%1 konnte nicht gestartet werden</translation>
+    </message>
+    <message>
+        <source>Search failed</source>
+        <translation>Suche fehlgeschlagen</translation>
+    </message>
+    <message>
+        <source>Install ripgrep (rg) to search file contents</source>
+        <translation>Für die Inhaltssuche ripgrep (rg) installieren</translation>
+    </message>
 </context>
 <context>
     <name>tandem::CopyJob</name>
@@ -1054,6 +1066,10 @@
         <translation>Unter jedem Panel</translation>
     </message>
     <message>
+        <source>Search files (names or contents)…</source>
+        <translation>Dateien suchen (Namen oder Inhalt)…</translation>
+    </message>
+    <message>
         <source>Preview: details instead of content</source>
         <translation>Vorschau: Details statt Inhalt</translation>
     </message>
@@ -1247,6 +1263,10 @@
     <message>
         <source>Preview: below each panel, below both or on the right (View &gt; Preview position)</source>
         <translation>Vorschau: unter jedem Panel, unter beiden oder rechts (Ansicht &gt; Position der Vorschau)</translation>
+    </message>
+    <message>
+        <source>Search names (fd) or contents (rg) here and below; results are a folder you can work in</source>
+        <translation>Namen (fd) oder Inhalte (rg) ab hier suchen; die Treffer sind ein Ordner, in dem man arbeiten kann</translation>
     </message>
     <message>
         <source>Previews show details: type, dates, permissions, owner, checksum…</source>
@@ -1740,12 +1760,36 @@ F3 öffnet es im Betrachter</translation>
         <translation>Orte (Alt+F1 / Alt+F2)</translation>
     </message>
     <message>
+        <source>Search results — click (or Esc) to leave</source>
+        <translation>Suchergebnisse – Klick (oder Esc) verlässt sie</translation>
+    </message>
+    <message>
         <source>Filter</source>
         <translation>Filter</translation>
     </message>
     <message>
         <source>words or *.ext — Esc clears, Enter/↓ back to the list</source>
         <translation>Wörter oder *.ext — Esc leert, Enter/↓ zurück zur Liste</translation>
+    </message>
+    <message>
+        <source>Names</source>
+        <translation>Namen</translation>
+    </message>
+    <message>
+        <source>Contents</source>
+        <translation>Inhalt</translation>
+    </message>
+    <message>
+        <source>search here and below — Enter starts, Esc closes</source>
+        <translation>ab hier suchen – Enter startet, Esc schließt</translation>
+    </message>
+    <message>
+        <source>hidden &amp;&amp; ignored</source>
+        <translation>versteckt &amp;&amp; ignoriert</translation>
+    </message>
+    <message>
+        <source>Also search hidden files and files excluded by .gitignore</source>
+        <translation>Auch versteckte und per .gitignore ausgeschlossene Dateien durchsuchen</translation>
     </message>
     <message>
         <source>Search</source>
@@ -1762,6 +1806,10 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>Cannot open %1: %2</source>
         <translation>%1 kann nicht geöffnet werden: %2</translation>
+    </message>
+    <message>
+        <source>Search stopped</source>
+        <translation>Suche angehalten</translation>
     </message>
     <message>
         <source>Cancelled</source>
@@ -1808,6 +1856,10 @@ F3 öffnet es im Betrachter</translation>
         <translation>%1 von %2 frei</translation>
     </message>
     <message>
+        <source>Searching %1 for “%2” …  %3 found   (Esc stops)</source>
+        <translation>Durchsuche %1 nach „%2“ …  %3 gefunden   (Esc hält an)</translation>
+    </message>
+    <message>
         <source>Loading %1 …   (Esc to cancel)</source>
         <translation>%1 wird geladen …   (Esc zum Abbrechen)</translation>
     </message>
@@ -1822,6 +1874,18 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>%1 files, %2 folders   ·   %3</source>
         <translation>%1 Dateien, %2 Ordner   ·   %3</translation>
+    </message>
+    <message>
+        <source>Searching inside archives isn&apos;t supported yet</source>
+        <translation>Suchen in Archiven wird noch nicht unterstützt</translation>
+    </message>
+    <message>
+        <source>%1 found…</source>
+        <translation>%1 gefunden…</translation>
+    </message>
+    <message>
+        <source>%1 found</source>
+        <translation>%1 gefunden</translation>
     </message>
 </context>
 <context>
