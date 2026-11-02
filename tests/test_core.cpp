@@ -255,6 +255,34 @@ private slots:
         QCOMPARE(DesktopApps::commandLines("\"my app\" --x=100%%", {"/f"}), L({{"my app", "--x=100%", "/f"}}));
     }
 
+    void defaultAppFromMimeappsList()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("data/applications")));
+        QVERIFY(QDir().mkpath(tmp.filePath("config")));
+        writeFile(tmp.filePath("data/applications/aaa.desktop"),
+                  "[Desktop Entry]\nType=Application\nName=Aaa\nExec=aaa %f\nMimeType=text/plain;\n");
+        writeFile(tmp.filePath("data/applications/zzz.desktop"),
+                  "[Desktop Entry]\nType=Application\nName=Zzz\nExec=zzz %F\nMimeType=text/plain;\n");
+        writeFile(tmp.filePath("data/applications/gone.desktop"),
+                  "[Desktop Entry]\nType=Application\nName=Gone\nExec=gone\nMimeType=text/plain;\n");
+        writeFile(tmp.filePath("config/mimeapps.list"),
+                  "[Default Applications]\ntext/plain=zzz.desktop;\n[Removed Associations]\ntext/plain=gone.desktop;\n");
+        qputenv("XDG_DATA_HOME", QFile::encodeName(tmp.filePath("data")));
+        qputenv("XDG_DATA_DIRS", QFile::encodeName(tmp.filePath("none")));
+        qputenv("XDG_CONFIG_HOME", QFile::encodeName(tmp.filePath("config")));
+        qputenv("XDG_CONFIG_DIRS", QFile::encodeName(tmp.filePath("none")));
+
+        DesktopApps& apps = DesktopApps::instance();
+        apps.loadAsync();
+        QTRY_VERIFY(apps.isLoaded());
+        QCOMPARE(apps.defaultFor({"text/plain"}).id, QString("zzz.desktop"));
+        const QList<DesktopApp> all = apps.appsFor({"text/plain"});
+        QCOMPARE(all.size(), 2);  // "gone" was removed by the user
+        QCOMPARE(all[1].id, QString("aaa.desktop"));
+        QVERIFY(apps.defaultFor({"image/x-nothing"}).id.isEmpty());
+    }
+
     void helpers()
     {
         QTemporaryDir tmp;

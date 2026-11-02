@@ -107,18 +107,24 @@ bool parseDesktopFile(const QString& path, DesktopApp& app)
     return !hidden && type == QLatin1String("Application") && !app.exec.isEmpty() && !app.name.isEmpty();
 }
 
-void parseMimeApps(const QString& path, QHash<QString, QStringList>& defaults, QHash<QString, QStringList>& added)
+void parseMimeApps(const QString& path, QHash<QString, QStringList>& defaults, QHash<QString, QStringList>& added,
+                   QHash<QString, QStringList>& removed)
 {
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
-    enum { None, Default, Added } section = None;
+    enum { None, Default, Added, Removed } section = None;
     while (!f.atEnd()) {
         const QString line = QString::fromUtf8(f.readLine()).trimmed();
         if (line.startsWith(QLatin1Char('['))) {
-            section = line == QLatin1String("[Default Applications]")
-                          ? Default
-                          : (line == QLatin1String("[Added Associations]") ? Added : None);
+            if (line == QLatin1String("[Default Applications]"))
+                section = Default;
+            else if (line == QLatin1String("[Added Associations]"))
+                section = Added;
+            else if (line == QLatin1String("[Removed Associations]"))
+                section = Removed;
+            else
+                section = None;
             continue;
         }
         const int eq = line.indexOf(QLatin1Char('='));
@@ -126,7 +132,7 @@ void parseMimeApps(const QString& path, QHash<QString, QStringList>& defaults, Q
             continue;
         const QString mime = line.left(eq).trimmed();
         const QStringList ids = line.mid(eq + 1).split(QLatin1Char(';'), Qt::SkipEmptyParts);
-        auto& target = section == Default ? defaults : added;
+        auto& target = section == Default ? defaults : (section == Added ? added : removed);
         // Earlier files take precedence: only append ids not yet present.
         QStringList& list = target[mime];
         for (const QString& id : ids)
@@ -140,7 +146,7 @@ void parseMimeApps(const QString& path, QHash<QString, QStringList>& defaults, Q
 void DesktopApps::load()
 {
     QHash<QString, DesktopApp> apps;
-    QHash<QString, QStringList> byMime, defaults, added;
+    QHash<QString, QStringList> byMime, defaults, added, removed;
 
     for (const QString& base : dataDirs()) {
         const QString dir = base + QStringLiteral("/applications");
@@ -163,9 +169,9 @@ void DesktopApps::load()
         }
     }
     for (const QString& dir : configDirs())
-        parseMimeApps(dir + QStringLiteral("/mimeapps.list"), defaults, added);
+        parseMimeApps(dir + QStringLiteral("/mimeapps.list"), defaults, added, removed);
     for (const QString& base : dataDirs())
-        parseMimeApps(base + QStringLiteral("/applications/mimeapps.list"), defaults, added);
+        parseMimeApps(base + QStringLiteral("/applications/mimeapps.list"), defaults, added, removed);
 
     QString terminal = qEnvironmentVariable("TERMINAL");
     if (terminal.isEmpty() || QStandardPaths::findExecutable(terminal.section(QLatin1Char(' '), 0, 0)).isEmpty()) {
@@ -184,6 +190,7 @@ void DesktopApps::load()
     m_byMime = std::move(byMime);
     m_defaults = std::move(defaults);
     m_added = std::move(added);
+    m_removed = std::move(removed);
     m_terminal = terminal;
     m_loaded.store(true);
 }
@@ -208,9 +215,18 @@ QList<DesktopApp> DesktopApps::appsFor(const QStringList& mimeChain) const
         take(m_defaults.value(m));
     for (const QString& m : mimeChain) {
         take(m_added.value(m));
-        take(m_byMime.value(m));
+        QStringList ids = m_byMime.value(m);
+        for (const QString& r : m_removed.value(m))
+            ids.removeAll(r);
+        take(ids);
     }
     return out;
+}
+
+DesktopApp DesktopApps::defaultFor(const QStringList& mimeChain) const
+{
+    const QList<DesktopApp> apps = appsFor(mimeChain);
+    return apps.isEmpty() ? DesktopApp{} : apps.first();
 }
 
 QString DesktopApps::defaultTerminal() const

@@ -31,6 +31,9 @@ public:
     // Apps that handle any type in mimeChain (most specific first), with the
     // user's default application first.
     QList<DesktopApp> appsFor(const QStringList& mimeChain) const;
+    // The app a double-click should use: the user's default, else the best
+    // registered match. Empty id if nothing handles the type.
+    DesktopApp defaultFor(const QStringList& mimeChain) const;
     QString defaultTerminal() const;
 
     // Expands Exec field codes (%f %F %u %U ...) and starts the app detached.
@@ -49,6 +52,7 @@ private:
     QHash<QString, QStringList> m_byMime;           // mime -> ids (from .desktop files)
     QHash<QString, QStringList> m_defaults;         // mime -> ids (mimeapps.list)
     QHash<QString, QStringList> m_added;            // mime -> ids (mimeapps.list)
+    QHash<QString, QStringList> m_removed;          // mime -> ids (mimeapps.list)
     QString m_terminal;
 };
 

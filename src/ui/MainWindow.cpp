@@ -407,8 +407,30 @@ void MainWindow::editCurrent()
     openFile(path);
 }
 
+// Mime types for a file name, most specific first. Name-based only: no disk I/O.
+static QStringList mimeChainFor(const QString& path)
+{
+    static QMimeDatabase db;
+    QStringList chain;
+    const QList<QMimeType> types = db.mimeTypesForFileName(baseName(path));
+    if (!types.isEmpty())
+        chain << types.first().name() << types.first().aliases() << types.first().allAncestors();
+    chain << QStringLiteral("application/octet-stream");
+    return chain;
+}
+
 void MainWindow::openFile(const QString& path)
 {
+    // Launch the default app ourselves: xdg-open / the portal may show an
+    // app chooser every time on some desktops, and this is faster anyway.
+    DesktopApps& apps = DesktopApps::instance();
+    if (apps.isLoaded()) {
+        const DesktopApp app = apps.defaultFor(mimeChainFor(path));
+        if (!app.id.isEmpty() && app.id != QLatin1String("tandem-fm.desktop")) {
+            if (DesktopApps::launch(app, {path}, parentPath(path), apps.defaultTerminal()))
+                return;
+        }
+    }
     if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
         active()->showMessage(tr("No application to open %1").arg(baseName(path)), true);
 }
@@ -624,17 +646,10 @@ void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)
         return;
     }
     // Apps that can open every selected file, best match first.
-    static QMimeDatabase db;
     QList<DesktopApp> apps;
     bool first = true;
     for (const QString& p : paths) {
-        const QList<QMimeType> types = db.mimeTypesForFileName(baseName(p));
-        QStringList chain;
-        if (!types.isEmpty()) {
-            chain << types.first().name() << types.first().aliases() << types.first().allAncestors();
-        }
-        chain << QStringLiteral("application/octet-stream");
-        const QList<DesktopApp> forThis = registry.appsFor(chain);
+        const QList<DesktopApp> forThis = registry.appsFor(mimeChainFor(p));
         if (first) {
             apps = forThis;
             first = false;
