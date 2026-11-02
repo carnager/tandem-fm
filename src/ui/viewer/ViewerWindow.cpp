@@ -16,6 +16,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMimeDatabase>
+#include <QPainter>
 #include <QPlainTextEdit>
 #include <QPointer>
 #include <QSettings>
@@ -122,6 +123,8 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     const Theme& t = theme();
 
     auto* layout = new QVBoxLayout(this);
+    // Embedded (preview column): an "inspector", deliberately unlike the file
+    // panels: no card or header strip, content on an inset sheet.
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
@@ -129,19 +132,44 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     top->setObjectName(QStringLiteral("viewerTop"));
     top->setAttribute(Qt::WA_StyledBackground);
     top->setStyleSheet(t.css(QStringLiteral(
-        "#viewerTop { background: @header; border-bottom: 1px solid @border; }"
-        "QToolButton { color: @dimText; border: none; padding: 4px 10px; border-radius: 6px; }"
-        "QToolButton:checked { color: @text; background: @headerActive; }"
-        "QToolButton:hover { color: @text; }")));
+        "#viewerTop { background: %1; %2 }"
+        "QToolButton { color: @dimText; border: none; padding: 2px 8px; border-radius: 9px; }"
+        "QToolButton:checked { color: @text; background: @border; }"
+        "QToolButton:hover:!checked { color: @text; }")
+                                .arg(embedded ? QStringLiteral("transparent") : QStringLiteral("@header"),
+                                     embedded ? QString() : QStringLiteral("border-bottom: 1px solid @border;"))));
     auto* tl = new QHBoxLayout(top);
-    tl->setContentsMargins(10, 4, 10, 4);
+    tl->setContentsMargins(10, 5, 8, 5);
     tl->setSpacing(4);
+    m_titleIcon = new QLabel(top);
+    m_titleIcon->setFixedSize(18, 18);
+    m_titleIcon->hide();
+    tl->addWidget(m_titleIcon);
+    tl->addSpacing(2);
     m_title = new QLabel(top);
     QFont bold = m_title->font();
     bold.setWeight(QFont::DemiBold);
     m_title->setFont(bold);
     m_title->setTextFormat(Qt::PlainText);
-    tl->addWidget(m_title, 1);
+    m_title->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);  // elided in resizeEvent
+    if (embedded) {
+        // A caption over the name, so it reads as a label, not a path bar.
+        auto* titles = new QVBoxLayout;
+        titles->setSpacing(0);
+        auto* caption = new QLabel(tr("PREVIEW"), top);
+        QFont cf = caption->font();
+        cf.setPointSizeF(cf.pointSizeF() * 0.78);
+        cf.setWeight(QFont::DemiBold);
+        cf.setLetterSpacing(QFont::PercentageSpacing, 112);
+        caption->setFont(cf);
+        caption->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+        titles->addWidget(caption);
+        titles->addWidget(m_title);
+        tl->addLayout(titles, 1);
+        tl->setContentsMargins(14, 8, 10, 4);
+    } else {
+        tl->addWidget(m_title, 1);
+    }
 
     auto makeButton = [&](const QString& text, const QString& tip) {
         auto* b = new QToolButton(top);
@@ -163,7 +191,8 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     connect(m_wrapButton, &QToolButton::toggled, this, [this](bool on) {
         m_text->setLineWrapMode(on ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
         m_big->setWrap(on);
-        QSettings().setValue(QStringLiteral("viewer/wrap"), on);
+        if (!m_embedded)
+            QSettings().setValue(QStringLiteral("viewer/wrap"), on);
     });
     layout->addWidget(top);
 
@@ -205,14 +234,46 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_list->header()->setStretchLastSection(false);
     m_list->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    m_message = new QLabel(m_stack);
+    m_noteBox = new QWidget(m_stack);
+    auto* nl = new QVBoxLayout(m_noteBox);
+    nl->addStretch(1);
+    m_noteIcon = new QLabel(m_noteBox);
+    m_noteIcon->setAlignment(Qt::AlignCenter);
+    {
+        // A big, dimmed icon for the empty state.
+        QPixmap pm = IconCache::themed("view-preview", "document-preview").pixmap(64, 64);
+        QPixmap faded(pm.size());
+        faded.fill(Qt::transparent);
+        QPainter fp(&faded);
+        fp.setOpacity(0.35);
+        fp.drawPixmap(0, 0, pm);
+        fp.end();
+        m_noteIcon->setPixmap(faded);
+    }
+    m_noteIcon->hide();
+    m_message = new QLabel(m_noteBox);
     m_message->setAlignment(Qt::AlignCenter);
-    m_message->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+    m_message->setWordWrap(true);
+    m_message->setStyleSheet(t.css(QStringLiteral("color: @dimText; padding: 8px 24px;")));
+    nl->addWidget(m_noteIcon);
+    nl->addWidget(m_message);
+    nl->addStretch(1);
     for (QWidget* w : {static_cast<QWidget*>(m_text), static_cast<QWidget*>(m_big), static_cast<QWidget*>(m_hex),
-                       m_mediaPage, static_cast<QWidget*>(m_doc), static_cast<QWidget*>(m_list),
-                       static_cast<QWidget*>(m_message)})
+                       m_mediaPage, static_cast<QWidget*>(m_doc), static_cast<QWidget*>(m_list), m_noteBox})
         m_stack->addWidget(w);
-    layout->addWidget(m_stack, 1);
+    if (embedded) {
+        m_sheet = new QFrame(this);
+        m_sheet->setObjectName(QStringLiteral("sheet"));
+        auto* sl = new QVBoxLayout(m_sheet);
+        sl->setContentsMargins(8, 8, 8, 8);
+        sl->addWidget(m_stack);
+        auto* inset = new QVBoxLayout;
+        inset->setContentsMargins(10, 4, 10, 0);
+        inset->addWidget(m_sheet);
+        layout->addLayout(inset, 1);
+    } else {
+        layout->addWidget(m_stack, 1);
+    }
 
     m_searchBar = new QWidget(this);
     m_searchBar->setObjectName(QStringLiteral("searchBar"));
@@ -235,16 +296,31 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     layout->addWidget(m_searchBar);
 
     m_status = new QLabel(this);
-    m_status->setContentsMargins(10, 3, 10, 4);
+    m_status->setContentsMargins(10, 4, 10, 5);
     m_status->setStyleSheet(t.css(QStringLiteral("color: @dimText; background: @window;")));
+    if (embedded) {
+        m_status->setContentsMargins(16, 6, 16, 8);
+        m_status->setWordWrap(true);
+    }
     layout->addWidget(m_status);
+    if (embedded) {
+        m_image->setBackground(t.window);  // pictures float on the background
+        m_image->setPadding(4);
+        // The column is narrow: wrap long lines rather than scroll sideways.
+        m_text->setLineWrapMode(QPlainTextEdit::WidgetWidth);
+        m_big->setWrap(true);
+        m_info->setStyleSheet(t.css(QStringLiteral("color: @text; background: @window;")));
+        m_info->setContentsMargins(4, 10, 4, 0);
+        m_doc->viewport()->setAutoFillBackground(false);
+        m_list->viewport()->setAutoFillBackground(false);
+    }
 
     connect(m_big, &ByteViewBase::positionChanged, this, &ViewerWindow::updateStatus);
     connect(m_hex, &ByteViewBase::positionChanged, this, &ViewerWindow::updateStatus);
     connect(m_image, &ImageView::scaleChanged, this, &ViewerWindow::updateStatus);
 
     QSettings s;
-    m_wrapButton->setChecked(s.value(QStringLiteral("viewer/wrap"), false).toBool());
+    m_wrapButton->setChecked(embedded || s.value(QStringLiteral("viewer/wrap"), false).toBool());
     m_text->setLineWrapMode(m_wrapButton->isChecked() ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
     m_big->setWrap(m_wrapButton->isChecked());
     if (!embedded) {
@@ -266,6 +342,45 @@ void ViewerWindow::closeEvent(QCloseEvent* e)
     if (!m_embedded)
         QSettings().setValue(QStringLiteral("viewer/geometry"), saveGeometry());
     QWidget::closeEvent(e);
+}
+
+void ViewerWindow::paintEvent(QPaintEvent* e)
+{
+    if (!m_embedded) {
+        QWidget::paintEvent(e);
+        return;
+    }
+    QPainter p(this);
+    p.fillRect(rect(), theme().window);
+}
+
+// Text, documents and lists sit on a rounded sheet; pictures and notes float.
+void ViewerWindow::updateSheet()
+{
+    if (!m_sheet)
+        return;
+    QWidget* page = m_stack->currentWidget();
+    const bool floating = page == m_mediaPage || page == m_noteBox;
+    m_sheet->setStyleSheet(theme().css(floating ? QStringLiteral("#sheet { background: transparent; }")
+                                                : QStringLiteral("#sheet { background: @base; border-radius: 10px; }")));
+}
+
+void ViewerWindow::resizeEvent(QResizeEvent* e)
+{
+    QWidget::resizeEvent(e);
+    setTitle(m_titleText, QIcon());
+}
+
+void ViewerWindow::setTitle(const QString& text, const QIcon& icon)
+{
+    m_titleText = text;
+    if (!icon.isNull()) {
+        m_titleIcon->setPixmap(icon.pixmap(18, 18));
+        m_titleIcon->show();
+    } else if (text.isEmpty()) {
+        m_titleIcon->hide();
+    }
+    m_title->setText(m_title->fontMetrics().elidedText(text, Qt::ElideMiddle, qMax(40, m_title->width())));
 }
 
 void ViewerWindow::setupShortcuts()
@@ -329,11 +444,14 @@ void ViewerWindow::showNote(const QString& text)
     m_hex->setCache(nullptr);
     delete m_cache;
     m_cache = nullptr;
-    m_title->clear();
+    setTitle(QString(), QIcon());
+    m_titleIcon->hide();
+    m_title->setToolTip(QString());
     m_status->clear();
     for (QToolButton* b : {m_textButton, m_hexButton, m_imageButton, m_wrapButton})
         b->hide();
     showMessage(text);
+    m_noteIcon->show();  // the empty state gets the big icon
 }
 
 // ------------------------------------------------------------------ loading
@@ -361,8 +479,16 @@ void ViewerWindow::openIndex(int index)
     m_cache = nullptr;
 
     setWindowTitle(QStringLiteral("%1 — Tandem").arg(baseName(m_path)));
-    m_title->setText(m_files.size() == 1 ? m_path
-                                         : QStringLiteral("%1   (%2/%3)").arg(m_path).arg(index + 1).arg(m_files.size()));
+    if (m_embedded) {
+        FileEntry e;
+        e.name = baseName(m_path);
+        setTitle(e.name, IconCache::forEntry(e));
+        m_title->setToolTip(m_path);
+    } else {
+        setTitle(m_files.size() == 1 ? m_path
+                                     : QStringLiteral("%1   (%2/%3)").arg(m_path).arg(index + 1).arg(m_files.size()),
+                 QIcon());
+    }
     m_textButton->show();
     m_hexButton->show();
     showMessage(tr("Loading…"));
@@ -392,6 +518,11 @@ void ViewerWindow::openIndex(int index)
             w->m_size = head->size;
             w->m_mtime = head->mtime;
             w->m_mimeComment = head->isDir ? tr("Folder") : head->mimeComment;
+            if (w->m_embedded && head->isDir) {
+                FileEntry e;
+                e.isDir = true;
+                w->setTitle(w->m_titleText, IconCache::forEntry(e));
+            }
             w->m_binary = w->m_kind == PreviewKind::Binary;
             if (w->m_kind != PreviewKind::Folder) {
                 w->m_cache = new BlockCache(w->m_path, w->m_size, w);
@@ -441,6 +572,7 @@ void ViewerWindow::setMode(Mode mode)
     case Mode::None:
         break;
     }
+    updateSheet();
     updateStatus();
 }
 
@@ -505,6 +637,7 @@ void ViewerWindow::loadText()
             w->m_textLoaded = true;
             if (w->m_mode == Mode::Text) {
                 w->m_stack->setCurrentWidget(w->m_text);
+                w->updateSheet();
                 if (!w->m_embedded)
                     w->m_text->setFocus();
             }
@@ -594,13 +727,15 @@ void ViewerWindow::showRich(const RichPreview& r)
     default:
         m_image->setImage(r.image);
         m_info->setText(r.info);
-        m_info->setVisible(!r.info.isEmpty());
+        // A plain picture's size is already in the status line.
+        m_info->setVisible(!r.info.isEmpty() && !(m_embedded && m_kind == PreviewKind::Image));
         if (r.image.isNull() && !r.info.isEmpty() && m_kind != PreviewKind::Image)
             m_image->setImage({});  // audio without cover: just the details
         break;
     }
     if (m_mode == Mode::Image) {
         m_stack->setCurrentWidget(page);
+        updateSheet();
         if (!m_embedded)
             page->setFocus();
     }
@@ -636,7 +771,9 @@ void ViewerWindow::preload(const QStringList& paths)
 void ViewerWindow::showMessage(const QString& text)
 {
     m_message->setText(text);
-    m_stack->setCurrentWidget(m_message);
+    m_noteIcon->hide();
+    m_stack->setCurrentWidget(m_noteBox);
+    updateSheet();
 }
 
 bool ViewerWindow::usesLargeTextView() const
@@ -660,6 +797,10 @@ void ViewerWindow::updateModeButtons()
 
 void ViewerWindow::updateStatus()
 {
+    if (m_path.isEmpty()) {
+        m_status->clear();
+        return;
+    }
     QStringList parts;
     if (m_kind != PreviewKind::Folder)
         parts << formatSize(m_size);

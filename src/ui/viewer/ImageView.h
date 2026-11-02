@@ -15,6 +15,8 @@ public:
     void setImage(const QImage& image);
     const QImage& image() const { return m_image; }
     void zoom(int steps);  // 0 = back to fit
+    void setBackground(const QColor& c) { m_background = c; viewport()->update(); }
+    void setPadding(int px) { m_padding = px; relayout(); }
     double scale() const;
 
 signals:
@@ -36,6 +38,8 @@ private:
     double m_zoom = 1.0;
     bool m_fit = true;
     QPoint m_dragFrom;
+    QColor m_background;
+    int m_padding = 0;
 };
 
 }  // namespace tandem

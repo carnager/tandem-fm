@@ -790,7 +790,7 @@ void MainWindow::updateQuickView()
     Panel* p = active();
     const FileEntry* e = p->currentEntry();
     if (!e || e->isParent) {
-        m_quickView->showNote(tr("Preview: move the cursor onto a file"));
+        m_quickView->showNote(tr("Move the cursor onto a file"));
     } else if (p->inArchive()) {
         m_quickView->showNote(tr("“%1” is inside an archive\n\nF3 opens it in the viewer").arg(e->name));
     } else if (m_quickView->currentPath() != p->currentPath()) {

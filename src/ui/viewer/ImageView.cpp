@@ -32,8 +32,8 @@ double ImageView::scale() const
         return 1.0;
     if (!m_fit)
         return m_zoom;
-    const double sx = double(viewport()->width()) / m_image.width();
-    const double sy = double(viewport()->height()) / m_image.height();
+    const double sx = double(viewport()->width() - 2 * m_padding) / m_image.width();
+    const double sy = double(viewport()->height() - 2 * m_padding) / m_image.height();
     return std::min({1.0, sx, sy});  // never blow small images up when fitting
 }
 
@@ -76,7 +76,7 @@ void ImageView::paintEvent(QPaintEvent*)
 {
     const Theme& t = theme();
     QPainter p(viewport());
-    p.fillRect(viewport()->rect(), t.window);
+    p.fillRect(viewport()->rect(), m_background.isValid() ? m_background : t.window);
     if (m_scaled.isNull())
         return;
     const QSize s = m_scaled.size();

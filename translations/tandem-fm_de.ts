@@ -1062,8 +1062,8 @@
         <translation>Langsames Laden eines Ordners abbrechen</translation>
     </message>
     <message>
-        <source>Preview: move the cursor onto a file</source>
-        <translation>Vorschau: Cursor auf eine Datei bewegen</translation>
+        <source>Move the cursor onto a file</source>
+        <translation>Cursor auf eine Datei setzen</translation>
     </message>
     <message>
         <source>“%1” is inside an archive
@@ -1741,6 +1741,10 @@ F3 öffnet es im Betrachter</translation>
 </context>
 <context>
     <name>tandem::ViewerWindow</name>
+    <message>
+        <source>PREVIEW</source>
+        <translation>VORSCHAU</translation>
+    </message>
     <message>
         <source>Text</source>
         <translation>Text</translation>

@@ -8,6 +8,7 @@
 #include <atomic>
 #include <memory>
 
+class QFrame;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
@@ -68,6 +69,8 @@ signals:
 
 protected:
     void closeEvent(QCloseEvent* e) override;
+    void paintEvent(QPaintEvent* e) override;
+    void resizeEvent(QResizeEvent* e) override;
 
 private:
     void setupShortcuts();
@@ -113,6 +116,13 @@ private:
     QTextBrowser* m_doc;
     QTreeWidget* m_list;
     QLabel* m_message;
+    QWidget* m_noteBox;
+    QLabel* m_noteIcon;
+    QLabel* m_titleIcon;
+    QFrame* m_sheet = nullptr;  // preview column: the inset surface content sits on
+    void updateSheet();
+    QString m_titleText;
+    void setTitle(const QString& text, const QIcon& icon);
     QLabel* m_title;
     QLabel* m_status;
     QToolButton* m_textButton;
