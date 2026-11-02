@@ -56,6 +56,7 @@ public:
     void addTab(const QString& path, bool activate = true, int position = -1);
     void closeCurrentTab();
     void cycleTab(int step);
+    void selectTab(int index);  // Alt+1…9
     QStringList tabPaths() const;
     int currentTabIndex() const { return m_current; }
     void restoreTabs(const QStringList& paths, int current);
@@ -113,6 +114,7 @@ private:
     void positionSearch();
     void doRename(const QString& from, const QString& to);
     int tabIndexOf(DirTab* t) const;
+    void updateTabTitles();
 
     std::vector<DirTab*> m_tabs;
     int m_current = -1;

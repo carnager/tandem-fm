@@ -20,6 +20,7 @@
 #include <QSignalSpy>
 
 #include <QApplication>
+#include <QTabBar>
 #include <QToolButton>
 #include <QSettings>
 #include <QImage>
@@ -303,6 +304,15 @@ private slots:
         moveCursorTo(m_left, "sub");
         QTest::keyClick(m_left->view(), Qt::Key_T, Qt::ControlModifier);
         QTRY_COMPARE(m_left->tabPaths(), QStringList({L(), L("sub")}));
+        QTRY_COMPARE(m_left->path(), L("sub"));
+        // Numbered titles; Alt+number switches.
+        auto* bar = m_left->findChild<QTabBar*>();
+        QVERIFY(bar);
+        QCOMPARE(bar->tabText(0).left(1), QString("1"));
+        QCOMPARE(bar->tabText(1), QString("2  sub"));
+        QTest::keyClick(m_left->view(), Qt::Key_1, Qt::AltModifier);
+        QTRY_COMPARE(m_left->path(), L());
+        QTest::keyClick(m_left->view(), Qt::Key_2, Qt::AltModifier);
         QTRY_COMPARE(m_left->path(), L("sub"));
         QTest::keyClick(m_left->view(), Qt::Key_W, Qt::ControlModifier);
         QTRY_COMPARE(m_left->tabPaths(), QStringList({L()}));

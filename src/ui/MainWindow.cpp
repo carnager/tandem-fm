@@ -325,6 +325,8 @@ void MainWindow::createMenus()
         active()->addTab(p);
     });
     addCommand(tabs, tr("Close tab"), {K(Qt::CTRL | Qt::Key_W)}, [this] { active()->closeCurrentTab(); });
+    for (int i = 1; i <= 9; ++i)
+        addCommand(tabs, tr("Tab %1").arg(i), {K(Qt::ALT | (Qt::Key_0 + i))}, [this, i] { active()->selectTab(i - 1); });
     addCommand(tabs, tr("Next tab"), {K(Qt::CTRL | Qt::Key_Tab)}, [this] { active()->cycleTab(1); });
     addCommand(tabs, tr("Previous tab"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab), K(Qt::CTRL | Qt::Key_Backtab)},
                [this] { active()->cycleTab(-1); });
@@ -697,6 +699,7 @@ void MainWindow::showShortcuts()
         {"F7 / Shift+F4", "New folder / new file"},
         {"F8, Del / Shift+F8", "Trash / delete permanently"},
         {"Ctrl+T / Ctrl+W / Ctrl+Tab", "New / close / next tab"},
+        {"Alt+1 … Alt+9", "Go to tab 1 … 9 (tabs are numbered)"},
         {"Alt+← / Alt+→", "History back / forward"},
         {"Ctrl+PgUp / Ctrl+\\ / Ctrl+`", "Parent / root / home"},
         {"Ctrl+L", "Type a path"},

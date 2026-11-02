@@ -143,6 +143,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
         m_tabs.erase(m_tabs.begin() + from);
         m_tabs.insert(m_tabs.begin() + to, moved);
         m_current = m_tabBar->currentIndex();
+        updateTabTitles();
         emit stateChanged();
     });
     connect(m_tabBar, &QTabBar::tabBarDoubleClicked, this, [this](int i) {
@@ -325,6 +326,7 @@ void Panel::addTab(const QString& path, bool activate, int position)
     }
     m_tabBar->setVisible(m_tabs.size() > 1);
     t->navigate(path);
+    updateTabTitles();  // after navigate: the title comes from the path being loaded
     if (activate || m_current < 0)
         showTab(index);
     emit stateChanged();
@@ -344,9 +346,26 @@ void Panel::closeCurrentTab()
         m_tabBar->removeTab(index);
     }
     m_tabBar->setVisible(m_tabs.size() > 1);
+    updateTabTitles();
     showTab(qMin(index, int(m_tabs.size()) - 1));
     t->deleteLater();
     emit stateChanged();
+}
+
+void Panel::selectTab(int index)
+{
+    if (index >= 0 && index < int(m_tabs.size()))
+        showTab(index);
+}
+
+// "1  src", "2  Downloads": the number is the Alt+number shortcut (like yazi).
+void Panel::updateTabTitles()
+{
+    for (int i = 0; i < int(m_tabs.size()); ++i) {
+        const QString title = m_tabs[size_t(i)]->title();
+        m_tabBar->setTabText(i, i < 9 ? QStringLiteral("%1  %2").arg(i + 1).arg(title) : title);
+        m_tabBar->setTabToolTip(i, m_tabs[size_t(i)]->path());
+    }
 }
 
 void Panel::cycleTab(int step)
@@ -425,9 +444,7 @@ void Panel::showTab(int index)
 
 void Panel::onListingReady(DirTab* t, const QString& focus)
 {
-    const int ti = tabIndexOf(t);
-    if (ti >= 0)
-        m_tabBar->setTabText(ti, t->title());
+    updateTabTitles();
     if (t != tab()) {
         t->savedCursor = focus;
         t->savedScroll = 0;
