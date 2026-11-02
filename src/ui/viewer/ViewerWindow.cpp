@@ -552,7 +552,8 @@ void ViewerWindow::updateStatus()
         break;
     }
     m_status->setText(parts.join(QStringLiteral("   ·   ")) +
-                      tr("        N / P: next / previous file   1 / 3 / 4: text / hex / image   F7: find"));
+                      (m_embedded ? QString()
+                                  : tr("        N / P: next / previous file   1 / 3 / 4: text / hex / image   F7: find")));
 }
 
 void ViewerWindow::zoom(int steps)

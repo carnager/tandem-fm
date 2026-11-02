@@ -383,7 +383,7 @@ void Panel::showTab(int index)
         old->savedCursor = currentName();
         old->savedScroll = m_view->verticalScrollBar()->value();
         old->setCursorProvider(nullptr);
-        m_headerState = m_view->header()->saveState();
+        m_headerState = m_view->userHeaderState();
     }
     m_current = index;
     DirTab* t = m_tabs[size_t(index)];
@@ -395,6 +395,7 @@ void Panel::showTab(int index)
         applyDefaultColumns();
     else
         m_view->header()->restoreState(m_headerState);
+    m_view->fitColumns();
     {
         QSignalBlocker block(m_view->header());
         const SortSpec s = t->model()->sortSpec();
@@ -458,7 +459,7 @@ void Panel::applyDefaultColumns()
 
 QByteArray Panel::headerState() const
 {
-    return m_view->header()->saveState();
+    return m_view->userHeaderState();
 }
 
 void Panel::restoreHeaderState(const QByteArray& state)

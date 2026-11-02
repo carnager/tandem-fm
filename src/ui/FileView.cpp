@@ -526,6 +526,55 @@ void FileView::currentChanged(const QModelIndex& current, const QModelIndex& pre
         emit cursorMoved();
 }
 
+// Narrow panel (e.g. with the preview column open): hide Attributes, then
+// Modified, so names stay readable; bring them back when there is room.
+void FileView::fitColumns()
+{
+    QHeaderView* h = header();
+    if (!model() || h->count() < FileModel::ColCount)
+        return;
+    auto nameRoom = [&] {
+        int others = 0;
+        for (int c = 1; c < h->count(); ++c)
+            if (!h->isSectionHidden(c))
+                others += h->sectionSize(c);
+        return viewport()->width() - others;
+    };
+    constexpr int kMinName = 210;
+    for (int col : {int(FileModel::ColAttr), int(FileModel::ColTime)}) {
+        if (nameRoom() >= kMinName)
+            break;
+        if (!h->isSectionHidden(col)) {
+            h->setSectionHidden(col, true);
+            m_autoHidden.append(col);
+        }
+    }
+    while (!m_autoHidden.isEmpty()) {
+        const int col = m_autoHidden.last();
+        if (nameRoom() - h->sectionSize(col) < kMinName + 40)
+            break;
+        h->setSectionHidden(col, false);
+        m_autoHidden.removeLast();
+    }
+}
+
+QByteArray FileView::userHeaderState()
+{
+    QHeaderView* h = header();
+    for (int col : std::as_const(m_autoHidden))
+        h->setSectionHidden(col, false);
+    const QByteArray state = h->saveState();
+    for (int col : std::as_const(m_autoHidden))
+        h->setSectionHidden(col, true);
+    return state;
+}
+
+void FileView::resizeEvent(QResizeEvent* e)
+{
+    QTreeView::resizeEvent(e);
+    fitColumns();
+}
+
 void FileView::contextMenuEvent(QContextMenuEvent* e)
 {
     if (e->reason() == QContextMenuEvent::Keyboard) {
@@ -545,7 +594,12 @@ void FileView::showHeaderMenu(const QPoint& pos)
         QAction* a = menu.addAction(model()->headerData(c, Qt::Horizontal).toString());
         a->setCheckable(true);
         a->setChecked(!h->isSectionHidden(c));
-        connect(a, &QAction::toggled, this, [h, c](bool on) { h->setSectionHidden(c, !on); });
+        a->setChecked(!h->isSectionHidden(c) || m_autoHidden.contains(c));
+        connect(a, &QAction::toggled, this, [this, h, c](bool on) {
+            m_autoHidden.removeAll(c);
+            h->setSectionHidden(c, !on);
+            fitColumns();
+        });
     }
     menu.exec(h->mapToGlobal(pos));
 }

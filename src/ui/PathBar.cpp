@@ -54,6 +54,11 @@ PathBar::PathBar(QWidget* parent) : QWidget(parent)
     m_edit->installEventFilter(this);
     m_stack->addWidget(m_crumbs);
     m_stack->addWidget(m_edit);
+    // The segments shrink into "…" to fit, so the bar must never demand
+    // their full width (that would stop the splitter from resizing panels).
+    m_crumbs->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_edit->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     setCursor(Qt::IBeamCursor);
     connect(m_edit, &QLineEdit::returnPressed, this, [this] {
         const QString text = m_edit->text();
@@ -143,7 +148,10 @@ bool PathBar::eventFilter(QObject* obj, QEvent* e)
 void PathBar::rebuild()
 {
     while (QLayoutItem* item = m_crumbLayout->takeAt(0)) {
-        delete item->widget();
+        if (QWidget* w = item->widget()) {
+            w->hide();
+            w->deleteLater();  // never delete widgets synchronously during a rebuild
+        }
         delete item;
     }
     if (m_path.isEmpty())
@@ -184,13 +192,19 @@ void PathBar::rebuild()
         QToolButton* b = makeButton(segs[i], i == segs.size() - 1);
         const int w = b->sizeHint().width() + (i > 0 ? 14 : 0);
         if (used + w > available && i < segs.size() - 1) {
-            delete b;
+            b->deleteLater();
             break;
         }
         used += w;
         kept.prepend(b);
         first = i;
     }
+    // Shown before going into the layout: otherwise Qt queues a deferred show
+    // for each new child, which misbehaves when the bar is rebuilt quickly.
+    auto add = [this](QWidget* w) {
+        w->show();
+        m_crumbLayout->addWidget(w);
+    };
     if (first > 0) {
         auto* more = new QToolButton(m_crumbs);
         more->setObjectName(QStringLiteral("crumb"));
@@ -202,13 +216,13 @@ void PathBar::rebuild()
         for (int i = first - 1; i >= 0; --i)
             menu->addAction(segs[i].path, this, [this, p = segs[i].path] { emit segmentClicked(p); });
         more->setMenu(menu);
-        m_crumbLayout->addWidget(more);
-        m_crumbLayout->addWidget(makeSeparator());
+        add(more);
+        add(makeSeparator());
     }
     for (int i = 0; i < kept.size(); ++i) {
         if (i > 0)
-            m_crumbLayout->addWidget(makeSeparator());
-        m_crumbLayout->addWidget(kept[i]);
+            add(makeSeparator());
+        add(kept[i]);
     }
     m_crumbLayout->addStretch(1);
 }

@@ -96,9 +96,9 @@ private:
     QAction* m_hiddenAction = nullptr;
     QHash<QString, QAction*> m_actions;
     FuzzyPopup* m_popup = nullptr;
-    ViewerWindow* m_quickView = nullptr;  // replaces the other panel (Ctrl+Q)
-    Panel* m_quickHidden = nullptr;
+    ViewerWindow* m_quickView = nullptr;  // preview column right of the panels (Ctrl+Q)
     QTimer* m_quickTimer = nullptr;
+    double m_panelRatio = 0.5;  // left panel's share of the two panels
     QList<IconTheme> m_iconThemes;
     bool m_iconThemesLoaded = false;
     QList<UndoEntry> m_undo;

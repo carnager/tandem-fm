@@ -787,7 +787,7 @@ private slots:
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         ViewerWindow* qv = nullptr;
         QTRY_VERIFY((qv = m_window->findChild<ViewerWindow*>("quickView")) != nullptr);
-        QVERIFY(!m_right->isVisible());
+        QVERIFY(m_right->isVisible());  // the copy/move target stays
         QTRY_COMPARE(qv->textEdit()->toPlainText(), QString("first file"));
         QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(m_left->view()));  // focus stays
 
@@ -796,9 +796,19 @@ private slots:
         QTRY_COMPARE(qv->textEdit()->toPlainText(), QString("second file"));
         QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(m_left->view()));
 
+        // It follows the active panel.
+        m_right->navigate(L("qv"));
+        QTRY_COMPARE(rightModel()->path(), L("qv"));
+        m_right->view()->setFocus();
+        QTRY_VERIFY(m_right->isActive());
+        moveCursorTo(m_right, "a.txt");
+        QTRY_COMPARE(qv->currentPath(), L("qv/a.txt"));
+        m_left->view()->setFocus();
+        m_right->navigate(R());
+
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
-        QTRY_VERIFY(m_right->isVisible());
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") == nullptr);
+        QSettings().setValue("view/preview", false);
 
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
@@ -817,6 +827,7 @@ private slots:
             return nullptr;
         };
         QTRY_VERIFY(segment(L("sub")) != nullptr);
+        QTRY_VERIFY(segment(L("sub"))->isVisible());
         segment(L("sub"))->click();
         QTRY_COMPARE(leftModel()->path(), L("sub"));
         QCOMPARE(m_left->currentName(), QString("deep"));  // lands where it came from

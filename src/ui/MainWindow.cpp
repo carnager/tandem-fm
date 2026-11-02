@@ -151,8 +151,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
     for (Panel* p : {m_left, m_right}) {
         connect(p, &Panel::activated, this, &MainWindow::setActive);
         connect(p, &Panel::switchRequested, this, [this] {
-            if (!m_quickView)  // the other panel is a preview right now
-                other()->view()->setFocus();
+            other()->view()->setFocus();
         });
         connect(p, &Panel::cursorChanged, this, [this](Panel* panel) {
             if (m_quickView && panel == active())
@@ -215,6 +214,8 @@ void MainWindow::setActive(Panel* p)
     m_active = p;
     m_left->setActive(p == m_left);
     m_right->setActive(p == m_right);
+    if (m_quickView)
+        m_quickTimer->start();
     setWindowTitle(QStringLiteral("Tandem — %1").arg(p->path()));
 }
 
@@ -358,7 +359,7 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("notifications")] = notes;
     QMenu* icons = view->addMenu(tr("Icon theme"));
     connect(icons, &QMenu::aboutToShow, this, [this, icons] { populateIconThemeMenu(icons); });
-    addCommand(view, tr("Quick view in the other panel"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
+    addCommand(view, tr("Preview column"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
     addCommand(view, tr("Toggle menu bar"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_M)},
                [this] { menuBar()->setVisible(!menuBar()->isVisible()); });
 
@@ -702,7 +703,7 @@ void MainWindow::showShortcuts()
         {"Alt+F5 / Alt+F9", "Pack / unpack archives"},
         {"Ctrl+PgDn", "Enter folder, or browse any file as archive"},
         {"Menu key, Shift+F10", "Context menu"},
-        {"Ctrl+Q", "Quick view of the file under the cursor in the other panel"},
+        {"Ctrl+Q", "Preview column: shows the file under the cursor, both panels stay"},
         {"Alt+F4", "Quit"},
         {"Vim keys (View menu)", "j k move · h l out/in · gg G top/bottom · Ctrl+D/U half page · / n N search · v mark · : palette"},
         {"Esc", "Cancel a slow folder load"},
@@ -721,23 +722,32 @@ void MainWindow::showShortcuts()
 
 // --------------------------------------------------------------- quick view
 
+// A third column right of both panels: copy/move targets stay visible.
 void MainWindow::toggleQuickView()
 {
+    QSettings settings;
     if (m_quickView) {
-        const int idx = m_splitter->indexOf(m_quickView);
-        m_splitter->replaceWidget(idx, m_quickHidden);
-        m_quickHidden->show();
+        settings.setValue(QStringLiteral("view/previewWidth"), m_splitter->sizes().value(2));
+        settings.setValue(QStringLiteral("view/preview"), false);
+        m_quickView->hide();
         m_quickView->deleteLater();
         m_quickView = nullptr;
-        m_quickHidden = nullptr;
         active()->view()->setFocus();
         return;
     }
-    Panel* o = other();
+    int total = m_splitter->width() - 2 * m_splitter->handleWidth();
+    if (total < 400)
+        total = 1200;  // not laid out yet; the splitter rescales proportionally later
+    const int width = qBound(220, settings.value(QStringLiteral("view/previewWidth"), total * 3 / 10).toInt(),
+                             qMax(220, total / 2));
     m_quickView = new ViewerWindow({}, -1, this, true);
     m_quickView->setObjectName(QStringLiteral("quickView"));
-    m_quickHidden = o;
-    m_splitter->replaceWidget(m_splitter->indexOf(o), m_quickView);
+    m_splitter->addWidget(m_quickView);
+    // Both panels give up room in proportion; their ratio stays.
+    const int remaining = qMax(200, total - width);
+    const int left = int(remaining * m_panelRatio);
+    m_splitter->setSizes({left, remaining - left, width});
+    settings.setValue(QStringLiteral("view/preview"), true);
     updateQuickView();
     active()->view()->setFocus();
 }
@@ -749,7 +759,7 @@ void MainWindow::updateQuickView()
     Panel* p = active();
     const FileEntry* e = p->currentEntry();
     if (!e || e->isParent) {
-        m_quickView->showNote(tr("Quick view: move the cursor onto a file"));
+        m_quickView->showNote(tr("Preview: move the cursor onto a file"));
     } else if (e->isDir) {
         m_quickView->showNote(tr("Folder “%1”\n\nSpace calculates its size").arg(e->name));
     } else if (p->inArchive()) {
@@ -1508,8 +1518,15 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     restoreGeometry(s.value(QStringLiteral("window/geometry")).toByteArray());
     if (!s.contains(QStringLiteral("window/geometry")))
         resize(1280, 800);
-    if (!m_splitter->restoreState(s.value(QStringLiteral("window/splitter")).toByteArray()))
-        m_splitter->setSizes({10000, 10000});
+    const QVariantList panelSizes = s.value(QStringLiteral("window/panelSizes")).toList();
+    if (panelSizes.size() == 2 && panelSizes[0].toInt() > 0 && panelSizes[1].toInt() > 0)
+        m_panelRatio = double(panelSizes[0].toInt()) / (panelSizes[0].toInt() + panelSizes[1].toInt());
+    m_splitter->setSizes({int(10000 * m_panelRatio), int(10000 * (1 - m_panelRatio))});
+    connect(m_splitter, &QSplitter::splitterMoved, this, [this] {
+        const QList<int> s = m_splitter->sizes();
+        if (s.value(0) > 0 && s.value(1) > 0)
+            m_panelRatio = double(s[0]) / (s[0] + s[1]);
+    });
     menuBar()->setVisible(s.value(QStringLiteral("window/menuBar"), true).toBool());
     const QString iconTheme = s.value(QStringLiteral("view/iconTheme")).toString();
     if (!iconTheme.isEmpty())
@@ -1550,13 +1567,21 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     Panel* act = s.value(QStringLiteral("window/active")).toString() == QLatin1String("right") ? m_right : m_left;
     setActive(act);
     act->view()->setFocus();
+    if (s.value(QStringLiteral("view/preview"), false).toBool())
+        QTimer::singleShot(0, this, [this] {
+            if (!m_quickView)
+                toggleQuickView();
+        });
 }
 
 void MainWindow::saveSettings()
 {
     QSettings s;
     s.setValue(QStringLiteral("window/geometry"), saveGeometry());
-    s.setValue(QStringLiteral("window/splitter"), m_splitter->saveState());
+    if (m_quickView)
+        s.setValue(QStringLiteral("view/previewWidth"), m_splitter->sizes().value(2));
+    s.setValue(QStringLiteral("window/panelSizes"),
+               QVariantList{m_splitter->sizes().value(0), m_splitter->sizes().value(1)});
     s.setValue(QStringLiteral("window/menuBar"), menuBar()->isVisible());
     s.setValue(QStringLiteral("window/active"), m_active == m_right ? "right" : "left");
     s.setValue(QStringLiteral("view/showHidden"), m_hiddenAction->isChecked());

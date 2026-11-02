@@ -32,6 +32,9 @@ public:
     bool isActive() const { return m_active; }
     int currentRow() const { return currentIndex().row(); }
     void setVimKeys(bool on) { m_vim = on; }
+    // Header state as the user configured it (ignores columns hidden for width).
+    QByteArray userHeaderState();
+    void fitColumns();
     void setCurrentRow(int row, bool center = false);
 
 signals:
@@ -67,6 +70,7 @@ protected:
     void dropEvent(QDropEvent* e) override;
     void contextMenuEvent(QContextMenuEvent* e) override;
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
+    void resizeEvent(QResizeEvent* e) override;
 
 private:
     void moveCursorBy(int delta);
@@ -79,6 +83,7 @@ private:
     QPoint m_pressPos;
     bool m_maybeDrag = false;
     bool m_vim = false;
+    QList<int> m_autoHidden;  // columns hidden because the panel is narrow
     qint64 m_lastG = 0;  // for "gg"
 };
 
