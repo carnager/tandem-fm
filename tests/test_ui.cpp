@@ -714,6 +714,62 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void filterAsYouType()
+    {
+        QVERIFY(QDir().mkpath(L("flt/inside")));
+        for (const char* n : {"alpha.txt", "beta.txt", "gamma.jpg", "alpine.jpg"})
+            writeFile(L(QString("flt/") + n), n);
+        m_left->navigate(L("flt"));
+        QTRY_COMPARE(leftModel()->path(), L("flt"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+
+        auto visible = [this] {
+            QStringList out;
+            for (int r = 0; r < leftModel()->count(); ++r)
+                if (!leftModel()->entry(r)->isParent)
+                    out << leftModel()->entry(r)->name;
+            return out;
+        };
+        QTest::keyClick(m_left->view(), Qt::Key_F, Qt::ControlModifier);
+        QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()));
+        QTest::keyClicks(QApplication::focusWidget(), "al");
+        QTRY_COMPARE(visible(), QStringList({"alpha.txt", "alpine.jpg"}));
+        QTest::keyClicks(QApplication::focusWidget(), " *.jpg");
+        QTRY_COMPARE(visible(), QStringList({"alpine.jpg"}));
+        QCOMPARE(m_left->currentName(), QString("alpine.jpg"));
+
+        // Live updates respect the filter.
+        writeFile(L("flt/also.jpg"), "x");     // "al" + jpg: shows up
+        writeFile(L("flt/other.jpg"), "x");    // hidden
+        QTRY_VERIFY(leftModel()->rowOf("also.jpg") >= 0);
+        QTest::qWait(300);
+        QCOMPARE(leftModel()->rowOf("other.jpg"), -1);
+
+        // Esc brings everything back.
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+        QTRY_VERIFY(leftModel()->rowOf("other.jpg") >= 0);
+        QCOMPARE(leftModel()->rowOf("beta.txt") >= 0, true);
+
+        // A new folder starts unfiltered.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_F, Qt::ControlModifier);
+        QTest::keyClicks(QApplication::focusWidget(), "inside");
+        QTRY_COMPARE(visible(), QStringList({"inside"}));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        moveCursorTo(m_left, "inside");
+        QTest::keyClick(m_left->view(), Qt::Key_Return);
+        QTRY_COMPARE(leftModel()->path(), L("flt/inside"));
+        QCOMPARE(leftModel()->filter(), QString());
+        QTest::keyClick(m_left->view(), Qt::Key_Backspace);
+        QTRY_COMPARE(leftModel()->path(), L("flt"));
+        QVERIFY(leftModel()->rowOf("beta.txt") >= 0);
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
     void cleanupTestCase()
     {
         m_window->close();

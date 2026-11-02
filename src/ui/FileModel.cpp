@@ -180,21 +180,67 @@ void FileModel::accountMark(const FileEntry& e, int sign)
     }
 }
 
-void FileModel::setListing(const QString& path, std::vector<FileEntry>&& entries)
+bool FileModel::matchesFilter(const FileEntry& e) const
 {
-    beginResetModel();
-    m_path = path;
+    if (e.isParent || m_filterTerms.isEmpty())
+        return true;
+    for (const QRegularExpression& rx : m_filterTerms)
+        if (!rx.match(e.name).hasMatch())
+            return false;
+    return true;
+}
+
+// Splits `all` (sorted, without "..") into visible and hidden.
+void FileModel::partition(std::vector<FileEntry>& all)
+{
     m_entries.clear();
-    m_entries.reserve(entries.size() + 1);
-    if (path != QLatin1String("/")) {
+    m_hidden.clear();
+    m_entries.reserve(all.size() + 1);
+    if (!m_path.isEmpty() && m_path != QLatin1String("/")) {
         FileEntry up;
         up.name = QStringLiteral("..");
         up.isDir = true;
         up.isParent = true;
         m_entries.push_back(std::move(up));
     }
-    for (auto& e : entries)
-        m_entries.push_back(std::move(e));
+    for (auto& e : all)
+        (matchesFilter(e) ? m_entries : m_hidden).push_back(std::move(e));
+}
+
+void FileModel::setFilter(const QString& text)
+{
+    if (text == m_filter)
+        return;
+    m_filter = text;
+    m_filterTerms.clear();
+    for (const QString& term : text.split(QLatin1Char(' '), Qt::SkipEmptyParts)) {
+        const bool wild = term.contains(QLatin1Char('*')) || term.contains(QLatin1Char('?'));
+        const QString pattern = wild ? QRegularExpression::wildcardToRegularExpression(term)
+                                     : QRegularExpression::escape(term);
+        m_filterTerms.append(QRegularExpression(pattern, QRegularExpression::CaseInsensitiveOption));
+    }
+    beginResetModel();
+    std::vector<FileEntry> all;
+    all.reserve(m_entries.size() + m_hidden.size());
+    for (auto& e : m_entries)
+        if (!e.isParent)
+            all.push_back(std::move(e));
+    for (auto& e : m_hidden)
+        all.push_back(std::move(e));
+    sortEntries(all, m_sort);
+    partition(all);
+    m_stats = {};
+    for (const auto& e : m_entries)
+        account(e, +1);
+    endResetModel();
+    emit statsChanged();
+}
+
+void FileModel::setListing(const QString& path, std::vector<FileEntry>&& entries)
+{
+    beginResetModel();
+    m_path = path;
+    partition(entries);
     m_stats = {};
     for (const auto& e : m_entries)
         account(e, +1);
@@ -230,16 +276,27 @@ void FileModel::applyUpdates(std::vector<EntryUpdate>&& updates)
 {
     for (auto& [name, maybe] : updates) {
         const int row = rowOf(name);
+        if (row < 0) {
+            // Maybe it's set aside by the filter.
+            auto hid = std::find_if(m_hidden.begin(), m_hidden.end(), [&](const FileEntry& h) { return h.name == name; });
+            const bool marked = hid != m_hidden.end() && hid->marked;
+            if (hid != m_hidden.end())
+                m_hidden.erase(hid);
+            if (!maybe)
+                continue;
+            FileEntry e = std::move(*maybe);
+            e.marked = marked;
+            if (matchesFilter(e))
+                insertEntry(std::move(e));
+            else
+                m_hidden.push_back(std::move(e));
+            continue;
+        }
         if (!maybe) {
-            if (row >= 0)
-                removeRow(row);
+            removeRow(row);
             continue;
         }
         FileEntry e = std::move(*maybe);
-        if (row < 0) {
-            insertEntry(std::move(e));
-            continue;
-        }
         FileEntry& old = m_entries[size_t(row)];
         e.marked = old.marked;
         if (e.isDir && old.isDir && e.size < 0)

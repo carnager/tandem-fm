@@ -192,6 +192,8 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
             t->m_free = result->freeBytes;
             t->m_total = result->totalBytes;
             t->m_pendingNames.clear();
+            if (old != result->path && !t->m_model->filter().isEmpty())
+                t->m_model->setFilter({});  // a new folder starts unfiltered
             if (result->sortedBy != t->m_model->sortSpec())  // sort changed while loading
                 sortEntries(result->entries, t->m_model->sortSpec());
             t->m_model->setListing(result->path, std::move(result->entries));

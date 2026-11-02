@@ -5,6 +5,7 @@
 #include "core/Sorting.h"
 
 #include <QAbstractTableModel>
+#include <QRegularExpression>
 #include <QSet>
 
 #include <vector>
@@ -58,6 +59,13 @@ public:
     void restoreMarks(const QSet<QString>& names);
     Stats stats() const { return m_stats; }
 
+    // Filter as you type: entries not matching are set aside (they keep
+    // their marks and still get live updates). Space-separated terms must
+    // all be in the name; * and ? work as wildcards.
+    void setFilter(const QString& text);
+    QString filter() const { return m_filter; }
+    int hiddenByFilter() const { return int(m_hidden.size()); }
+
     static QString displayName(const FileEntry& e);
     static QString displayExt(const FileEntry& e);
 
@@ -72,8 +80,14 @@ private:
     void insertEntry(FileEntry&& e);
     void removeRow(int row);
 
+    bool matchesFilter(const FileEntry& e) const;
+    void partition(std::vector<FileEntry>& all);
+
     QString m_path;
     std::vector<FileEntry> m_entries;  // ".." first when not at "/"
+    std::vector<FileEntry> m_hidden;   // filtered out
+    QString m_filter;
+    QList<QRegularExpression> m_filterTerms;
     SortSpec m_sort;
     Stats m_stats;
 };

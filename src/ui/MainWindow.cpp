@@ -258,6 +258,8 @@ void MainWindow::createMenus()
     addCommand(files, tr("Quit"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { close(); });
 
     QMenu* mark = bar->addMenu(tr("&Mark"));
+    addCommand(mark, tr("Filter as you type…"), {K(Qt::CTRL | Qt::Key_F)}, [this] { active()->startFilter(); });
+    mark->addSeparator();
     addCommand(mark, tr("Mark group…\tNum +"), {}, [this] { active()->markGroup(1); });
     addCommand(mark, tr("Unmark group…\tNum -"), {}, [this] { active()->markGroup(-1); });
     addCommand(mark, tr("Invert marks\tNum *"), {}, [this] { active()->markGroup(0); });

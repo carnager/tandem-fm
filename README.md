@@ -53,6 +53,7 @@ Visual check without a display:
 | Tab | Switch panel |
 | Enter / Backspace | Open / parent folder |
 | Type letters | Quick search (↑/↓ next match, Esc close) |
+| Ctrl+F | Filter as you type: words must all appear, `*`/`?` wildcards; Esc clears |
 | Insert, Space, Shift+↑/↓ | Mark (Space also computes folder size) |
 | Num + / Num − / Num * | Mark group / unmark group / invert |
 | F3 / F4 | Built-in viewer / edit (default app; set `tools/editor` in the config for F4) |

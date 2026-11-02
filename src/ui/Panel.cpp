@@ -74,6 +74,39 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_view = new FileView(this);
     layout->addWidget(m_view, 1);
 
+    m_filterBar = new QWidget(this);
+    m_filterBar->setObjectName(QStringLiteral("filterBar"));
+    m_filterBar->setAttribute(Qt::WA_StyledBackground);
+    m_filterBar->setStyleSheet(t.css(QStringLiteral(
+        "#filterBar { background: @header; border-top: 1px solid @border; }"
+        "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 6px; padding: 2px 8px; }"
+        "QLabel { color: @dimText; }")));
+    auto* fl = new QHBoxLayout(m_filterBar);
+    fl->setContentsMargins(8, 4, 8, 4);
+    auto* filterLabel = new QLabel(tr("Filter"), m_filterBar);
+    m_filterEdit = new QLineEdit(m_filterBar);
+    m_filterEdit->setPlaceholderText(tr("words or *.ext — Esc clears, Enter/↓ back to the list"));
+    m_filterEdit->installEventFilter(this);
+    m_filterInfo = new QLabel(m_filterBar);
+    fl->addWidget(filterLabel);
+    fl->addWidget(m_filterEdit, 1);
+    fl->addWidget(m_filterInfo);
+    m_filterBar->hide();
+    layout->addWidget(m_filterBar);
+    connect(m_filterEdit, &QLineEdit::textChanged, this, [this](const QString& text) {
+        DirTab* t = tab();
+        if (!t)
+            return;
+        const QString keep = currentName();
+        t->model()->setFilter(text);
+        int row = t->model()->rowOf(keep);
+        // While filtering, land on the first match rather than "..".
+        if (row < 0 || (!text.isEmpty() && t->model()->entry(row)->isParent))
+            row = t->model()->count() > 1 && t->model()->entry(0)->isParent ? 1 : 0;
+        m_view->setCurrentRow(row);
+        updateStatus();
+    });
+
     m_status = new QLabel(this);
     m_status->setContentsMargins(10, 4, 10, 5);
     m_status->setTextFormat(Qt::PlainText);
@@ -345,6 +378,11 @@ void Panel::showTab(int index)
         m_view->header()->setSortIndicator(int(s.column), s.descending ? Qt::DescendingOrder : Qt::AscendingOrder);
     }
     t->setCursorProvider([this] { return currentName(); });
+    {
+        QSignalBlocker block(m_filterEdit);
+        m_filterEdit->setText(t->model()->filter());
+    }
+    m_filterBar->setVisible(!t->model()->filter().isEmpty());
 
     const int row = t->model()->rowOf(t->savedCursor);
     m_view->setCurrentRow(row < 0 ? 0 : row);
@@ -369,6 +407,7 @@ void Panel::onListingReady(DirTab* t, const QString& focus)
         t->savedScroll = 0;
         return;
     }
+    m_filterBar->setVisible(!t->model()->filter().isEmpty());
     int row = focus.isEmpty() ? 0 : t->model()->rowOf(focus);
     if (row < 0)
         row = 0;
@@ -782,6 +821,8 @@ void Panel::updateStatus()
         color = t.accent;
     } else if (tb) {
         const FileModel::Stats s = tb->model()->stats();
+        if (!tb->model()->filter().isEmpty())
+            m_filterInfo->setText(tr("%1 shown, %2 hidden").arg(s.files + s.dirs).arg(tb->model()->hiddenByFilter()));
         if (s.markedFiles + s.markedDirs > 0) {
             text = tr("%1 of %2 files, %3 of %4 folders marked   ·   %5 of %6")
                        .arg(s.markedFiles).arg(s.files).arg(s.markedDirs).arg(s.dirs)
@@ -803,6 +844,22 @@ void Panel::showMessage(const QString& text, bool error)
     m_messageError = error;
     m_messageTimer.start(error ? 6000 : 2500);
     updateStatus();
+}
+
+void Panel::startFilter()
+{
+    m_filterBar->show();
+    m_filterEdit->setFocus();
+    m_filterEdit->selectAll();
+}
+
+void Panel::clearFilter()
+{
+    m_filterEdit->clear();
+    m_filterBar->hide();
+    if (DirTab* t = tab())
+        t->model()->setFilter({});
+    m_view->setFocus();
 }
 
 void Panel::focusPathEdit()
@@ -828,6 +885,18 @@ bool Panel::eventFilter(QObject* obj, QEvent* e)
             emit activated(this);
         if (e->type() == QEvent::FocusOut)
             m_pathEdit->setText(path());
+        return false;
+    }
+    if (obj == m_filterEdit && e->type() == QEvent::KeyPress) {
+        auto* ke = static_cast<QKeyEvent*>(e);
+        if (ke->key() == Qt::Key_Escape) {
+            clearFilter();
+            return true;
+        }
+        if (ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter || ke->key() == Qt::Key_Down) {
+            m_view->setFocus();
+            return true;
+        }
         return false;
     }
     if (obj == m_search) {

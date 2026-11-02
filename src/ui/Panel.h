@@ -72,6 +72,8 @@ public:
     void startRename();
     void expectName(const QString& name);
     void focusPathEdit();
+    void startFilter();
+    void clearFilter();
     void showMountMenu();
     void showMessage(const QString& text, bool error = false);
 
@@ -120,6 +122,9 @@ private:
     FileView* m_view;
     QLabel* m_status;
     QLineEdit* m_search;
+    QWidget* m_filterBar;
+    QLineEdit* m_filterEdit;
+    QLabel* m_filterInfo;
 
     QTimer m_loadingTimer;
     QTimer m_messageTimer;
