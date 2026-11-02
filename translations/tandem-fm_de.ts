@@ -367,6 +367,38 @@
         <source>&lt;DIR&gt;</source>
         <translation>&lt;DIR&gt;</translation>
     </message>
+    <message>
+        <source>Connect</source>
+        <translation>Verbinden</translation>
+    </message>
+    <message>
+        <source>User</source>
+        <translation>Benutzer</translation>
+    </message>
+    <message>
+        <source>Domain</source>
+        <translation>Domäne</translation>
+    </message>
+    <message>
+        <source>Password</source>
+        <translation>Passwort</translation>
+    </message>
+    <message>
+        <source>Remember the password (keyring)</source>
+        <translation>Passwort merken (Schlüsselbund)</translation>
+    </message>
+    <message>
+        <source>Connect anonymously</source>
+        <translation>Anonym verbinden</translation>
+    </message>
+    <message>
+        <source>Mounted, but GVfs has no local path for it (is gvfsd-fuse running?)</source>
+        <translation>Eingehängt, aber GVfs liefert keinen lokalen Pfad (läuft gvfsd-fuse?)</translation>
+    </message>
+    <message>
+        <source>Mounted, but it has no local path</source>
+        <translation>Eingehängt, aber ohne lokalen Pfad</translation>
+    </message>
 </context>
 <context>
     <name>tandem::CommandBar</name>
@@ -1105,6 +1137,10 @@
         <translation>Dateien suchen (Namen oder Inhalt)…</translation>
     </message>
     <message>
+        <source>Connect to server…</source>
+        <translation>Mit Server verbinden…</translation>
+    </message>
+    <message>
         <source>Preview: details instead of content</source>
         <translation>Vorschau: Details statt Inhalt</translation>
     </message>
@@ -1298,6 +1334,10 @@
     <message>
         <source>Preview: below each panel, below both or on the right (View &gt; Preview position)</source>
         <translation>Vorschau: unter jedem Panel, unter beiden oder rechts (Ansicht &gt; Position der Vorschau)</translation>
+    </message>
+    <message>
+        <source>Connect to a server (sftp, smb, WebDAV, ftp; via GVfs). Typing sftp://… or user@host:path in the path bar works too</source>
+        <translation>Mit einem Server verbinden (sftp, smb, WebDAV, ftp; über GVfs). sftp://… oder benutzer@host:pfad in der Pfadleiste geht auch</translation>
     </message>
     <message>
         <source>Compare the two panels: marks what is newer or missing on the other side</source>
@@ -1810,6 +1850,21 @@ F3 öffnet es im Betrachter</translation>
     </message>
 </context>
 <context>
+    <name>tandem::Network</name>
+    <message>
+        <source>The drive is gone</source>
+        <translation>Das Laufwerk ist weg</translation>
+    </message>
+    <message>
+        <source>Not a mount Tandem can disconnect</source>
+        <translation>Kein Einhängepunkt, den Tandem trennen kann</translation>
+    </message>
+    <message>
+        <source>Tandem was built without GIO</source>
+        <translation>Tandem wurde ohne GIO gebaut</translation>
+    </message>
+</context>
+<context>
     <name>tandem::PackJob</name>
     <message>
         <source>Pack</source>
@@ -1893,6 +1948,30 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>Home</source>
         <translation>Persönlicher Ordner</translation>
+    </message>
+    <message>
+        <source>Network &amp;&amp; drives</source>
+        <translation>Netzwerk &amp;&amp; Laufwerke</translation>
+    </message>
+    <message>
+        <source>%1   (mount)</source>
+        <translation>%1   (einhängen)</translation>
+    </message>
+    <message>
+        <source>Mounting…</source>
+        <translation>Hänge ein…</translation>
+    </message>
+    <message>
+        <source>Servers</source>
+        <translation>Server</translation>
+    </message>
+    <message>
+        <source>Connect to server…	Ctrl+K</source>
+        <translation>Mit Server verbinden…	Strg+K</translation>
+    </message>
+    <message>
+        <source>Disconnect / eject</source>
+        <translation>Trennen / auswerfen</translation>
     </message>
     <message>
         <source>Dragging out of archives isn&apos;t supported yet. Use F5 to extract.</source>
@@ -1981,6 +2060,48 @@ F3 öffnet es im Betrachter</translation>
     <message>
         <source>%1 found</source>
         <translation>%1 gefunden</translation>
+    </message>
+    <message>
+        <source>Tandem was built without GIO: mount with sshfs/rclone and browse the folder</source>
+        <translation>Tandem wurde ohne GIO gebaut: mit sshfs/rclone einhängen und den Ordner öffnen</translation>
+    </message>
+    <message>
+        <source>Connecting to %1 …</source>
+        <translation>Verbinde mit %1 …</translation>
+    </message>
+    <message>
+        <source>%1: %2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <source>Connect to server</source>
+        <translation>Mit Server verbinden</translation>
+    </message>
+    <message>
+        <source>Examples:  sftp://user@host/path  ·  user@host:folder  ·  smb://nas/share  ·  davs://cloud.example.com/remote.php/dav/files/me  ·  ftp://host
+Mounted with GVfs, so other apps see it too. Passwords can go to the keyring.</source>
+        <translation>Beispiele:  sftp://benutzer@host/pfad  ·  benutzer@host:ordner  ·  smb://nas/freigabe  ·  davs://cloud.example.com/remote.php/dav/files/ich  ·  ftp://host
+Eingehängt über GVfs, andere Programme sehen es also auch. Passwörter können in den Schlüsselbund.</translation>
+    </message>
+    <message>
+        <source>Connect</source>
+        <translation>Verbinden</translation>
+    </message>
+    <message>
+        <source>Not a server address: %1</source>
+        <translation>Keine Serveradresse: %1</translation>
+    </message>
+    <message>
+        <source>Disconnecting…</source>
+        <translation>Trenne…</translation>
+    </message>
+    <message>
+        <source>Disconnected %1</source>
+        <translation>%1 getrennt</translation>
+    </message>
+    <message>
+        <source>Could not unmount</source>
+        <translation>Aushängen fehlgeschlagen</translation>
     </message>
 </context>
 <context>

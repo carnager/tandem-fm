@@ -81,6 +81,10 @@ public:
     void startSearchBar();  // Alt+F7
     void clearFilter();
     void showMountMenu();
+    // sftp://…, smb://…, user@host:path, …: mount through GVfs, then open.
+    void connectTo(const QString& uri);
+    void connectDialog();
+    void disconnectMount(const QString& path);
     void showMessage(const QString& text, bool error = false);
 
     void setVimKeys(bool on);

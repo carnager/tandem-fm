@@ -343,6 +343,7 @@ void MainWindow::createMenus()
                [this] { m_chords->openAssign(active()->path()); });
     addCommand(go, tr("Jump to folder (search)…"), {K(Qt::CTRL | Qt::Key_J)}, [this] { jumpToFolder(); });
     go->addSeparator();
+    addCommand(go, tr("Connect to server…"), {K(Qt::CTRL | Qt::Key_K)}, [this] { active()->connectDialog(); });
     addCommand(go, tr("Locations (left)"), {K(Qt::ALT | Qt::Key_F1)}, [this] { m_left->showMountMenu(); });
     addCommand(go, tr("Locations (right)"), {K(Qt::ALT | Qt::Key_F2)}, [this] { m_right->showMountMenu(); });
     addCommand(go, tr("Show in left panel"), {K(Qt::CTRL | Qt::Key_Left)}, [this] { openInPanel(m_left); });
@@ -798,6 +799,7 @@ void MainWindow::showShortcuts()
         {"Ctrl+PgDn", QT_TR_NOOP("Enter folder, or browse any file as archive")},
         {"Menu key, Shift+F10", QT_TR_NOOP("Context menu")},
         {"Ctrl+Q", QT_TR_NOOP("Preview: below each panel, below both or on the right (View > Preview position)")},
+        {"Ctrl+K", QT_TR_NOOP("Connect to a server (sftp, smb, WebDAV, ftp; via GVfs). Typing sftp://… or user@host:path in the path bar works too")},
         {"Shift+F2", QT_TR_NOOP("Compare the two panels: marks what is newer or missing on the other side")},
         {"Ctrl+Shift+S", QT_TR_NOOP("Synchronize folders: compare both trees, choose directions, copy (or mirror)")},
         {"Ctrl+;", QT_TR_NOOP("Run a shell command: %s marked files, %f file, %d folder, %D other panel; Ctrl+Enter in a terminal")},

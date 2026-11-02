@@ -32,6 +32,7 @@ add_library(tandem_core STATIC
   src/core/GitStatus.h src/core/GitStatus.cpp
   src/core/Search.h src/core/Search.cpp
   src/core/FolderCompare.h src/core/FolderCompare.cpp
+  src/core/Remote.h src/core/Remote.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 find_package(LibArchive 3.3 REQUIRED)
@@ -57,6 +58,7 @@ add_library(tandem_ui STATIC
   src/ui/KeyChordPopup.h src/ui/KeyChordPopup.cpp
   src/ui/CommandBar.h src/ui/CommandBar.cpp
   src/ui/SyncDialog.h src/ui/SyncDialog.cpp
+  src/ui/Network.h src/ui/Network.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp
@@ -65,6 +67,19 @@ add_library(tandem_ui STATIC
   src/ui/viewer/FileInfo.h src/ui/viewer/FileInfo.cpp
 )
 target_link_libraries(tandem_ui PUBLIC tandem_core Qt6::Widgets Qt6::DBus Qt6::Pdf)
+
+# Optional: network locations and drives through GIO/GVfs.
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  pkg_check_modules(GIO IMPORTED_TARGET gio-2.0)
+endif()
+if(GIO_FOUND)
+  target_link_libraries(tandem_ui PRIVATE PkgConfig::GIO)
+  target_compile_definitions(tandem_ui PRIVATE TANDEM_HAVE_GIO)
+  message(STATUS "Network locations (GIO/GVfs): enabled")
+else()
+  message(STATUS "Network locations (GIO/GVfs): disabled (gio-2.0 not found)")
+endif()
 
 # Optional: syntax highlighting in the viewer (KDE's KSyntaxHighlighting).
 find_package(KF6SyntaxHighlighting QUIET)

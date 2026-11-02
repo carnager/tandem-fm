@@ -1,5 +1,6 @@
 #include "core/IoScheduler.h"
 
+#include "core/Remote.h"
 #include "core/Util.h"
 
 #include <chrono>
@@ -15,6 +16,10 @@ IoScheduler& IoScheduler::instance()
 
 quint64 IoScheduler::deviceOf(const QString& path)
 {
+    // All GVfs mounts share one FUSE device; queue each server separately
+    // so a copy to one doesn't wait for a copy to another.
+    if (const auto r = remoteRootOf(path))
+        return (quint64(1) << 63) | quint64(qHash(r->root));
     QString p = path;
     struct stat st;
     for (;;) {

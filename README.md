@@ -53,6 +53,7 @@ Visual check without a display:
 | Tab | Switch panel |
 | Enter / Backspace | Open / parent folder |
 | Type letters | Quick search (↑/↓ next match, Esc close) |
+| Ctrl+K | Connect to a server through GVfs: `sftp://user@host/path`, `user@host:folder`, `smb://nas/share`, `davs://…`, `ftp://…`. Also works typed into the path bar (Ctrl+L). Password/host-key questions are dialogs; passwords can go to the keyring. Servers you used are listed in the Locations menu (Alt+F1/F2), which also mounts unmounted drives and has "Disconnect / eject". Each server gets its own transfer queue |
 | Shift+F2 | Compare the panels: marks files that are newer or missing on the other side (instant, uses what's listed) |
 | Ctrl+Shift+S | Synchronize folders: compares both trees off-thread (optionally byte by byte), shows every difference with a direction (→ ← = ≠ ✕). Change it with ←/→/Space/Del or a click, Enter diffs two files (meld/kdiff3/…, else `diff -u`), Ctrl+Enter syncs. Modes: both ways (newer wins), mirror left→right, mirror right→left (extra files go to the trash) |
 | Ctrl+; (vim: `!`) | Run a shell command: `%s` marked files (quoted), `%f` file, `%n` name, `%d` folder, `%D` other panel's folder. Enter runs it in the background (output in a window), Ctrl+Enter in your terminal. ↑↓ history |

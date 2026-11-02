@@ -1,5 +1,7 @@
 #include "ui/DirTab.h"
 
+#include "core/Remote.h"
+
 #include "core/DirWatcher.h"
 #include "core/FileOps.h"
 #include "core/FolderHistory.h"
@@ -61,6 +63,8 @@ QString DirTab::title() const
     const QString p = path();
     if (p == QDir::homePath())
         return QStringLiteral("~");
+    if (const auto r = remoteRootOf(p); r && r->root == p)
+        return r->label.section(QStringLiteral("://"), -1);
     return baseName(p);
 }
 
@@ -315,7 +319,7 @@ void DirTab::refreshGit()
 {
     const QString dir = m_model->path();
     const quint64 gen = ++m_gitGen;
-    if (!g_gitEnabled || m_inArchive || m_inSearch || dir.isEmpty()) {
+    if (!g_gitEnabled || m_inArchive || m_inSearch || dir.isEmpty() || isRemotePath(dir)) {
         m_model->setGitStatus({});
         if (!m_gitBranch.isEmpty()) {
             m_gitBranch.clear();

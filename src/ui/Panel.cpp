@@ -3,16 +3,22 @@
 #include "core/Archive.h"
 #include "core/FileOps.h"
 #include "core/Mounts.h"
+#include "core/Remote.h"
 #include "core/Util.h"
 #include "ui/DirTab.h"
 #include "ui/FileModel.h"
 #include "ui/FileView.h"
 #include "ui/IconCache.h"
+#include "ui/Network.h"
 #include "ui/PathBar.h"
 #include "ui/Theme.h"
 
 #include <QCheckBox>
+#include <QComboBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QInputDialog>
@@ -22,10 +28,16 @@
 #include <QMenu>
 #include <QPainter>
 #include <QPointer>
+#include <QProcess>
+#include <QPushButton>
 #include <QScrollBar>
 #include <QTabBar>
 #include <QToolButton>
+#include <QUrl>
 #include <QVBoxLayout>
+
+#include <chrono>
+#include <thread>
 
 namespace tandem {
 
@@ -198,6 +210,11 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
 
     connect(m_pathBar, &PathBar::pathEntered, this, [this](QString text) {
         text = text.trimmed();
+        if (const QString uri = normalizeServerUri(text); !uri.isEmpty()) {
+            connectTo(uri);
+            m_view->setFocus();
+            return;
+        }
         if (!text.startsWith(QLatin1Char('/')) && !text.startsWith(QLatin1Char('~')) &&
             !text.startsWith(QLatin1String("file:")))
             text = joinPath(path(), text);
@@ -226,6 +243,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
         menu->addAction(IconCache::themed("folder-root", "folder"), QStringLiteral("/"),
                         this, [this] { navigate(QStringLiteral("/")); });
         menu->addSeparator();
+        QStringList unmountable;
         for (const MountPoint& m : listMounts()) {
             if (m.path == QLatin1String("/"))
                 continue;
@@ -234,6 +252,55 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
                                          QStringLiteral("%1   (%2)").arg(m.path, m.fsType),
                                          this, [this, p = m.path] { navigate(p); });
             a->setToolTip(m.device);
+            if (m.isRemovable)
+                unmountable << m.path;
+        }
+        const QList<Place> places = Network::instance().places();
+        bool header = false;
+        for (const Place& pl : places) {
+            if (!header) {
+                menu->addSection(tr("Network && drives"));
+                header = true;
+            }
+            const QIcon icon = IconCache::themed(pl.iconName.toUtf8().constData(),
+                                                 pl.network ? "network-server" : "drive-removable-media");
+            if (!pl.path.isEmpty()) {
+                const auto r = remoteRootOf(pl.path);
+                menu->addAction(icon, r ? QStringLiteral("%1   (%2)").arg(pl.name, r->label) : pl.name, this,
+                                [this, p = pl.path] { navigate(p); });
+                unmountable << pl.path;
+            } else {
+                menu->addAction(icon, tr("%1   (mount)").arg(pl.name), this, [this, id = pl.volumeId] {
+                    showMessage(tr("Mounting…"));
+                    QPointer<Panel> self(this);
+                    Network::instance().mountVolume(id, this, [self](const QString& path, const QString& error) {
+                        if (!self)
+                            return;
+                        if (!error.isEmpty())
+                            self->showMessage(error, true);
+                        else
+                            self->navigate(path);
+                    });
+                });
+            }
+        }
+        const QStringList recent = Network::instance().recentServers();
+        if (!recent.isEmpty()) {
+            menu->addSection(tr("Servers"));
+            for (const QString& uri : recent)
+                menu->addAction(IconCache::themed("network-server", "folder-remote"), uri, this,
+                                [this, uri] { connectTo(uri); });
+        }
+        menu->addSeparator();
+        if (Network::available())
+            menu->addAction(IconCache::themed("network-connect", "network-server"), tr("Connect to server…\tCtrl+K"),
+                            this, &Panel::connectDialog);
+        if (!unmountable.isEmpty()) {
+            QMenu* sub = menu->addMenu(IconCache::themed("media-eject", "media-eject"), tr("Disconnect / eject"));
+            for (const QString& p : unmountable) {
+                const auto r = remoteRootOf(p);
+                sub->addAction(r ? r->label : p, this, [this, p] { disconnectMount(p); });
+            }
         }
     });
 
@@ -956,7 +1023,7 @@ void Panel::updateHeader()
                                           : IconCache::themed("drive-harddisk", "folder"));
     m_mountButton->setToolTip(t->inArchive() ? tr("Inside archive %1").arg(t->archivePath())
                                              : tr("Locations (Alt+F1 / Alt+F2)"));
-    if (t->freeBytes() >= 0) {
+    if (t->freeBytes() >= 0 && t->totalBytes() > 0) {  // GVfs/FUSE often report 0 of 0
         m_freeLabel->setText(tr("%1 free").arg(formatSize(t->freeBytes())));
         m_freeLabel->setToolTip(tr("%1 free of %2").arg(formatSize(t->freeBytes()), formatSize(t->totalBytes())));
     } else {
@@ -1082,6 +1149,114 @@ void Panel::focusPathEdit()
 void Panel::showMountMenu()
 {
     m_mountButton->showMenu();
+}
+
+void Panel::connectTo(const QString& uri)
+{
+    if (!Network::available()) {
+        showMessage(tr("Tandem was built without GIO: mount with sshfs/rclone and browse the folder"), true);
+        return;
+    }
+    showMessage(tr("Connecting to %1 …").arg(uri));
+    QPointer<Panel> self(this);
+    const QString user = QUrl(uri).userName().isEmpty() ? QString::fromLocal8Bit(qgetenv("USER")) : QUrl(uri).userName();
+    const bool wantsHome = uri.startsWith(QLatin1String("sftp://")) && (QUrl(uri).path().isEmpty() || QUrl(uri).path() == QLatin1String("/"));
+    Network::instance().mount(uri, this, [self, uri, user, wantsHome](const QString& path, const QString& error) {
+        if (!self)
+            return;
+        if (!error.isEmpty()) {
+            self->showMessage(tr("%1: %2").arg(uri, error), true);
+            return;
+        }
+        Network::instance().rememberServer(uri);
+        // Off the UI thread (network round trips): right after a reconnect
+        // the kernel can briefly still report the folder as missing, so wait
+        // a moment for it. A bare sftp://host starts in the home folder.
+        ioPool()->start([self, path, user, wantsHome] {
+            for (int i = 0; i < 30 && !QFileInfo::exists(path); ++i)
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            const QString home = path + QStringLiteral("/home/") + user;
+            const QString target = wantsHome && QFileInfo(home).isDir() ? home : path;
+            postToUi([self, target] {
+                if (self)
+                    self->navigate(target);
+            });
+        });
+    });
+}
+
+void Panel::connectDialog()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Connect to server"));
+    auto* layout = new QVBoxLayout(&dlg);
+    auto* edit = new QComboBox(&dlg);
+    edit->setEditable(true);
+    edit->addItems(Network::instance().recentServers());
+    edit->setCurrentText(QString());
+    edit->lineEdit()->setPlaceholderText(QStringLiteral("sftp://user@host/path"));
+    edit->setMinimumWidth(460);
+    auto* hint = new QLabel(tr("Examples:  sftp://user@host/path  ·  user@host:folder  ·  smb://nas/share  ·  "
+                               "davs://cloud.example.com/remote.php/dav/files/me  ·  ftp://host\n"
+                               "Mounted with GVfs, so other apps see it too. Passwords can go to the keyring."),
+                            &dlg);
+    hint->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    hint->setWordWrap(true);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    buttons->button(QDialogButtonBox::Ok)->setText(tr("Connect"));
+    layout->addWidget(edit);
+    layout->addWidget(hint);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    edit->setFocus();
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    const QString text = edit->currentText().trimmed();
+    QString uri = normalizeServerUri(text);
+    if (uri.isEmpty() && !text.isEmpty() && !text.contains(QLatin1Char('/')))
+        uri = QStringLiteral("sftp://") + text;  // a bare host name
+    if (uri.isEmpty()) {
+        showMessage(tr("Not a server address: %1").arg(text), true);
+        return;
+    }
+    connectTo(uri);
+}
+
+void Panel::disconnectMount(const QString& mountPath)
+{
+    QPointer<Panel> self(this);
+    auto leave = [mountPath](Panel* p) {
+        const QString cur = p->path();
+        if (cur == mountPath || cur.startsWith(mountPath + QLatin1Char('/')))
+            p->navigate(QDir::homePath());
+    };
+    // Step out first, so nothing in Tandem keeps the mount busy.
+    leave(this);
+    if (auto* w = window())
+        for (Panel* p : w->findChildren<Panel*>())
+            leave(p);
+    showMessage(tr("Disconnecting…"));
+    auto finish = [self, mountPath](const QString& error) {
+        if (!self)
+            return;
+        if (error.isEmpty())
+            self->showMessage(tr("Disconnected %1").arg(mountPath));
+        else
+            self->showMessage(error, true);
+    };
+    if (Network::instance().canUnmount(mountPath)) {
+        Network::instance().unmount(mountPath, this, finish);
+        return;
+    }
+    // A kernel/FUSE mount GIO doesn't manage (sshfs, rclone, …).
+    auto* proc = new QProcess(this);
+    connect(proc, &QProcess::finished, this, [proc, finish](int code) {
+        const QString err = QString::fromLocal8Bit(proc->readAllStandardError()).trimmed();
+        proc->deleteLater();
+        finish(code == 0 ? QString() : (err.isEmpty() ? tr("Could not unmount") : err));
+    });
+    proc->start(QStringLiteral("umount"), {mountPath});
 }
 
 bool Panel::eventFilter(QObject* obj, QEvent* e)

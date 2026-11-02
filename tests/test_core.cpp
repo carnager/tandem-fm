@@ -4,6 +4,7 @@
 #include "core/FileOps.h"
 #include "core/Search.h"
 #include "core/FolderCompare.h"
+#include "core/Remote.h"
 #include "core/GitStatus.h"
 #include "core/Undo.h"
 #include "core/FolderHistory.h"
@@ -897,6 +898,42 @@ private slots:
         const SyncPlan mirror = buildSyncPlan(L, R, res2.items, actions);
         QCOMPARE(mirror.deletions, QStringList({R + "/extra.txt"}));
         QVERIFY(mirror.copies.isEmpty());
+    }
+
+    void remotePaths()
+    {
+        QCOMPARE(describeGvfsName("sftp:host=example.com,user=bob").label, QString("sftp://bob@example.com"));
+        QCOMPARE(describeGvfsName("sftp:host=example.com,port=2222").label, QString("sftp://example.com:2222"));
+        QCOMPARE(describeGvfsName("smb-share:server=nas,share=media,user=me").label, QString("smb://me@nas/media"));
+        QCOMPARE(describeGvfsName("dav:host=cloud.org,ssl=true,prefix=%2Fremote.php%2Fdav").label,
+                 QString("davs://cloud.org/remote.php/dav"));
+        QCOMPARE(describeGvfsName("ftp:host=ftp.gnu.org").scheme, QString("ftp"));
+        QCOMPARE(describeGvfsName("localtest:").label, QString("localtest"));
+
+        const QString root = gvfsDirectory() + "/sftp:host=h,user=u";
+        QVERIFY(isRemotePath(root + "/srv/x"));
+        QVERIFY(!isRemotePath("/home/u"));
+        QCOMPARE(remoteRootOf(root + "/srv/x")->root, root);
+        QCOMPARE(remoteRootOf(root)->label, QString("sftp://u@h"));
+        QVERIFY(!remoteRootOf(gvfsDirectory()));
+        // Each GVfs mount gets its own transfer queue, unlike the shared FUSE device.
+        const QString other = gvfsDirectory() + "/smb-share:server=nas,share=x";
+        QCOMPARE(IoScheduler::deviceOf(root + "/a"), IoScheduler::deviceOf(root + "/b/c"));
+        QVERIFY(IoScheduler::deviceOf(root + "/a") != IoScheduler::deviceOf(other + "/a"));
+
+        qputenv("USER", "me");
+        QCOMPARE(normalizeServerUri("sftp://h/srv"), QString("sftp://h/srv"));
+        QCOMPARE(normalizeServerUri("ssh://u@h"), QString("sftp://u@h"));
+        QCOMPARE(normalizeServerUri("https://cloud/dav"), QString("davs://cloud/dav"));
+        QCOMPARE(normalizeServerUri("u@h"), QString("sftp://u@h"));
+        QCOMPARE(normalizeServerUri("u@h:/etc"), QString("sftp://u@h/etc"));
+        QCOMPARE(normalizeServerUri("u@h:code/x"), QString("sftp://u@h/home/u/code/x"));
+        QCOMPARE(normalizeServerUri("h:~"), QString("sftp://h/home/me"));
+        QCOMPARE(normalizeServerUri("/home/me"), QString());
+        QCOMPARE(normalizeServerUri("~/x"), QString());
+        QCOMPARE(normalizeServerUri("file:///x"), QString());
+        QCOMPARE(normalizeServerUri("plainname"), QString());
+        QCOMPARE(normalizeServerUri("my file@2x.png"), QString());
     }
 
     void helpers()

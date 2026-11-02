@@ -7,6 +7,9 @@
 #include "ui/FileModel.h"
 #include "ui/CommandBar.h"
 #include "ui/SyncDialog.h"
+#include "ui/Network.h"
+#include "ui/PathBar.h"
+#include "core/Remote.h"
 #include "ui/FileView.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/KeyChordPopup.h"
@@ -22,6 +25,7 @@
 #include <QSignalSpy>
 
 #include <QApplication>
+#include <QLabel>
 #include <QComboBox>
 #include <QPlainTextEdit>
 #include <QSplitter>
@@ -1257,6 +1261,52 @@ private slots:
 
         m_left->navigate(L());
         m_right->navigate(R());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void networkMount()
+    {
+        if (!Network::available() || QStandardPaths::findExecutable("gvfsd-localtest", {"/usr/lib", "/usr/libexec", "/usr/lib/gvfs"}).isEmpty())
+            QSKIP("GVfs localtest backend not available");
+        QVERIFY(QDir().mkpath(L("net")));
+        writeFile(R("tocopy.txt"), "over gvfs");
+        m_right->navigate(R());
+        QTRY_VERIFY(rightModel()->rowOf("tocopy.txt") >= 0);
+
+        // What the path bar does with "sftp://…": mount through GVfs, then open.
+        m_left->connectTo("localtest://" + L("net"));
+        const QString viaGvfs = gvfsDirectory() + "/localtest:" + L("net");
+        if (!QTest::qWaitFor([&] { return m_left->path() == viaGvfs; }, 15000))
+            QSKIP("localtest mount failed in this session");
+        QVERIFY(isRemotePath(m_left->path()));
+        QVERIFY(Network::instance().canUnmount(m_left->path()));
+        QVERIFY(Network::instance().recentServers().contains("localtest://" + L("net")));
+        // The path bar shows a readable root instead of the GVfs folder name.
+        auto labelled = [&] {
+            for (auto* b : m_left->findChild<PathBar*>()->findChildren<QToolButton*>())
+                if (b->isVisibleTo(m_left) && b->text().startsWith(QString::fromUtf8("⇄ localtest")))
+                    return true;
+            return false;
+        };
+        QTRY_VERIFY(labelled());
+
+        // Copy into the remote folder with F5 (the normal job engine).
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+        moveCursorTo(m_right, "tocopy.txt");
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_right->view(), Qt::Key_F5);
+        QTRY_COMPARE(readFile(L("net/tocopy.txt")), QByteArray("over gvfs"));
+        QTRY_VERIFY(leftModel()->rowOf("tocopy.txt") >= 0);
+
+        // Disconnect: the panel steps out, the mount goes away.
+        m_left->disconnectMount(remoteRootOf(m_left->path())->root);
+        QTRY_COMPARE(m_left->path(), QDir::homePath());
+        QTRY_VERIFY_WITH_TIMEOUT(!QFileInfo::exists(viaGvfs), 10000);
+        Network::instance().forgetServer("localtest://" + L("net"));
+
+        m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
