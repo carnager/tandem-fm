@@ -11,6 +11,7 @@
 #include "ui/JobsPanel.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
+#include "ui/viewer/ViewerWindow.h"
 
 #include <QAbstractButton>
 #include <QActionGroup>
@@ -392,15 +393,28 @@ void MainWindow::makeFolder()
 
 void MainWindow::viewCurrent()
 {
-    // A built-in viewer (lister) comes later; until then, use the default app.
-    const FileEntry* e = active()->currentEntry();
+    Panel* p = active();
+    const FileEntry* e = p->currentEntry();
     if (!e)
         return;
     if (e->isDir) {
-        active()->computeCurrentSize();
+        p->computeCurrentSize();
         return;
     }
-    openFile(active()->currentPath());
+    // The viewer can step through all files of the folder with N / P.
+    QStringList files;
+    int index = 0;
+    const FileModel* m = p->tab()->model();
+    for (int r = 0; r < m->count(); ++r) {
+        const FileEntry* f = m->entry(r);
+        if (f->isDir)
+            continue;
+        if (f == e)
+            index = int(files.size());
+        files.append(m->filePath(r));
+    }
+    auto* viewer = new ViewerWindow(files, index, this);
+    viewer->show();
 }
 
 void MainWindow::editCurrent()
@@ -532,7 +546,7 @@ void MainWindow::showShortcuts()
         {"Type letters", "Quick search (Up/Down: next match)"},
         {"Insert, Space, Shift+↑↓", "Mark (Space also sizes folders)"},
         {"Num + / Num - / Num *", "Mark group / unmark group / invert"},
-        {"F3 / F4", "View / edit"},
+        {"F3 / F4", "Viewer (Esc closes, N/P next file, 1/3/4 modes) / edit"},
         {"F5 / F6", "Copy / move to other panel"},
         {"Shift+F6", "Rename in place"},
         {"F7 / Shift+F4", "New folder / new file"},

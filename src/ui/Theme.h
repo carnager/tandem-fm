@@ -19,6 +19,8 @@ struct Theme {
 };
 
 const Theme& theme();
+// The configured fixed-width font, guaranteed to really be monospaced.
+QFont monoFont();
 void applyTheme(QApplication& app);
 
 }  // namespace tandem

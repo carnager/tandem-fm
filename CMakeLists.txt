@@ -39,8 +39,22 @@ add_library(tandem_ui STATIC
   src/ui/JobManager.h src/ui/JobManager.cpp
   src/ui/JobsPanel.h src/ui/JobsPanel.cpp
   src/ui/MainWindow.h src/ui/MainWindow.cpp
+  src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
+  src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
+  src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp
+  src/ui/viewer/ViewerWindow.h src/ui/viewer/ViewerWindow.cpp
 )
 target_link_libraries(tandem_ui PUBLIC tandem_core Qt6::Widgets)
+
+# Optional: syntax highlighting in the viewer (KDE's KSyntaxHighlighting).
+find_package(KF6SyntaxHighlighting QUIET)
+if(KF6SyntaxHighlighting_FOUND)
+  target_link_libraries(tandem_ui PRIVATE KF6::SyntaxHighlighting)
+  target_compile_definitions(tandem_ui PRIVATE TANDEM_HAVE_KSYNTAXHIGHLIGHTING)
+  message(STATUS "Viewer syntax highlighting: enabled")
+else()
+  message(STATUS "Viewer syntax highlighting: disabled (KF6SyntaxHighlighting not found)")
+endif()
 target_compile_options(tandem_ui PRIVATE -Wall -Wextra)
 
 add_executable(tandem-fm src/main.cpp)
@@ -57,6 +71,10 @@ add_executable(test_ui tests/test_ui.cpp)
 target_link_libraries(test_ui PRIVATE tandem_ui Qt6::Test)
 add_test(NAME test_ui COMMAND test_ui)
 set_tests_properties(test_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+add_executable(test_viewer tests/test_viewer.cpp)
+target_link_libraries(test_viewer PRIVATE tandem_ui Qt6::Test)
+add_test(NAME test_viewer COMMAND test_viewer)
+set_tests_properties(test_viewer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 install(TARGETS tandem-fm RUNTIME DESTINATION bin)
 install(FILES tandem-fm.desktop DESTINATION share/applications)

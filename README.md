@@ -50,7 +50,7 @@ Visual check without a display:
 | Type letters | Quick search (↑/↓ next match, Esc close) |
 | Insert, Space, Shift+↑/↓ | Mark (Space also computes folder size) |
 | Num + / Num − / Num * | Mark group / unmark group / invert |
-| F3 / F4 | View / edit (default app for now; set `tools/editor` in the config for F4) |
+| F3 / F4 | Built-in viewer / edit (default app; set `tools/editor` in the config for F4) |
 | F5 / F6 | Copy / move to the other panel (`name/` = into that folder) |
 | Shift+F6 | Rename in place |
 | F7 / Shift+F4 | New folder (`a/b/c` creates nested folders) / new file |
@@ -80,18 +80,35 @@ marked file acts on all marked files; an unmarked file is acted on alone and
 your marks stay. Each tab remembers cursor and marks per folder, so Back,
 Forward and re-entering a folder put you where you were.
 
+## Viewer (F3)
+
+Text with syntax highlighting (KSyntaxHighlighting, optional; files up to 1 MiB),
+text of any size (only the visible part is read, so multi-GB logs open
+instantly), hex, and images (every format Qt and kimageformats support: AVIF,
+HEIF, JXL, WebP, RAW, PSD…). All reads happen off the UI thread.
+
+| Key | Action |
+|---|---|
+| Esc, Q | Close |
+| N / P | Next / previous file in the folder |
+| 1 / 3 / 4 | Text / hex / image |
+| W | Wrap long lines |
+| F7, Ctrl+F / F3, Shift+F3 | Find (case-insensitive) / next / previous |
+| + / − / 0, Ctrl+wheel | Zoom (text size or image) / reset (image: fit) |
+
 ## Layout
 
 ```
 src/core/   QtCore only, no UI: lister, inotify watcher, mounts, job engine
 src/ui/     Widgets: model/view, panels, tabs, dialogs, jobs strip, main window
-tests/      test_core (engine), test_ui (drives the real window with keys)
+src/ui/viewer/  F3 viewer: block cache, large-text/hex/image views
+tests/      test_core (engine), test_ui (drives the real window), test_viewer
 bench/      tandem-bench
 ```
 
 ## Roadmap
 
 1. ✅ Dual panels, tabs, keyboard flow, quick search, background F5–F8, watcher, benchmarks
-2. Built-in viewer (F3 lister), archives as folders (libarchive), multi-rename, compare/sync folders
+2. ✅ Built-in viewer (F3) · VFS layer + archives as folders (libarchive), multi-rename, compare/sync folders
 3. Network backends (SFTP, SMB, WebDAV, S3), connection manager, button bar, command line
 4. Plugins, themes, configurable keys

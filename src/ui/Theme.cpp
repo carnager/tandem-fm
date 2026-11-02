@@ -2,6 +2,8 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QFontDatabase>
+#include <QFontInfo>
 #include <QIcon>
 #include <QPalette>
 #include <QStyleFactory>
@@ -12,6 +14,17 @@ namespace tandem {
 static Theme g_theme;
 
 const Theme& theme() { return g_theme; }
+
+QFont monoFont()
+{
+    QFont f = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    if (!QFontInfo(f).fixedPitch()) {
+        f.setFamily(QStringLiteral("monospace"));
+        f.setStyleHint(QFont::Monospace);
+        f.setFixedPitch(true);
+    }
+    return f;
+}
 
 static QString rgba(const QColor& c)
 {
