@@ -45,6 +45,7 @@ signals:
     void focused();
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void dragPathsRequested(QStringList& out);  // panel fills marked/current paths
+    void contextMenuRequested(const QPoint& globalPos, int row);  // row -1: empty area
 
 protected:
     bool event(QEvent* e) override;
@@ -60,11 +61,13 @@ protected:
     void dragMoveEvent(QDragMoveEvent* e) override;
     void dragLeaveEvent(QDragLeaveEvent* e) override;
     void dropEvent(QDropEvent* e) override;
+    void contextMenuEvent(QContextMenuEvent* e) override;
 
 private:
     void moveCursorBy(int delta);
     QString dropTargetFor(const QPoint& pos, int* row) const;
     void startFileDrag();
+    void showHeaderMenu(const QPoint& pos);
 
     bool m_active = false;
     int m_dropRow = -1;

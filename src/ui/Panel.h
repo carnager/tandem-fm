@@ -30,7 +30,10 @@ public:
     const FileEntry* currentEntry() const;
     QString currentName() const;
     QString currentPath() const;      // full path of the cursor entry ("" on "..")
-    QStringList selectedPaths() const; // marked entries, or the cursor entry
+    QStringList selectedPaths() const; // override, else marked entries, else the cursor entry
+    // While a context menu runs, commands act on what was right-clicked.
+    void setSelectionOverride(const QStringList& paths) { m_override = paths; }
+    bool hasSelectionOverride() const { return !m_override.isEmpty(); }
     bool isActive() const { return m_active; }
     void setActive(bool active);
 
@@ -75,6 +78,7 @@ signals:
     void openFileRequested(const QString& path);
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void stateChanged();
+    void contextMenuRequested(Panel* panel, const QPoint& globalPos, bool onItem);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;
@@ -115,6 +119,7 @@ private:
     QString m_message;
     bool m_messageError = false;
     QByteArray m_headerState;
+    QStringList m_override;
     QString m_pathBeforeReset;
     int m_scrollBeforeReset = 0;
 };

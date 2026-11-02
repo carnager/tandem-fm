@@ -21,6 +21,7 @@ add_library(tandem_core STATIC
   src/core/Mounts.h src/core/Mounts.cpp
   src/core/Job.h src/core/Job.cpp
   src/core/FileOps.h src/core/FileOps.cpp
+  src/core/DesktopApps.h src/core/DesktopApps.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
 target_link_libraries(tandem_core PUBLIC Qt6::Core)

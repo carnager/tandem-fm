@@ -53,7 +53,7 @@ Visual check without a display:
 | F3 / F4 | View / edit (default app for now; set `tools/editor` in the config for F4) |
 | F5 / F6 | Copy / move to the other panel (`name/` = into that folder) |
 | Shift+F6 | Rename in place |
-| F7 | New folder (`a/b/c` creates nested folders) |
+| F7 / Shift+F4 | New folder (`a/b/c` creates nested folders) / new file |
 | F8, Del / Shift+F8, Shift+Del | Move to trash / delete permanently |
 | Ctrl+T / Ctrl+W / Ctrl+Tab | New / close / next tab (double-click a tab closes it) |
 | Alt+← / Alt+→ | History back / forward (mouse back/forward buttons too) |
@@ -67,9 +67,18 @@ Visual check without a display:
 | Ctrl+C / X / V | Clipboard, interoperable with other file managers |
 | Ctrl+Shift+C | Copy full paths as text |
 | Alt+Shift+Enter | Compute all folder sizes |
+| Ctrl+Alt+T | Open terminal here (`$TERMINAL`, or `tools/terminal` in the config) |
+| Right click, Menu key, Shift+F10 | Context menu |
 | Esc | Cancel a slow folder load |
 
 Drag and drop works within Tandem and with other applications (Shift = move).
+
+Right-click menus: on files (Open with…, clipboard, copy/move to other panel,
+rename, terminal, trash…), on empty space (new folder/file, paste, sort,
+hidden files) and on the column header (show/hide columns). Right-clicking a
+marked file acts on all marked files; an unmarked file is acted on alone and
+your marks stay. Each tab remembers cursor and marks per folder, so Back,
+Forward and re-entering a folder put you where you were.
 
 ## Layout
 

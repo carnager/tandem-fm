@@ -164,6 +164,22 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
             t->computeSize(e->name);
         t->model()->setMarked(row, willMark);
     });
+    connect(m_view, &FileView::contextMenuRequested, this, [this](const QPoint& pos, int row) {
+        DirTab* t = tab();
+        emit activated(this);
+        const FileEntry* e = t ? t->model()->entry(row) : nullptr;
+        if (!e || e->isParent) {
+            emit contextMenuRequested(this, pos, false);
+            return;
+        }
+        m_view->setCurrentRow(row);
+        // Marked item: act on all marks. Unmarked item: act on it alone and
+        // leave the marks alone (they may have taken a while to make).
+        if (!e->marked)
+            m_override = {joinPath(t->path(), e->name)};
+        emit contextMenuRequested(this, pos, true);
+        m_override.clear();
+    });
     connect(m_view->header(), &QHeaderView::sectionClicked, this, [this](int section) {
         sortBy(SortColumn(section));
     });
@@ -418,6 +434,8 @@ QStringList Panel::selectedPaths() const
     DirTab* t = tab();
     if (!t)
         return {};
+    if (!m_override.isEmpty())
+        return m_override;
     QStringList out;
     for (const QString& n : t->model()->markedNames())
         out.append(joinPath(t->path(), n));

@@ -1,3 +1,4 @@
+#include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
 #include "core/Sorting.h"
@@ -240,6 +241,18 @@ private slots:
         QVERIFY(job.errors().isEmpty());
         QVERIFY(!QFile::exists(tmp.filePath("x")));
         QCOMPARE(job.snapshot().filesDone, int64_t(5));
+    }
+
+    void desktopExecExpansion()
+    {
+        using L = QList<QStringList>;
+        QCOMPARE(DesktopApps::commandLines("kate -b %U", {"/a b", "/c"}),
+                 L({{"kate", "-b", "file:///a%20b", "file:///c"}}));
+        QCOMPARE(DesktopApps::commandLines("mpv --player-operation-mode=pseudo-gui -- %f", {"/x", "/y"}),
+                 L({{"mpv", "--player-operation-mode=pseudo-gui", "--", "/x"},
+                    {"mpv", "--player-operation-mode=pseudo-gui", "--", "/y"}}));
+        QCOMPARE(DesktopApps::commandLines("gimp %i %F", {"/p.png"}), L({{"gimp", "/p.png"}}));
+        QCOMPARE(DesktopApps::commandLines("\"my app\" --x=100%%", {"/f"}), L({{"my app", "--x=100%", "/f"}}));
     }
 
     void helpers()

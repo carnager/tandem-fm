@@ -2,6 +2,7 @@
 
 #include "core/FileOps.h"
 
+#include <QHash>
 #include <QMainWindow>
 #include <QUrl>
 
@@ -48,6 +49,11 @@ private:
     void swapPanels();
     void openInPanel(Panel* target);
     void showShortcuts();
+    void showContextMenu(Panel* panel, const QPoint& pos, bool onItem);
+    void addOpenWithMenu(QMenu* menu, const QStringList& paths);
+    void makeFile();
+    void openTerminal(const QString& dir = {});
+    void pasteInto(const QString& dir);
 
     void loadSettings(const QStringList& startPaths);
     void saveSettings();
@@ -59,6 +65,7 @@ private:
     JobManager* m_jobs;
     JobsPanel* m_jobsPanel;
     QAction* m_hiddenAction = nullptr;
+    QHash<QString, QAction*> m_actions;
 };
 
 }  // namespace tandem

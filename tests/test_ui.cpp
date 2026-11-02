@@ -9,6 +9,9 @@
 #include "ui/Theme.h"
 
 #include <QApplication>
+#include <QClipboard>
+#include <QContextMenuEvent>
+#include <QMenu>
 #include <QDialog>
 #include <QInputDialog>
 #include <QLineEdit>
@@ -44,6 +47,36 @@ void answerNextDialog(std::function<void(QWidget*)> answer)
         answer(w);
     };
     QTimer::singleShot(20, [attempt] { (*attempt)(200); });
+}
+
+// Picks an entry from the next popup menu (searching submenus too).
+void chooseFromNextMenu(const QString& text)
+{
+    QTimer::singleShot(50, [text] {
+        auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+        QVERIFY(menu);
+        std::function<QAction*(QMenu*)> find = [&](QMenu* m) -> QAction* {
+            for (QAction* a : m->actions()) {
+                if (a->text() == text)
+                    return a;
+                if (a->menu())
+                    if (QAction* sub = find(a->menu()))
+                        return sub;
+            }
+            return nullptr;
+        };
+        QAction* a = find(menu);
+        QVERIFY2(a, qPrintable(text));
+        menu->close();
+        a->trigger();
+    });
+}
+
+void rightClick(QAbstractItemView* view, int row)
+{
+    const QPoint pos = view->visualRect(view->model()->index(row, 0)).center();
+    QContextMenuEvent ev(QContextMenuEvent::Mouse, pos, view->viewport()->mapToGlobal(pos));
+    QApplication::sendEvent(view->viewport(), &ev);
 }
 
 void acceptDialog(QWidget* w)
@@ -261,6 +294,59 @@ private slots:
         QCOMPARE(p.tabPaths(), QStringList({L(), L("sub"), R()}));
         QCOMPARE(p.currentTabIndex(), 1);
         QTRY_COMPARE(p.path(), L("sub"));
+    }
+
+    void historyRemembersCursorAndMarks()
+    {
+        moveCursorTo(m_left, "photo.jpg");
+        leftModel()->setMarked(leftModel()->rowOf("file1.txt"), true);
+        moveCursorTo(m_left, "sub");
+        moveCursorTo(m_left, "photo.jpg");
+        m_left->navigate(L("sub"));
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+        moveCursorTo(m_left, "inner.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_Left, Qt::AltModifier);
+        QTRY_COMPARE(leftModel()->path(), L());
+        QCOMPARE(m_left->currentName(), QString("photo.jpg"));
+        QCOMPARE(leftModel()->markedNames(), QStringList({"file1.txt"}));
+        QTest::keyClick(m_left->view(), Qt::Key_Right, Qt::AltModifier);
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+        QCOMPARE(m_left->currentName(), QString("inner.txt"));
+        QTest::keyClick(m_left->view(), Qt::Key_Backspace);
+        QTRY_COMPARE(leftModel()->path(), L());
+        QCOMPARE(leftModel()->markedNames(), QStringList({"file1.txt"}));
+        leftModel()->markAll(false);
+    }
+
+    void contextMenuActsOnClickedItemOnly()
+    {
+        leftModel()->setMarked(leftModel()->rowOf("file1.txt"), true);
+        leftModel()->setMarked(leftModel()->rowOf("file10.txt"), true);
+        chooseFromNextMenu(QObject::tr("Copy full paths as text"));
+        rightClick(m_left->view(), leftModel()->rowOf("photo.jpg"));
+        QCOMPARE(QApplication::clipboard()->text(), L("photo.jpg"));
+        QCOMPARE(leftModel()->markedNames().size(), 2);  // marks survive
+
+        chooseFromNextMenu(QObject::tr("Copy full paths as text"));
+        rightClick(m_left->view(), leftModel()->rowOf("file1.txt"));  // marked: acts on all marks
+        QCOMPARE(QApplication::clipboard()->text(), L("file1.txt") + "\n" + L("file10.txt"));
+        leftModel()->markAll(false);
+    }
+
+    void contextMenuNewFileOnEmptyArea()
+    {
+        answerNextDialog([](QWidget* w) {
+            auto* dlg = qobject_cast<QInputDialog*>(w);
+            QVERIFY(dlg);
+            dlg->setTextValue("blank.txt");
+            dlg->accept();
+        });
+        chooseFromNextMenu(QObject::tr("New file…"));
+        const QPoint empty(20, m_left->view()->viewport()->height() - 5);
+        QContextMenuEvent ev(QContextMenuEvent::Mouse, empty, m_left->view()->viewport()->mapToGlobal(empty));
+        QApplication::sendEvent(m_left->view()->viewport(), &ev);
+        QTRY_VERIFY(QFile::exists(L("blank.txt")));
+        QTRY_COMPARE(m_left->currentName(), QString("blank.txt"));
     }
 
     void switchPanelsWithTab()

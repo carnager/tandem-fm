@@ -3,6 +3,7 @@
 #include "core/DirLister.h"
 
 #include <QObject>
+#include <QHash>
 #include <QSet>
 #include <QStringList>
 
@@ -69,6 +70,7 @@ private:
     void onDirectoryGone(int wd);
     void setWatch(int wd);
     void computeSizes(const QStringList& names);
+    void remember(const QString& dir);
 
     FileModel* m_model;
     quint64 m_gen = 0;
@@ -80,6 +82,13 @@ private:
     int64_t m_free = -1, m_total = -1;
     bool m_showHidden = false;
     QStringList m_back, m_forward;
+    // Cursor and marks per folder, restored when coming back to it.
+    struct FolderMemory {
+        QString cursor;
+        QSet<QString> marks;
+    };
+    QHash<QString, FolderMemory> m_memory;
+    QStringList m_memoryOrder;  // oldest first, bounded
     QString m_pendingFocus;
     QSet<QString> m_pendingNames;
     bool m_statInFlight = false;

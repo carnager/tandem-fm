@@ -169,6 +169,17 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
                 if (t->m_back.size() > 100)
                     t->m_back.removeFirst();
             }
+            QString focusName = focus;
+            QSet<QString> restore = marks;
+            if (!old.isEmpty() && old != result->path) {
+                t->remember(old);
+                const auto mem = t->m_memory.constFind(result->path);
+                if (mem != t->m_memory.cend()) {
+                    if (focusName.isEmpty())
+                        focusName = mem->cursor;
+                    restore = mem->marks;
+                }
+            }
             t->setWatch(result->watch);
             t->m_free = result->freeBytes;
             t->m_total = result->totalBytes;
@@ -176,11 +187,20 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
             if (result->sortedBy != t->m_model->sortSpec())  // sort changed while loading
                 sortEntries(result->entries, t->m_model->sortSpec());
             t->m_model->setListing(result->path, std::move(result->entries));
-            t->m_model->restoreMarks(marks);
-            emit t->listingReady(focus);
+            t->m_model->restoreMarks(restore);
+            emit t->listingReady(focusName);
             emit t->infoChanged();
         });
     });
+}
+
+void DirTab::remember(const QString& dir)
+{
+    m_memory.insert(dir, {cursorName(), m_model->markedSet()});
+    m_memoryOrder.removeOne(dir);
+    m_memoryOrder.append(dir);
+    while (m_memoryOrder.size() > 200)
+        m_memory.remove(m_memoryOrder.takeFirst());
 }
 
 void DirTab::onWatchChanged(int wd, const QStringList& names)

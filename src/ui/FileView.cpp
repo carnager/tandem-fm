@@ -8,6 +8,7 @@
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMimeData>
 #include <QPainter>
 #include <QScrollBar>
@@ -142,6 +143,8 @@ FileView::FileView(QWidget* parent) : QTreeView(parent)
     h->setStretchLastSection(false);
     h->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     h->setMinimumSectionSize(30);
+    h->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(h, &QHeaderView::customContextMenuRequested, this, &FileView::showHeaderMenu);
     h->setStyleSheet(theme().css(QStringLiteral(
         "QHeaderView { background: @base; border: none; border-bottom: 1px solid @border; }"
         "QHeaderView::section { background: @base; color: @dimText; border: none; padding: 4px 6px; }"
@@ -212,6 +215,13 @@ void FileView::keyPressEvent(QKeyEvent* e)
     case Qt::Key_Escape:
         emit escapePressed();
         return;
+    case Qt::Key_F10:
+        if (mods == Qt::ShiftModifier) {
+            const QRect r = visualRect(currentIndex());
+            emit contextMenuRequested(viewport()->mapToGlobal(QPoint(r.left() + 40, r.bottom())), currentRow());
+            return;
+        }
+        break;
     case Qt::Key_Insert:
         if (mods == Qt::NoModifier && m) {
             m->toggleMarked(currentRow());
@@ -432,6 +442,30 @@ void FileView::dropEvent(QDropEvent* e)
     e->setDropAction(action);
     e->accept();
     emit dropRequested(e->mimeData()->urls(), target, action);
+}
+
+void FileView::contextMenuEvent(QContextMenuEvent* e)
+{
+    if (e->reason() == QContextMenuEvent::Keyboard) {
+        const QRect r = visualRect(currentIndex());
+        emit contextMenuRequested(viewport()->mapToGlobal(QPoint(r.left() + 40, r.bottom())), currentRow());
+        return;
+    }
+    const QModelIndex idx = indexAt(viewport()->mapFromGlobal(e->globalPos()));
+    emit contextMenuRequested(e->globalPos(), idx.isValid() ? idx.row() : -1);
+}
+
+void FileView::showHeaderMenu(const QPoint& pos)
+{
+    QMenu menu(this);
+    QHeaderView* h = header();
+    for (int c = 1; c < h->count(); ++c) {  // the name column always stays
+        QAction* a = menu.addAction(model()->headerData(c, Qt::Horizontal).toString());
+        a->setCheckable(true);
+        a->setChecked(!h->isSectionHidden(c));
+        connect(a, &QAction::toggled, this, [h, c](bool on) { h->setSectionHidden(c, !on); });
+    }
+    menu.exec(h->mapToGlobal(pos));
 }
 
 void FileView::startFileDrag()
