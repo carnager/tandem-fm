@@ -67,7 +67,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QScrollArea>
-#include <QSettings>
+#include "core/Config.h"
 #include <QSplitter>
 #include <QVBoxLayout>
 
@@ -252,6 +252,10 @@ MainWindow::MainWindow(const QStringList& startPaths)
 
     createMenus();
     loadSettings(startPaths);
+    connect(&Config::instance(), &Config::changed, this, &MainWindow::reloadConfiguration);
+    connect(&Config::instance(), &Config::locationChanged, this, [] { FolderHistory::instance().configurationChanged(); });
+    connect(&Config::instance(), &Config::historyChanged, this, [] { FolderHistory::instance().reloadAsync(); });
+    connect(&Config::instance(), &Config::storageError, this, [this](const QString& error) { active()->showMessage(error, true); });
     DesktopApps::instance().loadAsync();
     FolderHistory::instance().loadAsync();
     m_popup = new FuzzyPopup(this);
@@ -432,6 +436,7 @@ void MainWindow::createMenus()
     m_hiddenAction = addCommand(view, QT_TR_NOOP("Show hidden files"), {K(Qt::CTRL | Qt::Key_H)}, [this] {
         m_left->setShowHidden(m_hiddenAction->isChecked());
         m_right->setShowHidden(m_hiddenAction->isChecked());
+        Settings().setValue(QStringLiteral("view/showHidden"), m_hiddenAction->isChecked());
     });
     m_hiddenAction->setCheckable(true);
     addCommand(view, QT_TR_NOOP("Thumbnails (for this folder)"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_F1)},
@@ -439,17 +444,20 @@ void MainWindow::createMenus()
     view->addSeparator();
     addCommand(view, QT_TR_NOOP("Preview"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
     addCommand(view, QT_TR_NOOP("Preview: details instead of content"), {K(Qt::CTRL | Qt::Key_I)}, [this] {
-        const bool on = !QSettings().value(QStringLiteral("preview/info"), false).toBool();
+        const bool on = !Settings().value(QStringLiteral("preview/info"), false).toBool();
         if (!m_quickView)
             toggleQuickView();
         for (ViewerWindow* v : {m_quickView, m_quickView2})
             if (v)
                 v->setShowInfo(on);
-        QSettings().setValue(QStringLiteral("preview/info"), on);
+        Settings().setValue(QStringLiteral("preview/info"), on);
     });
     view->addSeparator();
     addCommand(view, QT_TR_NOOP("Toggle menu bar"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_M)},
-               [this] { menuBar()->setVisible(!menuBar()->isVisible()); });
+               [this] {
+                   menuBar()->setVisible(!menuBar()->isVisible());
+                   Settings().setValue(QStringLiteral("window/menuBar"), menuBar()->isVisible());
+               });
     m_actions[QStringLiteral("refresh")] = addCommand(view, QT_TR_NOOP("Refresh"), {K(Qt::CTRL | Qt::Key_R)}, [this] { active()->refresh(); });
 
     // Tools: the bigger jobs, each with its own window or bar.
@@ -484,7 +492,7 @@ void MainWindow::createMenus()
     auto* prefs = new QMenu(tr("Settings"), this);
     QAction* vim = addCommand(prefs, QT_TR_NOOP("Vim keys (j k h l gg G / n N : v)"), {}, [this] {
         const bool on = m_actions.value(QStringLiteral("vim"))->isChecked();
-        QSettings().setValue(QStringLiteral("input/vimKeys"), on);
+        Settings().setValue(QStringLiteral("input/vimKeys"), on);
         m_left->setVimKeys(on);
         m_right->setVimKeys(on);
         active()->showMessage(on ? tr("Vim keys on: letters are commands; / searches") : tr("Vim keys off"));
@@ -493,7 +501,7 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("vim")] = vim;
     QAction* git = addCommand(prefs, QT_TR_NOOP("Show Git status"), {}, [this] {
         const bool on = m_actions.value(QStringLiteral("git"))->isChecked();
-        QSettings().setValue(QStringLiteral("view/gitStatus"), on);
+        Settings().setValue(QStringLiteral("view/gitStatus"), on);
         DirTab::setGitEnabled(on);
         for (Panel* p : {m_left, m_right})
             if (p->tab())
@@ -502,7 +510,7 @@ void MainWindow::createMenus()
     git->setCheckable(true);
     m_actions[QStringLiteral("git")] = git;
     QAction* notes = addCommand(prefs, QT_TR_NOOP("Notify when long operations finish"), {}, [this] {
-        QSettings().setValue(QStringLiteral("view/notifications"),
+        Settings().setValue(QStringLiteral("view/notifications"),
                              m_actions.value(QStringLiteral("notifications"))->isChecked());
     });
     notes->setCheckable(true);
@@ -579,7 +587,7 @@ void MainWindow::showTrash()
 
 void MainWindow::setPreviewPosition(const QString& code)
 {
-    QSettings().setValue(QStringLiteral("view/previewPosition"), code);
+    Settings().setValue(QStringLiteral("view/previewPosition"), code);
     if (m_quickView) {  // move it right away
         closePreview();
         toggleQuickView();
@@ -870,7 +878,7 @@ void MainWindow::editCurrent()
         editRemote(active(), path);
         return;
     }
-    const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
+    const QString editor = Settings().value(QStringLiteral("tools/editor")).toString();
     if (!editor.isEmpty()) {
         QStringList args = QProcess::splitCommand(editor);
         const QString program = args.takeFirst();
@@ -1009,7 +1017,7 @@ void MainWindow::showShortcuts()
 // A third column right of both panels: copy/move targets stay visible.
 QString MainWindow::previewMode() const
 {
-    const QString m = QSettings().value(QStringLiteral("view/previewPosition"), QStringLiteral("each")).toString();
+    const QString m = Settings().value(QStringLiteral("view/previewPosition"), QStringLiteral("each")).toString();
     return m == QLatin1String("bottom") || m == QLatin1String("right") ? m : QStringLiteral("each");
 }
 
@@ -1017,7 +1025,7 @@ void MainWindow::closePreview()
 {
     if (!m_quickView)
         return;
-    QSettings settings;
+    Settings settings;
     if (m_quickView2)
         settings.setValue(QStringLiteral("view/previewHeightEach"), m_leftCol->sizes().value(1));
     else if (m_vsplit->indexOf(m_quickView) >= 0)
@@ -1037,7 +1045,7 @@ void MainWindow::closePreview()
 // right. Never in place of a panel.
 void MainWindow::toggleQuickView()
 {
-    QSettings settings;
+    Settings settings;
     if (m_quickView) {
         closePreview();
         settings.setValue(QStringLiteral("view/preview"), false);
@@ -1243,7 +1251,7 @@ void MainWindow::jumpToFolder()
 
 void MainWindow::setIconTheme(const QString& id)
 {
-    QSettings().setValue(QStringLiteral("view/iconTheme"), id);
+    Settings().setValue(QStringLiteral("view/iconTheme"), id);
     IconCache::setTheme(id);
     for (Panel* p : {m_left, m_right})
         p->view()->viewport()->update();
@@ -1418,7 +1426,7 @@ void MainWindow::editRemote(Panel* p, const QString& path)
     const QString editCopy = remoteCachePath(path).replace(QStringLiteral("/tandem-fm/remote/"), QStringLiteral("/tandem-fm/edit/"));
     if (m_editedRemote.value(editCopy) == path && QFileInfo::exists(editCopy)) {
         // Already being edited: reopen that copy, don't fetch over changes.
-        const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
+        const QString editor = Settings().value(QStringLiteral("tools/editor")).toString();
         QStringList args = QProcess::splitCommand(editor);
         if (args.isEmpty() || !QProcess::startDetached(args.takeFirst(), args << editCopy, parentPath(editCopy)))
             openFile(editCopy);
@@ -1450,7 +1458,7 @@ void MainWindow::watchEdit(const QString& local)
     }
     m_editWatch->addPath(local);
     m_editWatch->addPath(parentPath(local));
-    const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
+    const QString editor = Settings().value(QStringLiteral("tools/editor")).toString();
     if (!editor.isEmpty()) {
         QStringList args = QProcess::splitCommand(editor);
         const QString program = args.takeFirst();
@@ -1614,7 +1622,7 @@ void MainWindow::createLink()
     auto* help = new QLabel(&dlg);
     help->setWordWrap(true);
     setThemeStyle(help, (QStringLiteral("color: @dimText;")));
-    const int saved = QSettings().value(QStringLiteral("links/kind"), 0).toInt();
+    const int saved = Settings().value(QStringLiteral("links/kind"), 0).toInt();
     for (const auto& [kind, label, tip] : choices) {
         auto* b = new QToolButton(&dlg);
         b->setObjectName(QStringLiteral("segment"));
@@ -1643,7 +1651,7 @@ void MainWindow::createLink()
     if (dlg.exec() != QDialog::Accepted)
         return;
     const auto kind = LinkKind(group->checkedId());
-    QSettings().setValue(QStringLiteral("links/kind"), int(kind));
+    Settings().setValue(QStringLiteral("links/kind"), int(kind));
     QString dest = expandUserPath(where->text().trimmed());
     if (!dest.startsWith(QLatin1Char('/')) && !isRemoteLocation(dest))
         dest = joinPath(p->path(), dest);
@@ -1923,7 +1931,7 @@ void MainWindow::runCommand(const QString& command, bool inTerminal)
     const QString expanded = expandCommand(command, ctx);
 
     if (inTerminal) {
-        QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
+        QString terminal = Settings().value(QStringLiteral("tools/terminal")).toString();
         if (terminal.isEmpty())
             terminal = DesktopApps::instance().defaultTerminal();
         if (terminal.isEmpty()) {
@@ -1979,7 +1987,7 @@ void MainWindow::runCommand(const QString& command, bool inTerminal)
 void MainWindow::notifyFinished(Job* job)
 {
     const qint64 took = QDateTime::currentMSecsSinceEpoch() - job->property("startedAt").toLongLong();
-    if (isActiveWindow() || took < 5000 || !QSettings().value(QStringLiteral("view/notifications"), true).toBool())
+    if (isActiveWindow() || took < 5000 || !Settings().value(QStringLiteral("view/notifications"), true).toBool())
         return;
     const Job::Snapshot s = job->snapshot();
     QString summary, body;
@@ -2357,14 +2365,14 @@ void MainWindow::openTerminal(const QString& dir)
     if (active()->inArchive() && where.startsWith(active()->archivePath()))
         where = parentPath(active()->archivePath());  // the folder holding the archive
 #ifdef Q_OS_MACOS
-    if (QSettings().value(QStringLiteral("tools/terminal")).toString().isEmpty()) {
+    if (Settings().value(QStringLiteral("tools/terminal")).toString().isEmpty()) {
         if (!QProcess::startDetached(QStringLiteral("/usr/bin/open"),
                                      {QStringLiteral("-a"), QStringLiteral("Terminal"), where}))
             active()->showMessage(tr("Could not open Terminal"), true);
         return;
     }
 #endif
-    QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
+    QString terminal = Settings().value(QStringLiteral("tools/terminal")).toString();
     if (terminal.isEmpty())
         terminal = DesktopApps::instance().defaultTerminal();
     if (terminal.isEmpty()) {
@@ -2432,7 +2440,7 @@ void MainWindow::makeFile()
 
 void MainWindow::loadSettings(const QStringList& startPaths)
 {
-    QSettings s;
+    Settings s;
     restoreGeometry(s.value(QStringLiteral("window/geometry")).toByteArray());
     if (!s.contains(QStringLiteral("window/geometry")))
         resize(1280, 800);
@@ -2495,9 +2503,47 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         });
 }
 
+void MainWindow::reloadConfiguration(const QStringList& keys)
+{
+    if (keys.isEmpty()) return;
+    Settings settings;
+    if (keys.contains(QStringLiteral("view/theme")) || keys.contains(QStringLiteral("view/fontScale")))
+        applyTheme(*qApp);
+    if (keys.contains(QStringLiteral("view/iconTheme")))
+        setIconTheme(settings.value(QStringLiteral("view/iconTheme")).toString());
+    for (Panel* panel : {m_left, m_right}) panel->applyAppearance();
+    if (keys.contains(QStringLiteral("view/showHidden"))) {
+        const bool hidden = settings.value(QStringLiteral("view/showHidden"), false).toBool();
+        const QSignalBlocker block(m_hiddenAction);
+        m_hiddenAction->setChecked(hidden);
+        m_left->setShowHidden(hidden); m_right->setShowHidden(hidden);
+    }
+    if (keys.contains(QStringLiteral("input/vimKeys"))) {
+        const bool vim = settings.value(QStringLiteral("input/vimKeys"), false).toBool();
+        m_actions.value(QStringLiteral("vim"))->setChecked(vim);
+        m_left->setVimKeys(vim); m_right->setVimKeys(vim);
+    }
+    if (keys.contains(QStringLiteral("view/gitStatus"))) {
+        const bool git = settings.value(QStringLiteral("view/gitStatus"), true).toBool();
+        m_actions.value(QStringLiteral("git"))->setChecked(git);
+        DirTab::setGitEnabled(git);
+        for (Panel* panel : {m_left, m_right}) if (panel->tab()) panel->tab()->refreshGit();
+    }
+    m_actions.value(QStringLiteral("notifications"))->setChecked(settings.value(QStringLiteral("view/notifications"), true).toBool());
+    if (keys.contains(QStringLiteral("window/menuBar"))) menuBar()->setVisible(settings.value(QStringLiteral("window/menuBar"), true).toBool());
+    if (std::any_of(keys.begin(), keys.end(), [](const QString& key) { return key.startsWith(QLatin1String("keys/")); }))
+        applyKeyBindings(actions());
+    // Do not navigate, restore geometry or close previews in response to a
+    // remote edit: an incoming sync must not disrupt current work.
+    if (keys.contains(QStringLiteral("view/thumbnailFolders")))
+        for (Panel* panel : {m_left, m_right}) panel->applyViewMode();
+    if (keys.contains(QStringLiteral("view/language")))
+        active()->showMessage(tr("Synced language setting received; it takes effect on the next start."));
+}
+
 void MainWindow::saveSettings()
 {
-    QSettings s;
+    Settings s;
     s.setValue(QStringLiteral("window/geometry"), saveGeometry());
     if (m_quickView2)
         s.setValue(QStringLiteral("view/previewHeightEach"), m_leftCol->sizes().value(1));

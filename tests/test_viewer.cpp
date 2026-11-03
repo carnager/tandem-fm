@@ -6,7 +6,7 @@
 #include "ui/viewer/ViewerWindow.h"
 
 #include <QApplication>
-#include <QSettings>
+#include "core/Config.h"
 #include <QScopeGuard>
 #include <QLabel>
 #include <QPushButton>
@@ -98,13 +98,13 @@ private slots:
 
     void largeTextAndHexScaleLive()
     {
-        const QVariant previous = QSettings().value("view/fontScale");
+        const QVariant previous = Settings().value("view/fontScale");
         auto restore = qScopeGuard([&] {
-            if (previous.isValid()) QSettings().setValue("view/fontScale", previous);
-            else QSettings().remove("view/fontScale");
+            if (previous.isValid()) Settings().setValue("view/fontScale", previous);
+            else Settings().remove("view/fontScale");
             applyFontScale(*qApp);
         });
-        QSettings().setValue("view/fontScale", 100);
+        Settings().setValue("view/fontScale", 100);
         applyFontScale(*qApp);
         struct TextProbe : TextScrollView {
             qreal size() const { return m_font.pointSizeF(); }
@@ -115,16 +115,16 @@ private slots:
         } hex;
         const qreal original = text.size();
         const int height = text.lineHeight();
-        QSettings().setValue("view/fontScale", 150);
+        Settings().setValue("view/fontScale", 150);
         applyFontScale(*qApp);
         QCOMPARE(text.size(), original * 1.5);
         QCOMPARE(hex.size(), original * 1.5);
         QVERIFY(text.lineHeight() > height);
         text.zoom(2);
-        QSettings().setValue("view/fontScale", 200);
+        Settings().setValue("view/fontScale", 200);
         applyFontScale(*qApp);
         QCOMPARE(text.size(), original * 2 + 2);
-        QSettings().setValue("view/fontScale", 100);
+        Settings().setValue("view/fontScale", 100);
         applyFontScale(*qApp);
         text.zoom(0);
         QCOMPARE(text.size(), original);

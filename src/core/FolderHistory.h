@@ -12,7 +12,7 @@ namespace tandem {
 
 // Folders you visit, ranked by "frecency" (zoxide-style: visit count weighted
 // by how recently), plus pinned folders (the hotlist). Thread-safe. Stored in
-// $XDG_DATA_HOME/tandem-fm/folders.tsv; saving happens off the UI thread.
+// folders.tsv beside the selected INI file; saving happens off the UI thread.
 class FolderHistory {
 public:
     struct Item {
@@ -29,8 +29,10 @@ public:
     static FolderHistory& instance();
 
     void loadAsync();
+    void reloadAsync(); // merge external changes without losing local edits
+    void configurationChanged();
     bool isLoaded() const { return m_loaded.load(); }
-    void saveNow();  // blocking, small file; used at exit
+    bool saveNow();  // blocking, small file; used at exit
 
     void visit(const QString& path);
     void forget(const QString& path);
@@ -56,7 +58,17 @@ private:
     struct Entry {
         double count = 0;
         qint64 last = 0;
+        bool operator==(const Entry&) const = default;
     };
+    struct Snapshot {
+        QHash<QString, Entry> entries;
+        QStringList pinned;
+        QHash<QString, QString> keys;
+        bool operator==(const Snapshot&) const = default;
+    };
+    static bool readSnapshot(const QString& path, Snapshot& out);
+    Snapshot mergeDiskLocked(const Snapshot& disk) const;
+    Snapshot m_baseline;
 
     mutable QMutex m_mutex;
     QHash<QString, Entry> m_entries;

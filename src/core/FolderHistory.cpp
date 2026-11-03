@@ -1,4 +1,5 @@
 #include "core/FolderHistory.h"
+#include "core/Config.h"
 
 #include "core/Util.h"
 
@@ -8,6 +9,7 @@
 #include <QFileInfo>
 #include <QSet>
 #include <QSaveFile>
+#include <QLockFile>
 #include <QStandardPaths>
 #include <QThread>
 
@@ -30,7 +32,7 @@ QString FolderHistory::storagePath() const
     QMutexLocker lock(&m_mutex);
     if (!m_storage.isEmpty())
         return m_storage;
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/folders.tsv");
+    return Config::instance().historyFile();
 }
 
 void FolderHistory::setStoragePath(const QString& path)
@@ -40,6 +42,8 @@ void FolderHistory::setStoragePath(const QString& path)
     m_entries.clear();
     m_pinned.clear();
     m_keys.clear();
+    m_baseline = {};
+    m_loaded = false;
 }
 
 double FolderHistory::frecency(double count, qint64 lastVisit, qint64 now)
@@ -61,90 +65,154 @@ void FolderHistory::loadAsync()
 
 void FolderHistory::load()
 {
-    QFile f(storagePath());
-    QHash<QString, Entry> entries;
-    QStringList pinned;
-    QHash<QString, QString> keys;
-    const bool exists = f.open(QIODevice::ReadOnly | QIODevice::Text);
-    if (exists) {
-        bool v2 = false;
-        while (!f.atEnd()) {
-            const QString line = QString::fromUtf8(f.readLine()).chopped(1);
-            if (line.startsWith(QLatin1String("#tandem-folders"))) {
-                v2 = true;
-                continue;
-            }
-            const QStringList parts = line.split(QLatin1Char('\t'));
-            const int pathField = v2 ? 4 : 3;
-            if (parts.size() <= pathField)
-                continue;
-            const QString path = parts.mid(pathField).join(QLatin1Char('\t'));
-            entries.insert(path, {parts[0].toDouble(), parts[1].toLongLong()});
-            if (parts[2] == QLatin1String("1"))
-                pinned.append(path);
-            if (v2 && !parts[3].isEmpty())
-                keys.insert(path, parts[3]);
-        }
-    } else {
-        // First start: yazi-like defaults.
-        const QString home = QDir::homePath();
-        for (const auto& [key, path] : {std::pair{QStringLiteral("h"), home},
-                                        std::pair{QStringLiteral("d"), home + QStringLiteral("/Downloads")},
-                                        std::pair{QStringLiteral("c"), home + QStringLiteral("/.config")},
-                                        std::pair{QStringLiteral("/"), QStringLiteral("/")}}) {
-            pinned.append(path);
-            keys.insert(path, key);
-        }
-    }
+    const QString path = storagePath();
     QMutexLocker lock(&m_mutex);
-    // Visits made before loading finished win.
-    for (auto it = entries.cbegin(); it != entries.cend(); ++it) {
-        Entry& e = m_entries[it.key()];
-        e.count += it->count;
-        e.last = std::max(e.last, it->last);
+    const QString current = m_storage.isEmpty() ? Config::instance().historyFile() : m_storage;
+    if (path != current) return;
+    Snapshot disk;
+    const bool exists = QFileInfo::exists(path);
+    if (exists && !readSnapshot(path, disk)) return;
+    if (!exists) {
+        const QString home = QDir::homePath();
+        for (const auto& [key, folder] : {std::pair{QStringLiteral("h"), home},
+                                             std::pair{QStringLiteral("d"), home + QStringLiteral("/Downloads")},
+                                             std::pair{QStringLiteral("c"), home + QStringLiteral("/.config")},
+                                             std::pair{QStringLiteral("/"), QStringLiteral("/")}}) {
+            if (!m_pinned.contains(folder)) m_pinned.append(folder);
+            if (!m_keys.contains(folder) && pathForKeyLocked(key).isEmpty()) m_keys.insert(folder, key);
+        }
     }
-    for (const QString& p : pinned)
-        if (!m_pinned.contains(p))
-            m_pinned.append(p);
-    for (auto it = keys.cbegin(); it != keys.cend(); ++it)
-        if (!m_keys.contains(it.key()) && pathForKeyLocked(it.value()).isEmpty())
-            m_keys.insert(it.key(), it.value());
-    m_loaded.store(true);
+    const Snapshot merged = mergeDiskLocked(disk);
+    m_entries = merged.entries; m_pinned = merged.pinned; m_keys = merged.keys;
+    m_baseline = disk;
+    m_loaded = true;
 }
 
-void FolderHistory::saveNow()
+bool FolderHistory::readSnapshot(const QString& path, Snapshot& out)
 {
-    QHash<QString, Entry> entries;
-    QStringList pinned;
-    QHash<QString, QString> keys;
-    {
-        QMutexLocker lock(&m_mutex);
-        entries = m_entries;
-        pinned = m_pinned;
-        keys = m_keys;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return false;
+    bool v2 = false;
+    while (!file.atEnd()) {
+        QString line = QString::fromUtf8(file.readLine());
+        if (line.endsWith(QLatin1Char('\n'))) line.chop(1);
+        if (line.startsWith(QLatin1String("#tandem-folders"))) { v2 = true; continue; }
+        if (line.isEmpty()) continue;
+        const auto parts = line.split(QLatin1Char('\t'));
+        const int field = v2 ? 4 : 3;
+        if (parts.size() <= field) return false; // keep a malformed/incomplete cloud file intact
+        const QString path = parts.mid(field).join(QLatin1Char('\t'));
+        bool countOk = false, timeOk = false;
+        const double count = parts[0].toDouble(&countOk);
+        const qint64 time = parts[1].toLongLong(&timeOk);
+        if (!countOk || !timeOk) return false;
+        out.entries.insert(path, {count, time});
+        if (parts[2] == QLatin1String("1")) out.pinned.append(path);
+        if (v2 && !parts[3].isEmpty()) out.keys.insert(path, parts[3]);
     }
+    return file.error() == QFileDevice::NoError;
+}
+
+FolderHistory::Snapshot FolderHistory::mergeDiskLocked(const Snapshot& disk) const
+{
+    Snapshot merged = disk;
+    QSet<QString> paths;
+    for (const auto* entries : {&m_entries, &m_baseline.entries})
+        for (const QString& p : entries->keys()) paths.insert(p);
+    for (const auto* pins : {&m_pinned, &m_baseline.pinned})
+        for (const QString& p : *pins) paths.insert(p);
+    for (const auto* keys : {&m_keys, &m_baseline.keys})
+        for (const QString& p : keys->keys()) paths.insert(p);
+    for (const QString& p : paths) {
+        const bool has = m_entries.contains(p), had = m_baseline.entries.contains(p);
+        const Entry local = m_entries.value(p), base = m_baseline.entries.value(p);
+        if (has != had || (has && local != base)) {
+            if (!has) merged.entries.remove(p);
+            else {
+                Entry e = local;
+                if (local.count >= base.count) e.count = merged.entries.value(p).count + local.count - base.count;
+                e.last = qMax(e.last, merged.entries.value(p).last);
+                merged.entries.insert(p, e);
+            }
+        }
+        if (m_pinned.contains(p) != m_baseline.pinned.contains(p)) {
+            merged.pinned.removeAll(p);
+            if (m_pinned.contains(p)) merged.pinned.append(p);
+        }
+        if (m_keys.value(p) != m_baseline.keys.value(p)) {
+            merged.keys.remove(p);
+            const QString key = m_keys.value(p);
+            if (!key.isEmpty()) {
+                for (auto it = merged.keys.begin(); it != merged.keys.end();)
+                    if (it.value() == key) it = merged.keys.erase(it); else ++it;
+                merged.keys.insert(p, key);
+            }
+        }
+    }
+    if (m_pinned != m_baseline.pinned)
+        for (const QString& path : m_pinned)
+            if (merged.pinned.contains(path)) { merged.pinned.removeAll(path); merged.pinned.append(path); }
+    return merged;
+}
+
+void FolderHistory::configurationChanged()
+{
+    // Pending saves look up the current path only after acquiring this mutex.
+    setStoragePath({});
+    loadAsync();
+}
+
+void FolderHistory::reloadAsync()
+{
+    if (!m_loaded.load()) { loadAsync(); return; }
     const QString path = storagePath();
-    QDir().mkpath(QFileInfo(path).absolutePath());
-    QSaveFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
-        return;
+    ioPool()->start([this, path] {
+        QMutexLocker lock(&m_mutex);
+        const QString current = m_storage.isEmpty() ? Config::instance().historyFile() : m_storage;
+        if (path != current || !m_loaded.load()) return;
+        Snapshot disk;
+        if (!readSnapshot(path, disk)) return;
+        const Snapshot merged = mergeDiskLocked(disk);
+        m_entries = merged.entries; m_pinned = merged.pinned; m_keys = merged.keys;
+        m_baseline = disk; // local changes remain pending until a successful save
+    });
+}
+
+bool FolderHistory::saveNow()
+{
+    QMutexLocker lock(&m_mutex);
+    if (!m_loaded.load() && m_storage.isEmpty()) return false;
+    const QString path = m_storage.isEmpty() ? Config::instance().historyFile() : m_storage;
+    // A missing cloud folder is not an empty profile. Do not recreate it and
+    // overwrite later-arriving bookmarks with defaults.
+    if (m_storage.isEmpty() && !QFileInfo::exists(Config::instance().fileName())) return false;
+    if (!QDir().mkpath(QFileInfo(path).absolutePath())) return false;
+    QLockFile fileLock(Config::localLockFile(path));
+    if (!fileLock.tryLock(1000)) return false;
+    Snapshot disk;
+    if (QFileInfo::exists(path) && !readSnapshot(path, disk)) return false;
+    const Snapshot merged = mergeDiskLocked(disk);
+    if (QFileInfo::exists(path) && merged == disk) {
+        m_entries = merged.entries; m_pinned = merged.pinned; m_keys = merged.keys; m_baseline = merged;
+        return true;
+    }
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
+    file.write("#tandem-folders 2\n");
     QSet<QString> written;
-    f.write("#tandem-folders 2\n");
-    auto line = [&](const QString& p, const Entry& e) {
-        f.write(QStringLiteral("%1\t%2\t%3\t%4\t%5\n")
-                    .arg(e.count)
-                    .arg(e.last)
-                    .arg(pinned.contains(p) ? 1 : 0)
-                    .arg(keys.value(p), p)
-                    .toUtf8());
+    auto line = [&](const QString& p) {
+        const Entry e = merged.entries.value(p);
+        file.write(QStringLiteral("%1\t%2\t%3\t%4\t%5\n").arg(e.count).arg(e.last)
+                   .arg(merged.pinned.contains(p) ? 1 : 0).arg(merged.keys.value(p), p).toUtf8());
         written.insert(p);
     };
-    for (const QString& p : std::as_const(pinned))
-        line(p, entries.value(p));
-    for (auto it = entries.cbegin(); it != entries.cend(); ++it)
-        if (!written.contains(it.key()))
-            line(it.key(), *it);
-    f.commit();
+    for (const QString& p : merged.pinned) line(p);
+    for (const QString& p : merged.entries.keys()) if (!written.contains(p)) line(p);
+    if (!file.commit()) return false;
+    m_entries = merged.entries; m_pinned = merged.pinned; m_keys = merged.keys;
+    m_baseline = merged;
+    return true;
 }
 
 void FolderHistory::scheduleSave()
@@ -154,8 +222,10 @@ void FolderHistory::scheduleSave()
     ioPool()->start([this] {
         QThread::msleep(2000);  // batch a burst of visits into one write
         m_saveScheduled.store(false);
-        if (m_loaded.load())
-            saveNow();
+        if (m_loaded.load() && !saveNow()) {
+            Config::instance().reportError(QObject::tr("Bookmarks could not be saved. They remain in memory and will be retried when the configuration folder is available."));
+            scheduleSave();
+        }
     });
 }
 

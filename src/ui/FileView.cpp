@@ -16,7 +16,7 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QScrollBar>
-#include <QSettings>
+#include "core/Config.h"
 
 namespace tandem {
 
@@ -336,7 +336,7 @@ void FileView::keyPressEvent(QKeyEvent* e)
     case Qt::Key_Left:
     case Qt::Key_Right:
         if (mods == Qt::NoModifier) {
-            if (QSettings().value(QStringLiteral("keys/lynxNavigation"), true).toBool()) {
+            if (Settings().value(QStringLiteral("keys/lynxNavigation"), true).toBool()) {
                 if (e->key() == Qt::Key_Left) {
                     emit parentRequested();
                 } else if (const FileEntry* entry = m ? m->entry(currentRow()) : nullptr;

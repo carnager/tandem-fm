@@ -119,6 +119,7 @@ private:
 
     void loadSettings(const QStringList& startPaths);
     void saveSettings();
+    void reloadConfiguration(const QStringList& keys);
 
     Panel* m_left;
     Panel* m_right;

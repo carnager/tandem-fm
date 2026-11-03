@@ -9,7 +9,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
-#include <QSettings>
+#include "core/Config.h"
 #include <QVBoxLayout>
 
 namespace tandem {
@@ -96,7 +96,7 @@ void CommandBar::open(const QString& hint)
 {
     if (!isVisible())
         m_returnFocus = QApplication::focusWidget();
-    m_history = QSettings().value(QStringLiteral("commands/history")).toStringList();
+    m_history = Settings().value(QStringLiteral("commands/history")).toStringList();
     m_historyPos = -1;
     m_hint->setText(hint + QStringLiteral("\n") +
                     tr("%s marked files · %f file · %n name · %d this folder · %D other panel   ·   "
@@ -152,7 +152,7 @@ bool CommandBar::eventFilter(QObject* obj, QEvent* e)
         m_history.prepend(cmd);
         while (m_history.size() > 50)
             m_history.removeLast();
-        QSettings().setValue(QStringLiteral("commands/history"), m_history);
+        Settings().setValue(QStringLiteral("commands/history"), m_history);
         const bool terminal = m_terminal->isChecked() || (ke->modifiers() & Qt::ControlModifier);
         close();
         emit runRequested(cmd, terminal);

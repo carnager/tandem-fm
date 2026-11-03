@@ -6,11 +6,13 @@
 #include "ui/Theme.h"
 
 #include <QApplication>
+#include <QCommandLineParser>
+#include <QMessageBox>
 #include <QIcon>
 #include <QDir>
 #include <QLibraryInfo>
 #include <QLocale>
-#include <QSettings>
+#include "core/Config.h"
 #include <QTranslator>
 #include <QTimer>
 
@@ -27,13 +29,32 @@ int main(int argc, char** argv)
     QApplication::setApplicationName(QStringLiteral("tandem-fm"));
     QApplication::setOrganizationName(QStringLiteral("tandem-fm"));
     QApplication::setApplicationDisplayName(QStringLiteral("Tandem"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.1"));
+    QApplication::setApplicationVersion(QStringLiteral("0.1.2"));
     QGuiApplication::setDesktopFileName(QStringLiteral("tandem-fm"));
+
+    QCommandLineParser parser;
+    parser.setApplicationDescription(QStringLiteral("Tandem two-panel file manager"));
+    parser.addHelpOption();
+    parser.addVersionOption();
+    parser.addOption(QCommandLineOption(QStringLiteral("config"), QStringLiteral("Use a portable INI settings file"), QStringLiteral("file")));
+    parser.addOption(QCommandLineOption(QStringLiteral("config-dir"), QStringLiteral("Use settings.ini and folders.tsv in this folder"), QStringLiteral("directory")));
+    parser.addPositionalArgument(QStringLiteral("paths"), QStringLiteral("Starting folders for the left and right panels"), QStringLiteral("[left] [right]"));
+    parser.process(app);
+    if (parser.isSet(QStringLiteral("config")) && parser.isSet(QStringLiteral("config-dir")))
+        parser.showHelp(1);
+    QString configFile = parser.value(QStringLiteral("config"));
+    if (parser.isSet(QStringLiteral("config-dir")))
+        configFile = QDir(parser.value(QStringLiteral("config-dir"))).filePath(QStringLiteral("settings.ini"));
+    QString configError;
+    if (!tandem::Config::instance().initialize(configFile, &configError)) {
+        QMessageBox::critical(nullptr, QStringLiteral("Tandem settings"), configError);
+        return 1;
+    }
 
     // UI language: TANDEM_LANG=de, else View > Language, else the system's.
     QString lang = qEnvironmentVariable("TANDEM_LANG");
     if (lang.isEmpty())
-        lang = QSettings().value(QStringLiteral("view/language")).toString();
+        lang = tandem::Settings().value(QStringLiteral("view/language")).toString();
     const QLocale locale = lang.isEmpty() ? QLocale() : QLocale(lang);
     QTranslator qtTranslator, appTranslator;
     if (qtTranslator.load(locale, QStringLiteral("qtbase"), QStringLiteral("_"),
@@ -49,7 +70,7 @@ int main(int argc, char** argv)
     tandem::installAuthDialogs();
     tandem::Network::instance().recentServers();  // drops passwords older versions stored
 
-    QStringList paths = app.arguments().mid(1);
+    QStringList paths = parser.positionalArguments();
     tandem::MainWindow w(paths);
     w.show();
 

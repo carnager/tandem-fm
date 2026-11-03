@@ -24,7 +24,7 @@
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QPointer>
-#include <QSettings>
+#include "core/Config.h"
 #include <QShortcut>
 #include <QStackedWidget>
 #include <QStringDecoder>
@@ -210,23 +210,23 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     connect(m_imageButton, &QToolButton::clicked, this, [this] {
         setMode(Mode::Image);
         if (m_embedded)
-            QSettings().setValue(QStringLiteral("preview/info"), false);
+            Settings().setValue(QStringLiteral("preview/info"), false);
     });
     connect(m_infoButton, &QToolButton::clicked, this, [this] {
         setMode(Mode::Info);
         if (m_embedded)
-            QSettings().setValue(QStringLiteral("preview/info"), true);
+            Settings().setValue(QStringLiteral("preview/info"), true);
     });
     for (QToolButton* b : {m_textButton, m_hexButton})
         connect(b, &QToolButton::clicked, this, [this] {
             if (m_embedded)
-                QSettings().setValue(QStringLiteral("preview/info"), false);
+                Settings().setValue(QStringLiteral("preview/info"), false);
         });
     connect(m_wrapButton, &QCheckBox::toggled, this, [this](bool on) {
         m_text->setLineWrapMode(on ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
         m_big->setWrap(on);
         if (!m_embedded)
-            QSettings().setValue(QStringLiteral("viewer/wrap"), on);
+            Settings().setValue(QStringLiteral("viewer/wrap"), on);
     });
     layout->addWidget(top);
 
@@ -374,7 +374,7 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     connect(m_hex, &ByteViewBase::positionChanged, this, &ViewerWindow::updateStatus);
     connect(m_image, &ImageView::scaleChanged, this, &ViewerWindow::updateStatus);
 
-    QSettings s;
+    Settings s;
     m_wrapButton->setChecked(embedded || s.value(QStringLiteral("viewer/wrap"), false).toBool());
     m_text->setLineWrapMode(m_wrapButton->isChecked() ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
     m_big->setWrap(m_wrapButton->isChecked());
@@ -395,7 +395,7 @@ ViewerWindow::~ViewerWindow()
 void ViewerWindow::closeEvent(QCloseEvent* e)
 {
     if (!m_embedded)
-        QSettings().setValue(QStringLiteral("viewer/geometry"), saveGeometry());
+        Settings().setValue(QStringLiteral("viewer/geometry"), saveGeometry());
     QWidget::closeEvent(e);
 }
 
@@ -469,7 +469,7 @@ void ViewerWindow::setupShortcuts()
     add(Qt::Key_Equal, [this] { zoom(1); });
     add(Qt::Key_Minus, [this] { zoom(-1); });
     add(Qt::Key_0, [this] { zoom(0); });
-    if (QSettings().value(QStringLiteral("input/vimKeys"), false).toBool()) {
+    if (Settings().value(QStringLiteral("input/vimKeys"), false).toBool()) {
         auto sendKey = [this](Qt::Key key, Qt::KeyboardModifiers mods = Qt::NoModifier) {
             QWidget* w = m_stack->currentWidget();
             QKeyEvent press(QEvent::KeyPress, key, mods);
@@ -590,7 +590,7 @@ void ViewerWindow::openIndex(int index)
                 connect(w->m_cache, &BlockCache::failed, w,
                         [w](const QString& err) { w->showMessage(tr("Read error: %1").arg(err)); });
             }
-            const bool info = w->m_embedded && QSettings().value(QStringLiteral("preview/info"), false).toBool();
+            const bool info = w->m_embedded && Settings().value(QStringLiteral("preview/info"), false).toBool();
             w->setMode(info ? Mode::Info : w->defaultMode());
         });
     });
@@ -603,7 +603,7 @@ ViewerWindow::Mode ViewerWindow::defaultMode() const
 
 void ViewerWindow::setShowInfo(bool on)
 {
-    QSettings().setValue(QStringLiteral("preview/info"), on);
+    Settings().setValue(QStringLiteral("preview/info"), on);
     if (m_path.isEmpty() || m_kind == PreviewKind::Special)
         return;
     setMode(on ? Mode::Info : defaultMode());

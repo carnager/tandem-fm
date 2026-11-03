@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(tandem-fm VERSION 0.1.1 LANGUAGES CXX)
+project(tandem-fm VERSION 0.1.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,6 +13,7 @@ qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES de)
 
 # Core engine: filesystem access, jobs, watching. QtCore only, no UI.
 add_library(tandem_core STATIC
+  src/core/Config.h src/core/Config.cpp
   src/core/FileEntry.h
   src/core/Util.h src/core/Util.cpp
   src/core/Sorting.h src/core/Sorting.cpp
@@ -204,6 +205,10 @@ add_executable(tandem-bench bench/bench_list.cpp)
 target_link_libraries(tandem-bench PRIVATE tandem_core)
 
 enable_testing()
+add_executable(test_config tests/test_config.cpp)
+target_link_libraries(test_config PRIVATE tandem_core Qt6::Test)
+add_test(NAME test_config COMMAND test_config)
+set_tests_properties(test_config PROPERTIES TIMEOUT 60)
 if(APPLE)
   add_executable(test_macos tests/test_macos.cpp)
   target_link_libraries(test_macos PRIVATE tandem_core Qt6::Test)

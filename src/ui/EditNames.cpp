@@ -9,7 +9,7 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QPushButton>
-#include <QSettings>
+#include "core/Config.h"
 #include <QStandardPaths>
 #include <QTemporaryDir>
 
@@ -28,7 +28,7 @@ EditNamesSession::~EditNamesSession()
 
 QStringList EditNamesSession::editorCommand(const QString& file, QString* error)
 {
-    const QString custom = QSettings().value(QStringLiteral("tools/nameEditor")).toString();
+    const QString custom = Settings().value(QStringLiteral("tools/nameEditor")).toString();
     if (!custom.isEmpty()) {
         QStringList argv = QProcess::splitCommand(custom);
         if (!argv.contains(QLatin1String("%f")))
@@ -40,7 +40,7 @@ QStringList EditNamesSession::editorCommand(const QString& file, QString* error)
     if (editor.isEmpty())
         editor = qEnvironmentVariable("EDITOR");
     if (!editor.isEmpty()) {
-        QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
+        QString terminal = Settings().value(QStringLiteral("tools/terminal")).toString();
         if (terminal.isEmpty())
             terminal = DesktopApps::instance().defaultTerminal();
         if (terminal.isEmpty()) {

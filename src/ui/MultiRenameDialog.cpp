@@ -18,7 +18,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QRegularExpression>
-#include <QSettings>
+#include "core/Config.h"
 #include <QShortcut>
 #include <QTableView>
 #include <QThreadPool>
@@ -296,7 +296,7 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString folder, QS
     m_recent->setMenu(recentMenu);
     connect(recentMenu, &QMenu::aboutToShow, this, [this, recentMenu] {
         recentMenu->clear();
-        const QStringList recent = QSettings().value(QStringLiteral("multiRename/recent")).toStringList();
+        const QStringList recent = Settings().value(QStringLiteral("multiRename/recent")).toStringList();
         for (const QString& r : recent)
             recentMenu->addAction(r, this, [this, r] { m_template->setText(r); });
         if (recent.isEmpty())
@@ -619,7 +619,7 @@ void MultiRenameDialog::accept()
 
 void MultiRenameDialog::loadSettings()
 {
-    QSettings s;
+    Settings s;
     s.beginGroup(QStringLiteral("multiRename"));
     m_template->setText(s.value(QStringLiteral("template"), QStringLiteral("{name}{ext}")).toString());
     m_find->setText(s.value(QStringLiteral("find")).toString());
@@ -632,7 +632,7 @@ void MultiRenameDialog::loadSettings()
 
 void MultiRenameDialog::saveSettings() const
 {
-    QSettings s;
+    Settings s;
     s.beginGroup(QStringLiteral("multiRename"));
     const RenameOptions o = options();
     s.setValue(QStringLiteral("template"), o.pattern);

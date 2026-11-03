@@ -11,7 +11,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
-#include <QSettings>
+#include "core/Config.h"
 #include <QProxyStyle>
 #include <QStyleOption>
 #include <QStyleFactory>
@@ -33,7 +33,7 @@ QFont monoFont()
         f.setStyleHint(QFont::Monospace);
         f.setFixedPitch(true);
     }
-    const qreal scale = qBound(75, QSettings().value(QStringLiteral("view/fontScale"), 100).toInt(), 200) / 100.0;
+    const qreal scale = qBound(75, Settings().value(QStringLiteral("view/fontScale"), 100).toInt(), 200) / 100.0;
     if (f.pointSizeF() > 0)
         f.setPointSizeF(f.pointSizeF() * scale);
     return f;
@@ -66,7 +66,7 @@ void setThemeStyle(QWidget* widget, const QString& templateCss)
 
 void applyFontScale(QApplication& app)
 {
-    const qreal scale = qBound(75, QSettings().value(QStringLiteral("view/fontScale"), 100).toInt(), 200) / 100.0;
+    const qreal scale = qBound(75, Settings().value(QStringLiteral("view/fontScale"), 100).toInt(), 200) / 100.0;
     const qreal previous = app.property("tandemFontScale").isValid() ? app.property("tandemFontScale").toDouble() : 1.0;
     if (!app.property("tandemBaseFont").isValid())
         app.setProperty("tandemBaseFont", app.font());
@@ -109,7 +109,7 @@ static bool systemPrefersDark(const QApplication& app)
 {
     QByteArray forced = qgetenv("TANDEM_THEME");
     if (forced.isEmpty())  // the setting (Settings › Appearance)
-        forced = QSettings().value(QStringLiteral("view/theme")).toString().toUtf8();
+        forced = Settings().value(QStringLiteral("view/theme")).toString().toUtf8();
     if (forced == "light")
         return false;
     if (forced == "dark")
@@ -241,7 +241,7 @@ void applyTheme(QApplication& app)
     QScopedValueRollback guard(applying, true);
     Theme& t = g_theme;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-    const QString requested = qEnvironmentVariable("TANDEM_THEME", QSettings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString());
+    const QString requested = qEnvironmentVariable("TANDEM_THEME", Settings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString());
     app.styleHints()->setColorScheme(requested == QLatin1String("dark") ? Qt::ColorScheme::Dark
                                      : requested == QLatin1String("light") ? Qt::ColorScheme::Light
                                                                           : Qt::ColorScheme::Unknown);
@@ -251,7 +251,7 @@ void applyTheme(QApplication& app)
         app.setProperty("tandemThemeConnected", true);
         QObject::connect(app.styleHints(), &QStyleHints::colorSchemeChanged, &app, [&app] {
             if (qEnvironmentVariableIsEmpty("TANDEM_THEME") &&
-                QSettings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString() == QLatin1String("system"))
+                Settings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString() == QLatin1String("system"))
                 applyTheme(app);
         });
     }

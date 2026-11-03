@@ -16,7 +16,7 @@
 #include <QLabel>
 #include <QPointer>
 #include <QPushButton>
-#include <QSettings>
+#include "core/Config.h"
 #include <QThreadPool>
 #include <QToolButton>
 #include <QTreeWidget>
@@ -48,7 +48,7 @@ ChecksumDialog::ChecksumDialog(QStringList paths, QWidget* parent) : QDialog(par
         auto* algos = new QHBoxLayout;
         algos->setSpacing(0);
         m_algo = new QButtonGroup(this);
-        const QString saved = QSettings().value(QStringLiteral("checksums/algo"), QStringLiteral("SHA-256")).toString();
+        const QString saved = Settings().value(QStringLiteral("checksums/algo"), QStringLiteral("SHA-256")).toString();
         const QList<ChecksumAlgo> all = checksumAlgos();
         for (int i = 0; i < all.size(); ++i) {
             auto* b = new QToolButton(this);
@@ -64,7 +64,7 @@ ChecksumDialog::ChecksumDialog(QStringList paths, QWidget* parent) : QDialog(par
         algos->addStretch(1);
         layout->addLayout(algos);
         connect(m_algo, &QButtonGroup::idClicked, this, [this](int id) {
-            QSettings().setValue(QStringLiteral("checksums/algo"), checksumAlgos().value(id).name);
+            Settings().setValue(QStringLiteral("checksums/algo"), checksumAlgos().value(id).name);
             start();
         });
     }

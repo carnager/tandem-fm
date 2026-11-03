@@ -35,7 +35,7 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QTabBar>
-#include <QSettings>
+#include "core/Config.h"
 #include <QTimer>
 #include <QToolButton>
 #include <QUrl>
@@ -61,7 +61,7 @@ protected:
     {
         QPainter painter(this);
         QColor shade = theme().window;
-        shade.setAlphaF(qBound(0, QSettings().value(QStringLiteral("view/inactiveDim"), 25).toInt(), 70) / 100.0);
+        shade.setAlphaF(qBound(0, Settings().value(QStringLiteral("view/inactiveDim"), 25).toInt(), 70) / 100.0);
         painter.fillRect(rect(), shade);
     }
 };
@@ -999,7 +999,7 @@ void Panel::applyAppearance()
     updateActiveStyle();
     if (m_inactiveShade) {
         m_inactiveShade->setGeometry(rect());
-        m_inactiveShade->setVisible(!m_active && QSettings().value(QStringLiteral("view/inactiveDim"), 25).toInt() > 0);
+        m_inactiveShade->setVisible(!m_active && Settings().value(QStringLiteral("view/inactiveDim"), 25).toInt() > 0);
         m_inactiveShade->raise();
         m_inactiveShade->update();
     }
@@ -1186,7 +1186,7 @@ void Panel::focusPathEdit()
 // there whenever ~/Pictures is open).
 static QStringList thumbnailFolders()
 {
-    return QSettings().value(QStringLiteral("view/thumbnailFolders")).toStringList();
+    return Settings().value(QStringLiteral("view/thumbnailFolders")).toStringList();
 }
 
 void Panel::applyViewMode()
@@ -1205,7 +1205,7 @@ void Panel::toggleThumbnails()
         folders.removeAll(t->path());
     else
         folders.prepend(t->path());
-    QSettings().setValue(QStringLiteral("view/thumbnailFolders"), folders.mid(0, 500));
+    Settings().setValue(QStringLiteral("view/thumbnailFolders"), folders.mid(0, 500));
     applyViewMode();
 }
 

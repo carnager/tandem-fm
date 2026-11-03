@@ -1,6 +1,10 @@
-# Tandem for macOS 0.1.1
+# Tandem for macOS 0.1.2
 
 An experimental macOS port of [carnager/tandem-fm](https://github.com/carnager/tandem-fm), based on upstream commit `f82cc2e955b9a58f066703f746661f29f00a6f36`. The upstream Qt 6 Widgets UI, libarchive, libssh, job queues, viewers, and fd/rg search tools are retained. macOS changes are guarded so the Linux implementations remain available.
+
+## Changes in 0.1.2
+
+Settings → Configuration lets you choose a synced folder or named INI file, migrate existing preferences, and reload incoming settings automatically. Bookmarks/history live beside the INI. See [portable configuration setup and behaviour](CONFIGURATION.md), including command-line/environment overrides and cloud-conflict limitations.
 
 ## Changes in 0.1.1
 

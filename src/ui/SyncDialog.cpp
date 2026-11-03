@@ -19,7 +19,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
-#include <QSettings>
+#include "core/Config.h"
 #include <QStandardPaths>
 #include <QToolButton>
 #include <QTreeView>
@@ -339,7 +339,7 @@ SyncDialog::SyncDialog(const QString& left, const QString& right, Runner runner,
     m_paths->setToolTip(QStringLiteral("%1\n%2").arg(left, right));
     top->addWidget(m_paths, 1);
 
-    QSettings s;
+    Settings s;
     m_mode = new QButtonGroup(this);
     m_mode->setExclusive(true);
     auto* segments = new QHBoxLayout;
@@ -511,7 +511,7 @@ SyncMode SyncDialog::mode() const
 
 void SyncDialog::saveOptions()
 {
-    QSettings s;
+    Settings s;
     s.setValue(QStringLiteral("sync/recursive"), m_recursive->isChecked());
     s.setValue(QStringLiteral("sync/contents"), m_contents->isChecked());
     s.setValue(QStringLiteral("sync/hidden"), m_hidden->isChecked());
@@ -671,7 +671,7 @@ void SyncDialog::compareFiles(int row)
     if (!(it.left.exists && it.right.exists) || it.left.isDir || it.right.isDir)
         return;
     const QString a = joinPath(m_left, it.rel), b = joinPath(m_right, it.rel);
-    QString tool = QSettings().value(QStringLiteral("tools/diff")).toString();
+    QString tool = Settings().value(QStringLiteral("tools/diff")).toString();
     if (tool.isEmpty()) {
         for (const char* t : {"meld", "kdiff3", "kompare", "diffuse"}) {
             if (!QStandardPaths::findExecutable(QLatin1String(t)).isEmpty()) {

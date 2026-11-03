@@ -27,7 +27,7 @@
 #include <QMenuBar>
 #include <QPushButton>
 #include <QScrollArea>
-#include <QSettings>
+#include "core/Config.h"
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QToolButton>
@@ -58,11 +58,14 @@ QString keysText(const QList<QKeySequence>& keys)
 
 void applyKeyBindings(const QList<QAction*>& actions)
 {
-    QSettings s;
+    Settings s;
     for (QAction* a : actions) {
         const QString id = a->property("commandId").toString();
-        if (id.isEmpty() || !s.contains(QStringLiteral("keys/") + id))
+        if (id.isEmpty()) continue;
+        if (!s.contains(QStringLiteral("keys/") + id)) {
+            a->setShortcuts(defaultKeys(a));
             continue;
+        }
         QList<QKeySequence> keys;
         for (const QString& k : s.value(QStringLiteral("keys/") + id).toStringList())
             if (!k.isEmpty() && k != QLatin1String("none"))
@@ -76,7 +79,7 @@ void saveKeyBinding(QAction* a)
     const QString id = a->property("commandId").toString();
     if (id.isEmpty())
         return;
-    QSettings s;
+    Settings s;
     if (a->shortcuts() == defaultKeys(a)) {
         s.remove(QStringLiteral("keys/") + id);
         return;
@@ -177,7 +180,7 @@ QComboBox* programBox(QWidget* parent, const QString& key, const QStringList& ca
         if (!QStandardPaths::findExecutable(program).isEmpty())
             box->addItem(c, c);
     }
-    const QString current = QSettings().value(key).toString();
+    const QString current = Settings().value(key).toString();
     if (current.isEmpty()) {
         box->setCurrentIndex(0);
     } else {
@@ -191,7 +194,7 @@ QComboBox* programBox(QWidget* parent, const QString& key, const QStringList& ca
         QString v = box->currentText().trimmed();
         if (v == automatic)
             v.clear();
-        QSettings().setValue(key, v);
+        Settings().setValue(key, v);
     };
     QObject::connect(box, &QComboBox::currentIndexChanged, box, save);
     QObject::connect(box->lineEdit(), &QLineEdit::editingFinished, box, save);
@@ -225,6 +228,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
         {tr("Behaviour"), QStringLiteral("preferences-system")},
         {tr("Tools"), QStringLiteral("applications-utilities")},
         {tr("Keys"), QStringLiteral("preferences-desktop-keyboard")},
+        {tr("Configuration"), QStringLiteral("folder-sync")},
     };
     for (const auto& [name, icon] : pages)
         new QListWidgetItem(IconCache::themed(icon.toUtf8().constData(), "preferences-system"), name, m_nav);
@@ -234,6 +238,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
     m_pages->addWidget(behaviourPage());
     m_pages->addWidget(toolsPage());
     m_pages->addWidget(keysPage());
+    m_pages->addWidget(configurationPage());
     body->addWidget(m_pages, 1);
     outer->addLayout(body, 1);
     connect(m_nav, &QListWidget::currentRowChanged, m_pages, &QStackedWidget::setCurrentIndex);
@@ -253,16 +258,90 @@ void SettingsDialog::showPage(int index)
     m_nav->setCurrentRow(index);
 }
 
+QWidget* SettingsDialog::configurationPage()
+{
+    Page page(this);
+    auto* location = new QLineEdit(Config::instance().fileName(), this);
+    location->setObjectName(QStringLiteral("configurationFile"));
+    location->setReadOnly(true);
+    page.add(tr("Settings file"), location,
+             tr("Choose a folder inside Dropbox or another sync service on each computer. Preferences are saved automatically; incoming changes reload within about a second."));
+    auto* history = new QLabel(Config::instance().historyFile(), this);
+    history->setObjectName(QStringLiteral("configurationHistoryFile"));
+    history->setWordWrap(true);
+    history->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    page.add(tr("Bookmarks and folder history"), history,
+             tr("Sync this file along with the INI file. Passwords, SSH keys, caches and temporary files stay outside the shared configuration."));
+    auto refresh = [location, history] {
+        location->setText(Config::instance().fileName());
+        history->setText(Config::instance().historyFile());
+    };
+    connect(&Config::instance(), &Config::locationChanged, this, refresh);
+    auto select = [this](const QString& file) {
+        // Flush the current profile before migrating. Existing profiles are
+        // adopted without replacing them; the original is kept in place.
+        m_window->saveSettings();
+        if (!FolderHistory::instance().saveNow()) {
+            QMessageBox::warning(this, tr("Cannot change configuration location"),
+                                 tr("Bookmarks could not be saved yet. Restore access to the current folder and try again."));
+            return;
+        }
+        QString error;
+        if (!Config::instance().useFile(file, &error)) {
+            QMessageBox::warning(this, tr("Cannot change configuration location"), error);
+            return;
+        }
+        m_window->active()->showMessage(tr("Configuration location updated. Language and saved tabs take effect on the next start."));
+    };
+    auto* choices = new QWidget(this);
+    auto* row = new QHBoxLayout(choices);
+    row->setContentsMargins(0, 0, 0, 0);
+    auto* folder = new QPushButton(tr("Choose folder…"), choices);
+    folder->setObjectName(QStringLiteral("chooseConfigurationFolder"));
+    auto* file = new QPushButton(tr("Choose INI file…"), choices);
+    file->setObjectName(QStringLiteral("chooseConfigurationFile"));
+    auto* standard = new QPushButton(tr("Use default location"), choices);
+    standard->setObjectName(QStringLiteral("defaultConfigurationLocation"));
+    for (auto* button : {folder, file, standard}) row->addWidget(button);
+    row->addStretch(1);
+    connect(folder, &QPushButton::clicked, this, [this, select] {
+        const QString dir = QFileDialog::getExistingDirectory(this, tr("Choose configuration folder"), QFileInfo(Config::instance().fileName()).absolutePath());
+        if (!dir.isEmpty()) select(QDir(dir).filePath(QStringLiteral("settings.ini")));
+    });
+    connect(file, &QPushButton::clicked, this, [this, select] {
+        const QString path = QFileDialog::getSaveFileName(this, tr("Choose or create INI settings file"), Config::instance().fileName(), tr("INI settings (*.ini)"), nullptr, QFileDialog::DontConfirmOverwrite);
+        if (!path.isEmpty()) select(path);
+    });
+    connect(standard, &QPushButton::clicked, this, [select] { select({}); });
+    page.add(tr("Location"), choices,
+             tr("An existing settings file is used as-is. A new location receives a copy of your current configuration. The location choice is saved only on this computer."));
+    auto* open = new QPushButton(tr("Open configuration folder"), this);
+    connect(open, &QPushButton::clicked, this, [] {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(Config::instance().fileName()).absolutePath()));
+    });
+    page.add(QString(), open,
+             tr("Appearance, keys and behaviour update live. Language, window layout and saved tabs apply at the next start so a sync cannot interrupt file operations. Reopen Settings to refresh its controls after an incoming change."));
+    auto* status = new QLabel(this);
+    status->setObjectName(QStringLiteral("configurationStatus"));
+    status->setWordWrap(true);
+    connect(&Config::instance(), &Config::changed, status, [status](const QStringList& keys) {
+        if (!keys.isEmpty()) status->setText(QObject::tr("Settings reloaded from the configuration file."));
+    });
+    connect(&Config::instance(), &Config::storageError, status, [status](const QString& error) { status->setText(error); });
+    page.add(QString(), status);
+    return page.finish();
+}
+
 QWidget* SettingsDialog::appearancePage()
 {
     Page page(this);
-    QSettings s;
+    Settings s;
     page.add(tr("Theme"),
              segments(this, {{QStringLiteral("system"), tr("Like the desktop")}, {QStringLiteral("dark"), tr("Dark")},
                              {QStringLiteral("light"), tr("Light")}},
                       s.value(QStringLiteral("view/theme"), QStringLiteral("system")).toString(),
                       [](const QString& code) {
-                          QSettings().setValue(QStringLiteral("view/theme"), code);
+                          Settings().setValue(QStringLiteral("view/theme"), code);
                           applyTheme(*qApp);
                       }),
              tr("Changes immediately, including the panels and open dialogs."));
@@ -275,7 +354,7 @@ QWidget* SettingsDialog::appearancePage()
     scale->setValue(s.value(QStringLiteral("view/fontScale"), 100).toInt());
     scale->setMaximumWidth(160);
     connect(scale, &QSpinBox::valueChanged, this, [](int value) {
-        QSettings().setValue(QStringLiteral("view/fontScale"), value);
+        Settings().setValue(QStringLiteral("view/fontScale"), value);
         applyFontScale(*qApp);
     });
     page.add(tr("Text size"), scale, tr("Scale fonts throughout Tandem. 100% is the system's normal size. Applies immediately."));
@@ -288,7 +367,7 @@ QWidget* SettingsDialog::appearancePage()
     dim->setValue(s.value(QStringLiteral("view/inactiveDim"), 25).toInt());
     dim->setMaximumWidth(160);
     connect(dim, &QSpinBox::valueChanged, this, [this](int value) {
-        QSettings().setValue(QStringLiteral("view/inactiveDim"), value);
+        Settings().setValue(QStringLiteral("view/inactiveDim"), value);
         m_window->m_left->applyAppearance();
         m_window->m_right->applyAppearance();
     });
@@ -300,7 +379,7 @@ QWidget* SettingsDialog::appearancePage()
     language->addItem(QStringLiteral("Deutsch"), QStringLiteral("de"));
     language->setCurrentIndex(qMax(0, language->findData(s.value(QStringLiteral("view/language")).toString())));
     connect(language, &QComboBox::currentIndexChanged, this,
-            [language] { QSettings().setValue(QStringLiteral("view/language"), language->currentData()); });
+            [language] { Settings().setValue(QStringLiteral("view/language"), language->currentData()); });
     language->setMaximumWidth(320);
     page.add(tr("Language"), language, tr("Takes effect the next time Tandem starts."));
 
@@ -333,7 +412,7 @@ QWidget* SettingsDialog::appearancePage()
     menu->setChecked(m_window->menuBar()->isVisible());
     connect(menu, &QCheckBox::toggled, this, [this](bool on) {
         m_window->menuBar()->setVisible(on);
-        QSettings().setValue(QStringLiteral("window/menuBar"), on);
+        Settings().setValue(QStringLiteral("window/menuBar"), on);
     });
     page.add(QString(), menu);
     return page.finish();
@@ -353,9 +432,9 @@ QWidget* SettingsDialog::behaviourPage()
     };
     auto* lynx = new QCheckBox(tr("Lynx-style Left/Right navigation"), this);
     lynx->setObjectName(QStringLiteral("lynxNavigation"));
-    lynx->setChecked(QSettings().value(QStringLiteral("keys/lynxNavigation"), true).toBool());
+    lynx->setChecked(Settings().value(QStringLiteral("keys/lynxNavigation"), true).toBool());
     connect(lynx, &QCheckBox::toggled, this, [](bool on) {
-        QSettings().setValue(QStringLiteral("keys/lynxNavigation"), on);
+        Settings().setValue(QStringLiteral("keys/lynxNavigation"), on);
     });
     page.add(tr("Keyboard"), lynx, tr("In the details view, Right enters the selected folder and Left opens its parent. Right never launches files. Thumbnail grids keep their arrow navigation."));
     page.add(QString(), toggle(tr("Vim keys"), m_window->m_actions.value(QStringLiteral("vim"))),
@@ -393,9 +472,9 @@ QWidget* SettingsDialog::toolsPage()
              tr("Used by the sync dialog's Enter."));
     auto* names = new QLineEdit(this);
     names->setPlaceholderText(tr("$EDITOR in your terminal"));
-    names->setText(QSettings().value(QStringLiteral("tools/nameEditor")).toString());
+    names->setText(Settings().value(QStringLiteral("tools/nameEditor")).toString());
     connect(names, &QLineEdit::editingFinished, this,
-            [names] { QSettings().setValue(QStringLiteral("tools/nameEditor"), names->text().trimmed()); });
+            [names] { Settings().setValue(QStringLiteral("tools/nameEditor"), names->text().trimmed()); });
     page.add(tr("Renaming in an editor (Ctrl+E)"), names,
              tr("A command that waits until you close the file; %f is the file with the names. Empty: $EDITOR "
                 "in your terminal."));

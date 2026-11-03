@@ -49,12 +49,13 @@
 #include <QSplitter>
 #include <QTabBar>
 #include <QToolButton>
-#include <QSettings>
+#include "core/Config.h"
 #include <QImage>
 #include <QImageReader>
 #include <QCheckBox>
 #include <QHeaderView>
 #include <QSpinBox>
+#include <QSaveFile>
 #include <QScopeGuard>
 #include <QSignalSpy>
 #include <QLabel>
@@ -188,7 +189,7 @@ private slots:
         registerBuiltinBackends();
         installAuthDialogs();
         FolderHistory::instance().setStoragePath(m_tmp.filePath("folders.tsv"));
-        QSettings().clear();  // test mode keeps settings in ~/.qttest across runs: start clean
+        Settings().clear();  // test mode keeps settings in ~/.qttest across runs: start clean
 
         QVERIFY(QDir().mkpath(L("sub/deep")));
         QVERIFY(QDir().mkpath(R()));
@@ -246,10 +247,10 @@ private slots:
 
     void lynxFolderNavigation()
     {
-        const QVariant previous = QSettings().value("keys/lynxNavigation");
+        const QVariant previous = Settings().value("keys/lynxNavigation");
         auto restore = qScopeGuard([&] {
-            if (previous.isValid()) QSettings().setValue("keys/lynxNavigation", previous);
-            else QSettings().remove("keys/lynxNavigation");
+            if (previous.isValid()) Settings().setValue("keys/lynxNavigation", previous);
+            else Settings().remove("keys/lynxNavigation");
         });
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
@@ -632,12 +633,12 @@ private slots:
         const QString editorScript = m_tmp.filePath("archive-editor.sh");
         writeFile(editorScript, "#!/bin/sh\nprintf 'edited in zip' > \"$1\"\n");
         QFile::setPermissions(editorScript, QFile::permissions(editorScript) | QFile::ExeOwner);
-        QSettings().setValue("tools/editor", editorScript);
+        Settings().setValue("tools/editor", editorScript);
         moveCursorTo(m_right, "renamed.txt");
         QTest::keyClick(m_right->view(), Qt::Key_F4);
         QTRY_COMPARE_WITH_TIMEOUT(readFile(extractToCache(R("pack.zip"), "sub/renamed.txt", &err)),
                                   QByteArray("edited in zip"), 10000);
-        QSettings().remove("tools/editor");
+        Settings().remove("tools/editor");
         QTRY_VERIFY(rightModel()->rowOf("renamed.txt") >= 0);
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
@@ -740,7 +741,7 @@ private slots:
             writeFile(L(QString("ed/") + n), n);
         m_left->navigate(L("ed"));
         QTRY_COMPARE(leftModel()->path(), L("ed"));
-        auto useEditor = [](const QString& cmd) { QSettings().setValue("tools/nameEditor", cmd); };
+        auto useEditor = [](const QString& cmd) { Settings().setValue("tools/nameEditor", cmd); };
 
         // The "editor" swaps .txt for .md on every line.
         useEditor("sed -i.bak s/\\.txt$/.md/ %f");
@@ -783,7 +784,7 @@ private slots:
         QTest::qWait(400);
         QVERIFY(QApplication::activeModalWidget() == nullptr);
 
-        QSettings().remove("tools/nameEditor");
+        Settings().remove("tools/nameEditor");
         leftModel()->markAll(false);
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
@@ -1266,17 +1267,61 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void sharedConfigurationReloadsLive()
+    {
+        QTemporaryDir shared;
+        const QString original = Config::instance().fileName();
+        const QString originalHistory = FolderHistory::instance().storagePath();
+        FolderHistory::instance().saveNow();
+        auto restore = qScopeGuard([&] {
+            QString error;
+            Config::instance().useFile(original, &error, false);
+            FolderHistory::instance().setStoragePath(originalHistory);
+            FolderHistory::instance().loadAsync();
+        });
+        QString error;
+        const QString target = shared.filePath("settings.ini");
+        QVERIFY2(Config::instance().useFile(target, &error, false), qPrintable(error));
+        SettingsDialog dialog(m_window.get());
+        dialog.showPage(4);
+        QCOMPARE(dialog.findChild<QLineEdit*>("configurationFile")->text(), target);
+        const QString left = m_left->path(), right = m_right->path();
+        QSaveFile remote(target);
+        QVERIFY(remote.open(QIODevice::WriteOnly));
+        remote.write("[view]\ntheme=light\nfontScale=125\ninactiveDim=45\n"
+                     "[input]\nvimKeys=true\n[keys]\ncopy=Ctrl+Alt+9\n"
+                     "[left]\ntabs=/this-must-not-replace-the-open-panel\n");
+        QVERIFY(remote.commit());
+        QTRY_VERIFY_WITH_TIMEOUT(!theme().dark, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(Settings().value("view/fontScale").toInt(), 125, 3000);
+        const auto base = qApp->property("tandemBaseFont").value<QFont>().pointSizeF();
+        QTRY_COMPARE(qApp->font().pointSizeF(), base * 1.25);
+        QAction* copy = nullptr;
+        for (QAction* action : m_window->actions())
+            if (action->property("commandId").toString() == "copy") copy = action;
+        QVERIFY(copy);
+        QTRY_COMPARE(copy->shortcut(), QKeySequence::fromString("Ctrl+Alt+9", QKeySequence::PortableText));
+        QCOMPARE(m_left->path(), left);
+        QCOMPARE(m_right->path(), right);
+        QVERIFY(!dialog.findChild<QLabel*>("configurationStatus")->text().isEmpty());
+        // A later atomic replacement is noticed even after the first watch was removed.
+        QSaveFile reset(target); QVERIFY(reset.open(QIODevice::WriteOnly));
+        reset.write("[view]\ntheme=dark\nfontScale=100\n"); QVERIFY(reset.commit());
+        QTRY_VERIFY_WITH_TIMEOUT(theme().dark, 3000);
+        QTRY_COMPARE(copy->shortcut(), QKeySequence(Qt::Key_F5)); // removed override restores default
+    }
+
     void liveAppearanceSettings()
     {
-        const QVariant oldTheme = QSettings().value("view/theme");
-        const QVariant oldScale = QSettings().value("view/fontScale");
-        const QVariant oldDim = QSettings().value("view/inactiveDim");
+        const QVariant oldTheme = Settings().value("view/theme");
+        const QVariant oldScale = Settings().value("view/fontScale");
+        const QVariant oldDim = Settings().value("view/inactiveDim");
         auto restore = qScopeGuard([&] {
             for (const auto& item : {qMakePair(QString("view/theme"), oldTheme),
                                      qMakePair(QString("view/fontScale"), oldScale),
                                      qMakePair(QString("view/inactiveDim"), oldDim)}) {
-                if (item.second.isValid()) QSettings().setValue(item.first, item.second);
-                else QSettings().remove(item.first);
+                if (item.second.isValid()) Settings().setValue(item.first, item.second);
+                else Settings().remove(item.first);
             }
             applyTheme(*qApp);
             m_left->applyAppearance();
@@ -1320,7 +1365,7 @@ private slots:
         boldFont.setBold(true);
         bold.setFont(boldFont);
         scale->setValue(150);
-        QCOMPARE(QSettings().value("view/fontScale").toInt(), 150);
+        QCOMPARE(Settings().value("view/fontScale").toInt(), 150);
         QCOMPARE(qApp->font().pointSizeF(), base * 1.5);
         QCOMPARE(m_left->view()->font().pointSizeF(), listBase * 1.5);
         QCOMPARE(popupEdit->font().pointSizeF(), popupBase * 1.5);
@@ -1360,7 +1405,7 @@ private slots:
         QTRY_VERIFY(m_right->isActive());
         QVERIFY(!leftShade->isHidden());
         QVERIFY(rightShade->isHidden());
-        QCOMPARE(QSettings().value("view/inactiveDim").toInt(), 40);
+        QCOMPARE(Settings().value("view/inactiveDim").toInt(), 40);
         SettingsDialog reopened(m_window.get());
         QCOMPARE(reopened.findChild<QSpinBox*>("inactiveDim")->value(), 40);
         QCOMPARE(reopened.findChild<QSpinBox*>("fontScale")->value(), 100);
@@ -1393,8 +1438,8 @@ private slots:
         QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F6));
         QVERIFY(move->shortcuts().isEmpty());  // gave it up
         QVERIFY(dlg.keyNote()->text().contains("Move"));
-        QCOMPARE(QSettings().value("keys/copy").toStringList(), QStringList({"F6"}));
-        QCOMPARE(QSettings().value("keys/move").toStringList(), QStringList({"none"}));
+        QCOMPARE(Settings().value("keys/copy").toStringList(), QStringList({"F6"}));
+        QCOMPARE(Settings().value("keys/move").toStringList(), QStringList({"none"}));
         // A restart applies them: simulate with the saved values.
         copy->setShortcut(QKeySequence(Qt::Key_F5));
         applyKeyBindings(m_window->actions());
@@ -1404,7 +1449,7 @@ private slots:
                 b->click();
         QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F5));
         QCOMPARE(move->shortcut(), QKeySequence(Qt::Key_F6));
-        QVERIFY(!QSettings().contains("keys/copy") && !QSettings().contains("keys/move"));
+        QVERIFY(!Settings().contains("keys/copy") && !Settings().contains("keys/move"));
     }
 
     // F1: grouped shortcuts in columns, with a filter.
@@ -1438,7 +1483,7 @@ private slots:
         auto focused = [] { return QApplication::focusWidget(); };
 
         // A click into a preview gives the keys back to that panel's list.
-        QSettings().setValue("view/previewPosition", "each");
+        Settings().setValue("view/previewPosition", "each");
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         ViewerWindow* left = nullptr;
         ViewerWindow* right = nullptr;
@@ -1454,7 +1499,7 @@ private slots:
         QTRY_VERIFY(m_right->isActive());
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") == nullptr);
-        QSettings().setValue("view/preview", false);
+        Settings().setValue("view/preview", false);
         m_left->view()->setFocus();
         QTRY_VERIFY(m_left->isActive());
 
@@ -1531,7 +1576,7 @@ private slots:
         m_left->view()->setFocus();
         moveCursorTo(m_left, "a.txt");
         // Settings live in ~/.qttest in test mode and survive runs: be explicit.
-        QSettings().setValue("view/previewPosition", "each");
+        Settings().setValue("view/previewPosition", "each");
 
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         ViewerWindow* qv = nullptr;
@@ -1572,7 +1617,7 @@ private slots:
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") &&
                     qobject_cast<QSplitter*>(m_window->findChild<ViewerWindow*>("quickView")->parentWidget())
                             ->orientation() == Qt::Horizontal);
-        QSettings().setValue("view/previewPosition", "each");
+        Settings().setValue("view/previewPosition", "each");
 
         // Photos with nearly the same names: each shows its own picture.
         QVERIFY(QDir().mkpath(L("pics")));
@@ -1601,7 +1646,7 @@ private slots:
         }
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") == nullptr);
-        QSettings().setValue("view/preview", false);
+        Settings().setValue("view/preview", false);
 
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
@@ -2114,14 +2159,14 @@ private slots:
         const QString editorScript = serverDir.filePath("fake-editor.sh");
         writeFile(editorScript, "#!/bin/sh\nprintf edited > \"$1\"\n");
         QFile::setPermissions(editorScript, QFile::permissions(editorScript) | QFile::ExeOwner);
-        QSettings().setValue("tools/editor", editorScript);
+        Settings().setValue("tools/editor", editorScript);
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_right->view()->setFocus();
         moveCursorTo(m_right, "renamed.txt");
         QTest::keyClick(m_right->view(), Qt::Key_F4);
         QTRY_COMPARE_WITH_TIMEOUT(readFile(srv + "/www/renamed.txt"), QByteArray("edited"), 10000);
-        QSettings().remove("tools/editor");
+        Settings().remove("tools/editor");
 
         // F8 on a server: permanent (no trash), says so.
         m_window->activateWindow();
@@ -2265,7 +2310,7 @@ private slots:
         writeFile(L("remote/docs/a.txt"), "1234");
         QVERIFY(QDir().mkpath(L("remote/docs/deeper")));
         writeFile(L("remote/docs/deeper/b.txt"), "123456");
-        QSettings().setValue("view/previewPosition", "each");
+        Settings().setValue("view/previewPosition", "each");
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_right->view()->setFocus();
@@ -2279,7 +2324,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(pv->richInfo().contains("10 B"), 10000);  // 4 + 6 bytes, in one request
         QTest::keyClick(m_right->view(), Qt::Key_Q, Qt::ControlModifier);
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickViewRight") == nullptr);
-        QSettings().setValue("view/preview", false);
+        Settings().setValue("view/preview", false);
 
 #ifndef Q_OS_MACOS
         // This block requires GNU stat/getfacl on the local test server.
