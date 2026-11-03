@@ -2,10 +2,17 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QStandardPaths>
+#include <QFileInfo>
+#include <QFile>
 #include <QFontDatabase>
 #include <QFontInfo>
 #include <QIcon>
+#include <QPainter>
+#include <QPainterPath>
 #include <QPalette>
+#include <QProxyStyle>
+#include <QStyleOption>
 #include <QStyleFactory>
 #include <QStyleHints>
 
@@ -38,7 +45,7 @@ QString Theme::css(const QString& tmpl) const
         {"@window", window},   {"@base", base},         {"@altBase", altBase},     {"@text", text},
         {"@dimText", dimText}, {"@accentText", accentText}, {"@accent", accent},   {"@border", border},
         {"@headerActive", headerActive}, {"@header", header}, {"@error", error},    {"@success", success},
-        {"@mark", mark},
+        {"@mark", mark},       {"@control", control},
     };
     for (const auto& [name, color] : vars)
         s.replace(QLatin1String(name), rgba(color));
@@ -60,6 +67,117 @@ static bool systemPrefersDark(const QApplication& app)
     return app.palette().color(QPalette::Window).lightness() < 128;
 }
 
+namespace {
+
+// Fusion draws checkboxes, radio buttons and arrows in colours that vanish
+// on a dark background. These are drawn here instead: clear outlines, the
+// accent colour when on.
+class TandemStyle : public QProxyStyle {
+public:
+    using QProxyStyle::QProxyStyle;
+
+    int pixelMetric(PixelMetric m, const QStyleOption* o, const QWidget* w) const override
+    {
+        if (m == PM_IndicatorWidth || m == PM_IndicatorHeight || m == PM_ExclusiveIndicatorWidth ||
+            m == PM_ExclusiveIndicatorHeight)
+            return 16;
+        return QProxyStyle::pixelMetric(m, o, w);
+    }
+
+    void drawPrimitive(PrimitiveElement pe, const QStyleOption* o, QPainter* p, const QWidget* w) const override
+    {
+        const Theme& t = theme();
+        const bool enabled = o->state & State_Enabled;
+        const bool hover = o->state & State_MouseOver;
+        auto fade = [&](QColor c) {
+            if (!enabled)
+                c.setAlphaF(c.alphaF() * 0.4);
+            return c;
+        };
+        switch (pe) {
+        case PE_IndicatorCheckBox:
+        case PE_IndicatorItemViewItemCheck: {
+            if (o->rect.width() < 6)  // hidden on purpose (toggle-style check boxes)
+                return;
+            const QRectF r = QRectF(o->rect).adjusted(1.5, 1.5, -1.5, -1.5);
+            const bool on = o->state & State_On;
+            const bool partial = o->state & State_NoChange;
+            p->save();
+            p->setRenderHint(QPainter::Antialiasing);
+            if (on || partial) {
+                QColor fill = t.accent;
+                if (partial)
+                    fill.setAlphaF(0.55);
+                p->setPen(Qt::NoPen);
+                p->setBrush(fade(fill));
+                p->drawRoundedRect(r, 3.5, 3.5);
+                p->setPen(QPen(fade(t.accentText), 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                p->setBrush(Qt::NoBrush);
+                if (partial) {
+                    p->drawLine(QPointF(r.left() + 3.5, r.center().y()), QPointF(r.right() - 3.5, r.center().y()));
+                } else {
+                    QPainterPath tick;
+                    tick.moveTo(r.left() + r.width() * 0.24, r.top() + r.height() * 0.53);
+                    tick.lineTo(r.left() + r.width() * 0.43, r.top() + r.height() * 0.72);
+                    tick.lineTo(r.left() + r.width() * 0.77, r.top() + r.height() * 0.30);
+                    p->drawPath(tick);
+                }
+            } else {
+                p->setPen(QPen(fade(hover && enabled ? t.accent : t.control), 1.3));
+                p->setBrush(t.base);
+                p->drawRoundedRect(r, 3.5, 3.5);
+            }
+            p->restore();
+            return;
+        }
+        case PE_IndicatorRadioButton: {
+            const QRectF r = QRectF(o->rect).adjusted(1.5, 1.5, -1.5, -1.5);
+            const bool on = o->state & State_On;
+            p->save();
+            p->setRenderHint(QPainter::Antialiasing);
+            p->setPen(QPen(fade(on ? t.accent : (hover && enabled ? t.accent : t.control)), on ? 1.6 : 1.3));
+            p->setBrush(t.base);
+            p->drawEllipse(r);
+            if (on) {
+                p->setPen(Qt::NoPen);
+                p->setBrush(fade(t.accent));
+                p->drawEllipse(r.center(), r.width() * 0.25, r.height() * 0.25);
+            }
+            p->restore();
+            return;
+        }
+        case PE_IndicatorArrowDown:
+        case PE_IndicatorArrowUp:
+        case PE_IndicatorArrowLeft:
+        case PE_IndicatorArrowRight: {
+            // A thin chevron instead of a filled triangle.
+            const QRectF r = QRectF(o->rect);
+            const qreal s = qMin(r.width(), r.height()) * 0.28;
+            const QPointF c = r.center();
+            QPolygonF v;
+            if (pe == PE_IndicatorArrowDown)
+                v << QPointF(c.x() - s, c.y() - s / 2) << QPointF(c.x(), c.y() + s / 2) << QPointF(c.x() + s, c.y() - s / 2);
+            else if (pe == PE_IndicatorArrowUp)
+                v << QPointF(c.x() - s, c.y() + s / 2) << QPointF(c.x(), c.y() - s / 2) << QPointF(c.x() + s, c.y() + s / 2);
+            else if (pe == PE_IndicatorArrowLeft)
+                v << QPointF(c.x() + s / 2, c.y() - s) << QPointF(c.x() - s / 2, c.y()) << QPointF(c.x() + s / 2, c.y() + s);
+            else
+                v << QPointF(c.x() - s / 2, c.y() - s) << QPointF(c.x() + s / 2, c.y()) << QPointF(c.x() - s / 2, c.y() + s);
+            p->save();
+            p->setRenderHint(QPainter::Antialiasing);
+            p->setPen(QPen(fade(t.dimText), 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            p->drawPolyline(v);
+            p->restore();
+            return;
+        }
+        default:
+            QProxyStyle::drawPrimitive(pe, o, p, w);
+        }
+    }
+};
+
+}  // namespace
+
 void applyTheme(QApplication& app)
 {
     Theme& t = g_theme;
@@ -79,6 +197,7 @@ void applyTheme(QApplication& app)
         t.cursorInactive = QColor(255, 255, 255, 46);
         t.dropTarget = QColor(108, 156, 255, 110);
         t.border = QColor(0x2d, 0x30, 0x37);
+        t.control = QColor(0x4a, 0x4f, 0x5a);
         t.header = QColor(0x22, 0x24, 0x2a);
         t.headerActive = QColor(0x27, 0x2f, 0x45);
         t.error = QColor(0xff, 0x6b, 0x6b);
@@ -100,6 +219,7 @@ void applyTheme(QApplication& app)
         t.cursorInactive = QColor(0, 0, 0, 40);
         t.dropTarget = QColor(47, 111, 237, 90);
         t.border = QColor(0xd9, 0xdc, 0xe1);
+        t.control = QColor(0xa9, 0xaf, 0xb9);
         t.header = QColor(0xe6, 0xe9, 0xee);
         t.headerActive = QColor(0xdc, 0xe6, 0xfb);
         t.error = QColor(0xd9, 0x2d, 0x20);
@@ -110,7 +230,7 @@ void applyTheme(QApplication& app)
     }
 
     // Fusion + our palette: consistent, fast to paint, no theme engine quirks.
-    app.setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
+    app.setStyle(new TandemStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
     QPalette p;
     p.setColor(QPalette::Window, t.window);
     p.setColor(QPalette::WindowText, t.text);
@@ -132,6 +252,43 @@ void applyTheme(QApplication& app)
     p.setColor(QPalette::Disabled, QPalette::WindowText, t.dimText);
     p.setColor(QPalette::Disabled, QPalette::ButtonText, t.dimText);
     app.setPalette(p);
+
+    // Style sheets can't draw a drop-down's arrow themselves: a small chevron file.
+    const QString chevron = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
+                            QStringLiteral("/chevron-%1.svg").arg(t.dimText.name().mid(1));
+    if (!QFileInfo::exists(chevron)) {
+        QDir().mkpath(QFileInfo(chevron).path());
+        QFile f(chevron);
+        if (f.open(QIODevice::WriteOnly))
+            f.write(QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'>"
+                                   "<path d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%1' stroke-width='1.6' "
+                                   "stroke-linecap='round' stroke-linejoin='round'/></svg>")
+                        .arg(t.dimText.name())
+                        .toUtf8());
+    }
+    // Inputs, drop-downs and buttons: visible edges, the accent when focused.
+    // Widgets with their own style sheets (popups, bars) still win.
+    app.setStyleSheet(t.css(QStringLiteral(
+        "QLineEdit, QComboBox, QSpinBox, QPlainTextEdit[frameShape=\"6\"] {"
+        "  background: @base; color: @text; border: 1px solid @control; border-radius: 6px;"
+        "  padding: 4px 8px; selection-background-color: @accent; selection-color: @accentText; }"
+        "QLineEdit:hover, QComboBox:hover, QSpinBox:hover { border-color: @dimText; }"
+        "QLineEdit:focus, QComboBox:focus, QComboBox:on, QSpinBox:focus { border-color: @accent; }"
+        "QLineEdit:disabled, QComboBox:disabled { color: @dimText; border-color: @border; }"
+        "QComboBox { padding-right: 26px; }"
+        "QComboBox::drop-down { border: none; width: 24px; subcontrol-origin: padding; subcontrol-position: center right; }"
+        "QComboBox::down-arrow { image: url(CHEVRON); width: 12px; height: 12px; }"
+        "QComboBox QAbstractItemView { background: @base; border: 1px solid @control; border-radius: 6px;"
+        "  padding: 4px; selection-background-color: @accent; selection-color: @accentText; outline: none; }"
+        "QPushButton { background: @header; color: @text; border: 1px solid @control; border-radius: 6px;"
+        "  padding: 5px 16px; min-height: 18px; }"
+        "QPushButton:hover { border-color: @dimText; }"
+        "QPushButton:pressed { background: @base; }"
+        "QPushButton:default { background: @accent; color: @accentText; border-color: @accent; }"
+        "QPushButton:default:hover { border-color: @text; }"
+        "QPushButton:disabled { color: @dimText; border-color: @border; background: @header; }"
+        "QToolTip { background: @header; color: @text; border: 1px solid @control; border-radius: 4px; padding: 4px 6px; }"))
+                          .replace(QStringLiteral("CHEVRON"), chevron));
 
     // Icons: keep the user's theme; pick a sensible one if none is configured.
     const QString current = QIcon::themeName();

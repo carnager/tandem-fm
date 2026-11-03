@@ -13,6 +13,7 @@ struct Theme {
     QColor mark, markBg, cursorActive, cursorInactive, dropTarget;
     QColor border, header, headerActive, error, success;
     QColor gitModified, gitAdded, gitUntracked;
+    QColor control;     // borders of inputs, buttons and checkboxes: visible, unlike @border
     QFont listFont;     // file list
     QFont numberFont;   // tabular digits for sizes and dates
 

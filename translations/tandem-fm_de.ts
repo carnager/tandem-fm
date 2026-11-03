@@ -2756,6 +2756,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Als Zahl, wie bei chmod: 644, 755, 2775 …</translation>
     </message>
     <message>
+        <source>Only root can give files to someone else</source>
+        <translation>Nur root kann Dateien jemand anderem geben</translation>
+    </message>
+    <message>
         <source>Runs as its owner</source>
         <translation>Läuft als Eigentümer</translation>
     </message>

@@ -126,30 +126,48 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
         layout->addWidget(dimLabel(tr("Only the owner (%1) or root can change these.").arg(first.owner), this));
     }
 
-    // Who can do what.
-    layout->addWidget(sectionLabel(tr("Who can do what"), this));
+    // Who can do what: one row each, the rights as toggles right after the name.
+    m_symbolic = new QLabel(this);
+    m_symbolic->setFont(monoFont());
+    m_symbolic->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    m_octal = new QLineEdit(this);
+    m_octal->setFont(monoFont());
+    m_octal->setFixedWidth(64);
+    m_octal->setAlignment(Qt::AlignCenter);
+    m_octal->setToolTip(tr("As a number, like chmod: 644, 755, 2775 …"));
+    m_octal->setValidator(new QRegularExpressionValidator(QRegularExpression(QStringLiteral("[0-7]{0,4}")), m_octal));
+    auto* whoHead = new QHBoxLayout;
+    whoHead->addWidget(sectionLabel(tr("Who can do what"), this), 1, Qt::AlignBottom);
+    whoHead->addWidget(m_symbolic, 0, Qt::AlignBottom);
+    whoHead->addSpacing(8);
+    whoHead->addWidget(m_octal, 0, Qt::AlignBottom);
+    layout->addLayout(whoHead);
+    setStyleSheet(theme().css(QStringLiteral(
+        "QCheckBox#perm { border: 1px solid @control; border-radius: 13px; padding: 4px 14px; color: @dimText; }"
+        "QCheckBox#perm::indicator { width: 0; height: 0; }"
+        "QCheckBox#perm:hover { border-color: @accent; }"
+        "QCheckBox#perm:checked { background: @accent; border-color: @accent; color: @accentText; }"
+        "QCheckBox#perm:indeterminate { border: 1px dashed @accent; color: @text; }"
+        "QCheckBox#perm:disabled { border-color: @border; }")));
     auto* grid = new QGridLayout;
-    grid->setHorizontalSpacing(18);
+    grid->setHorizontalSpacing(10);
     grid->setVerticalSpacing(8);
+    grid->setColumnMinimumWidth(0, 110);
     const QString runWord = allDirs ? tr("Open") : (anyDir ? tr("Run / open") : tr("Run"));
-    const QStringList heads = {tr("Read"), tr("Write"), runWord};
-    for (int c = 0; c < 3; ++c) {
-        auto* h = dimLabel(heads[c], this);
-        h->setAlignment(Qt::AlignCenter);
-        grid->addWidget(h, 0, 2 + c);
-    }
+    const QStringList chipNames = {tr("Read"), tr("Write"), runWord};
     const QStringList tips = {
         allDirs ? tr("See what's inside") : tr("Open and read it"),
         allDirs ? tr("Add, rename and delete items inside") : tr("Change it"),
         allDirs ? tr("Go into it and reach the items inside") : tr("Run it as a program"),
     };
     // Owner and group are picked right in their rows.
-    auto accountBox = [&](bool users, uint32_t current, bool same, bool canChange) -> QWidget* {
+    auto accountBox = [&](bool users, bool same, bool canChange) -> QWidget* {
+        const QString cur = same ? (users ? first.owner : first.group) : tr("(mixed)");
         if (!canChange || remote) {
-            QString name = same ? (users ? first.owner : first.group) : tr("(mixed)");
-            if (remote)
-                name = QString();
-            return dimLabel(name, this);
+            auto* l = new QLabel(remote ? QString() : cur, this);
+            l->setContentsMargins(9, 0, 0, 0);  // lines up with the text in a drop-down
+            l->setToolTip(users ? tr("Only root can give files to someone else") : QString());
+            return l;
         }
         auto* box = new QComboBox(this);
         box->setEditable(true);
@@ -164,57 +182,47 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
                 if (root || mineGroups.contains(g.second))
                     names << g.first;
         }
-        const QString cur = same ? (users ? first.owner : first.group) : QString();
         if (same && !names.contains(cur))
             names.prepend(cur);
         box->addItems(names);
-        box->setCurrentText(cur);
+        box->setCurrentText(same ? cur : QString());
         if (!same)
             box->lineEdit()->setPlaceholderText(tr("(mixed)"));
         box->completer()->setFilterMode(Qt::MatchContains);
         box->completer()->setCompletionMode(QCompleter::PopupCompletion);
-        (void)current;
         return box;
     };
     const QStringList rowNames = {tr("Owner"), tr("Group"), tr("Everyone else")};
     for (int r = 0; r < 3; ++r) {
-        grid->addWidget(new QLabel(rowNames[r], this), 1 + r, 0);
-        if (r == 0) {
-            QWidget* w = accountBox(true, first.uid, sameOwner, root);
-            m_owner = qobject_cast<QComboBox*>(w);
-            grid->addWidget(w, 1, 1);
-        } else if (r == 1) {
-            QWidget* w = accountBox(false, first.gid, sameGroup, root || mine);
-            m_group = qobject_cast<QComboBox*>(w);
-            grid->addWidget(w, 2, 1);
-        }
+        grid->addWidget(new QLabel(rowNames[r], this), r, 0);
+        QWidget* account = r == 0 ? accountBox(true, sameOwner, root)
+                                  : r == 1 ? accountBox(false, sameGroup, root || mine) : new QWidget(this);
+        account->setFixedWidth(180);
+        if (r == 0)
+            m_owner = qobject_cast<QComboBox*>(account);
+        if (r == 1)
+            m_group = qobject_cast<QComboBox*>(account);
+        grid->addWidget(account, r, 1);
+        auto* chips = new QHBoxLayout;
+        chips->setSpacing(6);
         for (int c = 0; c < 3; ++c) {
-            auto* b = new QCheckBox(this);
+            auto* b = new QCheckBox(chipNames[c], this);
+            b->setObjectName(QStringLiteral("perm"));
             b->setToolTip(tips[c]);
+            b->setCursor(Qt::PointingHandCursor);
             m_bits[r * 3 + c] = b;
-            grid->addWidget(b, 1 + r, 2 + c, Qt::AlignCenter);
+            chips->addWidget(b);
         }
+        chips->addStretch();
+        grid->addLayout(chips, r, 2);
     }
-    // The same as text, for people who think in rwx or numbers.
-    m_symbolic = new QLabel(this);
-    m_symbolic->setFont(monoFont());
-    m_octal = new QLineEdit(this);
-    m_octal->setFont(monoFont());
-    m_octal->setMaximumWidth(70);
-    m_octal->setToolTip(tr("As a number, like chmod: 644, 755, 2775 …"));
-    m_octal->setValidator(new QRegularExpressionValidator(QRegularExpression(QStringLiteral("[0-7]{0,4}")), m_octal));
-    auto* notation = new QVBoxLayout;
-    notation->addWidget(m_symbolic);
-    notation->addWidget(m_octal);
-    notation->addStretch();
-    grid->addLayout(notation, 1, 6, 3, 1);
-    grid->setColumnStretch(5, 1);
-    grid->setColumnMinimumWidth(1, 150);
+    grid->setColumnStretch(2, 1);
     layout->addLayout(grid);
 
-    // The three special bits, said plainly.
+    // The three special bits, said plainly, under the toggles.
     auto* special = new QHBoxLayout;
-    special->setSpacing(14);
+    special->setSpacing(16);
+    special->setContentsMargins(110 + 180 + 20, 4, 0, 0);
     m_bits[9] = new QCheckBox(tr("Runs as its owner"), this);
     m_bits[9]->setToolTip(tr("setuid: a program runs with its owner's rights, whoever starts it"));
     m_bits[10] = new QCheckBox(allDirs ? tr("New items get this group") : tr("Runs as its group"), this);
@@ -403,17 +411,19 @@ void PermissionsDialog::addAclRow(const AclEntry& e)
     auto* w = new QWidget(this);
     auto* h = new QHBoxLayout(w);
     h->setContentsMargins(0, 0, 0, 0);
-    h->setSpacing(14);
+    h->setSpacing(6);
     auto* name = new QLabel(QStringLiteral("%1  %2").arg(e.isGroup ? QStringLiteral("👥") : QStringLiteral("👤"), e.name), w);
     name->setToolTip(e.isGroup ? tr("Group %1").arg(e.name) : tr("Person %1").arg(e.name));
-    name->setMinimumWidth(180);
+    name->setFixedWidth(110 + 10 + 180 + 10 - 6);  // the toggles line up with the rows above
     h->addWidget(name);
     Row row;
     row.entry = e;
     row.widget = w;
-    const QStringList words = {tr("read"), tr("write"), tr("run")};
+    const QStringList words = {tr("Read"), tr("Write"), tr("Run")};
     for (int c = 0; c < 3; ++c) {
         row.box[c] = new QCheckBox(words[c], w);
+        row.box[c]->setObjectName(QStringLiteral("perm"));
+        row.box[c]->setCursor(Qt::PointingHandCursor);
         row.box[c]->setChecked(e.perms & (PermRead >> c));
         connect(row.box[c], &QCheckBox::toggled, this, &PermissionsDialog::updatePreview);
         h->addWidget(row.box[c]);
@@ -497,8 +507,7 @@ void PermissionsDialog::syncOctal()
         mixed |= b->checkState() == Qt::PartiallyChecked;
     const uint32_t m = checkedBits();
     m_symbolic->setText(mixed ? tr("(mixed)") : symbolicMode(m, false));
-    if (!m_octal->hasFocus())
-        m_octal->setText(mixed ? QString() : QStringLiteral("%1").arg(m, m > 0777 ? 4 : 3, 8, QLatin1Char('0')));
+    m_octal->setText(mixed ? QString() : QStringLiteral("%1").arg(m, m > 0777 ? 4 : 3, 8, QLatin1Char('0')));
     m_octal->setPlaceholderText(mixed ? tr("mixed") : QString());
 }
 
