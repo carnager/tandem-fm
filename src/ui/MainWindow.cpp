@@ -32,6 +32,7 @@
 #include <QAbstractButton>
 #include <QActionGroup>
 #include <QApplication>
+#include <QSignalBlocker>
 #include <QPushButton>
 #include <QToolButton>
 #include <QDialogButtonBox>
@@ -1599,7 +1600,7 @@ void MainWindow::createLink()
     layout->addWidget(new QLabel(single ? tr("Create the link as:") : tr("Create the links in:"), &dlg));
     auto* where = new QLineEdit(single ? joinPath(other()->path(), baseName(targets.first())) : other()->path(), &dlg);
     layout->addWidget(where);
-    dlg.setStyleSheet(theme().css(QStringLiteral(
+    setThemeStyle(&dlg, (QStringLiteral(
         "QToolButton#segment { padding: 5px 14px; border: 1px solid @control; background: @base; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }")));
     auto* kinds = new QHBoxLayout;
@@ -1612,7 +1613,7 @@ void MainWindow::createLink()
     };
     auto* help = new QLabel(&dlg);
     help->setWordWrap(true);
-    help->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(help, (QStringLiteral("color: @dimText;")));
     const int saved = QSettings().value(QStringLiteral("links/kind"), 0).toInt();
     for (const auto& [kind, label, tip] : choices) {
         auto* b = new QToolButton(&dlg);
@@ -1963,7 +1964,7 @@ void MainWindow::runCommand(const QString& command, bool inTerminal)
         text->setFont(monoFont());
         text->setLineWrapMode(QPlainTextEdit::NoWrap);
         auto* status2 = new QLabel(ok ? tr("Finished") : tr("Exit code %1").arg(code), dlg);
-        status2->setStyleSheet(theme().css(ok ? QStringLiteral("color: @dimText;") : QStringLiteral("color: @error;")));
+        setThemeStyle(status2, (ok ? QStringLiteral("color: @dimText;") : QStringLiteral("color: @error;")));
         l->addWidget(text, 1);
         l->addWidget(status2);
         dlg->show();

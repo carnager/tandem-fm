@@ -27,8 +27,7 @@ DuplicatesDialog::DuplicatesDialog(QString here, QString other, QWidget* parent)
 {
     setWindowTitle(tr("Duplicate files"));
     resize(1000, 660);
-    const Theme& t = theme();
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, (QStringLiteral(
         "QToolButton#segment { padding: 5px 12px; border: 1px solid @control; background: @base; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
         "QTreeWidget::item { padding: 3px 2px; }")));
@@ -80,7 +79,7 @@ DuplicatesDialog::DuplicatesDialog(QString here, QString other, QWidget* parent)
 
     auto* bottom = new QHBoxLayout;
     m_summary = new QLabel(this);
-    m_summary->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(m_summary, (QStringLiteral("color: @dimText;")));
     bottom->addWidget(m_summary, 1);
     auto* newest = new QPushButton(tr("Keep the newest"), this);
     newest->setToolTip(tr("Tick every copy but the newest in each group"));
@@ -260,7 +259,7 @@ void DuplicatesDialog::updateSummary()
     if (wholeGroupTicked)
         text += tr("  ·  careful: every copy of something is ticked");
     m_summary->setText(text);
-    m_summary->setStyleSheet(theme().css(wholeGroupTicked ? QStringLiteral("color: @error;") : QStringLiteral("color: @dimText;")));
+    setThemeStyle(m_summary, (wholeGroupTicked ? QStringLiteral("color: @error;") : QStringLiteral("color: @dimText;")));
     m_trash->setEnabled(n > 0);
     m_trash->setText(n ? plural(tr("Move %n to the trash", nullptr, n), n) : tr("Move to trash"));
     m_trash->setDefault(n > 0);

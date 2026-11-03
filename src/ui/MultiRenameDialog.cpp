@@ -168,16 +168,13 @@ RenameConfirmDialog::RenameConfirmDialog(const RenamePlan& plan, QWidget* parent
     model->setPlan(plan);
     layout->addWidget(makeRenamePreview(model, this), 1);
 
-    const Theme& t = theme();
     auto* bottom = new QHBoxLayout;
     auto* summary = new QLabel(this);
     if (plan.problems)
         summary->setText(plural(tr("%n name(s) can't be used. Edit again to fix them.", nullptr, plan.problems), plan.problems));
     else
         summary->setText(plural(tr("%n item(s) will be renamed", nullptr, plan.changes), plan.changes));
-    QPalette pal = summary->palette();
-    pal.setColor(QPalette::WindowText, plan.problems ? t.error : t.text);
-    summary->setPalette(pal);
+    setThemeStyle(summary, plan.problems ? QStringLiteral("color: @error;") : QStringLiteral("color: @text;"));
     bottom->addWidget(summary, 1);
     auto* again = new QPushButton(tr("Edit again"), this);
     auto* cancel = new QPushButton(tr("Cancel"), this);
@@ -277,7 +274,7 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString folder, QS
     layout->setSpacing(10);
     auto dim = [this, &t](const QString& text) {
         auto* l = new QLabel(text, this);
-        l->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+        setThemeStyle(l, (QStringLiteral("color: @dimText;")));
         return l;
     };
 
@@ -378,7 +375,7 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString folder, QS
     grid->addLayout(caseRow, 3, 1);
     grid->setColumnStretch(1, 1);
     layout->addLayout(grid);
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, (QStringLiteral(
         "QToolButton#segment { padding: 4px 12px; border: 1px solid @border; background: @base; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
         "QToolButton#chip { padding: 2px 10px; border: 1px solid @border; border-radius: 10px; background: @altBase; }"
@@ -414,7 +411,7 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString folder, QS
     m_completions->setObjectName(QStringLiteral("renameCompletions"));
     m_completions->setFocusPolicy(Qt::NoFocus);
     m_completions->setUniformItemSizes(true);
-    m_completions->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_completions, (QStringLiteral(
         "QListWidget { border: 1px solid @accent; border-radius: 6px; background: @base; padding: 3px; }"
         "QListWidget::item { padding: 4px 8px; border-radius: 4px; }"
         "QListWidget::item:selected { background: @accent; color: @accentText; }")));
@@ -585,27 +582,24 @@ void MultiRenameDialog::recompute()
     if (m_plan.error.isEmpty())
         m_model->setPlan(m_plan);
     m_table->setEnabled(m_plan.error.isEmpty());
-    const Theme& t = theme();
     QString text;
-    QColor color = t.dimText;
+    QString color = QStringLiteral("color: @dimText;");
     if (!m_plan.error.isEmpty()) {
         text = m_plan.error;
-        color = t.error;
+        color = QStringLiteral("color: @error;");
     } else if (m_plan.problems) {
         text = plural(tr("%n name(s) can't be used", nullptr, m_plan.problems), m_plan.problems);
-        color = t.error;
+        color = QStringLiteral("color: @error;");
     } else if (m_readingDates) {
         text = tr("Reading photo dates …");
     } else if (m_plan.changes == 0) {
         text = tr("Nothing changes yet");
     } else {
         text = tr("%1 of %2 change").arg(m_plan.changes).arg(m_plan.rows.size());
-        color = t.text;
+        color = QStringLiteral("color: @text;");
     }
     m_summary->setText(text);
-    QPalette pal = m_summary->palette();
-    pal.setColor(QPalette::WindowText, color);
-    m_summary->setPalette(pal);
+    setThemeStyle(m_summary, color);
     const bool ready = m_plan.canRun() && !m_readingDates;
     m_rename->setEnabled(ready);
     m_rename->setText(ready ? plural(tr("Rename %n", nullptr, m_plan.changes), m_plan.changes) : tr("Rename"));

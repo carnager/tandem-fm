@@ -53,6 +53,7 @@
 #include <QImage>
 #include <QImageReader>
 #include <QCheckBox>
+#include <QHeaderView>
 #include <QScopeGuard>
 #include <QSignalSpy>
 #include <QListWidget>
@@ -1261,6 +1262,41 @@ private slots:
         QCOMPARE(readFile(L("lk/target.txt")), QByteArray("t"));
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void liveAppearanceSettings()
+    {
+        const QVariant oldTheme = QSettings().value("view/theme");
+        auto restore = qScopeGuard([&] {
+            for (const auto& item : {qMakePair(QString("view/theme"), oldTheme)}) {
+                if (item.second.isValid()) QSettings().setValue(item.first, item.second);
+                else QSettings().remove(item.first);
+            }
+            applyTheme(*qApp);
+            m_left->view()->setFocus();
+        });
+        SettingsDialog dlg(m_window.get());
+        dlg.show();
+        auto chooseTheme = [&](const QString& code) {
+            for (QToolButton* button : dlg.findChildren<QToolButton*>())
+                if (button->property("segmentValue").toString() == code) {
+                    button->click();
+                    return true;
+                }
+            return false;
+        };
+        QVERIFY(chooseTheme("dark"));
+        QVERIFY(theme().dark);
+        QCOMPARE(qApp->palette().color(QPalette::Base), theme().base);
+        const QString darkHeader = m_left->view()->header()->styleSheet();
+        QVERIFY(chooseTheme("light"));
+        QVERIFY(!theme().dark);
+        QCOMPARE(qApp->palette().color(QPalette::Base), theme().base);
+        QVERIFY(m_left->view()->header()->styleSheet() != darkHeader);
+        QCOMPARE(m_left->view()->header()->styleSheet(),
+                 theme().css(m_left->view()->header()->property("tandemThemeCss").toString()));
+        QCOMPARE(dlg.styleSheet(), theme().css(dlg.property("tandemThemeCss").toString()));
+
     }
 
     // Ctrl+,: settings; keys can be changed, conflicts resolved, defaults restored.

@@ -1,11 +1,20 @@
 #include "ui/SettingsDialog.h"
 
+#include "core/FolderHistory.h"
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
 
 #include <QAction>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QDir>
+#include <QDesktopServices>
+#include <QMessageBox>
+#include <QUrl>
+#include <QApplication>
+#include <QSpinBox>
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
@@ -86,7 +95,7 @@ QLabel* hint(const QString& text, QWidget* parent)
 {
     auto* l = new QLabel(text, parent);
     l->setWordWrap(true);
-    l->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(l, (QStringLiteral("color: @dimText;")));
     return l;
 }
 
@@ -144,6 +153,7 @@ QWidget* segments(QWidget* parent, const QList<QPair<QString, QString>>& choices
     for (const auto& [code, label] : choices) {
         auto* b = new QToolButton(w);
         b->setObjectName(QStringLiteral("segment"));
+        b->setProperty("segmentValue", code);
         b->setText(label);
         b->setCheckable(true);
         b->setChecked(code == current);
@@ -194,8 +204,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
 {
     setWindowTitle(tr("Settings"));
     resize(860, 600);
-    const Theme& t = theme();
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, (QStringLiteral(
         "QListWidget#nav { background: transparent; border: none; outline: none; }"
         "QListWidget#nav::item { padding: 8px 12px; border-radius: 6px; color: @text; }"
         "QListWidget#nav::item:selected { background: @headerActive; color: @text; }"
@@ -252,11 +261,11 @@ QWidget* SettingsDialog::appearancePage()
              segments(this, {{QStringLiteral("system"), tr("Like the desktop")}, {QStringLiteral("dark"), tr("Dark")},
                              {QStringLiteral("light"), tr("Light")}},
                       s.value(QStringLiteral("view/theme"), QStringLiteral("system")).toString(),
-                      [this](const QString& code) {
+                      [](const QString& code) {
                           QSettings().setValue(QStringLiteral("view/theme"), code);
-                          m_window->active()->showMessage(tr("The theme changes the next time Tandem starts"));
+                          applyTheme(*qApp);
                       }),
-             tr("Takes effect the next time Tandem starts."));
+             tr("Changes immediately, including the panels and open dialogs."));
 
     auto* language = new QComboBox(this);
     language->addItem(tr("Like the system"), QString());

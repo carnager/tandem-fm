@@ -47,7 +47,7 @@ QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut, QLineEdit** user
     dlg->setMinimumWidth(420);
     auto* layout = new QVBoxLayout(dlg);
     auto* where = new QLabel(q.location, dlg);
-    where->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(where, (QStringLiteral("color: @dimText;")));
     auto* text = new QLabel(q.message, dlg);
     text->setWordWrap(true);
     layout->addWidget(where);
@@ -84,7 +84,7 @@ QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut, QLineEdit** user
                                             "in ~/.ssh/known_hosts, like ssh does."),
                                 dlg);
         hint->setWordWrap(true);
-        hint->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+        setThemeStyle(hint, (QStringLiteral("color: @dimText;")));
         layout->addWidget(hint);
     }
     QCheckBox* remember = nullptr;

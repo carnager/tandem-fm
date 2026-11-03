@@ -51,7 +51,7 @@ QLabel* sectionLabel(const QString& text, QWidget* parent)
     f.setBold(true);
     f.setLetterSpacing(QFont::PercentageSpacing, 108);
     l->setFont(f);
-    l->setStyleSheet(theme().css(QStringLiteral("color: @dimText; padding-top: 10px;")));
+    setThemeStyle(l, (QStringLiteral("color: @dimText; padding-top: 10px;")));
     return l;
 }
 
@@ -59,7 +59,7 @@ QLabel* dimLabel(const QString& text, QWidget* parent)
 {
     auto* l = new QLabel(text, parent);
     l->setWordWrap(true);
-    l->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(l, (QStringLiteral("color: @dimText;")));
     return l;
 }
 
@@ -148,7 +148,7 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
     // Who can do what: one row each, the rights as toggles right after the name.
     m_symbolic = new QLabel(this);
     m_symbolic->setFont(monoFont());
-    m_symbolic->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(m_symbolic, (QStringLiteral("color: @dimText;")));
     m_octal = new QLineEdit(this);
     m_octal->setFont(monoFont());
     m_octal->setFixedWidth(64);
@@ -161,7 +161,7 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
     whoHead->addSpacing(8);
     whoHead->addWidget(m_octal, 0, Qt::AlignBottom);
     layout->addLayout(whoHead);
-    setStyleSheet(theme().css(QStringLiteral(
+    setThemeStyle(this, (QStringLiteral(
         "QCheckBox#perm { border: 1px solid @control; border-radius: 13px; padding: 4px 14px; color: @dimText; }"
         "QCheckBox#perm::indicator { width: 0; height: 0; }"
         "QCheckBox#perm:hover { border-color: @accent; }"

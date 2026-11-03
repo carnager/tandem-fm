@@ -23,7 +23,6 @@ namespace tandem {
 
 JobRow::JobRow(Job* job, JobManager* manager, QWidget* parent) : QWidget(parent), m_job(job), m_manager(manager)
 {
-    const Theme& t = theme();
     auto* layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 6, 8, 6);
     layout->setSpacing(10);
@@ -35,7 +34,7 @@ JobRow::JobRow(Job* job, JobManager* manager, QWidget* parent) : QWidget(parent)
     bold.setWeight(QFont::DemiBold);
     m_title->setFont(bold);
     m_detail = new QLabel(this);
-    m_detail->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(m_detail, (QStringLiteral("color: @dimText;")));
     m_detail->setMinimumWidth(100);
     m_detail->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     text->addWidget(m_title);
@@ -46,7 +45,7 @@ JobRow::JobRow(Job* job, JobManager* manager, QWidget* parent) : QWidget(parent)
     m_bar->setTextVisible(false);
     m_bar->setFixedHeight(6);
     m_bar->setRange(0, 1000);
-    m_bar->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_bar, (QStringLiteral(
         "QProgressBar { background: @border; border: none; border-radius: 3px; }"
         "QProgressBar::chunk { background: @accent; border-radius: 3px; }")));
     layout->addWidget(m_bar, 2);
@@ -250,7 +249,7 @@ JobsPanel::JobsPanel(JobManager* manager, QWidget* overlayParent) : QWidget(over
 
     m_list = new QFrame(this);
     m_list->setObjectName(QStringLiteral("jobsList"));
-    m_list->setStyleSheet(theme().css(QStringLiteral(
+    setThemeStyle(m_list, (QStringLiteral(
         "#jobsList { background: @header; border: 1px solid @border; border-radius: 10px; }")));
     m_rows = new QVBoxLayout(m_list);
     m_rows->setContentsMargins(4, 4, 4, 4);
@@ -258,7 +257,7 @@ JobsPanel::JobsPanel(JobManager* manager, QWidget* overlayParent) : QWidget(over
     auto* header = new QHBoxLayout;
     header->setContentsMargins(12, 4, 6, 2);
     auto* title = new QLabel(tr("Operations"), m_list);
-    title->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(title, (QStringLiteral("color: @dimText;")));
     m_pauseAll = new QToolButton(m_list);
     m_pauseAll->setAutoRaise(true);
     m_pauseAll->setFocusPolicy(Qt::NoFocus);

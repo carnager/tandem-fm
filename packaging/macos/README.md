@@ -5,6 +5,7 @@ An experimental macOS port of [carnager/tandem-fm](https://github.com/carnager/t
 ## Changes in 0.1.1
 
 - Left/Right navigation is enabled by default in the details view: Left opens the parent and Right enters a folder. Right never launches regular files. Toggle it in Settings → Behaviour; thumbnail grids retain normal arrow movement.
+- Settings → Appearance switches Light, Dark, and system appearance immediately, including existing controls and dialogs. System mode follows desktop appearance changes.
 - Directory notifications refresh only affected macOS panels; background refreshes preserve cursor/marks changed while listing was in progress.
 
 ## Build and package

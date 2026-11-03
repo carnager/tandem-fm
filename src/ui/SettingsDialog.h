@@ -16,7 +16,7 @@ namespace tandem {
 class MainWindow;
 
 // Ctrl+,: appearance, behaviour, external tools and key bindings. Changes
-// apply right away; theme and language on the next start.
+// apply right away; language changes on the next start.
 class SettingsDialog : public QDialog {
     Q_OBJECT
 public:

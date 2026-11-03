@@ -48,7 +48,6 @@ namespace tandem {
 
 Panel::Panel(QWidget* parent) : QFrame(parent)
 {
-    const Theme& t = theme();
     setContentsMargins(1, 1, 1, 1);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);
@@ -60,7 +59,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_tabBar->setMovable(false);  // order is the tab numbers
     m_tabBar->setFocusPolicy(Qt::NoFocus);
     m_tabBar->setElideMode(Qt::ElideMiddle);
-    m_tabBar->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_tabBar, (QStringLiteral(
         "QTabBar { background: transparent; }"
         "QTabBar::tab { background: transparent; color: @dimText; padding: 5px 14px; border: none;"
         "  border-bottom: 2px solid transparent; max-width: 220px; }"
@@ -111,7 +110,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_filterBar = new QWidget(this);
     m_filterBar->setObjectName(QStringLiteral("filterBar"));
     m_filterBar->setAttribute(Qt::WA_StyledBackground);
-    m_filterBar->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_filterBar, (QStringLiteral(
         "#filterBar { background: @header; border-top: 1px solid @border; }"
         "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 6px; padding: 2px 8px; }"
         "QLabel { color: @dimText; }")));
@@ -144,7 +143,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_searchBar = new QWidget(this);
     m_searchBar->setObjectName(QStringLiteral("searchBarPanel"));
     m_searchBar->setAttribute(Qt::WA_StyledBackground);
-    m_searchBar->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_searchBar, (QStringLiteral(
         "#searchBarPanel { background: @header; border-top: 1px solid @border; }"
         "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 6px; padding: 2px 8px; }"
         "QToolButton { color: @dimText; border: none; padding: 2px 8px; border-radius: 9px; }"
@@ -188,7 +187,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_search->setPlaceholderText(tr("Search"));
     m_search->hide();
     m_search->installEventFilter(this);
-    m_search->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_search, (QStringLiteral(
         "QLineEdit { background: @header; color: @text; border: 1px solid @accent; border-radius: 12px;"
         "  padding: 3px 10px; }")));
     connect(m_search, &QLineEdit::textEdited, this, [this] { quickSearchFind(1, true); });
@@ -939,14 +938,14 @@ void Panel::quickSearchFind(int direction, bool includeCurrent)
             if (hit && !e->isParent) {
                 m_view->setCurrentRow(row);
                 m_search->setProperty("miss", false);
-                m_search->setStyleSheet(theme().css(QStringLiteral(
+                setThemeStyle(m_search, (QStringLiteral(
                     "QLineEdit { background: @header; color: @text; border: 1px solid @accent;"
                     "  border-radius: 12px; padding: 3px 10px; }")));
                 return;
             }
         }
     }
-    m_search->setStyleSheet(theme().css(QStringLiteral(
+    setThemeStyle(m_search, (QStringLiteral(
         "QLineEdit { background: @header; color: @error; border: 1px solid @error;"
         "  border-radius: 12px; padding: 3px 10px; }")));
 }
@@ -975,8 +974,7 @@ void Panel::setActive(bool active)
 
 void Panel::updateActiveStyle()
 {
-    const Theme& t = theme();
-    m_header->setStyleSheet(t.css(m_active ? QStringLiteral(
+    setThemeStyle(m_header, (m_active ? QStringLiteral(
         "#panelHeader { background: @headerActive; border-top-left-radius: 7px; border-top-right-radius: 7px; }"
         "QLineEdit { background: transparent; color: @text; font-weight: 600; }"
         "QToolButton#crumb { color: @text; border: none; padding: 1px 4px; border-radius: 4px; }"
@@ -1030,21 +1028,20 @@ void Panel::updateHeader()
 
 void Panel::updateStatus()
 {
-    const Theme& t = theme();
     DirTab* tb = tab();
     QString text;
-    QColor color = t.dimText;
+    QString color = QStringLiteral("color: @dimText;");
     if (!m_message.isEmpty()) {
         text = m_message;
-        color = m_messageError ? t.error : t.text;
+        color = m_messageError ? QStringLiteral("color: @error;") : QStringLiteral("color: @text;");
     } else if (tb && tb->isSearch() && tb->isSearching()) {
         text = tr("Searching %1 for “%2” …  %3 found   (Esc stops)")
                    .arg(tb->searchSpec().root, tb->searchSpec().query)
                    .arg(tb->searchFound());
-        color = t.accent;
+        color = QStringLiteral("color: @accent;");
     } else if (tb && tb->isLoading() && !m_loadingTimer.isActive()) {
         text = tr("Loading %1 …   (Esc to cancel)").arg(tb->loadingPath());
-        color = t.accent;
+        color = QStringLiteral("color: @accent;");
     } else if (tb) {
         const FileModel::Stats s = tb->model()->stats();
         if (!tb->model()->filter().isEmpty())
@@ -1053,15 +1050,13 @@ void Panel::updateStatus()
             text = tr("%1 of %2 files, %3 of %4 folders marked   ·   %5 of %6")
                        .arg(s.markedFiles).arg(s.files).arg(s.markedDirs).arg(s.dirs)
                        .arg(formatSize(s.markedBytes), formatSize(s.bytes));
-            color = t.mark;
+            color = QStringLiteral("color: @mark;");
         } else {
             text = tr("%1 files, %2 folders   ·   %3").arg(s.files).arg(s.dirs).arg(formatSize(s.bytes));
         }
     }
     m_status->setText(text);
-    QPalette pal = m_status->palette();
-    pal.setColor(QPalette::WindowText, color);
-    m_status->setPalette(pal);
+    setThemeStyle(m_status, color);
 }
 
 void Panel::showMessage(const QString& text, bool error)
@@ -1399,7 +1394,7 @@ void Panel::connectDialog()
                                "davs://cloud.example.com/remote.php/dav/files/me  ·  ftp://host\n"
                                "sftp and smb are built in; the others are mounted with GVfs (other apps see those too)."),
                             &dlg);
-    hint->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(hint, (QStringLiteral("color: @dimText;")));
     hint->setWordWrap(true);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     buttons->button(QDialogButtonBox::Ok)->setText(tr("Connect"));

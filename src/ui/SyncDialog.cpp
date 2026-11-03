@@ -317,13 +317,13 @@ SyncDialog::SyncDialog(const QString& left, const QString& right, Runner runner,
     const Theme& t = theme();
     setWindowTitle(tr("Synchronize folders"));
     resize(1040, 680);
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, (QStringLiteral(
         "QToolButton#segment { padding: 5px 14px; border: 1px solid @border; background: @base; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
         "QToolButton#show { color: @dimText; border: 1px solid transparent; border-radius: 12px; padding: 3px 12px; }"
         "QToolButton#show:checked { color: @text; background: @altBase; border-color: @border; }"
         "QToolButton#show:hover { border-color: @accent; }"
-        "QLabel#paths { font-weight: 600; font-size: 11pt; }"
+        "QLabel#paths { font-weight: 600; }"
         "QLabel#status, QLabel#keys { color: @dimText; }")));
 
     auto* layout = new QVBoxLayout(this);

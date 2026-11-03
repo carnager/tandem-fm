@@ -16,6 +16,8 @@
 #include <QStyleOption>
 #include <QStyleFactory>
 #include <QStyleHints>
+#include <QScopedValueRollback>
+#include <QWidget>
 
 namespace tandem {
 
@@ -51,6 +53,12 @@ QString Theme::css(const QString& tmpl) const
     for (const auto& [name, color] : vars)
         s.replace(QLatin1String(name), rgba(color));
     return s;
+}
+
+void setThemeStyle(QWidget* widget, const QString& templateCss)
+{
+    widget->setProperty("tandemThemeCss", templateCss);
+    widget->setStyleSheet(theme().css(templateCss));
 }
 
 static bool systemPrefersDark(const QApplication& app)
@@ -183,8 +191,26 @@ public:
 
 void applyTheme(QApplication& app)
 {
+    static bool applying = false;
+    if (applying)
+        return;
+    QScopedValueRollback guard(applying, true);
     Theme& t = g_theme;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    const QString requested = qEnvironmentVariable("TANDEM_THEME", QSettings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString());
+    app.styleHints()->setColorScheme(requested == QLatin1String("dark") ? Qt::ColorScheme::Dark
+                                     : requested == QLatin1String("light") ? Qt::ColorScheme::Light
+                                                                          : Qt::ColorScheme::Unknown);
+#endif
     t.dark = systemPrefersDark(app);
+    if (!app.property("tandemThemeConnected").toBool()) {
+        app.setProperty("tandemThemeConnected", true);
+        QObject::connect(app.styleHints(), &QStyleHints::colorSchemeChanged, &app, [&app] {
+            if (qEnvironmentVariableIsEmpty("TANDEM_THEME") &&
+                QSettings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString() == QLatin1String("system"))
+                applyTheme(app);
+        });
+    }
 
     if (t.dark) {
         t.window = QColor(0x1a, 0x1c, 0x20);
@@ -233,7 +259,10 @@ void applyTheme(QApplication& app)
     }
 
     // Fusion + our palette: consistent, fast to paint, no theme engine quirks.
-    app.setStyle(new TandemStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
+    if (!app.property("tandemStyleInstalled").toBool()) {
+        app.setStyle(new TandemStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
+        app.setProperty("tandemStyleInstalled", true);
+    }
     QPalette p;
     p.setColor(QPalette::Window, t.window);
     p.setColor(QPalette::WindowText, t.text);
@@ -306,6 +335,12 @@ void applyTheme(QApplication& app)
         }
     }
 
+    for (QWidget* widget : QApplication::allWidgets()) {
+        const QVariant css = widget->property("tandemThemeCss");
+        if (css.isValid())
+            widget->setStyleSheet(t.css(css.toString()));
+        widget->update();
+    }
     t.listFont = app.font();
     t.numberFont = t.listFont;
     t.numberFont.setFeature(QFont::Tag("tnum"), 1);

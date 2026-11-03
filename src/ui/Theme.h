@@ -4,6 +4,7 @@
 #include <QFont>
 
 class QApplication;
+class QWidget;
 
 namespace tandem {
 
@@ -24,5 +25,6 @@ const Theme& theme();
 // The configured fixed-width font, guaranteed to really be monospaced.
 QFont monoFont();
 void applyTheme(QApplication& app);
+void setThemeStyle(QWidget* widget, const QString& templateCss);
 
 }  // namespace tandem

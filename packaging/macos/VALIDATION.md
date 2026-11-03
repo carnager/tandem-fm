@@ -19,4 +19,4 @@ Not covered: another physical Mac, Intel, Linux execution, Developer ID/notariza
 
 The final bundle contains 74 Mach-O binaries. A recursive dependency audit found no missing libraries or external non-system library references. The bundle passed `codesign --verify --deep --strict` with a local ad-hoc signature, and launched with the native Cocoa backend, rendered a window, and exited successfully with Qt/DYLD override variables removed. This local smoke test does not replace validation on a clean second Mac.
 
-Feature-specific verification: Lynx Left/Right navigation is covered by `test_ui lynxFolderNavigation`.
+Feature-specific verification: Lynx Left/Right navigation is covered by `test_ui lynxFolderNavigation`. Live palette and stylesheet switching is covered by `test_ui liveAppearanceSettings`.

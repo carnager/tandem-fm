@@ -30,7 +30,7 @@ KeyChordPopup::KeyChordPopup(QWidget* window) : QFrame(window)
     const Theme& t = theme();
     setObjectName(QStringLiteral("chordPopup"));
     setFocusPolicy(Qt::StrongFocus);
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, (QStringLiteral(
         "#chordPopup { background: @header; border: 1px solid @border; border-radius: 12px; }"
         "QLabel { color: @text; }"
         "QLabel#dim { color: @dimText; }"

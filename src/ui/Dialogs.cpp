@@ -37,7 +37,7 @@ QString askDestination(QWidget* parent, const QString& title, const QString& lab
         auto* hint = new QLabel(QObject::tr("Enter: queue behind other operations on the same drive   ·   "
                                             "Shift+Enter: start right away"),
                                 &dlg);
-        hint->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+        setThemeStyle(hint, (QStringLiteral("color: @dimText;")));
         layout->addWidget(hint);
         for (auto key : {Qt::SHIFT | Qt::Key_Return, Qt::SHIFT | Qt::Key_Enter}) {
             auto* sc = new QShortcut(QKeySequence(key), &dlg);
@@ -63,7 +63,6 @@ static QString describe(int64_t size, int64_t time)
 
 PromptDialog::PromptDialog(const PromptRequest& req, QWidget* parent) : QDialog(parent)
 {
-    const Theme& t = theme();
     setWindowTitle(req.jobTitle);
     setMinimumWidth(520);
     auto* layout = new QVBoxLayout(this);
@@ -80,7 +79,7 @@ PromptDialog::PromptDialog(const PromptRequest& req, QWidget* parent) : QDialog(
 
     auto addPathRow = [&](QGridLayout* g, int row, const QString& caption, const QString& path, const QString& info) {
         auto* c = new QLabel(caption, this);
-        c->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+        setThemeStyle(c, (QStringLiteral("color: @dimText;")));
         auto* p = new QLabel(path, this);
         p->setTextInteractionFlags(Qt::TextSelectableByMouse);
         p->setWordWrap(true);
@@ -88,7 +87,7 @@ PromptDialog::PromptDialog(const PromptRequest& req, QWidget* parent) : QDialog(
         g->addWidget(p, row, 1);
         if (!info.isEmpty()) {
             auto* i = new QLabel(info, this);
-            i->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+            setThemeStyle(i, (QStringLiteral("color: @dimText;")));
             g->addWidget(i, row + 1, 1);
         }
     };
@@ -101,18 +100,18 @@ PromptDialog::PromptDialog(const PromptRequest& req, QWidget* parent) : QDialog(
         addPathRow(grid, 2, tr("Target"), req.dstPath, describe(req.dstSize, req.dstTime));
         if (req.srcTime > req.dstTime) {
             auto* hint = new QLabel(tr("The source is newer."), this);
-            hint->setStyleSheet(t.css(QStringLiteral("color: @success;")));
+            setThemeStyle(hint, (QStringLiteral("color: @success;")));
             grid->addWidget(hint, 4, 1);
         } else if (req.srcTime < req.dstTime) {
             auto* hint = new QLabel(tr("The target is newer."), this);
-            hint->setStyleSheet(t.css(QStringLiteral("color: @mark;")));
+            setThemeStyle(hint, (QStringLiteral("color: @mark;")));
             grid->addWidget(hint, 4, 1);
         }
     } else {
         addPathRow(grid, 0, tr("Path"), req.srcPath, QString());
         if (!req.detail.isEmpty()) {
             auto* d = new QLabel(req.detail, this);
-            d->setStyleSheet(t.css(QStringLiteral("color: @error;")));
+            setThemeStyle(d, (QStringLiteral("color: @error;")));
             grid->addWidget(d, 1, 1);
         }
     }

@@ -30,6 +30,7 @@ const Entry kEntries[] = {
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "a…z", QT_TRANSLATE_NOOP("Shortcuts", "Quick search: type letters (↑ ↓ next match)")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Alt+←", QT_TRANSLATE_NOOP("Shortcuts", "Back")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Alt+→", QT_TRANSLATE_NOOP("Shortcuts", "Forward")},
+    {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "← / →", QT_TRANSLATE_NOOP("Shortcuts", "Parent / enter folder (Lynx navigation, details view)")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Ctrl+PgUp", QT_TRANSLATE_NOOP("Shortcuts", "Parent folder")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Ctrl+\\", QT_TRANSLATE_NOOP("Shortcuts", "Root folder")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Ctrl+`", QT_TRANSLATE_NOOP("Shortcuts", "Home folder")},
@@ -197,7 +198,7 @@ ShortcutsDialog::ShortcutsDialog(QWidget* parent) : QDialog(parent)
     scroll->setWidget(m_page);
     layout->addWidget(scroll, 1);
     auto* note = new QLabel(tr("These are the default keys. Change them in Settings › Keys (Ctrl+,)."), this);
-    note->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(note, (QStringLiteral("color: @dimText;")));
     layout->addWidget(note);
     connect(m_filter, &QLineEdit::textChanged, this, &ShortcutsDialog::rebuild);
     rebuild();
@@ -212,7 +213,6 @@ void ShortcutsDialog::resizeEvent(QResizeEvent* e)
 
 void ShortcutsDialog::rebuild()
 {
-    const Theme& t = theme();
     const QString q = m_filter->text().trimmed();
     m_columns = qMax(1, (width() - 44) / 380);
 
@@ -254,7 +254,7 @@ void ShortcutsDialog::rebuild()
     }
     if (sections.isEmpty()) {
         auto* none = new QLabel(tr("No shortcut matches “%1”").arg(q), m_page);
-        none->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+        setThemeStyle(none, (QStringLiteral("color: @dimText;")));
         cols.first()->addWidget(none, 0, 0, 1, 2);
     }
     for (const auto& [name, entries] : sections) {
@@ -266,7 +266,7 @@ void ShortcutsDialog::rebuild()
         hf.setBold(true);
         hf.setLetterSpacing(QFont::PercentageSpacing, 108);
         head->setFont(hf);
-        head->setStyleSheet(t.css(QStringLiteral("color: @accent; padding-top: %1px; padding-bottom: 2px;"))
+        setThemeStyle(head, (QStringLiteral("color: @accent; padding-top: %1px; padding-bottom: 2px;"))
                                 .arg(heights[c] ? 14 : 0));
         cols[c]->addWidget(head, rows[c]++, 0, 1, 2);
         for (const Entry* e : entries) {
