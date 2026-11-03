@@ -1,6 +1,12 @@
-# Tandem for macOS 0.1.4
+# Tandem for macOS 0.1.5
 
 An experimental macOS port of [carnager/tandem-fm](https://github.com/carnager/tandem-fm), based on upstream commit `f82cc2e955b9a58f066703f746661f29f00a6f36`. The upstream Qt 6 Widgets UI, libarchive, libssh, job queues, viewers, and fd/rg search tools are retained. macOS changes are guarded so the Linux implementations remain available.
+
+## Changes in 0.1.5
+
+Right-click a detail-table heading to enable **Date Created** and **Date Added** independently in each panel. Both are optional and initially hidden, preserving existing layouts. Click a date heading to sort, or choose **Sort by date created** / **Sort by date added** in the Sort menu. New date sorts start newest first; selecting the same sort again reverses the order. Existing modified-date shortcuts remain unchanged. Column choices and sort settings persist in the selected configuration profile.
+
+Date Created is the filesystem birth time (macOS `stat`, Linux `statx` when available). Date Added is the macOS filesystem's added-to-folder timestamp, read through `getattrlistat`; it is not inferred from creation, modification, access, or download times. Links show their own dates. Missing/unsupported values stay blank and sort after known dates in either direction, while folders and the parent entry retain their usual priority. Remote protocols, archives, and mounted filesystems may not provide these dates. Metadata-only date changes participate in background refresh detection. The existing narrow-panel layout can temporarily hide date columns to keep names readable; widening the panel restores them.
 
 ## Changes in 0.1.4
 

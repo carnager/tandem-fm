@@ -54,12 +54,12 @@
 #include <QImage>
 #include <QImageReader>
 #include <QCheckBox>
-#include <QHeaderView>
 #include <QSpinBox>
 #include <QSaveFile>
 #include <QScopeGuard>
 #include <QSignalSpy>
 #include <QLabel>
+#include <QHeaderView>
 #include <QListWidget>
 #include <QKeySequenceEdit>
 #include <QTreeWidget>
@@ -484,6 +484,48 @@ private slots:
         QVERIFY(!m_left->isActive());
         QTest::keyClick(m_right->view(), Qt::Key_Tab);
         QTRY_VERIFY(m_left->isActive());
+    }
+
+    void dateColumnsAndSorting()
+    {
+        FileModel model;
+        FileEntry old, newer, unknown;
+        old.name = "old"; old.createdTime = 100; old.addedTime = 300;
+        newer.name = "new"; newer.createdTime = 200; newer.addedTime = 400;
+        unknown.name = "unknown";
+        model.setListing(m_tmp.path(), {old, newer, unknown});
+        QCOMPARE(model.headerData(FileModel::ColCreated, Qt::Horizontal, Qt::DisplayRole).toString(), QString("Date Created"));
+        QCOMPARE(model.headerData(FileModel::ColAdded, Qt::Horizontal, Qt::DisplayRole).toString(), QString("Date Added"));
+        QVERIFY(!model.data(model.index(model.rowOf("old"), FileModel::ColCreated), Qt::DisplayRole).toString().isEmpty());
+        QVERIFY(model.data(model.index(model.rowOf("unknown"), FileModel::ColAdded), Qt::DisplayRole).toString().isEmpty());
+        for (int column : {FileModel::ColCreated, FileModel::ColAdded}) {
+            model.sort(column, Qt::DescendingOrder);
+            QVERIFY(model.rowOf("new") < model.rowOf("old"));
+            QVERIFY(model.rowOf("old") < model.rowOf("unknown"));
+            model.sort(column, Qt::AscendingOrder);
+            QVERIFY(model.rowOf("old") < model.rowOf("new"));
+            QVERIFY(model.rowOf("new") < model.rowOf("unknown"));
+        }
+        for (const QString& text : {QString("Sort by date created"), QString("Sort by date added")}) {
+            QAction* action = nullptr;
+            for (auto* a : m_window->findChildren<QAction*>())
+                if (a->text() == text) action = a;
+            QVERIFY(action);
+            action->trigger();
+            QCOMPARE(m_left->sortSpec().column, text.endsWith("created") ? SortColumn::Created : SortColumn::Added);
+            QVERIFY(m_left->sortSpec().descending);
+            action->trigger();
+            QVERIFY(!m_left->sortSpec().descending);
+        }
+        // Explicit column choices survive header-state restoration.
+        m_left->resize(1500, 600);
+        for (int column : {FileModel::ColCreated, FileModel::ColAdded})
+            m_left->view()->setColumnHidden(column, false);
+        const QByteArray state = m_left->headerState();
+        m_left->view()->setColumnHidden(FileModel::ColCreated, true);
+        m_left->restoreHeaderState(state);
+        QVERIFY(!m_left->view()->isColumnHidden(FileModel::ColCreated));
+        QVERIFY(!m_left->view()->isColumnHidden(FileModel::ColAdded));
     }
 
     void sortBySize()

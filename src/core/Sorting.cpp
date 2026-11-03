@@ -98,6 +98,16 @@ bool entryLess(const FileEntry& a, const FileEntry& b, const SortSpec& spec)
     case SortColumn::Time:
         c = cmp(a.mtime, b.mtime);
         break;
+    case SortColumn::Created:
+    case SortColumn::Added: {
+        const auto& x = spec.column == SortColumn::Created ? a.createdTime : a.addedTime;
+        const auto& y = spec.column == SortColumn::Created ? b.createdTime : b.addedTime;
+        // Unknown dates remain last in either direction, within files/directories.
+        if (x.has_value() != y.has_value())
+            return x.has_value();
+        if (x) c = cmp(*x, *y);
+        break;
+    }
     case SortColumn::Attr:
         c = cmp(a.mode, b.mode);
         break;

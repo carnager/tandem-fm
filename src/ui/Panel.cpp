@@ -562,9 +562,8 @@ void Panel::showTab(int index)
     m_view->setModel(t->model());
     applyViewMode();
     delete oldSel;
-    if (m_headerState.isEmpty())
-        applyDefaultColumns();
-    else
+    applyDefaultColumns();
+    if (!m_headerState.isEmpty())
         m_view->header()->restoreState(m_headerState);
     m_view->fitColumns();
     {
@@ -627,6 +626,10 @@ void Panel::applyDefaultColumns()
     m_view->setColumnWidth(FileModel::ColExt, fm.horizontalAdvance(QStringLiteral("desktop")) + 24);
     m_view->setColumnWidth(FileModel::ColSize, fm.horizontalAdvance(QStringLiteral("999.9 MiB")) + 24);
     m_view->setColumnWidth(FileModel::ColTime, fm.horizontalAdvance(QStringLiteral("2026-12-31 23:59")) + 24);
+    for (int c : {FileModel::ColCreated, FileModel::ColAdded}) {
+        m_view->setColumnWidth(c, fm.horizontalAdvance(QStringLiteral("2026-12-31 23:59")) + 24);
+        m_view->setColumnHidden(c, true); // opt in through the header menu
+    }
     m_view->setColumnWidth(FileModel::ColAttr, fm.horizontalAdvance(QStringLiteral("drwxr-xr-x")) + 24);
 }
 
@@ -813,7 +816,7 @@ void Panel::sortBy(SortColumn column)
     } else {
         s.column = column;
         // Newest / biggest first is what you want for those columns.
-        s.descending = column == SortColumn::Time || column == SortColumn::Size;
+        s.descending = column == SortColumn::Time || column == SortColumn::Created || column == SortColumn::Added || column == SortColumn::Size;
     }
     setSortSpec(s);
     emit stateChanged();

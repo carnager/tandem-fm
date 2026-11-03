@@ -23,6 +23,10 @@
 #include "core/Permissions.h"
 #include "core/Sorting.h"
 
+#ifdef __APPLE__
+#include <sys/attr.h>
+#endif
+
 #include <QScopeGuard>
 #include <QDateTime>
 #include <QFile>
@@ -99,6 +103,65 @@ private slots:
         for (auto& e : v)
             names << e.name;
         QCOMPARE(names, QStringList({"..", "A-dir", "b-dir", "file1", "File2", "file10"}));
+    }
+
+    void dateSorting()
+    {
+        for (auto column : {SortColumn::Created, SortColumn::Added}) {
+            auto a = entry("old"), b = entry("new"), unknown = entry("unknown");
+            a.createdTime = a.addedTime = 100;
+            b.createdTime = b.addedTime = 200;
+            auto dir = entry("folder", true);
+            auto parent = entry("..", true); parent.isParent = true;
+            for (bool descending : {false, true}) {
+                std::vector<FileEntry> v = {unknown, b, parent, a, dir};
+                sortEntries(v, {column, descending});
+                QCOMPARE(v[0].name, QString(".."));
+                QCOMPARE(v[1].name, QString("folder"));
+                QCOMPARE(v[2].name, descending ? b.name : a.name);
+                QCOMPARE(v[3].name, descending ? a.name : b.name);
+                QCOMPARE(v[4].name, unknown.name);
+            }
+        }
+    }
+
+    void creationAndAddedDates()
+    {
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("dated"), "hello");
+#ifdef __APPLE__
+        struct attrlist attrs{};
+        attrs.bitmapcount = ATTR_BIT_MAP_COUNT;
+        attrs.commonattr = ATTR_CMN_ADDEDTIME;
+        timespec added{1700000000, 0};
+        QVERIFY(::setattrlist(QFile::encodeName(tmp.filePath("dated")).constData(), &attrs,
+                             &added, sizeof(added), FSOPT_NOFOLLOW) == 0);
+#endif
+        const auto listing = listDirectory(tmp.path(), {});
+        QCOMPARE(listing.error, 0);
+        QCOMPARE(listing.entries.size(), size_t(1));
+        const auto& e = listing.entries.front();
+#ifdef __APPLE__
+        struct stat st{};
+        QVERIFY(::lstat(QFile::encodeName(tmp.filePath("dated")).constData(), &st) == 0);
+        QVERIFY(e.createdTime.has_value());
+        QCOMPARE(*e.createdTime, int64_t(st.st_birthtimespec.tv_sec));
+        QVERIFY(e.addedTime.has_value());
+        QCOMPARE(*e.addedTime, int64_t(1700000000));
+#endif
+        auto updates = statNames(tmp.path(), {"dated"}, true);
+        QCOMPARE(updates.size(), size_t(1));
+        QVERIFY(updates[0].second.has_value());
+        QCOMPARE(updates[0].second->createdTime, e.createdTime);
+        QCOMPARE(updates[0].second->addedTime, e.addedTime);
+#ifdef __APPLE__
+        added.tv_sec += 3600;
+        QVERIFY(::setattrlist(QFile::encodeName(tmp.filePath("dated")).constData(), &attrs,
+                             &added, sizeof(added), FSOPT_NOFOLLOW) == 0);
+        updates = statNames(tmp.path(), {"dated"}, true);
+        QVERIFY(updates[0].second->addedTime.has_value());
+        QCOMPARE(*updates[0].second->addedTime, int64_t(1700003600));
+#endif
     }
 
     void extension()

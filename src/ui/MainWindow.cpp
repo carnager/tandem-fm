@@ -429,7 +429,9 @@ void MainWindow::createMenus()
     QMenu* sort = view->addMenu(tr("Sort by"));
     m_actions[QStringLiteral("sortName")] = addCommand(sort, QT_TR_NOOP("Sort by name"), {K(Qt::CTRL | Qt::Key_F3)}, [this] { active()->sortBy(SortColumn::Name); });
     m_actions[QStringLiteral("sortExt")] = addCommand(sort, QT_TR_NOOP("Sort by extension"), {K(Qt::CTRL | Qt::Key_F4)}, [this] { active()->sortBy(SortColumn::Ext); });
-    m_actions[QStringLiteral("sortDate")] = addCommand(sort, QT_TR_NOOP("Sort by date"), {K(Qt::CTRL | Qt::Key_F5)}, [this] { active()->sortBy(SortColumn::Time); });
+    m_actions[QStringLiteral("sortDate")] = addCommand(sort, QT_TR_NOOP("Sort by date modified"), {K(Qt::CTRL | Qt::Key_F5)}, [this] { active()->sortBy(SortColumn::Time); });
+    m_actions[QStringLiteral("sortCreated")] = addCommand(sort, QT_TR_NOOP("Sort by date created"), {}, [this] { active()->sortBy(SortColumn::Created); });
+    m_actions[QStringLiteral("sortAdded")] = addCommand(sort, QT_TR_NOOP("Sort by date added"), {}, [this] { active()->sortBy(SortColumn::Added); });
     m_actions[QStringLiteral("sortSize")] = addCommand(sort, QT_TR_NOOP("Sort by size"), {K(Qt::CTRL | Qt::Key_F6)}, [this] { active()->sortBy(SortColumn::Size); });
     for (QAction* a : sort->actions())
         a->setProperty("category", tr("View"));  // for the palette and keys page
@@ -2492,6 +2494,10 @@ void MainWindow::loadSettings(const QStringList& startPaths)
             current = 0;
         }
         p.panel->restoreTabs(tabs, current, numbers);
+        if (!s.value(QStringLiteral("headerDateColumns"), false).toBool()) {
+            p.panel->view()->setColumnHidden(FileModel::ColCreated, true);
+            p.panel->view()->setColumnHidden(FileModel::ColAdded, true);
+        }
         s.endGroup();
     }
     Panel* act = s.value(QStringLiteral("window/active")).toString() == QLatin1String("right") ? m_right : m_left;
@@ -2570,6 +2576,7 @@ void MainWindow::saveSettings()
         s.setValue(QStringLiteral("sortColumn"), int(panel->sortSpec().column));
         s.setValue(QStringLiteral("sortDescending"), panel->sortSpec().descending);
         s.setValue(QStringLiteral("header"), panel->headerState());
+        s.setValue(QStringLiteral("headerDateColumns"), true);
         s.endGroup();
     }
 }

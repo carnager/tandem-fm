@@ -121,7 +121,9 @@ size_t listingSignature(const std::vector<const FileEntry*>& entries)
     QStringList parts;
     parts.reserve(qsizetype(entries.size()));
     for (const FileEntry* e : entries)
-        parts << QStringLiteral("%1\t%2\t%3\t%4").arg(e->name).arg(e->isDir).arg(e->isDir ? -1 : e->size).arg(e->mtime);
+        parts << QStringLiteral("%1\t%2\t%3\t%4\t%5\t%6").arg(e->name).arg(e->isDir).arg(e->isDir ? -1 : e->size).arg(e->mtime)
+                     .arg(e->createdTime ? QString::number(*e->createdTime) : QString())
+                     .arg(e->addedTime ? QString::number(*e->addedTime) : QString());
     parts.sort();
     return qHash(parts.join(QLatin1Char('\n')));
 }

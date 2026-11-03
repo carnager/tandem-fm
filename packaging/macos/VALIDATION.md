@@ -1,8 +1,8 @@
-# macOS 0.1.4 validation
+# macOS 0.1.5 validation
 
 Validated on November 3, 2026, on Apple Silicon (arm64), macOS 27.0, AppleClang 21, Qt 6.11.2, Homebrew libarchive 3.8.8, and libssh 0.12.1.
 
-`./packaging/macos/build.sh` builds and runs CTest before bundling. The final CTest run passed all seven executables (168 QtTest passes, 5 explicit skips, zero failures):
+`./packaging/macos/build.sh` builds and runs CTest before bundling. The final CTest run passed all seven executables (171 QtTest passes, 5 explicit skips, zero failures):
 
 | Executable | Passes | Skips | Main coverage |
 | --- | ---: | ---: | --- |
@@ -10,8 +10,8 @@ Validated on November 3, 2026, on Apple Silicon (arm64), macOS 27.0, AppleClang 
 | test_config | 14 | 0 | Native preference migration in a fresh process, INI types and Unicode paths, existing-profile preservation, repeated atomic replacement, removed keys, independent key writes, cloud lock copies, temporary unavailability and queued writes, malformed input, stale settings scopes, local selector/environment precedence, bookmark retry and merge |
 | test_macsmb | 14 | 0 | Share/subfolder planning, Unicode/encoded spaces/credentials, traversal rejection, server/share/account/port matching, mount reuse, native completion routing, already-mounted results, invalid mount paths, cancellation/errors/timeouts/owner destruction, clean recents, stale panel navigation and safe unmount rejection |
 | test_macos | 3 | 0 | Temporary APFS disk image, actual cross-volume move, extended attributes, full-disk failed overwrite retaining both originals, temporary-file cleanup |
-| test_core | 54 | 3 | Listing, copy/move/delete, interrupted overwrite, symlink descendant guard, exclusive rename over files/broken links, Unicode and metadata, directory attributes, archive read/write/update and traversal checks, rename/swap, checksums, duplicate/usage scans, Trash undo, search, compare, queues, localhost SFTP upload/download/reconnect |
-| test_ui | 56 | 2 | Two-panel navigation and updates, F-key operations and prompts, cursor placement, tabs, rename/undo, bulk rename, editor integration, archive operations, permissions, preview and SFTP panels; Lynx navigation, live appearance/scale/dimming settings, cursor and marks during delayed refresh; live configuration reload without panel navigation |
+| test_core | 56 | 3 | Listing, copy/move/delete, interrupted overwrite, symlink descendant guard, exclusive rename over files/broken links, Unicode and metadata, directory attributes, archive read/write/update and traversal checks, rename/swap, checksums, duplicate/usage scans, Trash undo, search, compare, queues, localhost SFTP upload/download/reconnect |
+| test_ui | 57 | 2 | Two-panel navigation and updates, F-key operations and prompts, cursor placement, tabs, rename/undo, bulk rename, editor integration, archive operations, permissions, preview and SFTP panels; Lynx navigation, live appearance/scale/dimming settings, cursor and marks during delayed refresh; live configuration reload without panel navigation |
 | test_viewer | 18 | 0 | Text/hex, images, search, large files, media, fonts, metadata and close behavior; live large-text/hex scaling preserving local zoom |
 
 Counts include QtTest initialization and cleanup functions. UI/viewer automation uses Qt's offscreen backend. Syntax highlighting is optional and was absent: plain text behavior was asserted. SFTP tests launch a private sshd with temporary keys, rather than contacting an external server. GNU-only remote permissions/account and `find -printf` assertions are excluded for the local BSD server; protocol traversal is exercised instead.
@@ -29,3 +29,5 @@ For 0.1.2, all five CTest executables passed in one release run (about 48 second
 For 0.1.3, the rule editor was automated through add, edit, remove, ordering, enabling/disabling and persistence. Native Cocoa tests passed the editor and live shared-profile color reload. Color rules use filename metadata only; color matching does not read file contents. The local package was also smoke-tested with custom rules in both light and dark themes.
 
 For 0.1.4 all seven CTest executables passed in one run (about 50 seconds). A separate native Cocoa read-only probe used actual NetFS remount metadata and successfully reused the mounted media share. The probe never mounted, authenticated, unmounted, or wrote to a NAS. New-login outcomes are covered through controlled native-call fixtures rather than a live credential dialog/server. Tests did not disconnect any user volume.
+
+For 0.1.5, temporary-file tests compare creation dates to filesystem birth metadata, set a known macOS Date Added through `setattrlist`, verify its display source and subsequent restat updates, and check ascending/descending sorting with unknown values last and folders/parent first. UI tests exercise both date sort menu commands, heading labels, blank missing dates and column-state restoration; the date UI test also passes with native Cocoa. Mock server test cleanup now waits for outstanding polling work before unregistering its backend. Actual NAS creation/added-date availability is filesystem/server dependent and was not asserted.

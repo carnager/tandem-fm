@@ -86,6 +86,12 @@ QVariant FileModel::data(const QModelIndex& index, int role) const
             if (e->isParent || e->mtime == 0)
                 return QString();
             return QDateTime::fromSecsSinceEpoch(e->mtime).toString(QStringLiteral("yyyy-MM-dd HH:mm"));
+        case ColCreated:
+        case ColAdded: {
+            const auto& date = index.column() == ColCreated ? e->createdTime : e->addedTime;
+            return e->isParent || !date ? QString() :
+                QDateTime::fromSecsSinceEpoch(*date).toString(QStringLiteral("yyyy-MM-dd HH:mm"));
+        }
         case ColAttr:
             return e->isParent ? QString() : modeString(e->mode);
         }
@@ -114,6 +120,12 @@ QVariant FileModel::headerData(int section, Qt::Orientation orientation, int rol
 {
     if (orientation != Qt::Horizontal)
         return {};
+    if (role == Qt::ToolTipRole) {
+        if (section == ColCreated)
+            return tr("Filesystem creation date. Blank when unavailable; unknown dates sort last.");
+        if (section == ColAdded)
+            return tr("Date added to this folder, as recorded by macOS. Blank when unavailable; unknown dates sort last.");
+    }
     if (role == Qt::DisplayRole) {
         switch (section) {
         case ColName: return tr("Name");
@@ -121,6 +133,8 @@ QVariant FileModel::headerData(int section, Qt::Orientation orientation, int rol
         case ColSize: return tr("Size");
         case ColTime: return tr("Modified");
         case ColAttr: return tr("Attributes");
+        case ColCreated: return tr("Date Created");
+        case ColAdded: return tr("Date Added");
         }
     }
     if (role == Qt::TextAlignmentRole)

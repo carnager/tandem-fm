@@ -12,6 +12,10 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <sys/attr.h>
+#include <cstring>
+#endif
 
 namespace tandem {
 
@@ -26,6 +30,26 @@ bool fillEntry(int dirfd, const char* name, FileEntry& e)
     e.mode = st.st_mode;
     e.size = st.st_size;
     e.mtime = st.st_mtime;
+    // lstat semantics: a symlink's dates belong to the link itself.
+    if (st.st_birthtimespec.tv_sec != 0 || st.st_birthtimespec.tv_nsec != 0)
+        e.createdTime = st.st_birthtimespec.tv_sec;
+    struct attrlist attrs{};
+    attrs.bitmapcount = ATTR_BIT_MAP_COUNT;
+    attrs.commonattr = ATTR_CMN_RETURNED_ATTRS | ATTR_CMN_ADDEDTIME;
+    // Attribute buffers are packed to 4-byte boundaries, not timespec alignment.
+    char buffer[sizeof(uint32_t) + sizeof(attribute_set_t) + sizeof(timespec)]{};
+    if (::getattrlistat(dirfd, name, &attrs, buffer, sizeof(buffer), FSOPT_NOFOLLOW) == 0) {
+        uint32_t length;
+        attribute_set_t returned;
+        std::memcpy(&length, buffer, sizeof(length));
+        std::memcpy(&returned, buffer + sizeof(length), sizeof(returned));
+        if (length >= sizeof(buffer) && (returned.commonattr & ATTR_CMN_ADDEDTIME)) {
+            timespec added;
+            std::memcpy(&added, buffer + sizeof(length) + sizeof(returned), sizeof(added));
+            if (added.tv_sec != 0 || added.tv_nsec != 0)
+                e.addedTime = added.tv_sec;
+        }
+    }
     e.uid = st.st_uid;
     e.gid = st.st_gid;
     e.isLink = S_ISLNK(st.st_mode);
@@ -45,7 +69,7 @@ bool fillEntry(int dirfd, const char* name, FileEntry& e)
     return true;
 }
 #else
-constexpr unsigned kStatMask = STATX_TYPE | STATX_MODE | STATX_SIZE | STATX_MTIME | STATX_UID | STATX_GID;
+constexpr unsigned kStatMask = STATX_TYPE | STATX_MODE | STATX_SIZE | STATX_MTIME | STATX_BTIME | STATX_UID | STATX_GID;
 
 // AT_STATX_DONT_SYNC: on network filesystems use cached attributes instead of
 // a server round trip per file. Listings stay fast on NFS/SMB.
@@ -57,6 +81,8 @@ bool fillEntry(int dirfd, const char* name, FileEntry& e)
     e.mode = sx.stx_mode;
     e.size = int64_t(sx.stx_size);
     e.mtime = sx.stx_mtime.tv_sec;
+    if (sx.stx_mask & STATX_BTIME)
+        e.createdTime = sx.stx_btime.tv_sec;
     e.uid = sx.stx_uid;
     e.gid = sx.stx_gid;
     if (S_ISLNK(sx.stx_mode)) {

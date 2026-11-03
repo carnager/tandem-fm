@@ -29,7 +29,7 @@ int main(int argc, char** argv)
     QApplication::setApplicationName(QStringLiteral("tandem-fm"));
     QApplication::setOrganizationName(QStringLiteral("tandem-fm"));
     QApplication::setApplicationDisplayName(QStringLiteral("Tandem"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.4"));
+    QApplication::setApplicationVersion(QStringLiteral("0.1.5"));
     QGuiApplication::setDesktopFileName(QStringLiteral("tandem-fm"));
 
     QCommandLineParser parser;

@@ -17,7 +17,7 @@ namespace tandem {
 class FileModel : public QAbstractTableModel {
     Q_OBJECT
 public:
-    enum Column { ColName, ColExt, ColSize, ColTime, ColAttr, ColCount };
+    enum Column { ColName, ColExt, ColSize, ColTime, ColAttr, ColCreated, ColAdded, ColCount };
 
     struct Stats {
         int files = 0, dirs = 0;

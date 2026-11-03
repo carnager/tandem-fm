@@ -8,7 +8,7 @@
 
 namespace tandem {
 
-enum class SortColumn : uint8_t { Name = 0, Ext = 1, Size = 2, Time = 3, Attr = 4 };
+enum class SortColumn : uint8_t { Name = 0, Ext = 1, Size = 2, Time = 3, Attr = 4, Created = 5, Added = 6 };
 
 struct SortSpec {
     SortColumn column = SortColumn::Name;

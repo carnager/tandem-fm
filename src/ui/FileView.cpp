@@ -88,14 +88,14 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
         }
     }
 
-    QFont f = (col == FileModel::ColSize || col == FileModel::ColTime) ? t.numberFont : t.listFont;
+    QFont f = (col == FileModel::ColSize || col == FileModel::ColTime || col == FileModel::ColCreated || col == FileModel::ColAdded) ? t.numberFont : t.listFont;
     if (e->isDir && col == FileModel::ColName)
         f.setWeight(QFont::DemiBold);
     if (e->marked)
         f.setWeight(QFont::Bold);
     p->setFont(f);
     // Secondary columns are dimmed so names stand out; marks keep their color.
-    const bool secondary = col == FileModel::ColTime || col == FileModel::ColAttr ||
+    const bool secondary = col == FileModel::ColCreated || col == FileModel::ColAdded || col == FileModel::ColTime || col == FileModel::ColAttr ||
                            (col == FileModel::ColSize && e->isDir);
     if (secondary && !e->marked)
         fg = t.dimText;
@@ -604,7 +604,7 @@ void FileView::fitColumns()
         return viewport()->width() - others;
     };
     constexpr int kMinName = 210;
-    for (int col : {int(FileModel::ColAttr), int(FileModel::ColTime)}) {
+    for (int col : {int(FileModel::ColAttr), int(FileModel::ColTime), int(FileModel::ColAdded), int(FileModel::ColCreated)}) {
         if (nameRoom() >= kMinName)
             break;
         if (!h->isSectionHidden(col)) {
