@@ -479,6 +479,8 @@ void MainWindow::createMenus()
     }
     QMenu* icons = view->addMenu(tr("Icon theme"));
     connect(icons, &QMenu::aboutToShow, this, [this, icons] { populateIconThemeMenu(icons); });
+    addCommand(view, QT_TR_NOOP("Thumbnails (for this folder)"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_F1)},
+               [this] { active()->toggleThumbnails(); });
     addCommand(view, QT_TR_NOOP("Preview"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
     addCommand(view, QT_TR_NOOP("Preview: details instead of content"), {K(Qt::CTRL | Qt::Key_I)}, [this] {
         const bool on = !QSettings().value(QStringLiteral("preview/info"), false).toBool();

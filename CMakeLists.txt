@@ -70,6 +70,8 @@ add_library(tandem_ui STATIC
   src/ui/ShortcutsDialog.h src/ui/ShortcutsDialog.cpp
   src/ui/SettingsDialog.h src/ui/SettingsDialog.cpp
   src/ui/TrashDialog.h src/ui/TrashDialog.cpp
+  src/ui/Thumbnails.h src/ui/Thumbnails.cpp
+  src/ui/ThumbGrid.h src/ui/ThumbGrid.cpp
   src/ui/Network.h src/ui/Network.cpp
   src/ui/AuthDialogs.h src/ui/AuthDialogs.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp

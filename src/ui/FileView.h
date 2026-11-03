@@ -7,6 +7,7 @@
 namespace tandem {
 
 class FileModel;
+class ThumbGrid;
 
 class FileDelegate : public QStyledItemDelegate {
     Q_OBJECT
@@ -36,6 +37,10 @@ public:
     QByteArray userHeaderState();
     void fitColumns();
     void setCurrentRow(int row, bool center = false);
+    // Thumbnails in a grid instead of the detailed list.
+    void setThumbnails(bool on);
+    bool thumbnails() const;
+    ThumbGrid* thumbGrid() const { return m_grid; }
 
 signals:
     void openRequested();               // Enter, double click
@@ -76,6 +81,7 @@ protected:
     void resizeEvent(QResizeEvent* e) override;
 
 private:
+    friend class ThumbGrid;
     void moveCursorBy(int delta);
     QString dropTargetFor(const QPoint& pos, int* row) const;
     void startFileDrag();
@@ -88,6 +94,7 @@ private:
     bool m_vim = false;
     QList<int> m_autoHidden;  // columns hidden because the panel is narrow
     qint64 m_lastG = 0;  // for "gg"
+    ThumbGrid* m_grid = nullptr;
 };
 
 }  // namespace tandem

@@ -1,5 +1,7 @@
 #include "ui/FileView.h"
 
+#include "ui/ThumbGrid.h"
+
 #include "core/Sorting.h"
 #include "ui/FileModel.h"
 #include "ui/Theme.h"
@@ -203,6 +205,26 @@ void FileView::setCurrentRow(int row, bool center)
     scrollTo(idx, center ? QAbstractItemView::PositionAtCenter : QAbstractItemView::EnsureVisible);
 }
 
+void FileView::setThumbnails(bool on)
+{
+    if (on == thumbnails())
+        return;
+    if (on && !m_grid)
+        m_grid = new ThumbGrid(this);
+    if (m_grid) {
+        m_grid->setGeometry(viewport()->rect());
+        m_grid->setVisible(on);
+        if (on)
+            m_grid->ensureVisible(currentRow());
+    }
+    setHeaderHidden(on);  // columns mean nothing in a grid
+}
+
+bool FileView::thumbnails() const
+{
+    return m_grid && m_grid->isVisible();
+}
+
 void FileView::moveCursorBy(int delta)
 {
     setCurrentRow(currentRow() + delta);
@@ -234,6 +256,29 @@ void FileView::keyPressEvent(QKeyEvent* e)
     const bool keypad = e->modifiers() & Qt::KeypadModifier;
     const Qt::KeyboardModifiers mods = e->modifiers() & ~Qt::KeypadModifier;
     FileModel* m = fileModel();
+
+    if (thumbnails() && !(mods & (Qt::ControlModifier | Qt::AltModifier))) {
+        // In the grid the arrows go sideways too; up and down a whole row.
+        const int cols = m_grid->columns();
+        int step = 0;
+        switch (e->key()) {
+        case Qt::Key_Left: step = -1; break;
+        case Qt::Key_Right: step = 1; break;
+        case Qt::Key_Up: step = -cols; break;
+        case Qt::Key_Down: step = cols; break;
+        case Qt::Key_PageUp: step = -cols * m_grid->visibleRows(); break;
+        case Qt::Key_PageDown: step = cols * m_grid->visibleRows(); break;
+        case Qt::Key_Home: setCurrentRow(0); return;
+        case Qt::Key_End: setCurrentRow(model() ? model()->rowCount() - 1 : 0); return;
+        default: break;
+        }
+        if (step) {
+            if ((mods & Qt::ShiftModifier) && m)
+                m->toggleMarked(currentRow());
+            moveCursorBy(step);
+            return;
+        }
+    }
 
     switch (e->key()) {
     case Qt::Key_Return:
@@ -532,6 +577,8 @@ void FileView::dropEvent(QDropEvent* e)
 void FileView::currentChanged(const QModelIndex& current, const QModelIndex& previous)
 {
     QTreeView::currentChanged(current, previous);
+    if (m_grid && m_grid->isVisible())
+        m_grid->ensureVisible(current.row());
     if (current.row() != previous.row())
         emit cursorMoved();
 }

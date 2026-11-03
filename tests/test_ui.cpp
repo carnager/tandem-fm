@@ -18,6 +18,7 @@
 #include "ui/viewer/ImageView.h"
 #include "ui/viewer/ViewerWindow.h"
 #include "ui/FileView.h"
+#include "ui/ThumbGrid.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/KeyChordPopup.h"
 #include "ui/IconCache.h"
@@ -942,6 +943,58 @@ private slots:
             QTRY_COMPARE(readPermissions(L("pe/doc.txt")).acl.size(), 1);
             QCOMPARE(readPermissions(L("pe/doc.txt")).acl[0].perms, uint32_t(PermRead));
         }
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // Ctrl+Shift+F1: thumbnails in a grid, remembered for the folder.
+    void thumbnailGrid()
+    {
+        QVERIFY(QDir().mkpath(L("photos/inner")));
+        const QList<QColor> colors = {Qt::red, Qt::green, Qt::blue, Qt::yellow, Qt::magenta, Qt::cyan};
+        for (int i = 0; i < colors.size(); ++i) {
+            QImage img(400, 300, QImage::Format_RGB32);
+            img.fill(colors[i]);
+            QVERIFY(img.save(L(QString("photos/p%1.jpg").arg(i)), "JPG"));
+        }
+        writeFile(L("photos/notes.txt"), "text");
+        m_left->navigate(L("photos"));
+        QTRY_COMPARE(leftModel()->path(), L("photos"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        QVERIFY(!m_left->view()->thumbnails());
+        QTest::keyClick(m_left->view(), Qt::Key_F1, Qt::ControlModifier | Qt::ShiftModifier);
+        QVERIFY(m_left->view()->thumbnails());
+        ThumbGrid* grid = m_left->view()->thumbGrid();
+        QTRY_VERIFY(grid->isVisible());
+
+        // The pictures show up (made in the background).
+        auto colorIn = [&](int row) {
+            const QImage shot = grid->grab().toImage();
+            const QRect r = grid->cellRect(row);
+            return shot.pixelColor(r.left() + 8 + grid->cellSize() / 2, r.top() + 8 + grid->cellSize() / 2);
+        };
+        const int p2 = leftModel()->rowOf("p2.jpg");
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(colorIn(p2).blue() - 255) < 40 && colorIn(p2).red() < 60, 10000);
+
+        // Arrows: sideways one, up/down a row.
+        m_left->view()->setCurrentRow(0);
+        QTest::keyClick(m_left->view(), Qt::Key_Right);
+        QCOMPARE(m_left->view()->currentRow(), 1);
+        QTest::keyClick(m_left->view(), Qt::Key_Down);
+        QCOMPARE(m_left->view()->currentRow(), qMin(1 + grid->columns(), leftModel()->count() - 1));
+
+        // Another folder is a list again; coming back brings the grid back.
+        moveCursorTo(m_left, "inner");
+        QTest::keyClick(m_left->view(), Qt::Key_Return);
+        QTRY_COMPARE(leftModel()->path(), L("photos/inner"));
+        QTRY_VERIFY(!m_left->view()->thumbnails());
+        QTest::keyClick(m_left->view(), Qt::Key_Backspace);
+        QTRY_COMPARE(leftModel()->path(), L("photos"));
+        QTRY_VERIFY(m_left->view()->thumbnails());
+        QTest::keyClick(m_left->view(), Qt::Key_F1, Qt::ControlModifier | Qt::ShiftModifier);  // off again
+        QVERIFY(!m_left->view()->thumbnails());
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
     }

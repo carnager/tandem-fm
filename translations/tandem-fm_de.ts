@@ -850,6 +850,10 @@
         <translation>Berechtigungen, zusätzliche Personen und Gruppen (ACLs), Flags</translation>
     </message>
     <message>
+        <source>Create a link (symbolic, relative or hard)</source>
+        <translation>Verknüpfung erstellen (symbolisch, relativ oder hart)</translation>
+    </message>
+    <message>
         <source>Copy, cut, paste (works with other apps)</source>
         <translation>Kopieren, ausschneiden, einfügen (auch mit anderen Programmen)</translation>
     </message>
@@ -910,6 +914,10 @@
         <translation>Versteckte Dateien zeigen</translation>
     </message>
     <message>
+        <source>Thumbnails for this folder (Ctrl+wheel: bigger, smaller)</source>
+        <translation>Vorschaubilder für diesen Ordner (Strg+Mausrad: größer, kleiner)</translation>
+    </message>
+    <message>
         <source>Sort by name / extension / date / size</source>
         <translation>Nach Name / Endung / Datum / Größe sortieren</translation>
     </message>
@@ -960,6 +968,10 @@
     <message>
         <source>These shortcuts</source>
         <translation>Diese Tastenkürzel</translation>
+    </message>
+    <message>
+        <source>Settings: look, tools, keys</source>
+        <translation>Einstellungen: Aussehen, Werkzeuge, Tasten</translation>
     </message>
     <message>
         <source>Quit</source>
@@ -1844,6 +1856,10 @@
     <message>
         <source>Connect to server…</source>
         <translation>Mit Server verbinden…</translation>
+    </message>
+    <message>
+        <source>Thumbnails (for this folder)</source>
+        <translation>Vorschaubilder (für diesen Ordner)</translation>
     </message>
     <message>
         <source>Preview: details instead of content</source>

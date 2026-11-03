@@ -35,6 +35,7 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QTabBar>
+#include <QSettings>
 #include <QTimer>
 #include <QToolButton>
 #include <QUrl>
@@ -533,6 +534,7 @@ void Panel::showTab(int index)
 
     QItemSelectionModel* oldSel = m_view->selectionModel();
     m_view->setModel(t->model());
+    applyViewMode();
     delete oldSel;
     if (m_headerState.isEmpty())
         applyDefaultColumns();
@@ -572,6 +574,7 @@ void Panel::onListingReady(DirTab* t, const QString& focus)
         t->savedScroll = 0;
         return;
     }
+    applyViewMode();
     m_filterBar->setVisible(!t->model()->filter().isEmpty());
     const bool sameFolder = t->model()->path() == m_pathBeforeReset;
     int row = focus.isEmpty() ? 0 : t->model()->rowOf(focus);
@@ -1138,6 +1141,33 @@ void Panel::clearFilter()
 void Panel::focusPathEdit()
 {
     m_pathBar->startEditing();
+}
+
+// Thumbnails are remembered per folder (turned on in ~/Pictures, they're
+// there whenever ~/Pictures is open).
+static QStringList thumbnailFolders()
+{
+    return QSettings().value(QStringLiteral("view/thumbnailFolders")).toStringList();
+}
+
+void Panel::applyViewMode()
+{
+    DirTab* t = tab();
+    m_view->setThumbnails(t && !t->isSearch() && thumbnailFolders().contains(t->path()));
+}
+
+void Panel::toggleThumbnails()
+{
+    DirTab* t = tab();
+    if (!t)
+        return;
+    QStringList folders = thumbnailFolders();
+    if (folders.contains(t->path()))
+        folders.removeAll(t->path());
+    else
+        folders.prepend(t->path());
+    QSettings().setValue(QStringLiteral("view/thumbnailFolders"), folders.mid(0, 500));
+    applyViewMode();
 }
 
 void Panel::showMountMenu()

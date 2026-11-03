@@ -86,6 +86,8 @@ public:
     void clearFilter();
     void showMountMenu();
     void showLocations();
+    void toggleThumbnails();  // remembered for this folder
+    void applyViewMode();
     QList<PopupItem> locationItems();
     // sftp://…, smb://…, user@host:path, …: mount through GVfs, then open.
     void connectTo(const QString& uri);
