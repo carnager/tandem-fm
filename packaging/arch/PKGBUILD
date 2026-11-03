@@ -1,13 +1,11 @@
-# Builds Tandem from this checkout: `cd packaging/arch && makepkg -si`.
-# For the AUR, point source at the published repository instead.
+# Builds the latest commit from GitHub: `cd packaging/arch && makepkg -si`.
 pkgname=tandem-fm-git
-pkgver=r55.780b8a5
+pkgver=r59.e62be21
 pkgrel=1
 pkgdesc="Fast two-panel file manager in the spirit of Total Commander (Qt 6)"
 arch=('x86_64' 'aarch64')
-# url=: the published repository, once there is one
-# license: not chosen yet; set it here (and add a LICENSE file) before publishing
-license=('LicenseRef-unset')
+url="https://github.com/carnager/tandem-fm"
+license=('GPL-3.0-or-later')
 depends=('qt6-base' 'qt6-svg' 'qt6-webengine' 'libarchive' 'hicolor-icon-theme')
 makedepends=('cmake' 'ninja' 'git' 'qt6-tools' 'libssh' 'smbclient' 'libsecret' 'acl' 'glib2' 'syntax-highlighting')
 optdepends=('libssh: built-in SFTP (needed if it was there at build time)'
@@ -23,16 +21,16 @@ optdepends=('libssh: built-in SFTP (needed if it was there at build time)'
             'meld: comparing two files from the sync dialog')
 provides=('tandem-fm')
 conflicts=('tandem-fm')
-
-_src="$startdir/../.."
+source=("tandem-fm::git+https://github.com/carnager/tandem-fm.git")
+sha256sums=('SKIP')
 
 pkgver() {
-  cd "$_src"
+  cd tandem-fm
   printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 }
 
 build() {
-  cmake -S "$_src" -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+  cmake -S tandem-fm -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
   cmake --build build
 }
 

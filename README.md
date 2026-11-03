@@ -227,3 +227,7 @@ bench/      tandem-bench
 2. ✅ Built-in viewer (F3) · ✅ archives as folders (libarchive), writable · ✅ multi-rename with templates, ✅ compare/sync folders
 3. Network backends (SFTP, SMB, WebDAV, S3), connection manager, button bar, command line
 4. Plugins, themes, configurable keys
+
+## License
+
+GPL-3.0-or-later; see [LICENSE](LICENSE).

@@ -1,32 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Tandem — two folders, two directions</title>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#4f86f7"/>
-      <stop offset="1" stop-color="#2b55c9"/>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#303b52"/>
+      <stop offset="1" stop-color="#192235"/>
     </linearGradient>
-    <linearGradient id="arrow" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffc56b"/>
-      <stop offset="1" stop-color="#ff9a3d"/>
+    <linearGradient id="blue" x1="0" y1="0" x2="0.7" y2="1">
+      <stop stop-color="#8bb8ff"/>
+      <stop offset="1" stop-color="#4f87f1"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="1" y1="0" x2="0.2" y2="1">
+      <stop stop-color="#ffd18a"/>
+      <stop offset="1" stop-color="#f5a342"/>
     </linearGradient>
   </defs>
-  <rect x="12" y="12" width="232" height="232" rx="56" fill="url(#bg)"/>
-  <!-- the two panels -->
-  <rect x="40" y="52" width="82" height="152" rx="14" fill="#ffffff"/>
-  <rect x="134" y="52" width="82" height="152" rx="14" fill="#ffffff" fill-opacity="0.72"/>
-  <!-- rows of files -->
-  <g fill="#2b55c9" fill-opacity="0.85">
-    <rect x="54" y="72" width="54" height="10" rx="5"/>
-    <rect x="54" y="94" width="40" height="10" rx="5"/>
-    <rect x="54" y="116" width="48" height="10" rx="5"/>
-    <rect x="54" y="138" width="34" height="10" rx="5"/>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#tile)"/>
+  <path d="M54 56H82Q89 56 94 63L104 76H120V188Q120 200 108 200H54Q40 200 40 186V70Q40 56 54 56Z" fill="url(#blue)"/>
+  <path d="M202 56H174Q167 56 162 63L152 76H136V188Q136 200 148 200H202Q216 200 216 186V70Q216 56 202 56Z" fill="url(#amber)"/>
+  <g fill="none" stroke="#fff9ef" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M81 116H175L159 100"/>
+    <path d="M175 156H81L97 172"/>
   </g>
-  <g fill="#2b55c9" fill-opacity="0.45">
-    <rect x="148" y="72" width="44" height="10" rx="5"/>
-    <rect x="148" y="94" width="54" height="10" rx="5"/>
-    <rect x="148" y="116" width="36" height="10" rx="5"/>
-  </g>
-  <!-- the transfer between them -->
-  <circle cx="128" cy="176" r="34" fill="url(#arrow)" stroke="#2b55c9" stroke-width="6"/>
-  <path d="M110 176 H142 M130 162 L144 176 L130 190" fill="none" stroke="#ffffff" stroke-width="9"
-        stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

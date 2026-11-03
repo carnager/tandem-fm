@@ -201,3 +201,7 @@ set_tests_properties(test_viewer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscre
 install(TARGETS tandem-fm RUNTIME DESTINATION bin)
 install(FILES tandem-fm.desktop DESTINATION share/applications)
 install(FILES data/tandem-fm.svg DESTINATION share/icons/hicolor/scalable/apps)
+foreach(size 32 48 256)
+  install(FILES data/icons/${size}x${size}/tandem-fm.png DESTINATION share/icons/hicolor/${size}x${size}/apps)
+endforeach()
+install(FILES LICENSE DESTINATION share/licenses/tandem-fm)
