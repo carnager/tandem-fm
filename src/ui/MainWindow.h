@@ -34,6 +34,7 @@ public:
     explicit MainWindow(const QStringList& startPaths);
 
 protected:
+    bool eventFilter(QObject* obj, QEvent* e) override;
     void closeEvent(QCloseEvent* e) override;
 
 private:
@@ -65,6 +66,8 @@ private:
     void openTerminal(const QString& dir = {});
     void pasteInto(const QString& dir);
     bool refuseInArchive(Panel* p);
+    Panel* previewOwner(QWidget* w) const;
+    void returnFocusFromPreview(QWidget* w);
     // Archive changes run as one rewrite job. false (with a message) when the
     // archive's format can't be written.
     bool changeArchive(Panel* p, ArchiveChanges changes, const QString& title);

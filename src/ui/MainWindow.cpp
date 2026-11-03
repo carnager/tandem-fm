@@ -208,6 +208,21 @@ MainWindow::MainWindow(const QStringList& startPaths)
             pushUndo({UndoEntry::Kind::Rename, tr("rename of %1").arg(from), dir, {{to, from}}});
         });
     }
+    // Previews are for looking, not typing: a click in one hands the keys
+    // back to the list it belongs to (and makes that panel the active one).
+    connect(qApp, &QApplication::focusChanged, this, [this](QWidget*, QWidget* now) {
+        returnFocusFromPreview(now);
+        // Focus lost to nothing (a popup closed by a click on a label, say):
+        // the keys go back to the active list rather than nowhere.
+        if (!now || now == this)
+            QTimer::singleShot(0, this, [this] {
+                QWidget* f = QApplication::focusWidget();
+                if (isActiveWindow() && !QApplication::activeModalWidget() && !QApplication::activePopupWidget() &&
+                    (!f || f == this))
+                    active()->view()->setFocus();
+            });
+    });
+    qApp->installEventFilter(this);  // clicks on a preview's non-focusable parts too
     // Directories without inotify (some FUSE/network mounts) need a manual
     // refresh once an operation that touched them is done.
     connect(m_jobs, &JobManager::jobFinished, this, [this](Job* job) {
@@ -496,6 +511,34 @@ QWidget* MainWindow::createFKeyBar()
         l->addWidget(b);
     }
     return bar;
+}
+
+// The panel a preview belongs to, if w is (inside) one.
+Panel* MainWindow::previewOwner(QWidget* w) const
+{
+    if (!w)
+        return nullptr;
+    if (m_quickView && (m_quickView == w || m_quickView->isAncestorOf(w)))
+        return m_quickView2 ? m_left : active();
+    if (m_quickView2 && (m_quickView2 == w || m_quickView2->isAncestorOf(w)))
+        return m_right;
+    return nullptr;
+}
+
+void MainWindow::returnFocusFromPreview(QWidget* w)
+{
+    if (Panel* owner = previewOwner(w))
+        QTimer::singleShot(0, owner->view(), [v = QPointer<QWidget>(owner->view())] {
+            if (v)
+                v->setFocus(Qt::MouseFocusReason);
+        });
+}
+
+bool MainWindow::eventFilter(QObject* obj, QEvent* e)
+{
+    if (e->type() == QEvent::MouseButtonPress && obj->isWidgetType() && (m_quickView || m_quickView2))
+        returnFocusFromPreview(static_cast<QWidget*>(obj));
+    return QMainWindow::eventFilter(obj, e);
 }
 
 // --------------------------------------------------------------- commands

@@ -893,6 +893,78 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // The keyboard always ends up back in a file list, and Esc closes things.
+    void focusStaysWithTheLists()
+    {
+        QVERIFY(QDir().mkpath(L("fx")));
+        for (const char* n : {"apple.txt", "banana.txt", "cherry.txt"})
+            writeFile(L(QString("fx/") + n), n);
+        m_left->navigate(L("fx"));
+        QTRY_COMPARE(leftModel()->path(), L("fx"));
+        m_right->navigate(R());
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "apple.txt");
+        auto focused = [] { return QApplication::focusWidget(); };
+
+        // A click into a preview gives the keys back to that panel's list.
+        QSettings().setValue("view/previewPosition", "each");
+        QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
+        ViewerWindow* left = nullptr;
+        ViewerWindow* right = nullptr;
+        QTRY_VERIFY((left = m_window->findChild<ViewerWindow*>("quickView")) != nullptr);
+        QTRY_VERIFY((right = m_window->findChild<ViewerWindow*>("quickViewRight")) != nullptr);
+        QTRY_COMPARE(left->textEdit()->toPlainText(), QString("apple.txt"));
+        QTest::mouseClick(left->textEdit()->viewport(), Qt::LeftButton, {}, QPoint(20, 10));
+        QTRY_COMPARE(focused(), static_cast<QWidget*>(m_left->view()));
+        QTest::keyClick(focused(), Qt::Key_Down);
+        QCOMPARE(m_left->currentName(), QString("banana.txt"));
+        QTest::mouseClick(right, Qt::LeftButton, {}, QPoint(30, 30));  // the other panel's preview
+        QTRY_COMPARE(focused(), static_cast<QWidget*>(m_right->view()));
+        QTRY_VERIFY(m_right->isActive());
+        QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
+        QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") == nullptr);
+        QSettings().setValue("view/preview", false);
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+
+        // Search bar: ↓ goes to the results, Esc there closes the bar.
+        m_left->startSearchBar();
+        auto* searchEdit = qobject_cast<QLineEdit*>(focused());
+        QVERIFY(searchEdit && searchEdit->isVisible());
+        QTest::keyClick(searchEdit, Qt::Key_Down);
+        QCOMPARE(focused(), static_cast<QWidget*>(m_left->view()));
+        QTest::keyClick(m_left->view(), Qt::Key_Escape);
+        QVERIFY(!searchEdit->isVisible());
+        QCOMPARE(focused(), static_cast<QWidget*>(m_left->view()));
+
+        // Filter: Enter back to the list, Esc there clears it.
+        m_left->startFilter();
+        QTest::keyClicks(focused(), "an");
+        QTRY_VERIFY(leftModel()->rowOf("apple.txt") < 0);
+        QTest::keyClick(focused(), Qt::Key_Return);
+        QCOMPARE(focused(), static_cast<QWidget*>(m_left->view()));
+        QTest::keyClick(m_left->view(), Qt::Key_Escape);
+        QTRY_VERIFY(leftModel()->rowOf("apple.txt") >= 0);
+        QCOMPARE(focused(), static_cast<QWidget*>(m_left->view()));
+
+        // Path bar and quick search: Esc returns to the list.
+        m_left->focusPathEdit();
+        QVERIFY(focused() != m_left->view());
+        QTest::keyClick(focused(), Qt::Key_Escape);
+        QTRY_COMPARE(focused(), static_cast<QWidget*>(m_left->view()));
+        QTest::keyClicks(m_left->view(), "ch");
+        QTRY_COMPARE(m_left->currentName(), QString("cherry.txt"));
+        QTest::keyClick(focused(), Qt::Key_Escape);
+        QTRY_COMPARE(focused(), static_cast<QWidget*>(m_left->view()));
+        QTest::keyClick(focused(), Qt::Key_Up);
+        QCOMPARE(m_left->currentName(), QString("banana.txt"));
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
     // Alt+F1: places, drives, servers in a drop-down that also takes a typed path.
     void locations()
     {

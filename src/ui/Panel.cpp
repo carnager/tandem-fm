@@ -264,7 +264,18 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_view, &FileView::openRequested, this, &Panel::openCurrent);
     connect(m_view, &FileView::parentRequested, this, &Panel::goUp);
     connect(m_view, &FileView::switchPanelRequested, this, &Panel::switchRequested);
-    connect(m_view, &FileView::escapePressed, this, &Panel::cancelLoading);
+    // Esc in the list closes one thing at a time, innermost first.
+    connect(m_view, &FileView::escapePressed, this, [this] {
+        DirTab* t = tab();
+        if (t && (t->isLoading() || t->isSearching()))
+            cancelLoading();  // stop what's running
+        else if (m_searchBar->isVisible())
+            m_searchBar->hide();
+        else if (t && !t->model()->filter().isEmpty())
+            clearFilter();
+        else if (t && t->isSearch())
+            cancelLoading();  // leave the results
+    });
     connect(m_view, &FileView::quickSearchRequested, this, &Panel::startQuickSearch);
     connect(m_view, &FileView::markGroupRequested, this, &Panel::markGroup);
     connect(m_view, &FileView::historyRequested, this, [this](int step) { step < 0 ? back() : forward(); });
@@ -1076,6 +1087,7 @@ void Panel::runSearch()
     spec.contents = m_searchContents->isChecked();
     spec.all = m_searchAll->isChecked();
     t->startSearch(spec);
+    m_searchBar->hide();  // the header chip shows the search; Alt+F7 brings the bar back, filled in
     m_view->setFocus();
 }
 
