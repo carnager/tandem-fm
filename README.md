@@ -47,6 +47,13 @@ if installed.
 
 Tests: `ctest --test-dir build`.
 
+## Settings in another folder
+
+`tandem-fm --config-dir ~/Dropbox/tandem` (or `TANDEM_CONFIG_DIR=…`) keeps the
+settings, bookmarks and folder history there instead of the usual places, as
+plain INI files on every platform: a synced folder shares them between
+computers. Changes from another computer apply at the next start.
+
 ## License
 
 GPL-3.0-or-later

@@ -1,5 +1,6 @@
 #include "core/FolderHistory.h"
 
+#include "core/ConfigDir.h"
 #include "core/Util.h"
 
 #include <QDateTime>
@@ -8,6 +9,7 @@
 #include <QFileInfo>
 #include <QSet>
 #include <QSaveFile>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QThread>
 
@@ -30,6 +32,8 @@ QString FolderHistory::storagePath() const
     QMutexLocker lock(&m_mutex);
     if (!m_storage.isEmpty())
         return m_storage;
+    if (!configDir().isEmpty())  // a chosen config folder keeps the history too
+        return QFileInfo(QSettings().fileName()).path() + QStringLiteral("/folders.tsv");
     return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/folders.tsv");
 }
 

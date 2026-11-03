@@ -15,6 +15,7 @@ qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES de)
 add_library(tandem_core STATIC
   src/core/FileEntry.h
   src/core/Util.h src/core/Util.cpp
+  src/core/ConfigDir.h src/core/ConfigDir.cpp
   src/core/Sorting.h src/core/Sorting.cpp
   src/core/DirLister.h src/core/DirLister.cpp
   src/core/DirWatcher.h src/core/DirWatcher.cpp

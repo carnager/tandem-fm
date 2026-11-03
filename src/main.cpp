@@ -1,4 +1,5 @@
 #include "core/Backend.h"
+#include "core/ConfigDir.h"
 #include "core/DirWatcher.h"
 #include "ui/AuthDialogs.h"
 #include "ui/Network.h"
@@ -18,6 +19,8 @@ int main(int argc, char** argv)
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("tandem-fm"));
     QApplication::setOrganizationName(QStringLiteral("tandem-fm"));
+    QStringList paths = app.arguments().mid(1);
+    tandem::setupConfigDir(paths);  // before anything reads settings
     QApplication::setApplicationDisplayName(QStringLiteral("Tandem"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
     QGuiApplication::setDesktopFileName(QStringLiteral("tandem-fm"));
@@ -41,7 +44,6 @@ int main(int argc, char** argv)
     tandem::installAuthDialogs();
     tandem::Network::instance().recentServers();  // drops passwords older versions stored
 
-    QStringList paths = app.arguments().mid(1);
     tandem::MainWindow w(paths);
     w.show();
 

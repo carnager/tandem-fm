@@ -1,5 +1,6 @@
 #include "core/Archive.h"
 #include "core/Backend.h"
+#include "core/ConfigDir.h"
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
 #include "core/FileOps.h"
@@ -24,6 +25,7 @@
 #include "core/Sorting.h"
 
 #include <QScopeGuard>
+#include <QSettings>
 #include <QDateTime>
 #include <QFile>
 #include <QElapsedTimer>
@@ -1730,6 +1732,30 @@ private slots:
         QVERIFY(!denied.errorText.isEmpty());
 
         setAuthHandler({});
+    }
+
+    // --config-dir: settings and folder history in one chosen folder, as INI.
+    void configDir()
+    {
+        QTemporaryDir tmp;
+        QStringList args = {"/some/path", "--config-dir", tmp.filePath("sync"), "other"};
+        setupConfigDir(args);
+        auto restore = qScopeGuard([] { useConfigDir(QString()); });
+        QCOMPARE(args, QStringList({"/some/path", "other"}));
+        QCOMPARE(tandem::configDir(), tmp.filePath("sync"));
+        QSettings().setValue("test/key", 42);
+        const QString file = QSettings().fileName();  // sync/<organization>/<application>.ini
+        QVERIFY2(file.startsWith(tmp.filePath("sync/")) && file.endsWith(".ini"), qPrintable(file));
+        QSettings().sync();
+        QVERIFY(QFile::exists(file));
+        QCOMPARE(QSettings(file, QSettings::IniFormat).value("test/key").toInt(), 42);
+        FolderHistory::instance().setStoragePath(QString());  // an earlier test set its own
+        QCOMPARE(FolderHistory::instance().storagePath(), QFileInfo(file).path() + "/folders.tsv");
+
+        args = {"--config-dir=" + tmp.filePath("other")};
+        setupConfigDir(args);
+        QVERIFY(args.isEmpty());
+        QCOMPARE(tandem::configDir(), tmp.filePath("other"));
     }
 
     void helpers()
