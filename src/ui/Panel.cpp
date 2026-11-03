@@ -8,6 +8,7 @@
 #include "core/Mounts.h"
 #include "core/Remote.h"
 #include "core/Util.h"
+#include "core/Job.h"
 #include "ui/DirTab.h"
 #include "ui/ThumbGrid.h"
 #include "ui/FileModel.h"
@@ -31,6 +32,8 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QPainter>
+#include <QProgressBar>
+#include <QDateTime>
 #include <QPointer>
 #include <QSlider>
 #include <QProcess>
@@ -105,6 +108,41 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     hl->addWidget(m_branchLabel);
     hl->addWidget(m_freeLabel);
     layout->addWidget(m_header);
+
+    // A transfer into this folder shows here, where its files arrive.
+    m_transfer = new QFrame(this);
+    m_transfer->setObjectName(QStringLiteral("transfer"));
+    setThemeStyle(m_transfer, QStringLiteral(
+        "#transfer { background: @headerActive; border: 1px solid @control; border-radius: 10px; }"
+        "QProgressBar { background: @border; border: none; border-radius: 2px; }"
+        "QProgressBar::chunk { background: @accent; border-radius: 2px; }"));
+    auto* tl = new QVBoxLayout(m_transfer);
+    tl->setContentsMargins(12, 7, 6, 8);
+    tl->setSpacing(6);
+    auto* trow = new QHBoxLayout;
+    m_transferText = new QLabel(m_transfer);
+    m_transferText->setTextFormat(Qt::RichText);
+    m_transferText->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_transferPause = new QToolButton(m_transfer);
+    m_transferPause->setAutoRaise(true);
+    m_transferPause->setFocusPolicy(Qt::NoFocus);
+    connect(m_transferPause, &QToolButton::clicked, this, [this] {
+        if (m_transferJob)
+            m_transferJob->setPaused(!m_transferJob->snapshot().paused);
+    });
+    trow->addWidget(m_transferText, 1);
+    trow->addWidget(m_transferPause);
+    tl->addLayout(trow);
+    m_transferBar = new QProgressBar(m_transfer);
+    m_transferBar->setTextVisible(false);
+    m_transferBar->setFixedHeight(4);
+    m_transferBar->setRange(0, 1000);
+    tl->addWidget(m_transferBar);
+    m_transfer->hide();
+    auto* twrap = new QHBoxLayout;
+    twrap->setContentsMargins(8, 2, 8, 6);
+    twrap->addWidget(m_transfer);
+    layout->addLayout(twrap);
 
     m_view = new FileView(this);
     layout->addWidget(m_view, 1);
@@ -889,6 +927,51 @@ void Panel::markAll(bool on)
 {
     if (DirTab* t = tab())
         t->model()->markAll(on);
+}
+
+void Panel::showTransfer(Job* job, const QString& text)
+{
+    if (!job) {
+        m_transfer->hide();
+        m_transferJob = nullptr;
+        return;
+    }
+    const Job::Snapshot s = job->snapshot();
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (job != m_transferJob) {  // a new one: speed from scratch
+        m_transferJob = job;
+        m_transferBytes = s.bytesDone;
+        m_transferMs = now;
+        m_transferSpeed = 0;
+    } else if (now - m_transferMs >= 500) {
+        const double inst = double(s.bytesDone - m_transferBytes) * 1000.0 / double(now - m_transferMs);
+        m_transferSpeed = m_transferSpeed <= 0 ? inst : m_transferSpeed * 0.6 + inst * 0.4;
+        m_transferBytes = s.bytesDone;
+        m_transferMs = now;
+    }
+    QStringList how;
+    if (s.paused)
+        how << tr("paused");
+    else if (s.state == Job::State::Scanning || s.state == Job::State::Pending)
+        how << tr("counting…");
+    else if (s.state == Job::State::Queued)
+        how << tr("waiting for its drive");
+    if (!s.current.isEmpty())
+        how << baseName(s.current).toHtmlEscaped();
+    if (!s.paused && m_transferSpeed > 1 && s.bytesTotal > 0) {
+        how << formatSpeed(m_transferSpeed);
+        how << tr("%1 left").arg(formatDuration(int64_t(double(s.bytesTotal - s.bytesDone) / m_transferSpeed)));
+    }
+    m_transferText->setText(text + (how.isEmpty() ? QString()
+                                                   : QStringLiteral("&nbsp;&nbsp;<span style=\"color:%1\">%2</span>")
+                                                         .arg(theme().dimText.name(), how.join(QStringLiteral(" · ")))));
+    m_transferText->setToolTip(job->title());
+    const int permille = s.bytesTotal > 0 ? int(1000 * s.bytesDone / s.bytesTotal)
+                                          : (s.filesTotal > 0 ? int(1000 * s.filesDone / s.filesTotal) : 0);
+    m_transferBar->setValue(permille);
+    m_transferPause->setIcon(IconCache::themed(s.paused ? "media-playback-start" : "media-playback-pause"));
+    m_transferPause->setToolTip(s.paused ? tr("Resume") : tr("Pause"));
+    m_transfer->show();
 }
 
 void Panel::markNames(const QStringList& names)

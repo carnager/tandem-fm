@@ -40,6 +40,7 @@ public:
     int visualMode() const { return m_visual; }
     void setModel(QAbstractItemModel* model) override;
     // How much the panel that isn't active fades: 0 (not at all) to 1.
+    QString dropText() const { return m_dropText; }  // for tests
     static void setInactiveDim(double amount);
     static double inactiveDim();
     // Zoom of the file lists, in percent (both panels alike).
@@ -100,6 +101,7 @@ protected:
     void dragMoveEvent(QDragMoveEvent* e) override;
     void dragLeaveEvent(QDragLeaveEvent* e) override;
     void dropEvent(QDropEvent* e) override;
+    void paintEvent(QPaintEvent* e) override;
     void contextMenuEvent(QContextMenuEvent* e) override;
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
     void applyVisual();
@@ -114,6 +116,8 @@ private:
 
     bool m_active = false;
     int m_dropRow = -1;
+    QString m_dropText;  // while something is dragged over: what dropping would do
+    void updateDropText(const QMimeData* data, Qt::DropAction action, const QPoint& pos);
     QPoint m_pressPos;
     bool m_maybeDrag = false;
     bool m_vim = false;

@@ -3,12 +3,14 @@
 #include "ui/ThumbGrid.h"
 
 #include "core/Sorting.h"
+#include "core/Util.h"
 #include "ui/FileColors.h"
 #include "ui/FileModel.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
 #include <QDateTime>
+#include <QDir>
 #include <QDrag>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -782,11 +784,66 @@ void FileView::dragMoveEvent(QDragMoveEvent* e)
     else
         e->setDropAction(e->proposedAction());
     e->accept();
+    updateDropText(e->mimeData(), e->dropAction(), e->position().toPoint());
+}
+
+// "Copy 4 items into Projects": said before the drop, not after.
+void FileView::updateDropText(const QMimeData* data, Qt::DropAction action, const QPoint& pos)
+{
+    int row = -1;
+    QString target = dropTargetFor(pos, &row);
+    target = target == QDir::homePath() ? QStringLiteral("~") : baseName(target);
+    const QList<QUrl> urls = data ? data->urls() : QList<QUrl>{};
+    const QString what = urls.size() == 1 ? urls.first().fileName()
+                                          : plural(tr("%n item(s)", nullptr, int(urls.size())), urls.size());
+    QString text = action == Qt::MoveAction ? tr("Move %1 into %2") : action == Qt::LinkAction ? tr("Link %1 into %2")
+                                                                                              : tr("Copy %1 into %2");
+    text = text.arg(what, target);
+    if (text != m_dropText) {
+        m_dropText = text;
+        viewport()->update();
+    }
+}
+
+void FileView::paintEvent(QPaintEvent* e)
+{
+    QTreeView::paintEvent(e);
+    if (m_dropText.isEmpty())
+        return;
+    const Theme& t = theme();
+    QPainter p(viewport());
+    p.setRenderHint(QPainter::Antialiasing);
+    if (m_dropRow < 0) {  // into the folder itself: the whole list is the target
+        QPen dash(t.accent, 2, Qt::DashLine);
+        p.setPen(dash);
+        QColor fill = t.accent;
+        fill.setAlphaF(0.06);
+        p.setBrush(fill);
+        p.drawRoundedRect(QRectF(viewport()->rect()).adjusted(4, 4, -4, -4), 10, 10);
+    }
+    QFont bold = font();
+    bold.setWeight(QFont::DemiBold);
+    const QString hint = tr("Shift: move · Ctrl: copy");
+    const QFontMetrics bfm(bold), fm(font());
+    const int w = qMin(viewport()->width() - 24, qMax(bfm.horizontalAdvance(m_dropText), fm.horizontalAdvance(hint)) + 32);
+    const int h = bfm.height() + fm.height() + 20;
+    const QRectF pill((viewport()->width() - w) / 2.0, viewport()->height() - h - 16, w, h);
+    p.setPen(QPen(t.accent, 1));
+    p.setBrush(t.header);
+    p.drawRoundedRect(pill, 10, 10);
+    p.setFont(bold);
+    p.setPen(t.text);
+    p.drawText(pill.adjusted(12, 8, -12, -(fm.height() + 10)), Qt::AlignCenter,
+               bfm.elidedText(m_dropText, Qt::ElideMiddle, int(pill.width()) - 24));
+    p.setFont(font());
+    p.setPen(t.dimText);
+    p.drawText(pill.adjusted(12, bfm.height() + 10, -12, -8), Qt::AlignCenter, hint);
 }
 
 void FileView::dragLeaveEvent(QDragLeaveEvent* e)
 {
     m_dropRow = -1;
+    m_dropText.clear();
     viewport()->update();
     QTreeView::dragLeaveEvent(e);
 }
@@ -796,6 +853,7 @@ void FileView::dropEvent(QDropEvent* e)
     int row = -1;
     const QString target = dropTargetFor(e->position().toPoint(), &row);
     m_dropRow = -1;
+    m_dropText.clear();
     viewport()->update();
     if (!e->mimeData()->hasUrls() || target.isEmpty()) {
         e->ignore();

@@ -1825,6 +1825,29 @@
         <source>Sort by:  n name  ·  e extension  ·  m modified  ·  s size</source>
         <translation>Sortieren nach:  n Name  ·  e Endung  ·  m Änderung  ·  s Größe</translation>
     </message>
+    <message numerus="yes">
+        <source>%n item(s)</source>
+        <translation>
+            <numerusform>%n Element</numerusform>
+            <numerusform>%n Elemente</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Move %1 into %2</source>
+        <translation>%1 nach %2 verschieben</translation>
+    </message>
+    <message>
+        <source>Link %1 into %2</source>
+        <translation>%1 in %2 verknüpfen</translation>
+    </message>
+    <message>
+        <source>Copy %1 into %2</source>
+        <translation>%1 nach %2 kopieren</translation>
+    </message>
+    <message>
+        <source>Shift: move · Ctrl: copy</source>
+        <translation>Umschalt: verschieben · Strg: kopieren</translation>
+    </message>
 </context>
 <context>
     <name>tandem::FontPicker</name>
@@ -2415,6 +2438,18 @@
     <message>
         <source>New folder</source>
         <translation>Neuer Ordner</translation>
+    </message>
+    <message>
+        <source>Copying %1 here from %2</source>
+        <translation>%1 wird hierher kopiert aus %2</translation>
+    </message>
+    <message>
+        <source>Moving %1 here from %2</source>
+        <translation>%1 wird hierher verschoben aus %2</translation>
+    </message>
+    <message>
+        <source>Extracting %1 here</source>
+        <translation>%1 wird hier entpackt</translation>
     </message>
     <message numerus="yes">
         <source>%n folder(s)</source>
@@ -3403,6 +3438,30 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Patterns, separated by spaces or &apos;;&apos;. Add a trailing / for folders (e.g. build/):</source>
         <translation>Muster, getrennt durch Leerzeichen oder „;“. Ein abschließendes / steht für Ordner (z. B. build/):</translation>
+    </message>
+    <message>
+        <source>paused</source>
+        <translation>pausiert</translation>
+    </message>
+    <message>
+        <source>counting…</source>
+        <translation>wird gezählt …</translation>
+    </message>
+    <message>
+        <source>waiting for its drive</source>
+        <translation>wartet auf sein Laufwerk</translation>
+    </message>
+    <message>
+        <source>%1 left</source>
+        <translation>noch %1</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>Fortsetzen</translation>
+    </message>
+    <message>
+        <source>Pause</source>
+        <translation>Pausieren</translation>
     </message>
     <message>
         <source>A name cannot contain &apos;/&apos;</source>

@@ -56,6 +56,7 @@ private:
     QWidget* createFKeyBar();
     void scheduleFKeyUpdate();
     void updateFKeys();
+    void updateTransfers();
     void updateSelectionBars(const QString& target);
 
     void copyOrMove(CopyJob::Mode mode);
@@ -176,6 +177,7 @@ private:
     QMenu* m_pluginMenu = nullptr;
     QHash<QString, QAbstractButton*> m_fkeys;  // F3 … F8
     bool m_fkeyUpdatePending = false;
+    QTimer* m_transferTimer = nullptr;
     QList<UndoEntry> m_undo;
 };
 

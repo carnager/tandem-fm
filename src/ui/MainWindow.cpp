@@ -366,6 +366,14 @@ MainWindow::MainWindow(const QStringList& startPaths)
     connect(m_quickTimer, &QTimer::timeout, this, &MainWindow::updateQuickView);
     ioPool()->start([] { pruneExtractCache(); });
     loadPlugins();
+    // Transfers into a shown folder appear in that panel while they run.
+    m_transferTimer = new QTimer(this);
+    m_transferTimer->setInterval(400);
+    connect(m_transferTimer, &QTimer::timeout, this, &MainWindow::updateTransfers);
+    connect(m_jobs, &JobManager::jobAdded, this, [this] {
+        m_transferTimer->start();
+        updateTransfers();
+    });
     QPointer<MainWindow> self(this);
     ioPool()->start([self] {
         auto themes = std::make_shared<QList<IconTheme>>(scanIconThemes());
@@ -751,6 +759,42 @@ QWidget* MainWindow::createFKeyBar()
     connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, &MainWindow::scheduleFKeyUpdate);
     scheduleFKeyUpdate();
     return bar;
+}
+
+void MainWindow::updateTransfers()
+{
+    bool running = false;
+    for (Panel* p : {m_left, m_right}) {
+        const QString here = p->path();
+        Job* found = nullptr;
+        QString text;
+        for (Job* j : m_jobs->jobs()) {
+            if (j->isFinished())
+                continue;
+            running = true;
+            if (found)
+                continue;
+            if (auto* c = dynamic_cast<CopyJob*>(j)) {
+                const QString dest = c->destination();
+                if (dest.isEmpty() || (dest != here && parentPath(dest) != here))
+                    continue;
+                const QStringList src = c->sources();
+                const QString what = QStringLiteral("<b>%1</b>").arg(itemsSummary(src).toHtmlEscaped());
+                const QString from = src.isEmpty() ? QString() : tildePath(parentPath(src.first())).toHtmlEscaped();
+                text = (c->mode() == CopyJob::Mode::Copy ? tr("Copying %1 here from %2") : tr("Moving %1 here from %2"))
+                           .arg(what, from);
+                found = j;
+            } else if (auto* x = dynamic_cast<ExtractJob*>(j)) {
+                if (x->destination() != here)
+                    continue;
+                text = tr("Extracting %1 here").arg(QStringLiteral("<b>%1</b>").arg(baseName(x->archivePath()).toHtmlEscaped()));
+                found = j;
+            }
+        }
+        p->showTransfer(found, text);
+    }
+    if (!running)
+        m_transferTimer->stop();
 }
 
 void MainWindow::scheduleFKeyUpdate()

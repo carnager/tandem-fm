@@ -44,6 +44,7 @@
 #include <sys/stat.h>
 #include <QFontDatabase>
 #include <QMenuBar>
+#include <QMimeData>
 #include <QScrollBar>
 #include <QStyle>
 
@@ -642,6 +643,43 @@ private slots:
         QTRY_VERIFY(!bar->isVisible());
         QVERIFY(leftModel()->markedNames().isEmpty());
         QVERIFY(!m_right->selectionBar()->isVisible());  // only the active panel has one
+    }
+
+    // A transfer shows in the panel it goes to; a drag says what dropping would do.
+    void transfersWhereTheyHappen()
+    {
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("big.bin"), QByteArray(4 << 20, 'b'));
+        CopyJob job(CopyJob::Mode::Copy, {tmp.filePath("big.bin")}, R());
+        job.setPaused(true);
+        job.start();
+        QTRY_VERIFY(job.snapshot().paused);
+        m_right->showTransfer(&job, "Copying <b>big.bin</b> here from /tmp");
+        auto* strip = m_right->findChild<QFrame*>("transfer");
+        QVERIFY(strip && strip->isVisible());
+        QVERIFY(strip->findChild<QLabel*>()->text().contains("paused"));
+        m_right->showTransfer(nullptr, {});
+        QVERIFY(!strip->isVisible());
+        job.cancel();
+        QTRY_VERIFY(job.isFinished());
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QMimeData data;
+        data.setUrls({QUrl::fromLocalFile(tmp.filePath("big.bin"))});
+        FileView* v = m_left->view();
+        const QPoint below(10, v->viewport()->height() - 5);  // past the last row: into the folder itself
+        QDragEnterEvent enter(below, Qt::CopyAction | Qt::MoveAction, &data, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(v->viewport(), &enter);
+        QDragMoveEvent move(below, Qt::CopyAction | Qt::MoveAction, &data, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(v->viewport(), &move);
+        QCOMPARE(v->dropText(), "Copy big.bin into " + baseName(L()));
+        QDragMoveEvent shifted(below, Qt::CopyAction | Qt::MoveAction, &data, Qt::LeftButton, Qt::ShiftModifier);
+        QApplication::sendEvent(v->viewport(), &shifted);
+        QCOMPARE(v->dropText(), "Move big.bin into " + baseName(L()));
+        QDragLeaveEvent leave;
+        QApplication::sendEvent(v->viewport(), &leave);
+        QVERIFY(v->dropText().isEmpty());
     }
 
     void quickSearch()

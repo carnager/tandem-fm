@@ -30,6 +30,7 @@ public:
 
     Mode mode() const { return m_mode; }
     QString destination() const { return m_destination; }
+    QStringList sources() const { return m_sources; }
 
 protected:
     void run() override;

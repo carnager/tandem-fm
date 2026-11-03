@@ -64,6 +64,7 @@ class ExtractJob : public Job {
 public:
     ExtractJob(QString archivePath, QStringList innerPaths, QString destDir, bool smartFolder = false);
     QString destination() const { return m_destDir; }
+    QString archivePath() const { return m_archive; }
 
 protected:
     void run() override;

@@ -4,6 +4,7 @@
 #include "core/Sorting.h"
 
 #include <QFrame>
+#include <QPointer>
 #include <QTimer>
 #include <QUrl>
 
@@ -12,6 +13,7 @@
 class QLabel;
 class QLineEdit;
 class QCheckBox;
+class QProgressBar;
 class QSlider;
 class QTabBar;
 class QToolButton;
@@ -106,6 +108,8 @@ public:
     void zoomBy(int step);  // +1 bigger, -1 smaller, 0 back to normal
     void syncZoom();        // the slider shows the zoom of what is shown
     QFrame* selectionBar() const { return m_selectionBar; }
+    // A copy, move or extraction into the shown folder, as it happens (nullptr: none).
+    void showTransfer(class Job* job, const QString& text);
     QByteArray headerState() const;
     void restoreHeaderState(const QByteArray& state);
 
@@ -173,6 +177,13 @@ private:
     FileView* m_view;
     QLabel* m_status;
     QFrame* m_selectionBar = nullptr;
+    QFrame* m_transfer = nullptr;
+    QLabel* m_transferText = nullptr;
+    QProgressBar* m_transferBar = nullptr;
+    QToolButton* m_transferPause = nullptr;
+    QPointer<class Job> m_transferJob;
+    qint64 m_transferBytes = 0, m_transferMs = 0;
+    double m_transferSpeed = 0;
     QSlider* m_zoom = nullptr;
     QLineEdit* m_search;
     QWidget* m_filterBar;
