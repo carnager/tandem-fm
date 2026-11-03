@@ -21,6 +21,7 @@ ImageView::ImageView(QWidget* parent) : QAbstractScrollArea(parent)
 void ImageView::setImage(const QImage& image)
 {
     m_image = image;
+    m_scaled = QPixmap();  // a new picture of the same size must not reuse the old one
     m_fit = true;
     m_zoom = 1.0;
     relayout();

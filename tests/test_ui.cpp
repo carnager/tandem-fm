@@ -14,6 +14,7 @@
 #include "TestBackend.h"
 #include "SshServer.h"
 #include "ui/AuthDialogs.h"
+#include "ui/viewer/ImageView.h"
 #include "ui/viewer/ViewerWindow.h"
 #include "ui/FileView.h"
 #include "ui/FuzzyPopup.h"
@@ -24,6 +25,7 @@
 #include "ui/Panel.h"
 #include "ui/PathBar.h"
 #include "ui/Theme.h"
+#include "ui/viewer/ImageView.h"
 #include "ui/viewer/ViewerWindow.h"
 
 #include <QPlainTextEdit>
@@ -38,6 +40,7 @@
 #include <QToolButton>
 #include <QSettings>
 #include <QImage>
+#include <QImageReader>
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QMenu>
@@ -930,6 +933,31 @@ private slots:
                             ->orientation() == Qt::Horizontal);
         QSettings().setValue("view/previewPosition", "each");
 
+        // Photos with nearly the same names: each shows its own picture.
+        QVERIFY(QDir().mkpath(L("pics")));
+        const QList<QColor> colors = {Qt::red, Qt::green, Qt::blue, Qt::yellow, Qt::magenta};
+        for (int i = 0; i < colors.size(); ++i) {
+            QImage img(64, 48, QImage::Format_RGB32);
+            img.fill(colors[i]);
+            QVERIFY(img.save(L(QString("pics/IMG_2024_000%1.jpg").arg(i)), "JPG"));
+        }
+        m_left->navigate(L("pics"));
+        QTRY_COMPARE(leftModel()->path(), L("pics"));
+        qv = m_window->findChild<ViewerWindow*>("quickView");
+        moveCursorTo(m_left, "IMG_2024_0000.jpg");
+        auto shown = [&] {  // what is drawn, not just what was loaded
+            QWidget* vp = qv->imageView()->viewport();
+            const QImage im = vp->grab().toImage();
+            return im.isNull() ? QColor() : im.pixelColor(im.width() / 2, im.height() / 2);
+        };
+        auto near = [](QColor a, QColor b) {
+            return a.isValid() && qAbs(a.red() - b.red()) < 40 && qAbs(a.green() - b.green()) < 40 && qAbs(a.blue() - b.blue()) < 40;
+        };
+        for (int i = 0; i < colors.size(); ++i) {
+            QTRY_COMPARE(qv->currentPath(), L(QString("pics/IMG_2024_000%1.jpg").arg(i)));
+            QTRY_VERIFY2(near(shown(), colors[i]), qPrintable(QString("file %1 shows %2").arg(i).arg(shown().name())));
+            QTest::keyClick(m_left->view(), Qt::Key_Down);
+        }
         QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") == nullptr);
         QSettings().setValue("view/preview", false);
