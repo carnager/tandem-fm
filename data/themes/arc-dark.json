@@ -1,0 +1,29 @@
+{
+  "name": "Arc Dark",
+  "dark": true,
+  "colors": {
+    "window": "#383c4a",
+    "base": "#404552",
+    "header": "#2f343f",
+    "border": "#2b2e39",
+    "control": "#5c616c",
+    "text": "#d3dae3",
+    "dimText": "#9aa1ad",
+    "accent": "#5294e2",
+    "accentText": "#ffffff",
+    "mark": "#f27835",
+    "error": "#fc4138",
+    "success": "#73d216",
+    "gitModified": "#e5b94e",
+    "gitAdded": "#73d216",
+    "gitUntracked": "#5bc4d1"
+  },
+  "files": {
+    "image": "#d670d6",
+    "video": "#5294e2",
+    "audio": "#5bc4d1",
+    "archive": "#fc4138",
+    "executable": "#73d216",
+    "document": "#e5b94e"
+  }
+}
