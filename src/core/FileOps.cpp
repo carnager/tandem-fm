@@ -60,6 +60,15 @@ bool isInside(const QByteArray& child, const QByteArray& parent)
     return child == parent || child.startsWith(parent.endsWith('/') ? parent : parent + '/');
 }
 
+// A hidden file next to `dst` to write a replacement into, so the old file
+// stays intact until the new one is complete. -1 if the folder won't have it.
+int openReplacement(const QByteArray& dst, QByteArray& temp)
+{
+    const int slash = dst.lastIndexOf('/');
+    temp = dst.left(slash + 1) + '.' + dst.mid(slash + 1) + ".tandem-XXXXXX";
+    return ::mkostemp(temp.data(), O_CLOEXEC);
+}
+
 void setTimes(const QByteArray& path, const struct stat& st, int flags = 0)
 {
     const struct timespec ts[2] = {st.st_atim, st.st_mtim};
@@ -475,10 +484,13 @@ bool CopyJob::copyRegular(const QByteArray& src, QByteArray dst, const struct st
     }
 
     int out;
+    QByteArray target;  // where the data goes: a temporary file when replacing
     for (;;) {
         out = ::open(dst.constData(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
-        if (out >= 0)
+        if (out >= 0) {
+            target = dst;  // Rename may have changed dst
             break;
+        }
         const int e = errno;
         struct stat dstSt;
         if (e == EEXIST && lstat(dst.constData(), &dstSt) == 0) {
@@ -495,6 +507,9 @@ bool CopyJob::copyRegular(const QByteArray& src, QByteArray dst, const struct st
                     ::close(in);
                     return false;
                 }
+                if ((out = openReplacement(dst, target)) >= 0)
+                    break;
+                // Can't create files beside it: replace the old way.
                 if (::unlink(dst.constData()) != 0) {
                     askError(tr("Cannot replace"), fromNative(dst), errno);
                     ::close(in);
@@ -544,8 +559,17 @@ bool CopyJob::copyRegular(const QByteArray& src, QByteArray dst, const struct st
     ::close(in);
 
     if (!ok) {
-        ::unlink(dst.constData());
+        ::unlink(target.constData());  // when replacing, the old file is untouched
         return false;
+    }
+    if (target != dst && ::rename(target.constData(), dst.constData()) != 0) {
+        // Some FUSE filesystems refuse to rename over a file.
+        const int e = errno;
+        if (::unlink(dst.constData()) != 0 || ::rename(target.constData(), dst.constData()) != 0) {
+            addError(tr("Cannot replace %1 (%2); the copy is in %3")
+                         .arg(fromNative(dst), errnoString(e), fromNative(target)));
+            return false;
+        }
     }
     m_filesDone += 1;
     if (m_mode == Mode::Move && ::unlink(src.constData()) != 0) {

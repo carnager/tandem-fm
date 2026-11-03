@@ -1321,6 +1321,10 @@
         <translation>Fehler beim Schreiben</translation>
     </message>
     <message>
+        <source>Cannot replace %1 (%2); the copy is in %3</source>
+        <translation>%1 kann nicht ersetzt werden (%2); die Kopie liegt in %3</translation>
+    </message>
+    <message>
         <source>Tandem can&apos;t open %1</source>
         <translation>Tandem kann %1 nicht öffnen</translation>
     </message>

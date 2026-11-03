@@ -239,6 +239,41 @@ private slots:
         QCOMPARE(readFile(tmp.filePath("t/1.txt")), QByteArray("old"));
     }
 
+    // Overwriting goes through a hidden file beside the target: the old file
+    // survives a cancelled or failed copy, and nothing is left behind.
+    void overwriteKeepsOldFileUntilDone()
+    {
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("source"), QByteArray(1024 * 1024, 'n'));
+        writeFile(tmp.filePath("target"), "original");
+        const auto leftovers = [&] {
+            return QDir(tmp.path()).entryList({".target.tandem-*"}, QDir::Files | QDir::Hidden);
+        };
+
+        CopyJob cancelled(CopyJob::Mode::Copy, {tmp.filePath("source")}, tmp.filePath("target"));
+        cancelled.setSyncPromptHandler([&](const PromptRequest& r) {
+            if (r.kind != PromptRequest::Kind::Conflict)
+                return Answer::Cancel;
+            cancelled.setPaused(true);  // stops before the first byte is written
+            return Answer::Overwrite;
+        });
+        QSignalSpy done(&cancelled, &Job::finished);
+        cancelled.start();
+        QTRY_VERIFY(cancelled.snapshot().paused);
+        QCOMPARE(readFile(tmp.filePath("target")), QByteArray("original"));
+        cancelled.cancel();
+        QVERIFY(done.wait(5000));
+        QCOMPARE(readFile(tmp.filePath("target")), QByteArray("original"));
+        QVERIFY(leftovers().isEmpty());
+
+        CopyJob replace(CopyJob::Mode::Copy, {tmp.filePath("source")}, tmp.filePath("target"));
+        replace.setSyncPromptHandler([](const PromptRequest&) { return Answer::Overwrite; });
+        QVERIFY(runJob(replace));
+        QVERIFY(replace.errors().isEmpty());
+        QCOMPARE(readFile(tmp.filePath("target")), QByteArray(1024 * 1024, 'n'));
+        QVERIFY(leftovers().isEmpty());
+    }
+
     void copyIntoItselfRejected()
     {
         QTemporaryDir tmp;
