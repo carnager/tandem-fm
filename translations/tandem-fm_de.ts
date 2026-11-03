@@ -2363,6 +2363,10 @@
         <translation>Doppelte finden</translation>
     </message>
     <message>
+        <source>Could not open Trash in Finder</source>
+        <translation>Papierkorb im Finder konnte nicht geöffnet werden</translation>
+    </message>
+    <message>
         <source>Copy</source>
         <translation>Kopieren</translation>
     </message>
@@ -2969,6 +2973,10 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Ein Terminal auf dem Server: ssh benutzen (Tandem öffnet dort noch keins)</translation>
     </message>
     <message>
+        <source>Could not open Terminal</source>
+        <translation>Terminal konnte nicht geöffnet werden</translation>
+    </message>
+    <message>
         <source>Create</source>
         <translation>Anlegen</translation>
     </message>
@@ -3189,6 +3197,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Not a mount Tandem can disconnect</source>
         <translation>Kein Einhängepunkt, den Tandem trennen kann</translation>
+    </message>
+    <message>
+        <source>On macOS only smb:// shares can be mounted; sftp:// is built in.</source>
+        <translation>Unter macOS lassen sich nur smb://-Freigaben einhängen; sftp:// ist eingebaut.</translation>
+    </message>
+    <message>
+        <source>Mount this drive in Finder, then open it from Locations.</source>
+        <translation>Dieses Laufwerk im Finder einhängen und dann über Orte öffnen.</translation>
     </message>
     <message>
         <source>Tandem was built without GIO</source>
@@ -3451,6 +3467,12 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Tandem was built without GIO: mount with sshfs/rclone and browse the folder</source>
         <translation>Tandem wurde ohne GIO gebaut: mit sshfs/rclone einhängen und den Ordner öffnen</translation>
+    </message>
+    <message>
+        <source>Examples:  sftp://user@host/path  ·  user@host:folder  ·  smb://nas/share/folder
+sftp is built in; smb shares are mounted by macOS (Finder sees them too).</source>
+        <translation>Beispiele:  sftp://user@host/pfad  ·  user@host:ordner  ·  smb://nas/freigabe/ordner
+sftp ist eingebaut; smb-Freigaben hängt macOS ein (auch der Finder sieht sie).</translation>
     </message>
     <message>
         <source>Examples:  sftp://user@host/path  ·  user@host:folder  ·  smb://nas/share  ·  davs://cloud.example.com/remote.php/dav/files/me  ·  ftp://host
