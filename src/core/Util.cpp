@@ -58,7 +58,11 @@ QString formatDuration(int64_t s)
 QString errnoString(int err)
 {
     char buf[256];
+#ifdef __APPLE__
+    const char* s = ::strerror_r(err, buf, sizeof buf) == 0 ? buf : nullptr;
+#else
     const char* s = strerror_r(err, buf, sizeof buf);  // GNU variant
+#endif
     return QString::fromLocal8Bit(s);
 }
 

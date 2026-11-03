@@ -43,7 +43,15 @@ public:
     bool isRemote() const { return m_remote; }  // listed through a Backend (sftp://, …)
     // Folders whose changes inotify can't see (servers, NFS, sshfs …) are
     // looked at again now and then while shown; this is one such look.
-    bool needsPolling() const { return (m_remote || m_networkFs) && !m_inArchive && !m_inSearch; }
+    bool needsPolling() const
+    {
+#ifdef Q_OS_MACOS
+        // kqueue sees files come and go, not files that change in place.
+        return !m_inArchive && !m_inSearch;
+#else
+        return (m_remote || m_networkFs) && !m_inArchive && !m_inSearch;
+#endif
+    }
     void poll();
 
     // Search results as a virtual folder: entries are paths relative to the

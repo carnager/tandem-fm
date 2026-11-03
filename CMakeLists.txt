@@ -8,7 +8,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets DBus Pdf Test OPTIONAL_COMPONENTS LinguistTools)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Pdf Test OPTIONAL_COMPONENTS LinguistTools)
 qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES de)
 
 # Core engine: filesystem access, jobs, watching. QtCore only, no UI.
@@ -19,8 +19,8 @@ add_library(tandem_core STATIC
   src/core/Plugins.h src/core/Plugins.cpp
   src/core/Sorting.h src/core/Sorting.cpp
   src/core/DirLister.h src/core/DirLister.cpp
-  src/core/DirWatcher.h src/core/DirWatcher.cpp
-  src/core/Mounts.h src/core/Mounts.cpp
+  src/core/DirWatcher.h
+  src/core/Mounts.h
   src/core/Job.h src/core/Job.cpp
   src/core/FileOps.h src/core/FileOps.cpp
   src/core/DesktopApps.h src/core/DesktopApps.cpp
@@ -48,6 +48,12 @@ add_library(tandem_core STATIC
   src/core/SmbBackend.cpp
 )
 target_include_directories(tandem_core PUBLIC src)
+# Platform parts: inotify and /proc/self/mounts on Linux, kqueue and getfsstat on macOS.
+if(APPLE)
+  target_sources(tandem_core PRIVATE src/core/DirWatcher_mac.cpp src/core/Mounts_mac.cpp)
+else()
+  target_sources(tandem_core PRIVATE src/core/DirWatcher.cpp src/core/Mounts.cpp)
+endif()
 find_package(LibArchive 3.3 REQUIRED)
 target_link_libraries(tandem_core PUBLIC Qt6::Core PRIVATE LibArchive::LibArchive)
 target_compile_options(tandem_core PRIVATE -Wall -Wextra)
@@ -91,14 +97,25 @@ add_library(tandem_ui STATIC
   src/ui/viewer/Previewers.h src/ui/viewer/Previewers.cpp
   src/ui/viewer/FileInfo.h src/ui/viewer/FileInfo.cpp
 )
-target_link_libraries(tandem_ui PUBLIC tandem_core Qt6::Widgets Qt6::DBus Qt6::Pdf)
+target_link_libraries(tandem_ui PUBLIC tandem_core Qt6::Widgets Qt6::Pdf)
+if(APPLE)
+  # SMB shares are mounted through NetFS, like Finder does.
+  target_sources(tandem_ui PRIVATE src/ui/MacSmb.h src/ui/MacSmb.cpp)
+  set_source_files_properties(src/ui/MacSmb.cpp PROPERTIES COMPILE_OPTIONS "-fblocks")
+  find_library(NETFS_FRAMEWORK NetFS REQUIRED)
+  find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+  target_link_libraries(tandem_ui PRIVATE ${NETFS_FRAMEWORK} ${COREFOUNDATION_FRAMEWORK})
+else()
+  find_package(Qt6 REQUIRED COMPONENTS DBus)
+  target_link_libraries(tandem_ui PRIVATE Qt6::DBus)
+endif()
 
 # Optional: network locations and drives through GIO/GVfs.
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
   pkg_check_modules(GIO IMPORTED_TARGET gio-2.0)
 endif()
-if(GIO_FOUND)
+if(GIO_FOUND AND NOT APPLE)
   target_link_libraries(tandem_ui PRIVATE PkgConfig::GIO)
   target_compile_definitions(tandem_ui PRIVATE TANDEM_HAVE_GIO)
   message(STATUS "Network locations (GIO/GVfs): enabled")
@@ -122,7 +139,7 @@ endif()
 if(PkgConfig_FOUND)
   pkg_check_modules(LIBACL IMPORTED_TARGET libacl)
 endif()
-if(LIBACL_FOUND)
+if(LIBACL_FOUND AND NOT APPLE)
   target_link_libraries(tandem_core PRIVATE PkgConfig::LIBACL)
   target_compile_definitions(tandem_core PRIVATE TANDEM_HAVE_ACL)
   message(STATUS "ACLs (libacl ${LIBACL_VERSION}): enabled")
@@ -134,7 +151,7 @@ endif()
 if(PkgConfig_FOUND)
   pkg_check_modules(LIBSECRET IMPORTED_TARGET libsecret-1)
 endif()
-if(LIBSECRET_FOUND)
+if(LIBSECRET_FOUND AND NOT APPLE)
   target_link_libraries(tandem_core PRIVATE PkgConfig::LIBSECRET)
   target_compile_definitions(tandem_core PRIVATE TANDEM_HAVE_LIBSECRET)
   message(STATUS "Keyring (libsecret ${LIBSECRET_VERSION}): enabled")
@@ -168,7 +185,22 @@ target_compile_options(tandem_ui PRIVATE -Wall -Wextra)
 file(GLOB TANDEM_THEMES CONFIGURE_DEPENDS data/themes/*.json)
 qt_add_resources(tandem_ui "themes" PREFIX "/themes" BASE data/themes FILES ${TANDEM_THEMES})
 
+if(APPLE)
+  set(CMAKE_MACOSX_RPATH ON)
+endif()
 add_executable(tandem-fm src/main.cpp)
+if(APPLE)
+  target_sources(tandem-fm PRIVATE packaging/macos/tandem-fm.icns)
+  set_source_files_properties(packaging/macos/tandem-fm.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  set_target_properties(tandem-fm PROPERTIES
+    MACOSX_BUNDLE_ICON_FILE "tandem-fm.icns"
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_BUNDLE_NAME "Tandem"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.carnager.tandem-fm"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in")
+endif()
 target_link_libraries(tandem-fm PRIVATE tandem_ui)
 # The app icon, inside the binary too (for running from the build folder).
 qt_add_resources(tandem-fm "icons" PREFIX "/icons" BASE data FILES data/tandem-fm.svg)
@@ -192,6 +224,16 @@ add_executable(tandem-bench bench/bench_list.cpp)
 target_link_libraries(tandem-bench PRIVATE tandem_core)
 
 enable_testing()
+if(APPLE)
+  add_executable(test_macsmb tests/test_macsmb.cpp)
+  target_link_libraries(test_macsmb PRIVATE tandem_ui Qt6::Test)
+  add_test(NAME test_macsmb COMMAND test_macsmb)
+  set_tests_properties(test_macsmb PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  add_executable(test_macos tests/test_macos.cpp)
+  target_link_libraries(test_macos PRIVATE tandem_core Qt6::Test)
+  add_test(NAME test_macos COMMAND test_macos)
+  set_tests_properties(test_macos PROPERTIES TIMEOUT 120)
+endif()
 add_executable(test_core tests/test_core.cpp)
 target_link_libraries(test_core PRIVATE tandem_core Qt6::Test)
 add_test(NAME test_core COMMAND test_core)
@@ -203,12 +245,20 @@ set_tests_properties(test_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_executable(test_viewer tests/test_viewer.cpp)
 target_link_libraries(test_viewer PRIVATE tandem_ui Qt6::Test)
 add_test(NAME test_viewer COMMAND test_viewer)
+if(KF6SyntaxHighlighting_FOUND)
+  target_compile_definitions(test_viewer PRIVATE TANDEM_TEST_HIGHLIGHTING)
+endif()
 set_tests_properties(test_viewer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(test_core test_ui test_viewer PROPERTIES TIMEOUT 300)
 
-install(TARGETS tandem-fm RUNTIME DESTINATION bin)
-install(FILES tandem-fm.desktop DESTINATION share/applications)
-install(FILES data/tandem-fm.svg DESTINATION share/icons/hicolor/scalable/apps)
-foreach(size 32 48 256)
-  install(FILES data/icons/${size}x${size}/tandem-fm.png DESTINATION share/icons/hicolor/${size}x${size}/apps)
-endforeach()
-install(FILES LICENSE DESTINATION share/licenses/tandem-fm)
+if(APPLE)
+  install(TARGETS tandem-fm BUNDLE DESTINATION .)
+else()
+  install(TARGETS tandem-fm RUNTIME DESTINATION bin)
+  install(FILES tandem-fm.desktop DESTINATION share/applications)
+  install(FILES data/tandem-fm.svg DESTINATION share/icons/hicolor/scalable/apps)
+  foreach(size 32 48 256)
+    install(FILES data/icons/${size}x${size}/tandem-fm.png DESTINATION share/icons/hicolor/${size}x${size}/apps)
+  endforeach()
+  install(FILES LICENSE DESTINATION share/licenses/tandem-fm)
+endif()

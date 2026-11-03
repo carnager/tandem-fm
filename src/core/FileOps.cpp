@@ -10,7 +10,12 @@
 #include <cerrno>
 #include <dirent.h>
 #include <fcntl.h>
+#ifdef __APPLE__
+#include <copyfile.h>
+#include <stdio.h>
+#else
 #include <linux/fs.h>
+#endif
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -19,7 +24,9 @@ namespace tandem {
 
 namespace {
 
+#ifndef __APPLE__
 constexpr size_t kChunk = 4 * 1024 * 1024;   // copy_file_range step: keeps cancel/pause responsive
+#endif
 constexpr size_t kBufSize = 1024 * 1024;     // read/write fallback buffer
 
 bool isDotOrDotDot(const char* n) { return n[0] == '.' && (n[1] == 0 || (n[1] == '.' && n[2] == 0)); }
@@ -42,6 +49,9 @@ int readNames(const QByteArray& dir, std::vector<QByteArray>& out)
 // that do not support RENAME_NOREPLACE.
 int moveNoReplace(const QByteArray& src, const QByteArray& dst)
 {
+#ifdef __APPLE__
+    return ::renamex_np(src.constData(), dst.constData(), RENAME_EXCL) == 0 ? 0 : errno;
+#else
     if (renameat2(AT_FDCWD, src.constData(), AT_FDCWD, dst.constData(), RENAME_NOREPLACE) == 0)
         return 0;
     const int e = errno;
@@ -53,6 +63,7 @@ int moveNoReplace(const QByteArray& src, const QByteArray& dst)
     if (::rename(src.constData(), dst.constData()) == 0)
         return 0;
     return errno;
+#endif
 }
 
 bool isInside(const QByteArray& child, const QByteArray& parent)
@@ -69,10 +80,42 @@ int openReplacement(const QByteArray& dst, QByteArray& temp)
     return ::mkostemp(temp.data(), O_CLOEXEC);
 }
 
+// Access and modification time of a stat result (the fields are named
+// differently on macOS).
+void statTimes(const struct stat& st, struct timespec (&ts)[2])
+{
+#ifdef __APPLE__
+    ts[0] = st.st_atimespec;
+    ts[1] = st.st_mtimespec;
+#else
+    ts[0] = st.st_atim;
+    ts[1] = st.st_mtim;
+#endif
+}
+
 void setTimes(const QByteArray& path, const struct stat& st, int flags = 0)
 {
-    const struct timespec ts[2] = {st.st_atim, st.st_mtim};
+    struct timespec ts[2];
+    statTimes(st, ts);
     utimensat(AT_FDCWD, path.constData(), ts, flags);
+}
+
+// Where a path really is, following symlinks; the missing tail (a folder
+// about to be created) is appended as is.
+QByteArray realLocation(QByteArray path)
+{
+    QByteArray tail;
+    while (!path.isEmpty() && path != "/") {
+        if (char* r = ::realpath(path.constData(), nullptr)) {
+            QByteArray out(r);
+            ::free(r);
+            return out + tail;
+        }
+        const int slash = path.lastIndexOf('/');
+        tail.prepend(path.mid(slash));
+        path = slash > 0 ? path.left(slash) : QByteArray("/");
+    }
+    return path + tail;
 }
 
 }  // namespace
@@ -168,7 +211,11 @@ void CopyJob::run()
     for (const QString& s : std::as_const(m_sources)) {
         const QByteArray src = toNative(s);
         const QByteArray dst = destIsDir ? joinPath(dest, toNative(baseName(s))) : dest;
-        if (src != dst && isInside(dst, src)) {
+        // Also through symlinks: copying a folder into a link that points
+        // inside it would recurse until the path gets too long.
+        struct stat st;
+        const bool isDir = ::lstat(src.constData(), &st) == 0 && S_ISDIR(st.st_mode);
+        if (src != dst && (isInside(dst, src) || (isDir && isInside(realLocation(dst), realLocation(src))))) {
             addError(tr("Cannot copy a folder into itself: %1").arg(s));
             continue;
         }
@@ -429,6 +476,10 @@ bool CopyJob::copyDirectory(const QByteArray& src, QByteArray dst, const struct 
         if (isCancelled())
             return false;
     }
+#ifdef __APPLE__
+    // Finder tags, comments and other extended attributes.
+    ::copyfile(src.constData(), dst.constData(), nullptr, COPYFILE_METADATA | COPYFILE_NOFOLLOW);
+#endif
     ::chmod(dst.constData(), st.st_mode & 07777);
     setTimes(dst, st);
     m_filesDone += 1;
@@ -470,6 +521,9 @@ bool CopyJob::copySymlink(const QByteArray& src, QByteArray dst, const struct st
         if (askError(tr("Cannot create link"), fromNative(dst), e) != Answer::Retry)
             return false;
     }
+#ifdef __APPLE__
+    ::copyfile(src.constData(), dst.constData(), nullptr, COPYFILE_METADATA | COPYFILE_NOFOLLOW);
+#endif
     setTimes(dst, st, AT_SYMLINK_NOFOLLOW);
     m_filesDone += 1;
     if (m_mode == Mode::Move && ::unlink(src.constData()) != 0) {
@@ -548,11 +602,17 @@ bool CopyJob::copyRegular(const QByteArray& src, QByteArray dst, const struct st
 
     bool ok = err == 0;
     if (ok) {
+#ifdef __APPLE__
+        // Extended attributes, ACLs and resource forks; best effort, like
+        // Finder on volumes that can't store them.
+        ::fcopyfile(in, out, nullptr, COPYFILE_METADATA);
+#endif
         ::fchmod(out, st.st_mode & 07777);
         if (::fchown(out, st.st_uid, st.st_gid) != 0) {
             // Expected when not root: the copy belongs to us.
         }
-        const struct timespec ts[2] = {st.st_atim, st.st_mtim};
+        struct timespec ts[2];
+        statTimes(st, ts);
         ::futimens(out, ts);
     }
     // Network filesystems may only report write errors on close.
@@ -585,6 +645,33 @@ bool CopyJob::copyRegular(const QByteArray& src, QByteArray dst, const struct st
 
 int CopyJob::copyData(int in, int out, int64_t size)
 {
+#ifdef __APPLE__
+    (void)size;
+    for (;;) {
+        if (checkpoint())
+            return -1;
+        if (m_buffer.empty())
+            m_buffer.resize(kBufSize);
+        const ssize_t n = ::read(in, m_buffer.data(), m_buffer.size());
+        if (n == 0)
+            return 0;
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            return errno;
+        }
+        for (ssize_t off = 0; off < n;) {
+            const ssize_t w = ::write(out, m_buffer.data() + off, size_t(n - off));
+            if (w < 0) {
+                if (errno == EINTR)
+                    continue;
+                return errno;
+            }
+            off += w;
+        }
+        m_bytesDone += n;
+    }
+#else
     ::posix_fadvise(in, 0, 0, POSIX_FADV_SEQUENTIAL);
 
     // Reflink (btrfs, xfs, bcachefs): instant copy-on-write clone.
@@ -635,6 +722,7 @@ int CopyJob::copyData(int in, int out, int64_t size)
         copied += n;
         m_bytesDone += n;
     }
+#endif
 }
 
 // -------------------------------------------------------------- DeleteJob

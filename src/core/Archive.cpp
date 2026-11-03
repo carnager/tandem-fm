@@ -56,6 +56,17 @@ QString archiveErrorText(archive* a, const QString& fallback)
     return s ? QString::fromUtf8(s) : fallback;
 }
 
+// libarchive supports zstd but not every release maps .tar.zst itself.
+int setWriterFormat(archive* writer, const QByteArray& name)
+{
+    const QByteArray lower = name.toLower();
+    if (lower.endsWith(".tar.zst") || lower.endsWith(".tzst")) {
+        const int result = archive_write_set_format_pax_restricted(writer);
+        return result == ARCHIVE_OK ? archive_write_add_filter_zstd(writer) : result;
+    }
+    return archive_write_set_format_filter_by_ext(writer, name.constData());
+}
+
 // Configured reader, or nullptr with *error set.
 archive* openReader(const QString& path, QString* error)
 {
@@ -663,7 +674,7 @@ void PackJob::run()
     const QByteArray part = target + ".part";
 
     archive* a = archive_write_new();
-    if (archive_write_set_format_filter_by_ext(a, target.constData()) != ARCHIVE_OK) {
+    if (setWriterFormat(a, target) != ARCHIVE_OK) {
         askErrorText(tr("Unknown archive type"), m_archive,
                      tr("use .zip, .7z, .tar, .tar.gz, .tar.xz, .tar.zst or .tar.bz2"));
         archive_write_free(a);
@@ -821,7 +832,7 @@ archive* writerLike(archive* in, bool haveHeader, const QByteArray& nameForExt)
         archive_write_free(out);
         out = archive_write_new();
     }
-    if (archive_write_set_format_filter_by_ext(out, nameForExt.constData()) == ARCHIVE_OK)
+    if (setWriterFormat(out, nameForExt) == ARCHIVE_OK)
         return out;
     archive_write_free(out);
     return nullptr;

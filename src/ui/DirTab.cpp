@@ -240,10 +240,10 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
 
     QPointer<DirTab> self(this);
     auto cancel = m_cancel;
-    ioPool()->start([self, gen, path, focus, history, marks, opt, cancel] {
+    ioPool()->start([self, gen, path, focus, history, marks, opt, cancel, keepMarks] {
         auto result = std::make_shared<ListResult>(listLocation(path, opt, cancel.get()));
         const bool networkFs = !result->error && !result->remote && !result->inArchive && isNetworkFilesystem(path);
-        postToUi([self, gen, focus, history, marks, result, networkFs] {
+        postToUi([self, gen, focus, history, marks, result, networkFs, keepMarks] {
             if (!self || gen != self->m_gen) {
                 DirWatcher::instance()->removeWatch(result->watch);
                 return;
@@ -288,8 +288,10 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
                 if (t->m_back.size() > 100)
                     t->m_back.removeFirst();
             }
-            QString focusName = focus;
-            QSet<QString> restore = marks;
+            // A background refresh must not undo a cursor move or selection
+            // made while the worker was reading the directory.
+            QString focusName = keepMarks && old == result->path ? t->cursorName() : focus;
+            QSet<QString> restore = keepMarks && old == result->path ? t->m_model->markedSet() : marks;
             if (!old.isEmpty() && old != result->path) {
                 t->remember(old);
                 const auto mem = t->m_memory.constFind(result->path);
@@ -316,6 +318,10 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
             if (old != result->path)
                 t->m_gitBranch.clear();
             t->refreshGit();
+            if (!t->m_pendingFocus.isEmpty() && t->m_model->rowOf(t->m_pendingFocus) >= 0) {
+                focusName = t->m_pendingFocus;
+                t->m_pendingFocus.clear();
+            }
             emit t->listingReady(focusName);
             emit t->infoChanged();
         });
@@ -335,6 +341,10 @@ void DirTab::onWatchChanged(int wd, const QStringList& names)
 {
     if (wd != m_watch || m_watch < 0 || m_loading)
         return;
+    if (names.isEmpty()) {
+        refresh(); // kqueue reports a changed directory without individual names
+        return;
+    }
     for (const QString& n : names)
         m_pendingNames.insert(n);
     if (!m_statInFlight)

@@ -13,8 +13,8 @@ struct MountPoint {
     bool isRemovable = false;  // under /run/media or /media
 };
 
-// Reads /proc/self/mounts (never blocks, even with dead network mounts) and
-// drops pseudo filesystems nobody wants to browse.
+// Reads the platform mount table without network round trips and filters
+// system mounts. macOS uses caller-owned getfsstat storage for thread safety.
 QList<MountPoint> listMounts();
 
 // NFS, SMB/CIFS, FUSE (sshfs, rclone, GVfs), Ceph, 9p: changes made by other

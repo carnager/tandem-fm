@@ -1382,6 +1382,11 @@ void Panel::showLocations()
 // the location (kept in tabs, history, settings) doesn't.
 QString Panel::takePassword(const QString& text)
 {
+#ifdef Q_OS_MACOS
+    // NetFS gets the password directly; it is never kept.
+    if (QUrl(text).scheme().compare(QLatin1String("smb"), Qt::CaseInsensitive) == 0)
+        return text;
+#endif
     if (!isRemoteLocation(text))
         return text;
     QUrl u(text);
@@ -1399,6 +1404,29 @@ QString Panel::takePassword(const QString& text)
 
 void Panel::connectTo(const QString& uriIn)
 {
+#ifdef Q_OS_MACOS
+    // SMB shares are mounted by the system and then browsed as local folders.
+    if (QUrl(uriIn).scheme().compare(QLatin1String("smb"), Qt::CaseInsensitive) == 0) {
+        const QString clean =
+            QUrl(uriIn).adjusted(QUrl::RemovePassword | QUrl::RemoveQuery | QUrl::RemoveFragment).toString();
+        showMessage(tr("Connecting to %1 …").arg(clean));
+        QPointer<Panel> self(this);
+        QPointer<DirTab> from = tab();
+        const QString fromPath = path();
+        Network::instance().mount(uriIn, this, [self, from, fromPath, clean](const QString& path, const QString& error) {
+            // The user went somewhere else meanwhile: don't yank the panel away.
+            if (!self || self->tab() != from || self->path() != fromPath)
+                return;
+            if (!error.isEmpty()) {
+                self->showMessage(error, true);
+                return;
+            }
+            Network::instance().rememberServer(clean);
+            self->navigate(path);
+        });
+        return;
+    }
+#endif
     const QString uri = takePassword(uriIn);
     if (hasBackend(uri.section(QLatin1Char(':'), 0, 0))) {  // built in: just go there
         if (!QUrl(uri).path().isEmpty()) {
@@ -1466,10 +1494,16 @@ void Panel::connectDialog()
     edit->setCurrentText(QString());
     edit->lineEdit()->setPlaceholderText(QStringLiteral("sftp://user@host/path"));
     edit->setMinimumWidth(460);
+#ifdef Q_OS_MACOS
+    auto* hint = new QLabel(tr("Examples:  sftp://user@host/path  ·  user@host:folder  ·  smb://nas/share/folder\n"
+                               "sftp is built in; smb shares are mounted by macOS (Finder sees them too)."),
+                            &dlg);
+#else
     auto* hint = new QLabel(tr("Examples:  sftp://user@host/path  ·  user@host:folder  ·  smb://nas/share  ·  "
                                "davs://cloud.example.com/remote.php/dav/files/me  ·  ftp://host\n"
                                "sftp and smb are built in; the others are mounted with GVfs (other apps see those too)."),
                             &dlg);
+#endif
     setThemeStyle(hint, QStringLiteral("color: @dimText;"));
     hint->setWordWrap(true);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);

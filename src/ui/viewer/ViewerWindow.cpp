@@ -555,7 +555,10 @@ void ViewerWindow::openIndex(int index)
     m_matchStart = -1;
     m_mode = Mode::None;
     m_loading = true;
+
+#ifdef TANDEM_HAVE_KSYNTAXHIGHLIGHTING
     delete m_highlighter;
+#endif
     m_highlighter = nullptr;
     m_text->clear();
     m_image->setImage({});

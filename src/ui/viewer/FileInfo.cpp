@@ -24,11 +24,36 @@ namespace tandem {
 
 namespace {
 
-QString when(const struct statx_timestamp& t)
+// The viewer needs seconds, while platform stat structures differ.
+struct InfoStat {
+    uint32_t mode = 0, uid = 0, gid = 0;
+    uint64_t size = 0, ino = 0, nlink = 0, blocks = 0;
+    int64_t mtime = 0, atime = 0, ctime = 0, birthtime = 0;
+    bool hasBirthTime = false;
+};
+
+bool readInfoStat(const QByteArray& path, int flags, InfoStat& out)
 {
-    if (t.tv_sec == 0)
-        return {};
-    return QDateTime::fromSecsSinceEpoch(t.tv_sec).toString(QStringLiteral("yyyy-MM-dd  HH:mm:ss"));
+#ifdef __APPLE__
+    struct stat st;
+    if (::fstatat(AT_FDCWD, path.constData(), &st, flags) != 0)
+        return false;
+    out = {uint32_t(st.st_mode), st.st_uid, st.st_gid, uint64_t(st.st_size), st.st_ino, st.st_nlink,
+           uint64_t(st.st_blocks), st.st_mtime, st.st_atime, st.st_ctime, st.st_birthtimespec.tv_sec, true};
+#else
+    struct statx st;
+    if (::statx(AT_FDCWD, path.constData(), flags, STATX_BASIC_STATS | STATX_BTIME, &st) != 0)
+        return false;
+    out = {st.stx_mode, st.stx_uid, st.stx_gid, st.stx_size, st.stx_ino, st.stx_nlink, st.stx_blocks,
+           st.stx_mtime.tv_sec, st.stx_atime.tv_sec, st.stx_ctime.tv_sec, st.stx_btime.tv_sec,
+           bool(st.stx_mask & STATX_BTIME)};
+#endif
+    return true;
+}
+
+QString when(int64_t seconds)
+{
+    return seconds == 0 ? QString() : QDateTime::fromSecsSinceEpoch(seconds).toString(QStringLiteral("yyyy-MM-dd  HH:mm:ss"));
 }
 
 QString userName(uint32_t uid)
@@ -135,9 +160,8 @@ FileInfo gatherFileInfo(const QString& path, char gitStatus)
 {
     FileInfo info;
     const QByteArray np = toNative(path);
-    struct statx sx;
-    const unsigned mask = STATX_BASIC_STATS | STATX_BTIME;
-    if (statx(AT_FDCWD, np.constData(), AT_SYMLINK_NOFOLLOW, mask, &sx) != 0) {
+    InfoStat sx;
+    if (!readInfoStat(np, AT_SYMLINK_NOFOLLOW, sx)) {
         info.error = errnoString(errno);
         return info;
     }
@@ -148,19 +172,19 @@ FileInfo gatherFileInfo(const QString& path, char gitStatus)
             rows.append({k, v});
     };
 
-    const bool isLink = S_ISLNK(sx.stx_mode);
-    info.isDir = S_ISDIR(sx.stx_mode);
-    info.isRegular = S_ISREG(sx.stx_mode);
-    struct statx target = sx;
+    const bool isLink = S_ISLNK(sx.mode);
+    info.isDir = S_ISDIR(sx.mode);
+    info.isRegular = S_ISREG(sx.mode);
+    InfoStat target = sx;
     QString linkTarget;
     if (isLink) {
         QByteArray buf(4096, '\0');
         const ssize_t n = ::readlink(np.constData(), buf.data(), size_t(buf.size()));
         if (n > 0)
             linkTarget = QFile::decodeName(buf.left(n));
-        if (statx(AT_FDCWD, np.constData(), 0, mask, &target) == 0) {
-            info.isDir = S_ISDIR(target.stx_mode);
-            info.isRegular = S_ISREG(target.stx_mode);
+        if (readInfoStat(np, 0, target)) {
+            info.isDir = S_ISDIR(target.mode);
+            info.isRegular = S_ISREG(target.mode);
         }
     }
 
@@ -173,7 +197,7 @@ FileInfo gatherFileInfo(const QString& path, char gitStatus)
     if (isLink)
         row(QObject::tr("Link to"), linkTarget.isEmpty() ? QObject::tr("(unreadable)") : linkTarget);
     if (!info.isDir)
-        row(QObject::tr("Size"), exactSize(qint64(target.stx_size)));
+        row(QObject::tr("Size"), exactSize(qint64(target.size)));
     if (info.isDir) {
         ListOptions opt;
         opt.showHidden = true;
@@ -189,15 +213,15 @@ FileInfo gatherFileInfo(const QString& path, char gitStatus)
     row(QObject::tr("Git"), gitText(gitStatus));
 
     section(QObject::tr("Dates"));
-    row(QObject::tr("Modified"), when(target.stx_mtime));
-    if (target.stx_mask & STATX_BTIME)
-        row(QObject::tr("Created"), when(target.stx_btime));
-    row(QObject::tr("Changed"), when(target.stx_ctime));
-    row(QObject::tr("Accessed"), when(target.stx_atime));
+    row(QObject::tr("Modified"), when(target.mtime));
+    if (target.hasBirthTime)
+        row(QObject::tr("Created"), when(target.birthtime));
+    row(QObject::tr("Changed"), when(target.ctime));
+    row(QObject::tr("Accessed"), when(target.atime));
 
     section(QObject::tr("Permissions"));
-    row(QObject::tr("Mode"), QStringLiteral("%1   %2").arg(modeString(sx.stx_mode)).arg(sx.stx_mode & 07777, 4, 8, QLatin1Char('0')));
-    row(QObject::tr("Owner"), QStringLiteral("%1 : %2").arg(userName(sx.stx_uid), groupName(sx.stx_gid)));
+    row(QObject::tr("Mode"), QStringLiteral("%1   %2").arg(modeString(sx.mode)).arg(sx.mode & 07777, 4, 8, QLatin1Char('0')));
+    row(QObject::tr("Owner"), QStringLiteral("%1 : %2").arg(userName(sx.uid), groupName(sx.gid)));
     row(QObject::tr("Readable / writable"),
         QStringLiteral("%1 / %2").arg(::access(np.constData(), R_OK) == 0 ? QObject::tr("yes") : QObject::tr("no"),
                                       ::access(np.constData(), W_OK) == 0 ? QObject::tr("yes") : QObject::tr("no")));
@@ -212,9 +236,9 @@ FileInfo gatherFileInfo(const QString& path, char gitStatus)
         }
     }
     row(QObject::tr("Filesystem"), mountPoint.isEmpty() ? QString() : QStringLiteral("%1  (%2)").arg(mountPoint, fsType));
-    row(QObject::tr("Inode / links"), QStringLiteral("%1 / %2").arg(sx.stx_ino).arg(sx.stx_nlink));
-    if (info.isRegular && target.stx_blocks * 512 < target.stx_size)
-        row(QObject::tr("On disk"), QObject::tr("%1 (sparse or compressed)").arg(formatSize(qint64(target.stx_blocks) * 512)));
+    row(QObject::tr("Inode / links"), QStringLiteral("%1 / %2").arg(sx.ino).arg(sx.nlink));
+    if (info.isRegular && target.blocks * 512 < target.size)
+        row(QObject::tr("On disk"), QObject::tr("%1 (sparse or compressed)").arg(formatSize(qint64(target.blocks) * 512)));
 
     if (info.isRegular && mt.name().startsWith(QLatin1String("image/"))) {
         QImageReader reader(path);

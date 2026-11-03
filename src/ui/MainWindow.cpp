@@ -43,8 +43,10 @@
 #include <QStandardPaths>
 #include <QCryptographicHash>
 #include <QClipboard>
+#ifndef Q_OS_MACOS
 #include <QDBusConnection>
 #include <QDBusInterface>
+#endif
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDialog>
@@ -580,6 +582,13 @@ void MainWindow::findDuplicates()
 
 void MainWindow::showTrash()
 {
+#ifdef Q_OS_MACOS
+    // Finder owns the private restore metadata. Never guess original paths.
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(QDir::homePath() + QStringLiteral("/.Trash"))))
+        active()->showMessage(tr("Could not open Trash in Finder"), true);
+    return;
+#endif
+
     TrashDialog dlg(this);
     connect(&dlg, &TrashDialog::changed, this, [this] {
         for (Panel* p : {m_left, m_right})
@@ -2038,12 +2047,14 @@ void MainWindow::notifyFinished(Job* job)
             body += QStringLiteral(" · ") + formatSize(s.bytesDone);
         body += QStringLiteral(" · ") + formatDuration(took / 1000);
     }
+#ifndef Q_OS_MACOS
     QDBusInterface notify(QStringLiteral("org.freedesktop.Notifications"), QStringLiteral("/org/freedesktop/Notifications"),
                           QStringLiteral("org.freedesktop.Notifications"), QDBusConnection::sessionBus());
     if (!notify.isValid())
         return;
     notify.asyncCall(QStringLiteral("Notify"), QStringLiteral("Tandem"), uint(0), QStringLiteral("system-file-manager"),
                      summary, body, QStringList(), QVariantMap(), int(-1));
+#endif
 }
 
 // --------------------------------------------------------------------- undo
@@ -2567,6 +2578,14 @@ void MainWindow::openTerminal(const QString& dir)
     }
     if (active()->inArchive() && where.startsWith(active()->archivePath()))
         where = parentPath(active()->archivePath());  // the folder holding the archive
+#ifdef Q_OS_MACOS
+    if (QSettings().value(QStringLiteral("tools/terminal")).toString().isEmpty()) {
+        if (!QProcess::startDetached(QStringLiteral("/usr/bin/open"),
+                                     {QStringLiteral("-a"), QStringLiteral("Terminal"), where}))
+            active()->showMessage(tr("Could not open Terminal"), true);
+        return;
+    }
+#endif
     QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
     if (terminal.isEmpty())
         terminal = DesktopApps::instance().defaultTerminal();

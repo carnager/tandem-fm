@@ -12,11 +12,15 @@
 #endif
 #include <fcntl.h>
 #include <grp.h>
+#ifdef __linux__
 #include <linux/fs.h>
+#include <sys/vfs.h>
+#else
+#include <sys/mount.h>
+#endif
 #include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
-#include <sys/vfs.h>
 #include <sys/xattr.h>
 #include <unistd.h>
 
@@ -173,6 +177,7 @@ void mergeEntries(QList<AclEntry>& list, const QList<AclEntry>& set, const QList
     }
 }
 
+#ifdef __linux__
 struct FlagBit {
     uint32_t ours;
     int fs;
@@ -184,6 +189,8 @@ int openForFlags(const QByteArray& path)
 {
     return ::open(path.constData(), O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOCTTY);
 }
+
+#endif
 
 }  // namespace
 
@@ -226,6 +233,13 @@ PermInfo readPermissions(const QString& path)
     }
 #endif
 
+#ifdef __APPLE__
+    struct statfs sf;
+    if (::statfs(np.constData(), &sf) == 0) {
+        info.fsName = QString::fromLocal8Bit(sf.f_fstypename);
+        info.posixPerms = info.fsName != QLatin1String("msdos") && info.fsName != QLatin1String("exfat");
+    }
+#else
     struct statfs sf;
     if (::statfs(np.constData(), &sf) == 0) {
         const uint32_t user = FlagNoAtime | FlagNoDump;
@@ -273,6 +287,7 @@ PermInfo readPermissions(const QString& path)
         }
         ::close(fd);
     }
+#endif
     return info;
 }
 
@@ -328,6 +343,10 @@ int applyPermissions(const QString& path, const PermChange& c, QString* what)
     (void)aclChanges;
 #endif
 
+#ifdef __APPLE__
+    if (c.flagsSet || c.flagsClear)
+        return fail(ENOTSUP, QObject::tr("flags"));
+#else
     if (c.flagsSet || c.flagsClear) {
         const int fd = openForFlags(np);
         if (fd < 0)
@@ -349,6 +368,7 @@ int applyPermissions(const QString& path, const PermChange& c, QString* what)
         if (err)
             return fail(err, QObject::tr("flags"));
     }
+#endif
     return 0;
 }
 

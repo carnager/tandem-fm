@@ -16,6 +16,14 @@
 
 int main(int argc, char** argv)
 {
+#ifdef Q_OS_MACOS
+    // Apps started from Finder don't get Homebrew's folders (fd, rg, ffmpeg).
+    QByteArray path = qgetenv("PATH");
+    for (const QByteArray& dir : {QByteArray("/opt/homebrew/bin"), QByteArray("/usr/local/bin")})
+        if (!path.split(':').contains(dir))
+            path += ':' + dir;
+    qputenv("PATH", path);
+#endif
     QCoreApplication::setApplicationName(QStringLiteral("tandem-fm"));
     QCoreApplication::setOrganizationName(QStringLiteral("tandem-fm"));
     QStringList paths;

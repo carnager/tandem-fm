@@ -5,6 +5,9 @@
 #endif
 
 #include "ui/Network.h"
+#ifdef Q_OS_MACOS
+#include "ui/MacSmb.h"
+#endif
 
 #include "core/Remote.h"
 
@@ -30,7 +33,7 @@ Network& Network::instance()
 
 bool Network::available()
 {
-#ifdef TANDEM_HAVE_GIO
+#if defined(TANDEM_HAVE_GIO) || defined(Q_OS_MACOS)
     return true;
 #else
     return false;
@@ -449,6 +452,47 @@ QList<Place> Network::places() const
     g_list_free_full(volumes, g_object_unref);
     g_object_unref(monitor);
     return out;
+}
+
+#elif defined(Q_OS_MACOS)  // SMB through NetFS, mounted under /Volumes like Finder does
+
+Network::Network() = default;
+
+void Network::mount(const QString& uri, QWidget* parent, Done done)
+{
+    if (QUrl(uri).scheme().compare(QLatin1String("smb"), Qt::CaseInsensitive) != 0) {
+        done({}, tr("On macOS only smb:// shares can be mounted; sftp:// is built in."));
+        return;
+    }
+    MacSmb::mount(uri, parent, [this, done = std::move(done)](const QString& path, const QString& error) {
+        if (error.isEmpty())
+            emit placesChanged();
+        done(path, error);
+    });
+}
+
+void Network::mountVolume(const QString&, QWidget*, Done done)
+{
+    done({}, tr("Mount this drive in Finder, then open it from Locations."));
+}
+
+void Network::unmount(const QString& path, QWidget*, std::function<void(const QString&)> done)
+{
+    MacSmb::unmount(path, [this, done = std::move(done)](const QString& error) {
+        if (error.isEmpty())
+            emit placesChanged();
+        done(error);
+    });
+}
+
+bool Network::canUnmount(const QString& path) const
+{
+    return !MacSmb::mountRoot(path).isEmpty();
+}
+
+QList<Place> Network::places() const
+{
+    return {};  // mounted shares already come from listMounts()
 }
 
 #else  // no GIO: network places come only from kernel/FUSE mounts

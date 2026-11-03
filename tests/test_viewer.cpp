@@ -86,8 +86,12 @@ private slots:
         QCOMPARE(w->mode(), ViewerWindow::Mode::Text);
         QVERIFY(!w->usesLargeTextView());
         QVERIFY(w->textEdit()->toPlainText().contains("return 0;"));
-        // KSyntaxHighlighting adds formats to the blocks.
+#ifdef TANDEM_TEST_HIGHLIGHTING
+        // KSyntaxHighlighting is optional on every platform.
         QVERIFY(!w->textEdit()->document()->firstBlock().layout()->formats().isEmpty());
+#else
+        QVERIFY(w->textEdit()->document()->firstBlock().layout()->formats().isEmpty());
+#endif
     }
 
     void binaryOpensAsHex()
@@ -251,7 +255,12 @@ private slots:
     void fontSample()
     {
         QString font;
-        QDirIterator it("/usr/share/fonts", {"*.ttf", "*.otf"}, QDir::Files, QDirIterator::Subdirectories);
+#ifdef Q_OS_MACOS
+        const QString fontRoot = QStringLiteral("/System/Library/Fonts");
+#else
+        const QString fontRoot = QStringLiteral("/usr/share/fonts");
+#endif
+        QDirIterator it(fontRoot, {"*.ttf", "*.otf"}, QDir::Files, QDirIterator::Subdirectories);
         if (it.hasNext())
             font = it.next();
         if (font.isEmpty())

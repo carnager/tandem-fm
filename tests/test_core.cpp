@@ -38,6 +38,9 @@
 #include <QTest>
 
 #include <sys/stat.h>
+#ifdef Q_OS_MACOS
+#include <sys/xattr.h>
+#endif
 #include <thread>
 #include <unistd.h>
 
@@ -301,6 +304,69 @@ private slots:
         QVERIFY(spy.wait(5000));
         QCOMPARE(job.snapshot().state, Job::State::Cancelled);
     }
+
+    void copyIntoSymlinkDescendantRejected()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("source/sub")));
+        QVERIFY(::symlink(QFile::encodeName(tmp.filePath("source/sub")).constData(),
+                          QFile::encodeName(tmp.filePath("alias")).constData()) == 0);
+        CopyJob job(CopyJob::Mode::Copy, {tmp.filePath("source")}, tmp.filePath("alias"));
+        QVERIFY(runJob(job));
+        QCOMPARE(job.errors().size(), 1);
+        QVERIFY(!QFileInfo::exists(tmp.filePath("source/sub/source")));
+    }
+
+    void renameNeverClobbers()
+    {
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("a"), "source");
+        writeFile(tmp.filePath("b"), "destination");
+        QCOMPARE(renameNoReplace(tmp.filePath("a"), tmp.filePath("b")), EEXIST);
+        QCOMPARE(readFile(tmp.filePath("a")), QByteArray("source"));
+        QCOMPARE(readFile(tmp.filePath("b")), QByteArray("destination"));
+        QVERIFY(::symlink("missing", QFile::encodeName(tmp.filePath("link")).constData()) == 0);
+        QCOMPARE(renameNoReplace(tmp.filePath("a"), tmp.filePath("link")), EEXIST);
+        QVERIFY(QFileInfo(tmp.filePath("link")).isSymLink());
+    }
+
+#ifdef Q_OS_MACOS
+    void copyPreservesMacDirectoryMetadata()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("source/sub")));
+        const QByteArray value("directory metadata");
+        QCOMPARE(::setxattr(QFile::encodeName(tmp.filePath("source/sub")).constData(), "com.tandem.test",
+                            value.constData(), value.size(), 0, 0), 0);
+        CopyJob job(CopyJob::Mode::Copy, {tmp.filePath("source")}, tmp.filePath("target"));
+        QVERIFY(runJob(job));
+        QVERIFY2(job.errors().isEmpty(), qPrintable(job.errors().join("; ")));
+        char buf[128];
+        const auto size = ::getxattr(QFile::encodeName(tmp.filePath("target/sub")).constData(),
+                                     "com.tandem.test", buf, sizeof buf, 0, 0);
+        QVERIFY(size >= 0);
+        QCOMPARE(QByteArray(buf, size), value);
+    }
+
+    void copyPreservesMacMetadata()
+    {
+        QTemporaryDir tmp;
+        const QString source = tmp.filePath(QString::fromUtf8("café 日本語.txt"));
+        const QString target = tmp.filePath("copy");
+        writeFile(source, "contents");
+        const QByteArray native = QFile::encodeName(source);
+        const QByteArray value("finder metadata");
+        QCOMPARE(::setxattr(native.constData(), "com.tandem.test", value.constData(), value.size(), 0, 0), 0);
+        CopyJob job(CopyJob::Mode::Copy, {source}, target);
+        QVERIFY(runJob(job));
+        QVERIFY2(job.errors().isEmpty(), qPrintable(job.errors().join("; ")));
+        QCOMPARE(readFile(target), QByteArray("contents"));
+        char buf[128];
+        const auto size = ::getxattr(QFile::encodeName(target).constData(), "com.tandem.test", buf, sizeof buf, 0, 0);
+        QVERIFY(size >= 0);
+        QCOMPARE(QByteArray(buf, size), value);
+    }
+#endif
 
     void deletePermanent()
     {
@@ -744,6 +810,9 @@ private slots:
 
     void trash()
     {
+#ifdef Q_OS_MACOS
+        QSKIP("Freedesktop Trash browsing is Linux-only; native Trash round-trip is covered by undoRecords");
+#endif
         QTemporaryDir tmp;
         const QByteArray oldData = qgetenv("XDG_DATA_HOME");  // never the real trash
         qputenv("XDG_DATA_HOME", QFile::encodeName(tmp.filePath("data")));
@@ -1590,6 +1659,9 @@ private slots:
         Backend* b = backendFor(S);
         QCOMPARE(b->homeLocation(S), server.location(QDir::homePath()));
 
+#ifndef Q_OS_MACOS
+        // The following fast-path and permissions assertions require a GNU
+        // userspace on the test server. A local macOS sshd uses BSD tools.
         // Whole trees in one request (find over an exec channel), same as walking.
         QVERIFY(QDir().mkpath(base + "/srv/sub/deep/er"));
         writeFile(base + "/srv/sub/deep/with space.txt", "12345678");
@@ -1642,6 +1714,15 @@ private slots:
         QVERIFY(b->listAccounts(S, users, groups));
         QVERIFY(std::any_of(users.begin(), users.end(), [](const auto& u) { return u.first == qEnvironmentVariable("USER"); }));
 
+#else
+        QVERIFY(QDir().mkpath(base + "/srv/sub/deep/er"));
+        writeFile(base + "/srv/sub/deep/with space.txt", "12345678");
+        Backend::Tree tree;
+        const CompareResult same = compareFolders(base + "/srv/sub", S + "/sub", {});
+        QVERIFY(same.error.isEmpty());
+        QVERIFY(!b->listTree(S, false, tree, nullptr));
+        QCOMPARE(directorySizeAt(S + "/sub", nullptr), int64_t(8));
+#endif
         qputenv("TANDEM_SFTP_NO_EXEC", "1");  // servers without a shell: walked folder by folder
         QVERIFY(!b->listTree(S, false, tree, nullptr));
         QCOMPARE(directorySizeAt(S + "/sub", nullptr), int64_t(8));
