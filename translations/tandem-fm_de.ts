@@ -4033,6 +4033,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Sprache</translation>
     </message>
     <message>
+        <source>%1 pt</source>
+        <translation>%1 pt</translation>
+    </message>
+    <message>
         <source>Like the desktop (%1)</source>
         <translation>Wie der Desktop (%1)</translation>
     </message>
@@ -4099,6 +4103,34 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Show the menu bar (Ctrl+Shift+M)</source>
         <translation>Menüleiste zeigen (Strg+Umschalt+M)</translation>
+    </message>
+    <message>
+        <source>Default size</source>
+        <translation>Standardgröße</translation>
+    </message>
+    <message>
+        <source>Font</source>
+        <translation>Schrift</translation>
+    </message>
+    <message>
+        <source>Menus, dialogs and everything else.</source>
+        <translation>Menüs, Dialoge und alles andere.</translation>
+    </message>
+    <message>
+        <source>File list font</source>
+        <translation>Schrift der Dateilisten</translation>
+    </message>
+    <message>
+        <source>Like the interface</source>
+        <translation>Wie die Oberfläche</translation>
+    </message>
+    <message>
+        <source>Fixed-width font</source>
+        <translation>Schrift mit fester Breite</translation>
+    </message>
+    <message>
+        <source>The viewer, hex view and rename templates. Only fonts with letters of equal width are listed.</source>
+        <translation>Betrachter, Hex-Ansicht und Umbenennen-Vorlagen. Nur Schriften mit gleich breiten Buchstaben stehen zur Wahl.</translation>
     </message>
     <message>
         <source>The interface size changes the next time Tandem starts</source>

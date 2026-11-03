@@ -42,6 +42,7 @@
 #include <QPlainTextEdit>
 
 #include <sys/stat.h>
+#include <QFontDatabase>
 #include <QScrollBar>
 #include <QSignalSpy>
 
@@ -474,6 +475,29 @@ private slots:
         QTest::keyClick(m_left->view(), Qt::Key_0, Qt::ControlModifier);
         QCOMPARE(FileView::listZoom(), 100);
         QTRY_COMPARE(m_left->view()->sizeHintForRow(0), row);
+    }
+
+    // Fonts from the settings: the interface, the lists (on top of it), fixed width.
+    void fonts()
+    {
+        auto restore = qScopeGuard([] {
+            QSettings s;
+            for (const char* k : {"view/fontFamily", "view/fontSize", "view/listFontFamily", "view/listFontSize",
+                                  "view/monoFontFamily", "view/monoFontSize"})
+                s.remove(k);
+            applyTheme(*qApp);
+        });
+        const QString family = QFontDatabase::families().value(0);
+        QSettings s;
+        s.setValue("view/fontSize", 13);
+        s.setValue("view/listFontFamily", family);
+        s.setValue("view/monoFontSize", 15);
+        applyTheme(*qApp);
+        QCOMPARE(QApplication::font().pointSizeF(), 13.0);
+        QCOMPARE(theme().listFont.family(), family);
+        QCOMPARE(theme().listFont.pointSizeF(), 13.0);  // the size comes from the interface font
+        QCOMPARE(monoFont().pointSizeF(), 15.0);
+        QVERIFY(QFontInfo(monoFont()).fixedPitch());
     }
 
     void quickSearch()

@@ -37,8 +37,28 @@ static Theme g_theme;
 
 const Theme& theme() { return g_theme; }
 
+namespace {
+QFont g_monoFont;
+bool g_monoSet = false;
+
+// A font from the settings: family and point size, each empty/0 for `base`'s.
+QFont chosenFont(const QFont& base, const char* family, const char* size)
+{
+    const QSettings s;
+    QFont f = base;
+    const QString fam = s.value(QLatin1String(family)).toString();
+    if (!fam.isEmpty())
+        f.setFamilies({fam});
+    if (const double pt = s.value(QLatin1String(size)).toDouble(); pt > 0)
+        f.setPointSizeF(pt);
+    return f;
+}
+}  // namespace
+
 QFont monoFont()
 {
+    if (g_monoSet)
+        return g_monoFont;
     QFont f = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     if (!QFontInfo(f).fixedPitch()) {
         f.setFamily(QStringLiteral("monospace"));
@@ -518,7 +538,6 @@ void applyTheme(QApplication& app)
 {
     static bool first = true;
     bool followsDesktop = false;
-    const QFont listFont = g_theme.listFont;
     static quint64 serial = 0;
     g_theme = chosenTheme(app, &followsDesktop);
     Theme& t = g_theme;
@@ -627,7 +646,15 @@ void applyTheme(QApplication& app)
         }
     }
 
-    t.listFont = first ? app.font() : listFont;
+    // Fonts (Settings › Appearance): the interface, the file lists, fixed width.
+    static const QFont desktopFont = app.font();  // as the desktop set it, before ours
+    const QFont ui = chosenFont(desktopFont, "view/fontFamily", "view/fontSize");
+    if (ui != app.font())
+        app.setFont(ui);  // reaches every widget that doesn't set its own
+    t.listFont = chosenFont(ui, "view/listFontFamily", "view/listFontSize");
+    g_monoSet = false;
+    g_monoFont = chosenFont(monoFont(), "view/monoFontFamily", "view/monoFontSize");
+    g_monoSet = true;
     t.numberFont = t.listFont;
     t.numberFont.setFeature(QFont::Tag("tnum"), 1);
 

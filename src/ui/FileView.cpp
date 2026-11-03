@@ -276,6 +276,9 @@ void FileDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewI
 FileView::FileView(QWidget* parent) : QTreeView(parent)
 {
     setItemDelegate(new FileDelegate(this));
+    connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, [this] {
+        scheduleDelayedItemsLayout();  // a new font: rows of another height
+    });
     setRootIsDecorated(false);
     setItemsExpandable(false);
     setUniformRowHeights(true);  // essential for huge directories
