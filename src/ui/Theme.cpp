@@ -18,6 +18,7 @@
 #include <QFontDatabase>
 #include <QFontInfo>
 #include <QIcon>
+#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
@@ -94,7 +95,7 @@ QString Theme::css(const QString& tmpl) const
         {"@window", window},   {"@base", base},         {"@altBase", altBase},     {"@text", text},
         {"@dimText", dimText}, {"@accentText", accentText}, {"@accent", accent},   {"@border", border},
         {"@headerActive", headerActive}, {"@header", header}, {"@error", error},    {"@success", success},
-        {"@mark", mark},       {"@control", control},
+        {"@mark", mark},       {"@control", control},       {"@cursorActive", cursorActive},
     };
     for (const auto& [name, color] : vars)
         s.replace(QLatin1String(name), rgba(color));
@@ -109,6 +110,14 @@ namespace {
 class TandemStyle : public QProxyStyle {
 public:
     using QProxyStyle::QProxyStyle;
+
+    // Menus get round corners: what's outside them must be see-through.
+    void polish(QWidget* w) override
+    {
+        QProxyStyle::polish(w);
+        if (qobject_cast<QMenu*>(w))
+            w->setAttribute(Qt::WA_TranslucentBackground);
+    }
 
     int pixelMetric(PixelMetric m, const QStyleOption* o, const QWidget* w) const override
     {
@@ -595,18 +604,23 @@ void applyTheme(QApplication& app)
     app.setPalette(p);
 
     // Style sheets can't draw a drop-down's arrow themselves: a small chevron file.
-    const QString chevron = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) +
-                            QStringLiteral("/tandem-fm/chevron-%1.svg").arg(t.dimText.name().mid(1));
-    if (!QFileInfo::exists(chevron)) {
-        QDir().mkpath(QFileInfo(chevron).path());
-        QFile f(chevron);
-        if (f.open(QIODevice::WriteOnly))
-            f.write(QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'>"
-                                   "<path d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%1' stroke-width='1.6' "
-                                   "stroke-linecap='round' stroke-linejoin='round'/></svg>")
-                        .arg(t.dimText.name())
-                        .toUtf8());
-    }
+    auto arrowFile = [&](const char* name, const char* path) {
+        const QString file = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) +
+                             QStringLiteral("/tandem-fm/%1-%2.svg").arg(QLatin1String(name), t.dimText.name().mid(1));
+        if (!QFileInfo::exists(file)) {
+            QDir().mkpath(QFileInfo(file).path());
+            QFile f(file);
+            if (f.open(QIODevice::WriteOnly))
+                f.write(QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'>"
+                                       "<path d='%1' fill='none' stroke='%2' stroke-width='1.6' "
+                                       "stroke-linecap='round' stroke-linejoin='round'/></svg>")
+                            .arg(QLatin1String(path), t.dimText.name())
+                            .toUtf8());
+        }
+        return file;
+    };
+    const QString chevron = arrowFile("chevron", "M2.5 4.5 6 8l3.5-3.5");
+    const QString chevronRight = arrowFile("chevron-right", "M4.5 2.5 8 6l-3.5 3.5");
     // Inputs, drop-downs and buttons: visible edges, the accent when focused.
     // Widgets with their own style sheets (popups, bars) still win.
     app.setStyleSheet(t.css(QStringLiteral(
@@ -628,7 +642,16 @@ void applyTheme(QApplication& app)
         "QPushButton:default { background: @accent; color: @accentText; border-color: @accent; }"
         "QPushButton:default:hover { border-color: @text; }"
         "QPushButton:disabled { color: @dimText; border-color: @border; background: @header; }"
-        "QToolTip { background: @header; color: @text; border: 1px solid @control; border-radius: 4px; padding: 4px 6px; }"))
+        "QToolTip { background: @header; color: @text; border: 1px solid @control; border-radius: 4px; padding: 4px 6px; }"
+        // Menus: an edge, room, and a soft highlight instead of a full bar.
+        "QMenu { background: @header; color: @text; border: 1px solid @control; border-radius: 8px; padding: 5px; }"
+        "QMenu::item { padding: 5px 24px 5px 10px; border-radius: 5px; background: transparent; }"
+        "QMenu::item:selected { background: @cursorActive; color: @text; }"
+        "QMenu::item:disabled { color: @dimText; }"
+        "QMenu::icon { padding-left: 10px; }"
+        "QMenu::separator { height: 1px; background: @border; margin: 4px 10px; }"
+        "QMenu::right-arrow { image: url(CHEVRONRIGHT); width: 12px; height: 12px; padding-right: 8px; }"))
+                          .replace(QStringLiteral("CHEVRONRIGHT"), chevronRight)
                           .replace(QStringLiteral("CHEVRON"), chevron));
 
     // Icons: the desktop's icon theme in its light or dark variant, to match
