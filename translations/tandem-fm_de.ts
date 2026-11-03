@@ -1793,6 +1793,29 @@
     </message>
 </context>
 <context>
+    <name>tandem::FontPicker</name>
+    <message>
+        <source>Search fonts</source>
+        <translation>Schriften suchen</translation>
+    </message>
+    <message>
+        <source>Default</source>
+        <translation>Standard</translation>
+    </message>
+    <message>
+        <source>%1 pt</source>
+        <translation>%1 pt</translation>
+    </message>
+    <message>
+        <source>The size it is based on</source>
+        <translation>Die Größe der Grundschrift</translation>
+    </message>
+    <message>
+        <source>Holiday 2026.jpg   report_final (2).pdf   1.27 KiB   2026-11-03 21:50</source>
+        <translation>Urlaub 2026.jpg   Bericht_final (2).pdf   1,27 KiB   2026-11-03 21:50</translation>
+    </message>
+</context>
+<context>
     <name>tandem::HexView</name>
     <message>
         <source>Loading…</source>
@@ -4059,6 +4082,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>%1 pt</translation>
     </message>
     <message>
+        <source>default size</source>
+        <translation>Standardgröße</translation>
+    </message>
+    <message>
         <source>Text and icons everywhere. Only the file lists: Ctrl+= and Ctrl+−.</source>
         <translation>Text und Symbole überall. Nur die Dateilisten: Strg+= und Strg+−.</translation>
     </message>
@@ -4129,10 +4156,6 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Show the menu bar (Ctrl+Shift+M)</source>
         <translation>Menüleiste zeigen (Strg+Umschalt+M)</translation>
-    </message>
-    <message>
-        <source>Default size</source>
-        <translation>Standardgröße</translation>
     </message>
     <message>
         <source>Font</source>

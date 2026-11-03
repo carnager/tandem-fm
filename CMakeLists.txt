@@ -57,6 +57,7 @@ add_library(tandem_ui STATIC
   src/ui/Theme.h src/ui/Theme.cpp
   src/ui/IconCache.h src/ui/IconCache.cpp
   src/ui/FileColors.h src/ui/FileColors.cpp
+  src/ui/FontPicker.h src/ui/FontPicker.cpp
   src/ui/FileModel.h src/ui/FileModel.cpp
   src/ui/FileView.h src/ui/FileView.cpp
   src/ui/DirTab.h src/ui/DirTab.cpp

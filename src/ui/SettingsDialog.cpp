@@ -1,6 +1,7 @@
 #include "ui/SettingsDialog.h"
 
 #include "ui/FileColors.h"
+#include "ui/FontPicker.h"
 #include "ui/FileView.h"
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
@@ -369,37 +370,37 @@ QWidget* SettingsDialog::appearancePage()
     language->setMaximumWidth(320);
     page.add(tr("Language"), language, tr("Takes effect the next time Tandem starts."));
 
-    // Fonts: a family (or the one it's based on) and a size (or that one's).
-    auto fontRow = [this, &s](const char* familyKey, const char* sizeKey, const QString& inherit, bool fixed) {
-        auto* row = new QWidget(this);
-        auto* h = new QHBoxLayout(row);
-        h->setContentsMargins(0, 0, 0, 0);
-        auto* family = new QComboBox(row);
-        family->setObjectName(QLatin1String(familyKey));
-        family->addItem(inherit, QString());
-        for (const QString& f : QFontDatabase::families())
-            if (!QFontDatabase::isPrivateFamily(f) && (!fixed || QFontDatabase::isFixedPitch(f)))
-                family->addItem(f, f);
-        family->setCurrentIndex(qMax(0, family->findData(s.value(QLatin1String(familyKey)).toString())));
-        family->setMaxVisibleItems(16);
-        auto* size = new QComboBox(row);
-        size->setObjectName(QLatin1String(sizeKey));
-        size->addItem(tr("Default size"), 0);
-        for (int pt : {8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24})
-            size->addItem(tr("%1 pt").arg(pt), pt);
-        size->setCurrentIndex(qMax(0, size->findData(s.value(QLatin1String(sizeKey)).toInt())));
-        h->addWidget(family, 1);
-        h->addWidget(size);
-        row->setMaximumWidth(420);
-        auto save = [familyKey, sizeKey, family, size] {
-            QSettings st;
-            st.setValue(QLatin1String(familyKey), family->currentData());
-            st.setValue(QLatin1String(sizeKey), size->currentData());
-            applyTheme(*qApp);  // restyles everything with the new font
+    // Fonts: a button showing the font in itself; it opens the picker.
+    auto fontRow = [this](const char* familyKey, const char* sizeKey, const QString& inherit, bool fixed) {
+        auto* button = new QPushButton(this);
+        button->setObjectName(QLatin1String(familyKey));
+        button->setMaximumWidth(320);
+        button->setStyleSheet(QStringLiteral("text-align: left; padding-left: 10px;"));
+        auto show = [button, familyKey, sizeKey, inherit] {
+            const QSettings s;
+            const QString family = s.value(QLatin1String(familyKey)).toString();
+            const int size = s.value(QLatin1String(sizeKey)).toInt();
+            const QString sizeText = size ? tr("%1 pt").arg(size) : tr("default size");
+            button->setText(QStringLiteral("%1  ·  %2").arg(family.isEmpty() ? inherit : family, sizeText));
+            QFont f = family.isEmpty() ? QApplication::font() : QFont(family);
+            f.setPointSizeF(QApplication::font().pointSizeF());
+            button->setFont(f);
         };
-        connect(family, &QComboBox::currentIndexChanged, this, save);
-        connect(size, &QComboBox::currentIndexChanged, this, save);
-        return row;
+        show();
+        connect(button, &QPushButton::clicked, this, [=, this] {
+            const QSettings s;
+            auto* picker = new FontPicker(s.value(QLatin1String(familyKey)).toString(),
+                                          s.value(QLatin1String(sizeKey)).toInt(), fixed, inherit, this);
+            connect(picker, &FontPicker::changed, this, [=](const QString& family, int size) {
+                QSettings st;
+                st.setValue(QLatin1String(familyKey), family);
+                st.setValue(QLatin1String(sizeKey), size);
+                applyTheme(*qApp);  // tried out at once
+                show();
+            });
+            picker->popupBelow(button);
+        });
+        return button;
     };
     page.add(tr("Font"), fontRow("view/fontFamily", "view/fontSize", tr("Like the desktop"), false),
              tr("Menus, dialogs and everything else."));
