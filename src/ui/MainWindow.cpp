@@ -21,6 +21,7 @@
 #include "ui/PermissionsDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/ShortcutsDialog.h"
+#include "ui/TrashDialog.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ViewerWindow.h"
@@ -207,6 +208,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
         connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
         connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
+        connect(p, &Panel::trashRequested, this, &MainWindow::showTrash);
         connect(p, &Panel::archiveRenameRequested, this, [this, p](const QString& from, const QString& to) {
             ArchiveChanges c;
             c.rename.append({p->innerPath(from), p->innerPath(to)});
@@ -328,6 +330,7 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("copy")] = addCommand(files, QT_TR_NOOP("Copy…"), {K(Qt::Key_F5)}, [this] { copyOrMove(CopyJob::Mode::Copy); });
     m_actions[QStringLiteral("move")] = addCommand(files, QT_TR_NOOP("Move…"), {K(Qt::Key_F6)}, [this] { copyOrMove(CopyJob::Mode::Move); });
     m_actions[QStringLiteral("rename")] = addCommand(files, QT_TR_NOOP("Rename"), {K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
+    addCommand(files, QT_TR_NOOP("Trash…"), {}, [this] { showTrash(); });
     m_actions[QStringLiteral("link")] =
         addCommand(files, QT_TR_NOOP("Create link…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_F5)}, [this] { createLink(); });
     m_actions[QStringLiteral("permissions")] =
@@ -508,6 +511,16 @@ void MainWindow::createMenus()
     addCommand(help, QT_TR_NOOP("Command palette…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_P)}, [this] { commandPalette(); });
     addCommand(help, QT_TR_NOOP("Keyboard shortcuts"), {K(Qt::Key_F1)}, [this] { showShortcuts(); });
     applyKeyBindings(actions());  // keys changed in the settings
+}
+
+void MainWindow::showTrash()
+{
+    TrashDialog dlg(this);
+    connect(&dlg, &TrashDialog::changed, this, [this] {
+        for (Panel* p : {m_left, m_right})
+            p->refresh();
+    });
+    dlg.exec();
 }
 
 void MainWindow::setPreviewPosition(const QString& code)

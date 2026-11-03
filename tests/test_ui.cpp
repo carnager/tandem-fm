@@ -25,6 +25,7 @@
 #include "ui/PermissionsDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/ShortcutsDialog.h"
+#include "ui/TrashDialog.h"
 #include "ui/Panel.h"
 #include "ui/PathBar.h"
 #include "ui/Theme.h"
@@ -941,6 +942,36 @@ private slots:
         }
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // The trash window: lists what's there, restores, deletes for good.
+    void trashWindow()
+    {
+        QVERIFY(QDir().mkpath(L("tw")));
+        writeFile(L("tw/old-report.pdf"), "pdf");
+        writeFile(L("tw/gone.txt"), "bye");
+        QVERIFY(QFile::moveToTrash(L("tw/old-report.pdf")));
+        QVERIFY(QFile::moveToTrash(L("tw/gone.txt")));
+        TrashDialog dlg(m_window.get());
+        dlg.show();
+        QTRY_VERIFY(!dlg.isLoading());
+        auto rowOf = [&](const QString& name) -> QTreeWidgetItem* {
+            for (int i = 0; i < dlg.list()->topLevelItemCount(); ++i)
+                if (dlg.list()->topLevelItem(i)->text(0) == name)
+                    return dlg.list()->topLevelItem(i);
+            return nullptr;
+        };
+        QTRY_VERIFY(rowOf("old-report.pdf") && rowOf("gone.txt"));
+        QCOMPARE(rowOf("old-report.pdf")->text(1), L("tw"));
+        dlg.list()->clearSelection();
+        rowOf("old-report.pdf")->setSelected(true);
+        dlg.restoreSelected();
+        QTRY_COMPARE(readFile(L("tw/old-report.pdf")), QByteArray("pdf"));
+        QTRY_VERIFY(!dlg.isLoading() && !rowOf("old-report.pdf"));
+        rowOf("gone.txt")->setSelected(true);
+        dlg.deleteSelected(false);
+        QTRY_VERIFY(!dlg.isLoading() && !rowOf("gone.txt"));
+        QVERIFY(!QFile::exists(L("tw/gone.txt")));
     }
 
     // Ctrl+Shift+F5: a link in the other panel; Ctrl+Z takes it away again.
@@ -1871,6 +1902,12 @@ private slots:
 
     void cleanupTestCase()
     {
+        // What the tests moved to a trash (/tmp has its own .Trash-<uid>) goes for good.
+        QList<TrashItem> ours;
+        for (const TrashItem& it : listTrash())
+            if (it.originalPath.startsWith(m_tmp.path() + '/'))
+                ours << it;
+        deleteTrashItems(ours);
         m_window->close();
         m_window.reset();
     }

@@ -1172,6 +1172,8 @@ QList<PopupItem> Panel::locationItems()
         [this] { navigate(QDir::homePath()); });
     add(places, IconCache::themed("folder-root", "folder"), tr("Computer"), QStringLiteral("/"), {},
         [this] { navigate(QStringLiteral("/")); });
+    add(places, IconCache::themed("user-trash", "user-trash-full"), tr("Trash"), tr("restore or delete for good"), {},
+        [this] { emit trashRequested(); });
 
     for (const MountPoint& m : listMounts()) {
         if (m.path == QLatin1String("/") || isSystemMount(m))

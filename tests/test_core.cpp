@@ -9,6 +9,7 @@
 #include "TestBackend.h"
 #include "SshServer.h"
 #include "core/GitStatus.h"
+#include "core/Trash.h"
 #include "core/Undo.h"
 #include "core/FolderHistory.h"
 #include "core/Fuzzy.h"
@@ -18,6 +19,7 @@
 #include "core/Permissions.h"
 #include "core/Sorting.h"
 
+#include <QScopeGuard>
 #include <QDateTime>
 #include <QFile>
 #include <QElapsedTimer>
@@ -597,6 +599,47 @@ private slots:
         QCOMPARE(names(with("{nope}")), QStringList({"Unknown field {nope}"}));
         QCOMPARE(names(with("{name")), QStringList({"A { is not closed"}));
         QCOMPARE(names(with("{name|shout}")).first(), QString("Unknown filter |shout (lower, upper, title, trim)"));
+    }
+
+    void trash()
+    {
+        QTemporaryDir tmp;
+        const QByteArray oldData = qgetenv("XDG_DATA_HOME");  // never the real trash
+        qputenv("XDG_DATA_HOME", QFile::encodeName(tmp.filePath("data")));
+        QVERIFY(QDir().mkpath(tmp.filePath("data")));
+        auto restoreEnv = qScopeGuard([&] { qputenv("XDG_DATA_HOME", oldData); });
+        QVERIFY(QDir().mkpath(tmp.filePath("work/sub")));
+        writeFile(tmp.filePath("work/note.txt"), "keep me");
+        writeFile(tmp.filePath("work/sub/x.bin"), QByteArray(1000, 'x'));
+        QString inTrash, dirInTrash;
+        QVERIFY(QFile::moveToTrash(tmp.filePath("work/note.txt"), &inTrash));
+        QVERIFY(QFile::moveToTrash(tmp.filePath("work/sub"), &dirInTrash));
+        auto find = [&](const QString& original) {
+            for (const TrashItem& it : listTrash())
+                if (it.originalPath == original)
+                    return it;
+            return TrashItem{};
+        };
+        TrashItem note = find(tmp.filePath("work/note.txt"));
+        QVERIFY2(!note.name.isEmpty(), qPrintable("not listed: " + inTrash + " roots " + trashRoots().join(',')));
+        QCOMPARE(note.size, int64_t(7));
+        QVERIFY(note.deletedAt > 0);
+        TrashItem sub = find(tmp.filePath("work/sub"));
+        QVERIFY(sub.isDir);
+        QCOMPARE(sub.size, int64_t(1000));
+
+        // Restore: back in place; a taken place gets a new name.
+        writeFile(tmp.filePath("work/note.txt"), "new one");
+        QVERIFY(restoreTrashItems({note}).isEmpty());
+        QCOMPARE(readFile(tmp.filePath("work/note.txt")), QByteArray("new one"));
+        const QStringList restored = QDir(tmp.filePath("work")).entryList({"note (*"});
+        QCOMPARE(restored.size(), 1);
+        QCOMPARE(readFile(tmp.filePath("work/" + restored.first())), QByteArray("keep me"));
+        QVERIFY(!QFile::exists(note.infoPath()));
+        // Delete for good.
+        QVERIFY(deleteTrashItems({sub}).isEmpty());
+        QVERIFY(!QFileInfo::exists(sub.filePath()));
+        QVERIFY(find(tmp.filePath("work/sub")).name.isEmpty());
     }
 
     void links()

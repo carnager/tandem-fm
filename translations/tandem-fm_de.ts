@@ -240,6 +240,21 @@
         <translation>unbekannt</translation>
     </message>
     <message>
+        <source>today %1</source>
+        <translation>heute %1</translation>
+    </message>
+    <message>
+        <source>yesterday %1</source>
+        <translation>gestern %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n day(s) ago</source>
+        <translation>
+            <numerusform>vor %n Tag</numerusform>
+            <numerusform>vor %n Tagen</numerusform>
+        </translation>
+    </message>
+    <message>
         <source>computing…</source>
         <translation>wird berechnet…</translation>
     </message>
@@ -658,6 +673,22 @@
     <message>
         <source>nothing</source>
         <translation>nichts</translation>
+    </message>
+    <message>
+        <source> (restored)</source>
+        <translation> (wiederhergestellt)</translation>
+    </message>
+    <message>
+        <source> (restored %1)</source>
+        <translation> (wiederhergestellt %1)</translation>
+    </message>
+    <message>
+        <source>%1: nobody knows where it came from</source>
+        <translation>%1: niemand weiß, woher es kam</translation>
+    </message>
+    <message>
+        <source>%1: could not delete everything</source>
+        <translation>%1: konnte nicht alles löschen</translation>
     </message>
 </context>
 <context>
@@ -1779,6 +1810,10 @@
         <translation>Unter jedem Panel</translation>
     </message>
     <message>
+        <source>Trash…</source>
+        <translation>Papierkorb…</translation>
+    </message>
+    <message>
         <source>Permissions…</source>
         <translation>Berechtigungen…</translation>
     </message>
@@ -2813,6 +2848,14 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Computer</translation>
     </message>
     <message>
+        <source>Trash</source>
+        <translation>Papierkorb</translation>
+    </message>
+    <message>
+        <source>restore or delete for good</source>
+        <translation>wiederherstellen oder endgültig löschen</translation>
+    </message>
+    <message>
         <source>Del ⏏</source>
         <translation>Entf ⏏</translation>
     </message>
@@ -3830,6 +3873,97 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Loading…</source>
         <translation>Wird geladen…</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::TrashDialog</name>
+    <message>
+        <source>Trash</source>
+        <translation>Papierkorb</translation>
+    </message>
+    <message>
+        <source>Find by name or where it came from</source>
+        <translation>Nach Name oder Herkunft finden</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <source>Came from</source>
+        <translation>Kam aus</translation>
+    </message>
+    <message>
+        <source>Deleted</source>
+        <translation>Gelöscht</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Größe</translation>
+    </message>
+    <message>
+        <source>Empty trash…</source>
+        <translation>Papierkorb leeren…</translation>
+    </message>
+    <message>
+        <source>Enter restores · Del deletes for good</source>
+        <translation>Enter stellt wieder her · Entf löscht endgültig</translation>
+    </message>
+    <message>
+        <source>Delete permanently</source>
+        <translation>Endgültig löschen</translation>
+    </message>
+    <message>
+        <source>Restore</source>
+        <translation>Wiederherstellen</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <source>Empty trash</source>
+        <translation>Papierkorb leeren</translation>
+    </message>
+    <message numerus="yes">
+        <source>Delete all %n item(s) in the trash for good? This cannot be undone.</source>
+        <translation>
+            <numerusform>%n Element im Papierkorb endgültig löschen? Das kann nicht rückgängig gemacht werden.</numerusform>
+            <numerusform>Alle %n Elemente im Papierkorb endgültig löschen? Das kann nicht rückgängig gemacht werden.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>The trash is empty</source>
+        <translation>Der Papierkorb ist leer</translation>
+    </message>
+    <message>
+        <source>Reading the trash …</source>
+        <translation>Lese den Papierkorb …</translation>
+    </message>
+    <message>
+        <source>(unknown)</source>
+        <translation>(unbekannt)</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n item(s)</source>
+        <translation>
+            <numerusform>%n Element</numerusform>
+            <numerusform>%n Elemente</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Restore %n</source>
+        <translation>
+            <numerusform>%n wiederherstellen</numerusform>
+            <numerusform>%n wiederherstellen</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Delete %n item(s) for good? This cannot be undone.</source>
+        <translation>
+            <numerusform>%n Element endgültig löschen? Das kann nicht rückgängig gemacht werden.</numerusform>
+            <numerusform>%n Elemente endgültig löschen? Das kann nicht rückgängig gemacht werden.</numerusform>
+        </translation>
     </message>
 </context>
 <context>

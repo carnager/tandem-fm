@@ -129,6 +129,7 @@ private:
     QString previewMode() const;  // "each" (default), "bottom", "right"
     void setPreviewPosition(const QString& code);
     void openSettings(int page = 0);
+    void showTrash();
     void closePreview();
     void updatePreviewFor(ViewerWindow* preview, Panel* panel);
     void openCommandBar();

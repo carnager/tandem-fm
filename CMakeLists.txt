@@ -27,6 +27,7 @@ add_library(tandem_core STATIC
   src/core/MultiRename.h src/core/MultiRename.cpp
   src/core/ExifDate.h src/core/ExifDate.cpp
   src/core/Permissions.h src/core/Permissions.cpp
+  src/core/Trash.h src/core/Trash.cpp
   src/core/IoScheduler.h src/core/IoScheduler.cpp
   src/core/Fuzzy.h src/core/Fuzzy.cpp
   src/core/FolderHistory.h src/core/FolderHistory.cpp
@@ -67,6 +68,7 @@ add_library(tandem_ui STATIC
   src/ui/PermissionsDialog.h src/ui/PermissionsDialog.cpp
   src/ui/ShortcutsDialog.h src/ui/ShortcutsDialog.cpp
   src/ui/SettingsDialog.h src/ui/SettingsDialog.cpp
+  src/ui/TrashDialog.h src/ui/TrashDialog.cpp
   src/ui/Network.h src/ui/Network.cpp
   src/ui/AuthDialogs.h src/ui/AuthDialogs.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
