@@ -114,6 +114,12 @@ public:
         return ::mkdir(toNative(path).constData(), mode & 07777 ? mode & 07777 : 0777) == 0 ? 0 : errno;
     }
     int rename(const QString& from, const QString& to) override { return renameNoReplace(from, to); }
+    int replace(const QString& from, const QString& to) override
+    {
+        if (::rename(toNative(from).constData(), toNative(to).constData()) == 0)
+            return 0;
+        return Backend::replace(from, to);
+    }
     int removeFile(const QString& path) override { return ::unlink(toNative(path).constData()) == 0 ? 0 : errno; }
     int removeDir(const QString& path) override { return ::rmdir(toNative(path).constData()) == 0 ? 0 : errno; }
     int readLink(const QString& path, QString& target) override

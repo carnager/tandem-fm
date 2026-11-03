@@ -6,6 +6,8 @@
 #include "core/FileOps.h"
 #include "core/Util.h"
 
+#include <QRandomGenerator>
+
 #include <sys/stat.h>
 
 namespace tandem {
@@ -252,6 +254,7 @@ bool CopyJob::backendItem(const QString& src, QString dst)
 bool CopyJob::backendFile(Backend* sb, const QString& src, Backend* db, QString dst, const FileStat& st)
 {
     // Target exists: the usual question (overwrite / skip / rename / all).
+    bool replacing = false;
     FileStat existing;
     if (db->stat(dst, existing) == 0) {
         QByteArray target = toNative(dst);
@@ -267,6 +270,8 @@ bool CopyJob::backendFile(Backend* sb, const QString& src, Backend* db, QString 
         } else if (existing.isDir) {
             addError(tr("Cannot replace a folder with a file: %1").arg(dst));
             return false;
+        } else {
+            replacing = true;
         }
     }
 
@@ -275,9 +280,24 @@ bool CopyJob::backendFile(Backend* sb, const QString& src, Backend* db, QString 
     while (!(in = sb->openRead(src, err)))
         if (askError(tr("Cannot open"), src, err) != Answer::Retry)
             return false;
+    // Replacing: write a hidden file beside the old one and swap them at the
+    // end, so a dropped connection or a cancel leaves the old file as it was.
+    QString target = dst;
     std::unique_ptr<Writer> out;
-    while (!(out = db->openWrite(dst, false, st.mode & 07777, err)))
-        if (askError(tr("Cannot create"), dst, err) != Answer::Retry)
+    if (replacing) {
+        const int slash = dst.lastIndexOf(QLatin1Char('/'));
+        for (int attempt = 0; attempt < 3 && !out; ++attempt) {
+            target = dst.left(slash + 1) + QLatin1Char('.') + dst.mid(slash + 1) + QStringLiteral(".tandem-") +
+                     QString::number(QRandomGenerator::global()->generate() % 0x1000000, 36);
+            out = db->openWrite(target, true, st.mode & 07777, err);
+            if (!out && err != EEXIST)
+                break;
+        }
+        if (!out)
+            target = dst;  // no files beside it: overwrite in place, as before
+    }
+    while (!out && !(out = db->openWrite(target, false, st.mode & 07777, err)))
+        if (askError(tr("Cannot create"), target, err) != Answer::Retry)
             return false;
 
     const int64_t before = m_bytesDone.load();
@@ -285,7 +305,7 @@ bool CopyJob::backendFile(Backend* sb, const QString& src, Backend* db, QString 
         m_buffer.resize(4u << 20);
     auto fail = [&](const QString& what, const QString& path, int e) {
         out.reset();
-        db->removeFile(dst);  // no half-written files left behind
+        db->removeFile(target);  // no half-written files left behind; a replaced file stays
         m_bytesDone = before + st.size;
         m_filesDone += 1;
         if (e != ECANCELED)
@@ -307,6 +327,14 @@ bool CopyJob::backendFile(Backend* sb, const QString& src, Backend* db, QString 
     in.reset();
     if (const int e = out->finish(st.mtime))
         return fail(tr("Cannot write"), dst, e);
+    out.reset();
+    if (target != dst) {
+        if (const int e = db->replace(target, dst)) {
+            addError(tr("Cannot replace %1 (%2); the copy is in %3").arg(dst, errnoString(e), target));
+            m_filesDone += 1;
+            return false;
+        }
+    }
     m_filesDone += 1;
     if (m_mode == Mode::Move) {
         if (const int e = sb->removeFile(src)) {

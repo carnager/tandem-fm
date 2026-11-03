@@ -533,6 +533,15 @@ public:
         });
     }
 
+    int replace(const QString& from, const QString& to) override
+    {
+        const QByteArray target = smbUrl(to);
+        const int e = withCtx(from, [&](SMBCCTX* c, const QByteArray& url) {
+            return smbc_getFunctionRename(c)(c, url.constData(), c, target.constData()) == 0 ? 0 : errno;
+        });
+        return e == 0 ? 0 : Backend::replace(from, to);
+    }
+
     int removeFile(const QString& path) override
     {
         return withCtx(path, [](SMBCCTX* c, const QByteArray& url) {

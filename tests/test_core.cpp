@@ -1434,6 +1434,27 @@ private slots:
         over.setOverwriteExisting();
         QVERIFY(runJob(over));
         QCOMPARE(readFile(server + "/existing/clash.txt"), QByteArray("new"));
+        const auto leftovers = [&] {
+            return QDir(server + "/existing").entryList({".clash.txt.tandem-*"}, QDir::Files | QDir::Hidden);
+        };
+        QVERIFY(leftovers().isEmpty());
+
+        // An overwrite that doesn't finish leaves the old file on the server.
+        writeFile(local + "/clash.txt", QByteArray(1 << 20, 'x'));
+        CopyJob cut(CopyJob::Mode::Copy, {local + "/clash.txt"}, S + "/existing");
+        cut.setSyncPromptHandler([&](const PromptRequest& r) {
+            if (r.kind != PromptRequest::Kind::Conflict)
+                return Answer::Cancel;
+            cut.setPaused(true);
+            return Answer::Overwrite;
+        });
+        QSignalSpy cutDone(&cut, &Job::finished);
+        cut.start();
+        QTRY_VERIFY(cut.snapshot().paused);
+        cut.cancel();
+        QVERIFY(cutDone.wait(5000));
+        QCOMPARE(readFile(server + "/existing/clash.txt"), QByteArray("new"));
+        QVERIFY(leftovers().isEmpty());
 
         // Move on the server: a rename, no data copied.
         const int before = backend->calls;
@@ -1544,6 +1565,16 @@ private slots:
         QCOMPARE(listLocation(S, opt).entries.size(), size_t(5));
         QCOMPARE(listLocation(S + "/missing", opt).error, ENOENT);
         QCOMPARE(int(hostKeyQuestions), 1);  // remembered in known_hosts
+
+        // Overwriting a file on the server swaps in a complete copy.
+        writeFile(base + "/newer.txt", "newer");
+        CopyJob over(CopyJob::Mode::Copy, {base + "/newer.txt"}, S + "/a.txt");
+        over.setOverwriteExisting();
+        QVERIFY(runJob(over));
+        QVERIFY2(over.errors().isEmpty(), qPrintable(over.errors().join('\n')));
+        QCOMPARE(readFile(base + "/srv/a.txt"), QByteArray("newer"));
+        QVERIFY(QDir(base + "/srv").entryList({".a.txt.tandem-*"}, QDir::Files | QDir::Hidden).isEmpty());
+        writeFile(base + "/srv/a.txt", "alpha");
 
         Backend* b = backendFor(S);
         QCOMPARE(b->homeLocation(S), server.location(QDir::homePath()));

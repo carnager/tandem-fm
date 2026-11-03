@@ -1022,6 +1022,16 @@ public:
         });
     }
 
+    int replace(const QString& from, const QString& to) override
+    {
+        // Servers that rename over files do it in one step; plain SFTP v3
+        // refuses, then the old file is removed first.
+        const int e = withConn(from, [&](Conn* c) {
+            return sftp_rename(c->sftp, remotePath(from).constData(), remotePath(to).constData()) == 0 ? 0 : c->error();
+        });
+        return e == 0 ? 0 : Backend::replace(from, to);
+    }
+
     int removeFile(const QString& path) override
     {
         return simple(path, [](Conn* c, const QByteArray& p) { return sftp_unlink(c->sftp, p.constData()) == 0 ? 0 : c->error(); });

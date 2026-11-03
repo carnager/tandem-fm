@@ -66,6 +66,14 @@ public:
     virtual int mkdir(const QString& path, uint32_t mode) = 0;
     // Must not replace an existing target (EEXIST).
     virtual int rename(const QString& from, const QString& to) = 0;
+    // Puts file `from` in the place of the existing file `to`. Atomic where
+    // the server can do that; otherwise `to` is removed first.
+    virtual int replace(const QString& from, const QString& to)
+    {
+        if (const int e = removeFile(to); e != 0 && e != ENOENT)
+            return e;
+        return rename(from, to);
+    }
     virtual int removeFile(const QString& path) = 0;
     virtual int removeDir(const QString& path) = 0;  // empty folders only
     virtual int readLink(const QString& path, QString& target) { (void)path; (void)target; return ENOTSUP; }
