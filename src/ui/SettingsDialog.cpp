@@ -3,6 +3,8 @@
 #include "core/FolderHistory.h"
 #include "ui/IconCache.h"
 #include "ui/FileColorsPage.h"
+#include "ui/ThemeProfiles.h"
+#include "ui/ThemeManager.h"
 #include "ui/MainWindow.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
@@ -339,15 +341,22 @@ QWidget* SettingsDialog::appearancePage()
 {
     Page page(this);
     Settings s;
-    page.add(tr("Theme"),
-             segments(this, {{QStringLiteral("system"), tr("Like the desktop")}, {QStringLiteral("dark"), tr("Dark")},
-                             {QStringLiteral("light"), tr("Light")}},
-                      s.value(QStringLiteral("view/theme"), QStringLiteral("system")).toString(),
-                      [](const QString& code) {
-                          Settings().setValue(QStringLiteral("view/theme"), code);
-                          applyTheme(*qApp);
-                      }),
-             tr("Changes immediately, including the panels and open dialogs."));
+    auto* themeChoice = new QComboBox(this);
+    themeChoice->setObjectName(QStringLiteral("themeChoice"));
+    auto fillThemes = [themeChoice] {
+        const QSignalBlocker block(themeChoice);
+        themeChoice->clear();
+        themeChoice->addItem(QObject::tr("Like the desktop"), QStringLiteral("system"));
+        for (const auto& profile : themeProfiles()) themeChoice->addItem(profile.name, profile.id);
+        themeChoice->setCurrentIndex(qMax(0, themeChoice->findData(Settings().value(QStringLiteral("view/theme"), QStringLiteral("system")))));
+    };
+    fillThemes();
+    connect(themeChoice, &QComboBox::currentIndexChanged, this, [themeChoice] { selectTheme(themeChoice->currentData().toString()); });
+    page.add(tr("Theme"), themeChoice, tr("Changes immediately, including the panels and open dialogs."));
+    auto* manageThemes = new QPushButton(tr("Add / manage themes…"), this);
+    manageThemes->setObjectName(QStringLiteral("manageThemes"));
+    connect(manageThemes, &QPushButton::clicked, this, [this, fillThemes] { showThemeManager(this); fillThemes(); });
+    page.add(tr("Custom colors"), manageThemes, tr("Duplicate a theme to change row backgrounds, alternate rows, marks, selection, extensions and highlights. Import or export custom themes."));
 
     auto* scale = new QSpinBox(this);
     scale->setObjectName(QStringLiteral("fontScale"));

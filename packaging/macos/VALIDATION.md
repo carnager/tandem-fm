@@ -1,11 +1,12 @@
-# macOS 0.1.5 validation
+# macOS 0.1.6 validation
 
 Validated on November 3, 2026, on Apple Silicon (arm64), macOS 27.0, AppleClang 21, Qt 6.11.2, Homebrew libarchive 3.8.8, and libssh 0.12.1.
 
-`./packaging/macos/build.sh` builds and runs CTest before bundling. The final CTest run passed all seven executables (171 QtTest passes, 5 explicit skips, zero failures):
+`./packaging/macos/build.sh` builds and runs CTest before bundling. The final CTest run passed all eight executables (179 QtTest passes, 5 explicit skips, zero failures):
 
 | Executable | Passes | Skips | Main coverage |
 | --- | ---: | ---: | --- |
+| test_themes | 8 | 0 | Built-in Nord/system/light/dark switching, custom profile round-trip and independent edits, invalid imports and protected built-ins, rendered row/mark backgrounds and selection/extension text precedence, actual manager/editor save and cancel, live synced palette reload without navigation |
 | test_filecolors | 9 | 0 | Extension lists/case/compound suffixes/Unicode, filename-only MIME matching, kinds, executable-link distinction, priority and disabling, theme changes, marked/error/parent precedence, invalid rules, portable serialization, actual detail-delegate name/extension/metadata colors |
 | test_config | 14 | 0 | Native preference migration in a fresh process, INI types and Unicode paths, existing-profile preservation, repeated atomic replacement, removed keys, independent key writes, cloud lock copies, temporary unavailability and queued writes, malformed input, stale settings scopes, local selector/environment precedence, bookmark retry and merge |
 | test_macsmb | 14 | 0 | Share/subfolder planning, Unicode/encoded spaces/credentials, traversal rejection, server/share/account/port matching, mount reuse, native completion routing, already-mounted results, invalid mount paths, cancellation/errors/timeouts/owner destruction, clean recents, stale panel navigation and safe unmount rejection |
@@ -31,3 +32,7 @@ For 0.1.3, the rule editor was automated through add, edit, remove, ordering, en
 For 0.1.4 all seven CTest executables passed in one run (about 50 seconds). A separate native Cocoa read-only probe used actual NetFS remount metadata and successfully reused the mounted media share. The probe never mounted, authenticated, unmounted, or wrote to a NAS. New-login outcomes are covered through controlled native-call fixtures rather than a live credential dialog/server. Tests did not disconnect any user volume.
 
 For 0.1.5, temporary-file tests compare creation dates to filesystem birth metadata, set a known macOS Date Added through `setattrlist`, verify its display source and subsequent restat updates, and check ascending/descending sorting with unknown values last and folders/parent first. UI tests exercise both date sort menu commands, heading labels, blank missing dates and column-state restoration; the date UI test also passes with native Cocoa. Mock server test cleanup now waits for outstanding polling work before unregistering its backend. Actual NAS creation/added-date availability is filesystem/server dependent and was not asserted.
+
+For 0.1.6 all eight CTest executables passed in one run (about 54 seconds). The complete theme suite also passed with native Cocoa: built-in palette selection, custom JSON serialization and validation, profile isolation, row background pixel checks, extension/rule/selection/mark/error precedence, actual manager/editor save and cancel, and an external configuration edit repainting the current theme without navigation. Theme tests use a disposable configuration folder. Import/export file chooser interaction and Dropbox transport are not asserted; JSON import/export logic and configuration reload are exercised directly. Custom themes are color data, and no user file operations are involved in changing a theme.
+
+The 0.1.6 packaged app also launched and rendered with the native Cocoa backend using both built-in Nord and a custom palette in disposable profiles, with Qt/DYLD overrides removed. The dependency audit and strict ad-hoc signature verification passed.

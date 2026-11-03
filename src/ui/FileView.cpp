@@ -41,10 +41,14 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
 
     const int col = idx.column();
     QColor fg = col == FileModel::ColName || col == FileModel::ColExt
-                    ? FileColors::instance().nameColor(*e, model->gitStatus(e->name))
+                    ? FileColors::instance().nameColor(*e, model->gitStatus(e->name), col == FileModel::ColExt)
                     : e->marked ? t.mark : e->brokenLink ? t.error
                     : !e->isParent && e->name.startsWith(QLatin1Char('.')) ? t.dimText : t.text;
 
+    const auto* fileView = qobject_cast<const FileView*>(m_view);
+    const bool selected = t.selectionTextEnabled && idx.row() == m_view->currentIndex().row()
+                          && fileView && fileView->isActive() && !e->marked && !e->brokenLink;
+    if (selected) fg = t.selectionText;
     QRect r = opt.rect.adjusted(6, 0, -6, 0);
     if (col == FileModel::ColName) {
         const int iconSize = 16;
@@ -97,7 +101,7 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
     // Secondary columns are dimmed so names stand out; marks keep their color.
     const bool secondary = col == FileModel::ColCreated || col == FileModel::ColAdded || col == FileModel::ColTime || col == FileModel::ColAttr ||
                            (col == FileModel::ColSize && e->isDir);
-    if (secondary && !e->marked)
+    if (secondary && !e->marked && !selected)
         fg = t.dimText;
     p->setPen(fg);
 
@@ -477,7 +481,8 @@ void FileView::drawRow(QPainter* p, const QStyleOptionViewItem& opt, const QMode
     const FileEntry* e = m ? m->entry(idx.row()) : nullptr;
     const QRect r(0, opt.rect.top(), viewport()->width(), opt.rect.height());
 
-    if (idx.row() % 2)
+    p->fillRect(r, t.base);
+    if (t.alternatingRows && idx.row() % 2)
         p->fillRect(r, t.altBase);
     if (e && e->marked)
         p->fillRect(r, t.markBg);

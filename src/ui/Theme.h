@@ -10,10 +10,13 @@ namespace tandem {
 
 struct Theme {
     bool dark = true;
+    bool alternatingRows = true;
+    bool selectionTextEnabled = false;
     QColor window, base, altBase, text, dimText, accent, accentText;
     QColor mark, markBg, cursorActive, cursorInactive, dropTarget;
     QColor border, header, headerActive, error, success;
     QColor gitModified, gitAdded, gitUntracked;
+    QColor extensionText, selectionText;
     QColor control;     // borders of inputs, buttons and checkboxes: visible, unlike @border
     QFont listFont;     // file list
     QFont numberFont;   // tabular digits for sizes and dates
@@ -22,6 +25,7 @@ struct Theme {
 };
 
 const Theme& theme();
+Theme defaultTheme(bool dark);
 // The configured fixed-width font, guaranteed to really be monospaced.
 QFont monoFont();
 void applyTheme(QApplication& app);

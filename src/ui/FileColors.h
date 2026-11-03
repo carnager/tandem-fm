@@ -23,7 +23,7 @@ public:
     static void saveRules(const QList<FileColorRule>& rules);
     static void setEnabled(bool on);
     static void refreshViews();
-    QColor nameColor(const FileEntry& entry, char gitStatus = 0);
+    QColor nameColor(const FileEntry& entry, char gitStatus = 0, bool extension = false);
 private:
     void load();
     bool matches(const FileColorRule& rule, const FileEntry& entry);

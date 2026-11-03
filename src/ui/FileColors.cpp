@@ -138,7 +138,7 @@ bool FileColors::matches(const FileColorRule& rule, const FileEntry& entry)
         if (wanted.endsWith(QLatin1String("/*")) ? name.startsWith(wanted.chopped(1)) : name == wanted) return true;
     return false;
 }
-QColor FileColors::nameColor(const FileEntry& entry, char gitStatus)
+QColor FileColors::nameColor(const FileEntry& entry, char gitStatus, bool extension)
 {
     const auto& t = theme();
     if (entry.isParent) return t.text;
@@ -148,6 +148,6 @@ QColor FileColors::nameColor(const FileEntry& entry, char gitStatus)
     if (m_enabled)
         for (const auto& rule : m_rules)
             if (rule.enabled && matches(rule, entry)) return t.dark ? rule.dark : rule.light;
-    return entry.name.startsWith(QLatin1Char('.')) || gitStatus == '!' ? t.dimText : t.text;
+    return entry.name.startsWith(QLatin1Char('.')) || gitStatus == '!' ? t.dimText : extension ? t.extensionText : t.text;
 }
 } // namespace tandem

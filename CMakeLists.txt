@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(tandem-fm VERSION 0.1.5 LANGUAGES CXX)
+project(tandem-fm VERSION 0.1.6 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -56,6 +56,8 @@ add_library(tandem_ui STATIC
   src/ui/FileColors.h src/ui/FileColors.cpp
   src/ui/FileColorsPage.h src/ui/FileColorsPage.cpp
   src/ui/Theme.h src/ui/Theme.cpp
+  src/ui/ThemeProfiles.h src/ui/ThemeProfiles.cpp
+  src/ui/ThemeManager.h src/ui/ThemeManager.cpp
   src/ui/IconCache.h src/ui/IconCache.cpp
   src/ui/FileModel.h src/ui/FileModel.cpp
   src/ui/FileView.h src/ui/FileView.cpp
@@ -214,6 +216,10 @@ add_executable(tandem-bench bench/bench_list.cpp)
 target_link_libraries(tandem-bench PRIVATE tandem_core)
 
 enable_testing()
+add_executable(test_themes tests/test_themes.cpp)
+target_link_libraries(test_themes PRIVATE tandem_ui Qt6::Test)
+add_test(NAME test_themes COMMAND test_themes)
+set_tests_properties(test_themes PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_executable(test_filecolors tests/test_filecolors.cpp)
 target_link_libraries(test_filecolors PRIVATE tandem_ui Qt6::Test)
 add_test(NAME test_filecolors COMMAND test_filecolors)

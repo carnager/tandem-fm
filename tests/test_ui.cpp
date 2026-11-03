@@ -1441,12 +1441,11 @@ private slots:
         auto* dim = dlg.findChild<QSpinBox*>("inactiveDim");
         QVERIFY(scale && dim);
         auto chooseTheme = [&](const QString& code) {
-            for (QToolButton* button : dlg.findChildren<QToolButton*>())
-                if (button->property("segmentValue").toString() == code) {
-                    button->click();
-                    return true;
-                }
-            return false;
+            auto* choice = dlg.findChild<QComboBox*>("themeChoice");
+            const int index = choice ? choice->findData(code) : -1;
+            if (index < 0) return false;
+            choice->setCurrentIndex(index);
+            return true;
         };
         QVERIFY(chooseTheme("dark"));
         QVERIFY(theme().dark);

@@ -246,7 +246,8 @@ void ThumbGrid::paintEvent(QPaintEvent*)
         // The name, on up to two lines.
         const QString name = e->isParent ? QStringLiteral("..") : e->name;
         const QRect text(r.left() + 6, pic.bottom() + 6, r.width() - 12, 2 * fm.height());
-        p.setPen(FileColors::instance().nameColor(*e, m->gitStatus(e->name)));
+        p.setPen(t.selectionTextEnabled && row == current && active && !e->marked && !e->brokenLink
+                     ? t.selectionText : FileColors::instance().nameColor(*e, m->gitStatus(e->name)));
         QString first = name, second;
         if (fm.horizontalAdvance(name) > text.width()) {
             int cut = int(name.size());

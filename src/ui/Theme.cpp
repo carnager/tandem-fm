@@ -1,4 +1,5 @@
 #include "ui/Theme.h"
+#include "ui/ThemeProfiles.h"
 
 #include <QApplication>
 #include <QDir>
@@ -233,30 +234,11 @@ public:
 
 }  // namespace
 
-void applyTheme(QApplication& app)
+Theme defaultTheme(bool dark)
 {
-    static bool applying = false;
-    if (applying)
-        return;
-    QScopedValueRollback guard(applying, true);
-    Theme& t = g_theme;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-    const QString requested = qEnvironmentVariable("TANDEM_THEME", Settings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString());
-    app.styleHints()->setColorScheme(requested == QLatin1String("dark") ? Qt::ColorScheme::Dark
-                                     : requested == QLatin1String("light") ? Qt::ColorScheme::Light
-                                                                          : Qt::ColorScheme::Unknown);
-#endif
-    t.dark = systemPrefersDark(app);
-    if (!app.property("tandemThemeConnected").toBool()) {
-        app.setProperty("tandemThemeConnected", true);
-        QObject::connect(app.styleHints(), &QStyleHints::colorSchemeChanged, &app, [&app] {
-            if (qEnvironmentVariableIsEmpty("TANDEM_THEME") &&
-                Settings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString() == QLatin1String("system"))
-                applyTheme(app);
-        });
-    }
-
-    if (t.dark) {
+    Theme t;
+    t.dark = dark;
+    if (dark) {
         t.window = QColor(0x1a, 0x1c, 0x20);
         t.base = QColor(0x1f, 0x21, 0x26);
         t.altBase = QColor(0x23, 0x25, 0x2b);
@@ -301,6 +283,37 @@ void applyTheme(QApplication& app)
         t.gitAdded = QColor(0x2e, 0x7d, 0x32);
         t.gitUntracked = QColor(0x00, 0x7c, 0x89);
     }
+
+    t.extensionText = t.text;
+    t.selectionText = t.text;
+    return t;
+}
+
+void applyTheme(QApplication& app)
+{
+    static bool applying = false;
+    if (applying)
+        return;
+    QScopedValueRollback guard(applying, true);
+    Theme& t = g_theme;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    const QString requested = qEnvironmentVariable("TANDEM_THEME", Settings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString());
+    const auto requestedProfile = findThemeProfile(requested);
+    app.styleHints()->setColorScheme(requestedProfile ? (requestedProfile->palette.dark ? Qt::ColorScheme::Dark : Qt::ColorScheme::Light)
+                                                     : Qt::ColorScheme::Unknown);
+#endif
+    if (!app.property("tandemThemeConnected").toBool()) {
+        app.setProperty("tandemThemeConnected", true);
+        QObject::connect(app.styleHints(), &QStyleHints::colorSchemeChanged, &app, [&app] {
+            if (qEnvironmentVariableIsEmpty("TANDEM_THEME") &&
+                !findThemeProfile(Settings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString()))
+                applyTheme(app);
+        });
+    }
+
+    const QString choice = qEnvironmentVariable("TANDEM_THEME", Settings().value(QStringLiteral("view/theme"), QStringLiteral("system")).toString());
+    const auto profile = findThemeProfile(choice);
+    t = profile ? profile->palette : defaultTheme(systemPrefersDark(app));
 
     // Fusion + our palette: consistent, fast to paint, no theme engine quirks.
     if (!app.property("tandemStyleInstalled").toBool()) {

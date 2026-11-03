@@ -28,6 +28,7 @@
 #include "ui/TrashDialog.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
+#include "ui/ThemeManager.h"
 #include "ui/viewer/ViewerWindow.h"
 
 #include <QAbstractButton>
@@ -426,6 +427,10 @@ void MainWindow::createMenus()
 
     // View: how the panels look right now. Lasting choices are in Settings.
     QMenu* view = bar->addMenu(tr("&View"));
+    auto* themes = bar->addMenu(tr("&Theme"));
+    themes->setObjectName(QStringLiteral("themeMenu"));
+    populateThemeMenu(themes, this);
+    connect(themes, &QMenu::aboutToShow, this, [this, themes] { populateThemeMenu(themes, this); });
     QMenu* sort = view->addMenu(tr("Sort by"));
     m_actions[QStringLiteral("sortName")] = addCommand(sort, QT_TR_NOOP("Sort by name"), {K(Qt::CTRL | Qt::Key_F3)}, [this] { active()->sortBy(SortColumn::Name); });
     m_actions[QStringLiteral("sortExt")] = addCommand(sort, QT_TR_NOOP("Sort by extension"), {K(Qt::CTRL | Qt::Key_F4)}, [this] { active()->sortBy(SortColumn::Ext); });
@@ -2514,7 +2519,8 @@ void MainWindow::reloadConfiguration(const QStringList& keys)
 {
     if (keys.isEmpty()) return;
     Settings settings;
-    if (keys.contains(QStringLiteral("view/theme")) || keys.contains(QStringLiteral("view/fontScale")))
+    if (keys.contains(QStringLiteral("view/theme")) || keys.contains(QStringLiteral("view/fontScale")) ||
+        std::any_of(keys.begin(), keys.end(), [](const QString& key) { return key.startsWith(QLatin1String("themes/")); }))
         applyTheme(*qApp);
     if (keys.contains(QStringLiteral("view/fileColors")) || keys.contains(QStringLiteral("view/fileColorsEnabled")))
         FileColors::refreshViews();

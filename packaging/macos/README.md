@@ -1,6 +1,12 @@
-# Tandem for macOS 0.1.5
+# Tandem for macOS 0.1.6
 
 An experimental macOS port of [carnager/tandem-fm](https://github.com/carnager/tandem-fm), based on upstream commit `f82cc2e955b9a58f066703f746661f29f00a6f36`. The upstream Qt 6 Widgets UI, libarchive, libssh, job queues, viewers, and fd/rg search tools are retained. macOS changes are guarded so the Linux implementations remain available.
+
+## Changes in 0.1.6
+
+The new **Theme** menu switches between desktop appearance, Dark, Light, built-in Nord, and saved custom themes. **Theme → Add / manage themes…** duplicates an existing palette, edits named custom themes with color pickers/hex values and a row preview, and imports/exports Tandem theme JSON files. Built-ins remain available as recovery options. Custom themes and the selected theme travel with your configuration profile.
+
+Customize normal/alternate row backgrounds, row and extension text, active/inactive selection, marked text/background, accent/highlight text, drop targets, headers, outlines, errors, success and Git colors. Alternate rows can be switched off per theme. Separate selection text is optional; mark and broken-link colors retain priority. Existing file/extension matching rules remain global and take precedence over default extension text; dark profiles use their dark rule colors, light profiles their light colors. See [theme setup and JSON format](THEMES.md).
 
 ## Changes in 0.1.5
 
