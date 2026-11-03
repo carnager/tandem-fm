@@ -15,6 +15,7 @@
 #include "core/Fuzzy.h"
 #include "core/IoScheduler.h"
 #include "core/MultiRename.h"
+#include "core/DiskUsage.h"
 #include "core/Duplicates.h"
 #include "core/ExifDate.h"
 #include "core/Keyring.h"
@@ -606,6 +607,33 @@ private slots:
         QCOMPARE(names(with("{nope}")), QStringList({"Unknown field {nope}"}));
         QCOMPARE(names(with("{name")), QStringList({"A { is not closed"}));
         QCOMPARE(names(with("{name|shout}")).first(), QString("Unknown filter |shout (lower, upper, title, trim)"));
+    }
+
+    void diskUsage()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("big/deeper")));
+        QVERIFY(QDir().mkpath(tmp.filePath("small")));
+        writeFile(tmp.filePath("big/deeper/a.bin"), QByteArray(2 << 20, 'a'));
+        writeFile(tmp.filePath("big/b.bin"), QByteArray(1 << 20, 'b'));
+        writeFile(tmp.filePath("small/c.txt"), "c");
+        QVERIFY(::link(QFile::encodeName(tmp.filePath("big/b.bin")).constData(),
+                       QFile::encodeName(tmp.filePath("small/b-again.bin")).constData()) == 0);
+        auto root = measureUsage(tmp.path());
+        QCOMPARE(root->files, int64_t(4));
+        QCOMPARE(root->children.size(), size_t(2));
+        UsageNode* big = root->children[0].get();  // biggest first
+        QCOMPARE(big->name, QString("big"));
+        QVERIFY(big->size >= (2 << 20));
+        // b.bin has two names; whichever is found first counts, the other is 0.
+        QVERIFY(root->size >= (3 << 20) && root->size < (4 << 20));
+        QCOMPARE(big->children[0]->path(), tmp.filePath("big/deeper"));
+        const int64_t before = root->size;
+        UsageNode* a = big->children[0]->children[0].get();
+        const int64_t aSize = a->size;
+        removeUsageNode(a);
+        QCOMPARE(root->size, before - aSize);
+        QCOMPARE(root->files, int64_t(3));
     }
 
     void duplicates()

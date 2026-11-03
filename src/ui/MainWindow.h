@@ -131,6 +131,7 @@ private:
     void openSettings(int page = 0);
     void showTrash();
     void findDuplicates();
+    void showDiskUsage();
     void closePreview();
     void updatePreviewFor(ViewerWindow* preview, Panel* panel);
     void openCommandBar();

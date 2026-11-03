@@ -17,6 +17,7 @@
 #include "ui/JobsPanel.h"
 #include "ui/KeyChordPopup.h"
 #include "ui/EditNames.h"
+#include "ui/DiskUsageDialog.h"
 #include "ui/DuplicatesDialog.h"
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
@@ -375,6 +376,7 @@ void MainWindow::createMenus()
     addCommand(mark, QT_TR_NOOP("Search files (names or contents)…"), {K(Qt::ALT | Qt::Key_F7), K(Qt::CTRL | Qt::SHIFT | Qt::Key_F)},
                [this] { active()->startSearchBar(); });
     addCommand(mark, QT_TR_NOOP("Find duplicate files…"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_F7)}, [this] { findDuplicates(); });
+    addCommand(mark, QT_TR_NOOP("Disk usage…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_U)}, [this] { showDiskUsage(); });
     mark->addSeparator();
     addCommand(mark, QT_TR_NOOP("Mark group…\tNum +"), {}, [this] { active()->markGroup(1); });
     addCommand(mark, QT_TR_NOOP("Unmark group…\tNum -"), {}, [this] { active()->markGroup(-1); });
@@ -515,6 +517,23 @@ void MainWindow::createMenus()
     addCommand(help, QT_TR_NOOP("Command palette…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_P)}, [this] { commandPalette(); });
     addCommand(help, QT_TR_NOOP("Keyboard shortcuts"), {K(Qt::Key_F1)}, [this] { showShortcuts(); });
     applyKeyBindings(actions());  // keys changed in the settings
+}
+
+void MainWindow::showDiskUsage()
+{
+    Panel* p = active();
+    if (refuseInArchive(p))
+        return;
+    DiskUsageDialog dlg(p->path(), p->isRemote(), this);
+    connect(&dlg, &DiskUsageDialog::deleteRequested, this, [this](const QStringList& paths, bool toTrash) {
+        auto* job = new DeleteJob(paths, toTrash);
+        job->setStartImmediately(true);
+        m_jobs->add(job);
+    });
+    connect(&dlg, &DiskUsageDialog::showRequested, this, [p](const QString& path) {
+        p->navigate(parentPath(path), baseName(path));
+    });
+    dlg.exec();
 }
 
 void MainWindow::findDuplicates()

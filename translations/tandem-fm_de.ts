@@ -938,6 +938,10 @@
         <translation>Doppelte Dateien finden und je eine behalten</translation>
     </message>
     <message>
+        <source>Disk usage: what takes the space, biggest first</source>
+        <translation>Speicherbelegung: was den Platz belegt, das Größte zuerst</translation>
+    </message>
+    <message>
         <source>Filter this folder</source>
         <translation>Diesen Ordner filtern</translation>
     </message>
@@ -1228,6 +1232,79 @@
     <message>
         <source>Cannot delete</source>
         <translation>Löschen nicht möglich</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::DiskUsageDialog</name>
+    <message>
+        <source>Disk usage</source>
+        <translation>Speicherbelegung</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Größe</translation>
+    </message>
+    <message>
+        <source>Share</source>
+        <translation>Anteil</translation>
+    </message>
+    <message>
+        <source>Files</source>
+        <translation>Dateien</translation>
+    </message>
+    <message>
+        <source>Enter goes in · Backspace goes up · Del deletes (no trash on servers)</source>
+        <translation>Enter geht hinein · Rücktaste nach oben · Entf löscht (kein Papierkorb auf Servern)</translation>
+    </message>
+    <message>
+        <source>Enter goes in · Backspace goes up · Del moves to the trash</source>
+        <translation>Enter geht hinein · Rücktaste nach oben · Entf in den Papierkorb</translation>
+    </message>
+    <message>
+        <source>Show in panel</source>
+        <translation>In der Seite zeigen</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Löschen</translation>
+    </message>
+    <message>
+        <source>Move to trash</source>
+        <translation>In den Papierkorb</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <source>Counting …</source>
+        <translation>Zähle …</translation>
+    </message>
+    <message>
+        <source>Counting … %1 files, %2</source>
+        <translation>Zähle … %1 Dateien, %2</translation>
+    </message>
+    <message>
+        <source>%1 in %2 files</source>
+        <translation>%1 in %2 Dateien</translation>
+    </message>
+    <message numerus="yes">
+        <source>Delete %n item(s) (%1) for good? Servers have no trash.</source>
+        <translation>
+            <numerusform>%n Element (%1) endgültig löschen? Server haben keinen Papierkorb.</numerusform>
+            <numerusform>%n Elemente (%1) endgültig löschen? Server haben keinen Papierkorb.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Move %n item(s) (%1) to the trash?</source>
+        <translation>
+            <numerusform>%n Element (%1) in den Papierkorb?</numerusform>
+            <numerusform>%n Elemente (%1) in den Papierkorb?</numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -1970,6 +2047,10 @@
     <message>
         <source>Find duplicate files…</source>
         <translation>Doppelte Dateien finden…</translation>
+    </message>
+    <message>
+        <source>Disk usage…</source>
+        <translation>Speicherbelegung…</translation>
     </message>
     <message>
         <source>Connect to server…</source>

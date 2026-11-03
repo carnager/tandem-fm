@@ -33,6 +33,23 @@
     </message>
 </context>
 <context>
+    <name>tandem::DiskUsageDialog</name>
+    <message numerus="yes">
+        <source>Delete %n item(s) (%1) for good? Servers have no trash.</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Move %n item(s) (%1) to the trash?</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>tandem::DuplicatesDialog</name>
     <message numerus="yes">
         <source>Move %n to the trash</source>

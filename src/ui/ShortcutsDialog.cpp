@@ -79,6 +79,7 @@ const Entry kEntries[] = {
     {QT_TRANSLATE_NOOP("Shortcuts", "View"), "Ctrl+Shift+P", QT_TRANSLATE_NOOP("Shortcuts", "Command palette: every command by name")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Search and compare"), "Alt+F7", QT_TRANSLATE_NOOP("Shortcuts", "Search names or contents here and below; the results are a folder")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Search and compare"), "Alt+Shift+F7", QT_TRANSLATE_NOOP("Shortcuts", "Find duplicate files and keep one of each")},
+    {QT_TRANSLATE_NOOP("Shortcuts", "Search and compare"), "Ctrl+Shift+U", QT_TRANSLATE_NOOP("Shortcuts", "Disk usage: what takes the space, biggest first")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Search and compare"), "Ctrl+F", QT_TRANSLATE_NOOP("Shortcuts", "Filter this folder")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Search and compare"), "Shift+F2", QT_TRANSLATE_NOOP("Shortcuts", "Compare the panels: mark what's newer or missing")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Search and compare"), "Ctrl+Shift+S", QT_TRANSLATE_NOOP("Shortcuts", "Synchronize folders, with a preview of the plan")},

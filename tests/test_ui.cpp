@@ -17,6 +17,7 @@
 #include "ui/AuthDialogs.h"
 #include "ui/viewer/ImageView.h"
 #include "ui/viewer/ViewerWindow.h"
+#include "ui/DiskUsageDialog.h"
 #include "ui/DuplicatesDialog.h"
 #include "ui/FileView.h"
 #include "ui/ThumbGrid.h"
@@ -946,6 +947,34 @@ private slots:
         }
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // Ctrl+Shift+U: disk usage, browse down and up, delete with sizes updating.
+    void diskUsageWindow()
+    {
+        QVERIFY(QDir().mkpath(L("du/videos")));
+        QVERIFY(QDir().mkpath(L("du/docs")));
+        writeFile(L("du/videos/film.mkv"), QByteArray(3 << 20, 'v'));
+        writeFile(L("du/videos/clip.mp4"), QByteArray(1 << 20, 'c'));
+        writeFile(L("du/docs/a.txt"), "a");
+        DiskUsageDialog dlg(L("du"), false, m_window.get());
+        dlg.show();
+        QTRY_VERIFY(!dlg.isCounting());
+        QCOMPARE(dlg.list()->topLevelItem(0)->text(0), QString("videos"));  // biggest first
+        dlg.list()->setCurrentItem(dlg.list()->topLevelItem(0));
+        QTest::keyClick(dlg.list(), Qt::Key_Return);
+        QCOMPARE(dlg.current()->name, QString("videos"));
+        QCOMPARE(dlg.list()->topLevelItem(0)->text(0), QString("film.mkv"));
+        const int64_t before = dlg.current()->parent->size;
+        QSignalSpy deleted(&dlg, &DiskUsageDialog::deleteRequested);
+        dlg.list()->setCurrentItem(dlg.list()->topLevelItem(0));
+        dlg.deleteSelected(false);
+        QCOMPARE(deleted.size(), 1);
+        QCOMPARE(deleted.first().at(0).toStringList(), QStringList({L("du/videos/film.mkv")}));
+        QVERIFY(dlg.current()->parent->size < before);
+        QTest::keyClick(dlg.list(), Qt::Key_Backspace);
+        QCOMPARE(dlg.current()->name, L("du"));
+        QCOMPARE(dlg.list()->currentItem()->text(0), QString("videos"));  // back on the folder we came from
     }
 
     // Alt+Shift+F7: duplicates, keep one of each, the rest to the trash.
