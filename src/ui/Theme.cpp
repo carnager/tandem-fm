@@ -546,8 +546,8 @@ void applyTheme(QApplication& app)
     app.setPalette(p);
 
     // Style sheets can't draw a drop-down's arrow themselves: a small chevron file.
-    const QString chevron = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
-                            QStringLiteral("/chevron-%1.svg").arg(t.dimText.name().mid(1));
+    const QString chevron = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) +
+                            QStringLiteral("/tandem-fm/chevron-%1.svg").arg(t.dimText.name().mid(1));
     if (!QFileInfo::exists(chevron)) {
         QDir().mkpath(QFileInfo(chevron).path());
         QFile f(chevron);

@@ -1855,7 +1855,21 @@ private slots:
         QFile::setPermissions(dir + "/report.sh", QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
         QFile::setPermissions(dir + "/devices.sh", QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
 
+        QVERIFY(QDir().mkpath(pluginsFolder() + "/misnamed"));
+        writeFile(pluginsFolder() + "/misnamed/tandem-plugin.json", "{}");
+
         const QList<Plugin> found = discoverPlugins();
+        const auto misnamed = std::find_if(found.begin(), found.end(), [](const Plugin& p) { return p.id == "misnamed"; });
+        QVERIFY(misnamed != found.end());
+        QVERIFY2(misnamed->error.contains("tandem-plugin.json"), qPrintable(misnamed->error));
+
+        // A plugin that only runs existing programs is a single file.
+        writeFile(pluginsFolder() + "/single.json", "{\"actions\": [{\"title\": \"Hi\", \"run\": \"echo hi\"}]}");
+        const QList<Plugin> again = discoverPlugins();
+        const auto single = std::find_if(again.begin(), again.end(), [](const Plugin& p) { return p.id == "single"; });
+        QVERIFY(single != again.end());
+        QVERIFY2(single->error.isEmpty(), qPrintable(single->error));
+        QCOMPARE(single->dir, pluginsFolder());
         const auto it = std::find_if(found.begin(), found.end(), [](const Plugin& p) { return p.id == "demo"; });
         QVERIFY(it != found.end());
         const Plugin& p = *it;

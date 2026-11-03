@@ -93,7 +93,7 @@ constexpr int kCachedArchives = 6;
 
 QString extractCacheDir()
 {
-    return QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/extract");
+    return QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + QStringLiteral("/tandem-fm/extract");
 }
 
 // No component between base and the final name may be a symlink: an archive
@@ -344,6 +344,14 @@ QString extractToCache(const QString& archivePath, const QString& innerPath, QSt
 void pruneExtractCache()
 {
     const QDateTime cutoff = QDateTime::currentDateTime().addDays(-1);
+    // Older versions extracted to ~/.cache/tandem-fm/tandem-fm: cleared out once.
+    const QString old = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    if (old != QFileInfo(extractCacheDir()).path() && QFileInfo::exists(old)) {
+        QDirIterator files(old, QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
+        while (files.hasNext())
+            ::chmod(toNative(files.next()).constData(), 0600);
+        QDir(old).removeRecursively();
+    }
     QDirIterator it(extractCacheDir(), QDir::Dirs | QDir::NoDotAndDotDot);
     while (it.hasNext()) {
         const QString d = it.next();

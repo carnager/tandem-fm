@@ -34,7 +34,17 @@ QString FolderHistory::storagePath() const
         return m_storage;
     if (!configDir().isEmpty())  // a chosen config folder keeps the history too
         return QFileInfo(QSettings().fileName()).path() + QStringLiteral("/folders.tsv");
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/folders.tsv");
+    // ~/.local/share/tandem-fm, not Qt's <organization>/<application>
+    // (tandem-fm/tandem-fm), where older versions kept it.
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
+                         QStringLiteral("/tandem-fm/folders.tsv");
+    const QString old = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/folders.tsv");
+    if (old != path && !QFileInfo::exists(path) && QFileInfo::exists(old)) {
+        QDir().mkpath(QFileInfo(path).path());
+        if (QFile::rename(old, path))
+            QDir().rmdir(QFileInfo(old).path());  // only if nothing else is in it
+    }
+    return path;
 }
 
 void FolderHistory::setStoragePath(const QString& path)

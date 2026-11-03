@@ -104,15 +104,29 @@ QList<Plugin> discoverPlugins()
     QList<Plugin> out;
     QSet<QString> seen;
     for (const QString& root : std::as_const(roots)) {
-        for (const QFileInfo& fi : QDir(root).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-            QFile f(fi.filePath() + QStringLiteral("/plugin.json"));
-            if (seen.contains(fi.fileName()) || !f.open(QIODevice::ReadOnly))
-                continue;  // the user's own copy wins over a package's
-            seen.insert(fi.fileName());
+        // A plugin is a single <name>.json, or a <name>/ folder with a
+        // plugin.json and whatever programs it brings along.
+        for (const QFileInfo& fi : QDir(root).entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::Name)) {
+            const bool folder = fi.isDir();
+            if (!folder && fi.suffix() != QLatin1String("json"))
+                continue;
             Plugin p;
-            p.id = fi.fileName();
-            p.dir = fi.filePath();
+            p.id = folder ? fi.fileName() : fi.completeBaseName();
+            if (seen.contains(p.id))
+                continue;  // the user's own copy wins over a package's
+            seen.insert(p.id);
+            p.name = p.id;
+            p.dir = folder ? fi.filePath() : root;
             p.system = root != roots.first();
+            QFile f(folder ? fi.filePath() + QStringLiteral("/plugin.json") : fi.filePath());
+            if (!f.open(QIODevice::ReadOnly)) {
+                // Shown in Settings, so a misnamed file is easy to spot.
+                const QStringList json = QDir(p.dir).entryList({QStringLiteral("*.json")}, QDir::Files);
+                p.error = json.isEmpty() ? QObject::tr("no plugin.json in this folder")
+                                         : QObject::tr("no plugin.json in this folder (rename %1?)").arg(json.first());
+                out.append(p);
+                continue;
+            }
             const QByteArray json = f.read(1 << 20);
             p.hash = QCryptographicHash::hash(json, QCryptographicHash::Sha256).toHex();
             parsePluginManifest(json, p);
@@ -252,8 +266,8 @@ PluginRun::PluginRun(const Plugin& p, const PluginAction& a, const PluginContext
         const bool ok = status == QProcess::NormalExit && code == 0;
         QString text = m_requestedMessage ? QString() : m_lastLine;
         if (!ok) {
-            const QStringList err = QString::fromLocal8Bit(m_proc->readAllStandardError()).trimmed().split(QLatin1Char('\n'));
-            text = err.last().trimmed();
+            // The first line says why; usage texts and traces only follow.
+            text = QString::fromLocal8Bit(m_proc->readAllStandardError()).trimmed().section(QLatin1Char('\n'), 0, 0).trimmed();
             if (text.isEmpty())
                 text = tr("%1 failed (exit %2)").arg(m_title).arg(code);
         }
@@ -312,10 +326,12 @@ void listPluginChoices(const Plugin& p, const PluginAction& a, const PluginConte
         if (e == QProcess::FailedToStart)
             finish({}, QObject::tr("Could not start %1").arg(argv.value(0)));
     });
-    QObject::connect(proc, &QProcess::finished, proc, [proc, finish](int code, QProcess::ExitStatus status) {
+    const QString command = argv.join(QLatin1Char(' '));
+    QObject::connect(proc, &QProcess::finished, proc, [proc, finish, command](int code, QProcess::ExitStatus status) {
         if (status != QProcess::NormalExit || code != 0) {
-            const QString err = QString::fromLocal8Bit(proc->readAllStandardError()).trimmed().section(QLatin1Char('\n'), -1);
-            finish({}, err.isEmpty() ? QObject::tr("failed (exit %1)").arg(code) : err);
+            const QString err =
+                QString::fromLocal8Bit(proc->readAllStandardError()).trimmed().section(QLatin1Char('\n'), 0, 0).trimmed();
+            finish({}, QStringLiteral("%1: %2").arg(command, err.isEmpty() ? QObject::tr("failed (exit %1)").arg(code) : err));
             return;
         }
         QList<QPair<QString, QString>> entries;

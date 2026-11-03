@@ -411,6 +411,14 @@
         <translation>keine nutzbaren Aktionen</translation>
     </message>
     <message>
+        <source>no plugin.json in this folder</source>
+        <translation>keine plugin.json in diesem Ordner</translation>
+    </message>
+    <message>
+        <source>no plugin.json in this folder (rename %1?)</source>
+        <translation>keine plugin.json in diesem Ordner (%1 umbenennen?)</translation>
+    </message>
+    <message>
         <source>no answer</source>
         <translation>keine Antwort</translation>
     </message>
