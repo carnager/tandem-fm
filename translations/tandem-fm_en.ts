@@ -178,6 +178,20 @@
         </translation>
     </message>
     <message numerus="yes">
+        <source>%n folder(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n file(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>Links to %n item(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>

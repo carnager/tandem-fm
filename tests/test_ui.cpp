@@ -618,6 +618,32 @@ private slots:
         m_left->view()->setFocus();
     }
 
+    // Marked items get a bar with what they are and what fits them.
+    void selectionBar()
+    {
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+        QFrame* bar = m_left->selectionBar();
+        QVERIFY(!bar->isVisible());
+        leftModel()->setMarkedNames({"file1.txt", "sub"});
+        QTRY_VERIFY(bar->isVisible());
+        QStringList texts;
+        for (auto* l : bar->findChildren<QLabel*>())
+            texts << l->text();
+        QVERIFY2(texts.join(' ').contains("1 folder, 1 file"), qPrintable(texts.join(' ')));
+        QAbstractButton* unmark = nullptr;
+        for (auto* b : bar->findChildren<QAbstractButton*>())
+            if (b->accessibleName() == "Unmark")
+                unmark = b;
+        QVERIFY(unmark);
+        unmark->click();
+        QTRY_VERIFY(!bar->isVisible());
+        QVERIFY(leftModel()->markedNames().isEmpty());
+        QVERIFY(!m_right->selectionBar()->isVisible());  // only the active panel has one
+    }
+
     void quickSearch()
     {
         m_left->view()->setCurrentRow(0);

@@ -95,6 +95,13 @@ public:
         setAttribute(Qt::WA_Hover);
         setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     }
+    // In the selection bar: a framed pill; primary = the accent.
+    void setBoxed(bool boxed, bool primary = false)
+    {
+        m_boxed = boxed;
+        m_primary = primary;
+        update();
+    }
     void setKeys(const QString& keys)
     {
         const QStringList k = keys.split(QLatin1Char('+'));
@@ -126,7 +133,14 @@ protected:
         const Theme& t = theme();
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
-        if (isDown() || underMouse()) {
+        if (m_boxed) {
+            QColor bg = m_primary ? t.cursorActive : t.base;
+            if (underMouse() || isDown())
+                bg = m_primary ? t.dropTarget : t.cursorInactive;
+            p.setPen(QPen(m_primary ? t.accent : t.control, 1));
+            p.setBrush(bg);
+            p.drawRoundedRect(QRectF(rect()).adjusted(1.5, 1.5, -1.5, -1.5), 8, 8);
+        } else if (isDown() || underMouse()) {
             p.setPen(QPen(t.border, 1));
             p.setBrush(isDown() ? t.cursorActive : t.header);
             p.drawRoundedRect(QRectF(rect()).adjusted(1.5, 1.5, -1.5, -1.5), 8, 8);
@@ -141,6 +155,8 @@ protected:
         const int capY = (height() - capH) / 2;
         p.setFont(kf);
         for (const QString& k : m_keys) {  // key caps, like the keys on the keyboard
+            if (k.isEmpty())
+                continue;
             const int w = qMax(capH, kfm.horizontalAdvance(k) + 10);
             const QRectF cap(x, capY, w, capH);
             p.setPen(QPen(t.control, 1));
@@ -150,7 +166,8 @@ protected:
             p.drawText(cap, Qt::AlignCenter, k);
             x += w + 3;
         }
-        x += 5;
+        if (!m_keys.join(QString()).isEmpty())
+            x += 5;
         p.setFont(font());
         p.setPen(t.text);
         p.drawText(QRect(x, 0, width() - x, height()), Qt::AlignLeft | Qt::AlignVCenter, m_label);
@@ -170,12 +187,40 @@ private:
         const QFontMetrics kfm(kf);
         int w = 0;
         for (const QString& k : m_keys)
-            w += qMax(kfm.height() + 4, kfm.horizontalAdvance(k) + 10) + 3;
+            if (!k.isEmpty())
+                w += qMax(kfm.height() + 4, kfm.horizontalAdvance(k) + 10) + 3;
         return w;
     }
 
     QStringList m_keys;
     QString m_label, m_detail;
+    bool m_boxed = false, m_primary = false;
+};
+
+// A label with a long and a short text: the long one when it fits.
+class FittingLabel : public QLabel {
+public:
+    FittingLabel(const QString& full, const QString& brief, QWidget* parent)
+        : QLabel(parent), m_full(full), m_brief(brief)
+    {
+        setTextFormat(Qt::RichText);
+        setText(full);
+    }
+
+protected:
+    void resizeEvent(QResizeEvent* e) override
+    {
+        QLabel::resizeEvent(e);
+        QLabel probe;
+        probe.setFont(font());
+        probe.setText(m_full);
+        const QString want = probe.sizeHint().width() <= width() ? m_full : m_brief;
+        if (text() != want)
+            setText(want);
+    }
+
+private:
+    QString m_full, m_brief;
 };
 
 QStringList localPaths(const QList<QUrl>& urls)
@@ -703,6 +748,7 @@ QWidget* MainWindow::createFKeyBar()
     // The labels follow the selection and the other panel's folder.
     for (Panel* p : {m_left, m_right})
         connect(p, &Panel::statusChanged, this, &MainWindow::scheduleFKeyUpdate);
+    connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, &MainWindow::scheduleFKeyUpdate);
     scheduleFKeyUpdate();
     return bar;
 }
@@ -746,6 +792,104 @@ void MainWindow::updateFKeys()
         if (a->property("commandId").toString() == QLatin1String("command-palette") && !a->shortcut().isEmpty())
             static_cast<FKeyButton*>(m_fkeys.value(QStringLiteral("all")))
                 ->setKeys(a->shortcut().toString(QKeySequence::NativeText));
+    updateSelectionBars(target);
+}
+
+// Marked items in the active panel: what they are, and what can be done
+// with them, plugins included. Rebuilt only when that changes.
+void MainWindow::updateSelectionBars(const QString& target)
+{
+    for (Panel* p : {m_left, m_right}) {
+        QFrame* bar = p->selectionBar();
+        DirTab* t = p->tab();
+        const FileModel::Stats s = t ? t->model()->stats() : FileModel::Stats{};
+        const int marked = s.markedFiles + s.markedDirs;
+        if (p != active() || marked == 0 || !t) {
+            bar->hide();
+            bar->setProperty("state", QString());
+            continue;
+        }
+        const PluginContext ctx = pluginContext(p);
+        QStringList plugins;
+        for (const Plugin& plugin : std::as_const(m_plugins))
+            if (plugin.error.isEmpty() && pluginTrust(plugin) == PluginTrust::On)
+                for (const PluginAction& action : plugin.actions)
+                    if (!action.forFolder && pluginApplies(action, ctx))
+                        plugins << plugin.id + QLatin1Char('/') + action.id;
+        const QString state = QStringLiteral("%1|%2|%3|%4|%5|%6")
+                                  .arg(s.markedFiles).arg(s.markedDirs).arg(s.markedBytes)
+                                  .arg(theme().serial)
+                                  .arg(target, plugins.join(QLatin1Char(',')));
+        if (bar->property("state").toString() == state && bar->isVisible())
+            continue;
+        bar->setProperty("state", state);
+        auto* l = static_cast<QHBoxLayout*>(bar->layout());
+        while (QLayoutItem* item = l->takeAt(0)) {
+            if (QWidget* w = item->widget())
+                w->deleteLater();
+            delete item;
+        }
+        QStringList what;
+        if (s.markedDirs)
+            what << plural(tr("%n folder(s)", nullptr, s.markedDirs), s.markedDirs);
+        if (s.markedFiles)
+            what << plural(tr("%n file(s)", nullptr, s.markedFiles), s.markedFiles);
+        const QString brief = QStringLiteral("<span style=\"color:%1\">●</span>&nbsp; <b>%2</b>")
+                                  .arg(theme().mark.name(), what.join(QStringLiteral(", ")).toHtmlEscaped());
+        const QString full = brief + (s.markedBytes > 0 ? QStringLiteral("&nbsp; <span style=\"color:%1\">· %2</span>")
+                                                              .arg(theme().dimText.name(), formatSize(s.markedBytes))
+                                                        : QString());
+        auto* summary = new FittingLabel(full, brief, bar);
+        summary->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);  // gives way first when narrow
+        summary->setMinimumWidth(40);
+        l->addWidget(summary, 1);
+        auto button = [&](const QString& keys, const QString& label, const QString& detail, bool primary,
+                          std::function<void()> fn) {
+            auto* b = new FKeyButton(keys, label, bar);
+            b->setObjectName(QStringLiteral("selection-") + (keys.isEmpty() ? label : keys));
+            b->setText(label, detail);
+            b->setBoxed(true, primary);
+            connect(b, &QAbstractButton::clicked, this, std::move(fn));
+            l->addWidget(b);
+            return b;
+        };
+        button(QStringLiteral("F5"), tr("Copy to"), target, true, [this] { copyOrMove(CopyJob::Mode::Copy); });
+        button(QStringLiteral("F6"), tr("Move"), QString(), false, [this] { copyOrMove(CopyJob::Mode::Move); });
+        for (const Plugin& plugin : std::as_const(m_plugins)) {
+            if (!plugin.error.isEmpty() || pluginTrust(plugin) != PluginTrust::On)
+                continue;
+            for (const PluginAction& action : plugin.actions) {
+                if (action.forFolder || !pluginApplies(action, ctx))
+                    continue;
+                if (action.choices.isEmpty()) {
+                    button(QString(), action.title, QString(), false, [this, plugin, action, p] { runPluginAction(plugin, action, p); });
+                } else {
+                    FKeyButton* b = nullptr;
+                    b = button(QString(), action.title, QStringLiteral("▾"), false, [] {});
+                    auto* menu = new QMenu(b);
+                    menu->addAction(tr("Loading…"))->setEnabled(false);
+                    connect(menu, &QMenu::aboutToShow, this, [this, menu, plugin, action, p] {
+                        if (!menu->property("filled").toBool()) {
+                            menu->setProperty("filled", true);
+                            fillPluginChoices(menu, plugin, action, p);
+                        }
+                    });
+                    connect(b, &QAbstractButton::clicked, this, [b, menu] { menu->popup(b->mapToGlobal(QPoint(0, -menu->sizeHint().height()))); });
+                }
+            }
+        }
+        button(QStringLiteral("F8"), tr("Trash"), QString(), false, [this] { deleteSelected(false); });
+        auto* unmark = new QToolButton(bar);
+        unmark->setAccessibleName(tr("Unmark"));
+        unmark->setToolTip(tr("Unmark all"));
+        unmark->setText(QStringLiteral("✕"));
+        unmark->setAutoRaise(true);
+        unmark->setFocusPolicy(Qt::NoFocus);
+        unmark->setFixedSize(28, 28);
+        connect(unmark, &QToolButton::clicked, p, [p] { p->markAll(false); });
+        l->addWidget(unmark);
+        bar->show();
+    }
 }
 
 // The panel a preview belongs to, if w is (inside) one.
@@ -2473,6 +2617,7 @@ void MainWindow::installPluginCommands()
     }
     m_pluginMenu->menuAction()->setVisible(!m_pluginActions.isEmpty());
     applyKeyBindings(m_pluginActions);
+    scheduleFKeyUpdate();  // the selection bar offers plugin actions
 }
 
 PluginContext MainWindow::pluginContext(Panel* p) const

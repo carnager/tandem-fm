@@ -105,6 +105,7 @@ public:
     void setArrowFolders(bool on);
     void zoomBy(int step);  // +1 bigger, -1 smaller, 0 back to normal
     void syncZoom();        // the slider shows the zoom of what is shown
+    QFrame* selectionBar() const { return m_selectionBar; }
     QByteArray headerState() const;
     void restoreHeaderState(const QByteArray& state);
 
@@ -171,6 +172,7 @@ private:
     void updateSearchUi();
     FileView* m_view;
     QLabel* m_status;
+    QFrame* m_selectionBar = nullptr;
     QSlider* m_zoom = nullptr;
     QLineEdit* m_search;
     QWidget* m_filterBar;

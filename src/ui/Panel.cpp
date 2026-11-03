@@ -194,6 +194,19 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_zoom->setToolTip(tr("Zoom (Ctrl+wheel, Ctrl+= and Ctrl+−, Ctrl+0 resets)"));
     connect(m_zoom, &QSlider::valueChanged, this, [this](int v) { emit zoomRequested(m_view->thumbnails(), v); });
     statusRow->addWidget(m_zoom);
+    // Shown while items are marked; MainWindow fills it with what fits them.
+    m_selectionBar = new QFrame(this);
+    m_selectionBar->setObjectName(QStringLiteral("selectionBar"));
+    setThemeStyle(m_selectionBar, QStringLiteral(
+        "#selectionBar { background: @header; border: 1px solid @control; border-radius: 12px; }"));
+    auto* sb = new QHBoxLayout(m_selectionBar);
+    sb->setContentsMargins(12, 5, 6, 5);
+    sb->setSpacing(4);
+    m_selectionBar->hide();
+    auto* sbWrap = new QHBoxLayout;
+    sbWrap->setContentsMargins(8, 4, 8, 2);
+    sbWrap->addWidget(m_selectionBar);
+    layout->addLayout(sbWrap);
     layout->addLayout(statusRow);
     connect(m_view, &FileView::zoomStepRequested, this, &Panel::zoomBy);
     connect(m_view, &FileView::commandIdRequested, this, &Panel::commandIdRequested);

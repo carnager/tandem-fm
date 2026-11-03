@@ -2416,6 +2416,28 @@
         <source>New folder</source>
         <translation>Neuer Ordner</translation>
     </message>
+    <message numerus="yes">
+        <source>%n folder(s)</source>
+        <translation>
+            <numerusform>%n Ordner</numerusform>
+            <numerusform>%n Ordner</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n file(s)</source>
+        <translation>
+            <numerusform>%n Datei</numerusform>
+            <numerusform>%n Dateien</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Copy to</source>
+        <translation>Kopieren nach</translation>
+    </message>
+    <message>
+        <source>Unmark</source>
+        <translation>Markierung aufheben</translation>
+    </message>
     <message>
         <source>Extract</source>
         <translation>Entpacken</translation>

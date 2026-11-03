@@ -56,6 +56,7 @@ private:
     QWidget* createFKeyBar();
     void scheduleFKeyUpdate();
     void updateFKeys();
+    void updateSelectionBars(const QString& target);
 
     void copyOrMove(CopyJob::Mode mode);
     void deleteSelected(bool permanent);
