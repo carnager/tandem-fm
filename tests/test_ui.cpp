@@ -1270,19 +1270,24 @@ private slots:
     {
         const QVariant oldTheme = QSettings().value("view/theme");
         const QVariant oldScale = QSettings().value("view/fontScale");
+        const QVariant oldDim = QSettings().value("view/inactiveDim");
         auto restore = qScopeGuard([&] {
             for (const auto& item : {qMakePair(QString("view/theme"), oldTheme),
-                                     qMakePair(QString("view/fontScale"), oldScale)}) {
+                                     qMakePair(QString("view/fontScale"), oldScale),
+                                     qMakePair(QString("view/inactiveDim"), oldDim)}) {
                 if (item.second.isValid()) QSettings().setValue(item.first, item.second);
                 else QSettings().remove(item.first);
             }
             applyTheme(*qApp);
+            m_left->applyAppearance();
+            m_right->applyAppearance();
             m_left->view()->setFocus();
         });
         SettingsDialog dlg(m_window.get());
         dlg.show();
         auto* scale = dlg.findChild<QSpinBox*>("fontScale");
-        QVERIFY(scale);
+        auto* dim = dlg.findChild<QSpinBox*>("inactiveDim");
+        QVERIFY(scale && dim);
         auto chooseTheme = [&](const QString& code) {
             for (QToolButton* button : dlg.findChildren<QToolButton*>())
                 if (button->property("segmentValue").toString() == code) {
@@ -1336,6 +1341,29 @@ private slots:
         QCOMPARE(createdAt150.font().pointSizeF(), base);
         QVERIFY(bold.font().bold() && createdAt150.font().bold());
 
+        dim->setValue(0);
+        auto* leftShade = m_left->findChild<QWidget*>("inactivePanelShade");
+        auto* rightShade = m_right->findChild<QWidget*>("inactivePanelShade");
+        QVERIFY(leftShade && rightShade);
+        QVERIFY(leftShade->isHidden() && rightShade->isHidden());
+        dim->setValue(40);
+        dlg.close();
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+        QVERIFY(leftShade->isHidden());
+        QVERIFY(!rightShade->isHidden());
+        QVERIFY(rightShade->testAttribute(Qt::WA_TransparentForMouseEvents));
+        QCOMPARE(rightShade->geometry(), m_right->rect());
+        QTest::mouseClick(m_right->view()->viewport(), Qt::LeftButton, Qt::NoModifier, QPoint(30, 30));
+        QTRY_VERIFY(m_right->isActive());
+        QVERIFY(!leftShade->isHidden());
+        QVERIFY(rightShade->isHidden());
+        QCOMPARE(QSettings().value("view/inactiveDim").toInt(), 40);
+        SettingsDialog reopened(m_window.get());
+        QCOMPARE(reopened.findChild<QSpinBox*>("inactiveDim")->value(), 40);
+        QCOMPARE(reopened.findChild<QSpinBox*>("fontScale")->value(), 100);
     }
 
     // Ctrl+,: settings; keys can be changed, conflicts resolved, defaults restored.

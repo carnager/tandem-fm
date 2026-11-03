@@ -40,6 +40,7 @@ public:
     bool hasSelectionOverride() const { return !m_override.isEmpty(); }
     bool isActive() const { return m_active; }
     void setActive(bool active);
+    void applyAppearance();
 
     void navigate(const QString& path, const QString& focus = {});
     void refresh();
@@ -120,6 +121,7 @@ signals:
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;
     void paintEvent(QPaintEvent* e) override;
+    void resizeEvent(QResizeEvent* e) override;
 
 private:
     void bindTab(DirTab* t);
@@ -139,6 +141,7 @@ private:
 
     std::vector<DirTab*> m_tabs;
     int m_current = -1;
+    QWidget* m_inactiveShade = nullptr;
     bool m_active = false;
     bool m_showHidden = false;
     SortSpec m_sort;

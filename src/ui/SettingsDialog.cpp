@@ -280,6 +280,20 @@ QWidget* SettingsDialog::appearancePage()
     });
     page.add(tr("Text size"), scale, tr("Scale fonts throughout Tandem. 100% is the system's normal size. Applies immediately."));
 
+    auto* dim = new QSpinBox(this);
+    dim->setObjectName(QStringLiteral("inactiveDim"));
+    dim->setRange(0, 70);
+    dim->setSingleStep(5);
+    dim->setSuffix(QStringLiteral("%"));
+    dim->setValue(s.value(QStringLiteral("view/inactiveDim"), 25).toInt());
+    dim->setMaximumWidth(160);
+    connect(dim, &QSpinBox::valueChanged, this, [this](int value) {
+        QSettings().setValue(QStringLiteral("view/inactiveDim"), value);
+        m_window->m_left->applyAppearance();
+        m_window->m_right->applyAppearance();
+    });
+    page.add(tr("Dim inactive panel"), dim, tr("Fade the unfocused panel towards the theme background. Set to 0% to turn off."));
+
     auto* language = new QComboBox(this);
     language->addItem(tr("Like the system"), QString());
     language->addItem(QStringLiteral("English"), QStringLiteral("en"));

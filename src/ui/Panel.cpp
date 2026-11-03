@@ -46,6 +46,27 @@
 
 namespace tandem {
 
+namespace {
+class InactiveShade : public QWidget {
+public:
+    explicit InactiveShade(QWidget* parent) : QWidget(parent)
+    {
+        setObjectName(QStringLiteral("inactivePanelShade"));
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_NoSystemBackground);
+        setFocusPolicy(Qt::NoFocus);
+    }
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter painter(this);
+        QColor shade = theme().window;
+        shade.setAlphaF(qBound(0, QSettings().value(QStringLiteral("view/inactiveDim"), 25).toInt(), 70) / 100.0);
+        painter.fillRect(rect(), shade);
+    }
+};
+} // namespace
+
 Panel::Panel(QWidget* parent) : QFrame(parent)
 {
     setContentsMargins(1, 1, 1, 1);
@@ -335,7 +356,8 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
         sortBy(SortColumn(section));
     });
 
-    updateActiveStyle();
+    m_inactiveShade = new InactiveShade(this);
+    applyAppearance();
 }
 
 // ------------------------------------------------------------------ tabs
@@ -968,8 +990,26 @@ void Panel::setActive(bool active)
         return;
     m_active = active;
     m_view->setActive(active);
-    updateActiveStyle();
+    applyAppearance();
     update();
+}
+
+void Panel::applyAppearance()
+{
+    updateActiveStyle();
+    if (m_inactiveShade) {
+        m_inactiveShade->setGeometry(rect());
+        m_inactiveShade->setVisible(!m_active && QSettings().value(QStringLiteral("view/inactiveDim"), 25).toInt() > 0);
+        m_inactiveShade->raise();
+        m_inactiveShade->update();
+    }
+}
+
+void Panel::resizeEvent(QResizeEvent* event)
+{
+    QFrame::resizeEvent(event);
+    if (m_inactiveShade)
+        m_inactiveShade->setGeometry(rect());
 }
 
 void Panel::updateActiveStyle()
