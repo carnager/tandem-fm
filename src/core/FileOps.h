@@ -83,6 +83,11 @@ private:
 // Small blocking helpers for the I/O pool. Return 0 or an errno value.
 int makeDirectories(const QString& path);
 int renameNoReplace(const QString& from, const QString& to);
+
+// A link at linkPath to target. Relative symlinks point "../x/y" so they
+// keep working when both move together; hard links need the same drive.
+enum class LinkKind { Symbolic, Relative, Hard };
+int makeLink(const QString& target, const QString& linkPath, LinkKind kind);
 // Recursive size of regular files below path. -1 if cancelled or unreadable.
 int64_t directorySize(const QString& path, const std::atomic<bool>* cancel);
 // "name (2).ext" style name that does not exist yet.

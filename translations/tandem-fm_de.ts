@@ -1511,6 +1511,10 @@
         <translation>Umbenennen</translation>
     </message>
     <message>
+        <source>Create link…</source>
+        <translation>Verknüpfung erstellen…</translation>
+    </message>
+    <message>
         <source>Multi-rename…</source>
         <translation>Mehrfach-Umbenennen…</translation>
     </message>
@@ -2064,6 +2068,71 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Unpack %1 to (archives with several top-level items get their own folder):</source>
         <translation>%1 entpacken nach (Archive mit mehreren Elementen auf oberster Ebene erhalten einen eigenen Ordner):</translation>
+    </message>
+    <message>
+        <source>Link to %1</source>
+        <translation>Verknüpfung zu %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>Links to %n item(s)</source>
+        <translation>
+            <numerusform>Verknüpfung zu %n Element</numerusform>
+            <numerusform>Verknüpfungen zu %n Elementen</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Create the link as:</source>
+        <translation>Verknüpfung anlegen als:</translation>
+    </message>
+    <message>
+        <source>Create the links in:</source>
+        <translation>Verknüpfungen anlegen in:</translation>
+    </message>
+    <message>
+        <source>Symbolic</source>
+        <translation>Symbolisch</translation>
+    </message>
+    <message>
+        <source>Points to the full path; works anywhere, breaks if the target moves</source>
+        <translation>Zeigt auf den vollen Pfad; funktioniert überall, bricht, wenn das Ziel verschoben wird</translation>
+    </message>
+    <message>
+        <source>Relative</source>
+        <translation>Relativ</translation>
+    </message>
+    <message>
+        <source>Points to ../the/target; keeps working when both move together (backups, projects)</source>
+        <translation>Zeigt auf ../das/ziel; funktioniert weiter, wenn beide zusammen verschoben werden (Sicherungen, Projekte)</translation>
+    </message>
+    <message>
+        <source>Hard link</source>
+        <translation>Harter Link</translation>
+    </message>
+    <message>
+        <source>A second name for the same file: same drive only, files only, no breaking</source>
+        <translation>Ein zweiter Name für dieselbe Datei: nur auf demselben Laufwerk, nur Dateien, bricht nie</translation>
+    </message>
+    <message>
+        <source>Create link</source>
+        <translation>Verknüpfung erstellen</translation>
+    </message>
+    <message>
+        <source>Create links</source>
+        <translation>Verknüpfungen erstellen</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n link(s)</source>
+        <translation>
+            <numerusform>%n Verknüpfung</numerusform>
+            <numerusform>%n Verknüpfungen</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Created %n link(s)</source>
+        <translation>
+            <numerusform>%n Verknüpfung erstellt</numerusform>
+            <numerusform>%n Verknüpfungen erstellt</numerusform>
+        </translation>
     </message>
     <message>
         <source>a Windows (SMB) share</source>
@@ -3447,7 +3516,7 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     </message>
     <message>
         <source>A command; the file is added at the end. Terminal editors (vim, nano) need a terminal: e.g. &quot;kitty nvim&quot;.</source>
-        <translation>Ein Befehl; die Datei kommt ans Ende. Terminal-Editoren (vim, nano) brauchen ein Terminal: z. B. "kitty nvim".</translation>
+        <translation>Ein Befehl; die Datei kommt ans Ende. Terminal-Editoren (vim, nano) brauchen ein Terminal: z. B. &quot;kitty nvim&quot;.</translation>
     </message>
     <message>
         <source>Terminal (Ctrl+Alt+T)</source>

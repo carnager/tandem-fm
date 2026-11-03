@@ -4,6 +4,7 @@
 
 #include "core/Util.h"
 
+#include <QDir>
 #include <QCoreApplication>
 
 #include <cerrno>
@@ -797,6 +798,30 @@ int64_t directorySize(const QString& path, const std::atomic<bool>* cancel)
     if (cancel && cancel->load())
         return -1;
     return s;
+}
+
+int makeLink(const QString& target, const QString& linkPath, LinkKind kind)
+{
+    if (isRemoteLocation(target) || isRemoteLocation(linkPath)) {
+        if (kind == LinkKind::Hard || locationAuthority(target) != locationAuthority(linkPath))
+            return ENOTSUP;
+        Backend* b = backendFor(linkPath);
+        if (!b)
+            return ENOTSUP;
+        const QString to = kind == LinkKind::Relative
+                               ? QDir(locationPath(parentPath(linkPath))).relativeFilePath(locationPath(target))
+                               : locationPath(target);
+        return b->symlink(to, linkPath);
+    }
+    const QByteArray l = toNative(linkPath);
+    int r;
+    if (kind == LinkKind::Hard) {
+        r = ::link(toNative(target).constData(), l.constData());
+    } else {
+        const QString to = kind == LinkKind::Relative ? QDir(parentPath(linkPath)).relativeFilePath(target) : target;
+        r = ::symlink(toNative(to).constData(), l.constData());
+    }
+    return r == 0 ? 0 : errno;
 }
 
 }  // namespace tandem

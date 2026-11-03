@@ -28,6 +28,10 @@
 #include <QAbstractButton>
 #include <QActionGroup>
 #include <QApplication>
+#include <QPushButton>
+#include <QToolButton>
+#include <QDialogButtonBox>
+#include <QButtonGroup>
 #include <QRegularExpression>
 #include <QDateTime>
 #include <QStandardPaths>
@@ -324,6 +328,8 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("copy")] = addCommand(files, QT_TR_NOOP("Copy…"), {K(Qt::Key_F5)}, [this] { copyOrMove(CopyJob::Mode::Copy); });
     m_actions[QStringLiteral("move")] = addCommand(files, QT_TR_NOOP("Move…"), {K(Qt::Key_F6)}, [this] { copyOrMove(CopyJob::Mode::Move); });
     m_actions[QStringLiteral("rename")] = addCommand(files, QT_TR_NOOP("Rename"), {K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
+    m_actions[QStringLiteral("link")] =
+        addCommand(files, QT_TR_NOOP("Create link…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_F5)}, [this] { createLink(); });
     m_actions[QStringLiteral("permissions")] =
         addCommand(files, QT_TR_NOOP("Permissions…"), {K(Qt::ALT | Qt::Key_A)}, [this] { editPermissions(); });
     m_actions[QStringLiteral("multiRename")] =
@@ -1529,6 +1535,94 @@ bool MainWindow::collectRenameItems(Panel* p, QList<RenameItem>& items, QSet<QSt
     return !items.isEmpty();
 }
 
+// Ctrl+Shift+F5: links to the selected items, in the other panel by default.
+void MainWindow::createLink()
+{
+    Panel* p = active();
+    const QStringList targets = p->selectedPaths();
+    if (targets.isEmpty() || refuseInArchive(p) || other()->inArchive())
+        return;
+    bool anyDir = false;
+    for (const QString& t : targets)
+        anyDir |= QFileInfo(t).isDir();
+    const bool remote = p->isRemote() || other()->isRemote();
+    const bool single = targets.size() == 1;
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(single ? tr("Link to %1").arg(baseName(targets.first())) : plural(tr("Links to %n item(s)", nullptr, int(targets.size())), int(targets.size())));
+    dlg.setMinimumWidth(560);
+    auto* layout = new QVBoxLayout(&dlg);
+    layout->setContentsMargins(18, 16, 18, 14);
+    layout->setSpacing(8);
+    layout->addWidget(new QLabel(single ? tr("Create the link as:") : tr("Create the links in:"), &dlg));
+    auto* where = new QLineEdit(single ? joinPath(other()->path(), baseName(targets.first())) : other()->path(), &dlg);
+    layout->addWidget(where);
+    dlg.setStyleSheet(theme().css(QStringLiteral(
+        "QToolButton#segment { padding: 5px 14px; border: 1px solid @control; background: @base; }"
+        "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }")));
+    auto* kinds = new QHBoxLayout;
+    kinds->setSpacing(0);
+    auto* group = new QButtonGroup(&dlg);
+    const QList<std::tuple<LinkKind, QString, QString>> choices = {
+        {LinkKind::Symbolic, tr("Symbolic"), tr("Points to the full path; works anywhere, breaks if the target moves")},
+        {LinkKind::Relative, tr("Relative"), tr("Points to ../the/target; keeps working when both move together (backups, projects)")},
+        {LinkKind::Hard, tr("Hard link"), tr("A second name for the same file: same drive only, files only, no breaking")},
+    };
+    auto* help = new QLabel(&dlg);
+    help->setWordWrap(true);
+    help->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    const int saved = QSettings().value(QStringLiteral("links/kind"), 0).toInt();
+    for (const auto& [kind, label, tip] : choices) {
+        auto* b = new QToolButton(&dlg);
+        b->setObjectName(QStringLiteral("segment"));
+        b->setText(label);
+        b->setCheckable(true);
+        b->setEnabled(!(kind == LinkKind::Hard && (anyDir || remote)));
+        group->addButton(b, int(kind));
+        kinds->addWidget(b);
+        connect(b, &QToolButton::toggled, help, [help, tip](bool on) {
+            if (on)
+                help->setText(tip);
+        });
+    }
+    kinds->addStretch(1);
+    QAbstractButton* start = group->button(saved);
+    (start && start->isEnabled() ? start : group->button(0))->setChecked(true);
+    layout->addLayout(kinds);
+    layout->addWidget(help);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    buttons->button(QDialogButtonBox::Ok)->setText(single ? tr("Create link") : tr("Create links"));
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    layout->addWidget(buttons);
+    where->setFocus();
+    where->selectAll();
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    const auto kind = LinkKind(group->checkedId());
+    QSettings().setValue(QStringLiteral("links/kind"), int(kind));
+    QString dest = expandUserPath(where->text().trimmed());
+    if (!dest.startsWith(QLatin1Char('/')) && !isRemoteLocation(dest))
+        dest = joinPath(p->path(), dest);
+    QList<QPair<QString, QString>> made;
+    QStringList errors;
+    for (const QString& t : targets) {
+        const QString link = single && !QFileInfo(dest).isDir() ? dest : joinPath(dest, baseName(t));
+        if (const int e = makeLink(t, link, kind))
+            errors << tr("%1: %2").arg(baseName(link), errnoString(e));
+        else
+            made.append({link, QString()});
+    }
+    if (!made.isEmpty())
+        pushUndo({UndoEntry::Kind::Create, plural(tr("%n link(s)", nullptr, int(made.size())), int(made.size())), {}, made});
+    p->showMessage(errors.isEmpty() ? plural(tr("Created %n link(s)", nullptr, int(made.size())), int(made.size()))
+                                    : errors.first(),
+                   !errors.isEmpty());
+    for (Panel* panel : {m_left, m_right})
+        if (panel->isRemote())
+            panel->refresh();
+}
+
 // Alt+A. Reading permissions (ACLs, flags) can touch slow mounts: off the UI thread.
 void MainWindow::editPermissions()
 {
@@ -2084,6 +2178,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     menu.addAction(act("multiRename"));
     menu.addAction(act("editorRename"));
     menu.addAction(act("permissions"));
+    menu.addAction(act("link"));
     menu.addAction(act("copyPath"));
     menu.addSeparator();
     if (e && e->isDir)

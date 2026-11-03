@@ -599,6 +599,29 @@ private slots:
         QCOMPARE(names(with("{name|shout}")).first(), QString("Unknown filter |shout (lower, upper, title, trim)"));
     }
 
+    void links()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("a/b")));
+        QVERIFY(QDir().mkpath(tmp.filePath("c")));
+        writeFile(tmp.filePath("a/b/f.txt"), "data");
+        QCOMPARE(makeLink(tmp.filePath("a/b/f.txt"), tmp.filePath("c/abs"), LinkKind::Symbolic), 0);
+        QCOMPARE(QFile::symLinkTarget(tmp.filePath("c/abs")), tmp.filePath("a/b/f.txt"));
+        QCOMPARE(makeLink(tmp.filePath("a/b/f.txt"), tmp.filePath("c/rel"), LinkKind::Relative), 0);
+        char buf[256] = {};
+        QVERIFY(::readlink(QFile::encodeName(tmp.filePath("c/rel")).constData(), buf, sizeof buf - 1) > 0);
+        QCOMPARE(QString(buf), QString("../a/b/f.txt"));
+        QCOMPARE(readFile(tmp.filePath("c/rel")), QByteArray("data"));
+        QCOMPARE(makeLink(tmp.filePath("a/b/f.txt"), tmp.filePath("c/hard"), LinkKind::Hard), 0);
+        QCOMPARE(readFile(tmp.filePath("c/hard")), QByteArray("data"));
+        QCOMPARE(makeLink(tmp.filePath("a/b/f.txt"), tmp.filePath("c/abs"), LinkKind::Symbolic), EEXIST);
+        // Undo removes the links, never the file.
+        QVERIFY(removeIfStillEmpty({tmp.filePath("c/abs"), tmp.filePath("c/rel"), tmp.filePath("c/hard")}).isEmpty());
+        QCOMPARE(QDir(tmp.filePath("c")).entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::System), QStringList());
+        QCOMPARE(readFile(tmp.filePath("a/b/f.txt")), QByteArray("data"));
+        QVERIFY(!removeIfStillEmpty({tmp.filePath("a/b/f.txt")}).isEmpty());  // the only name: kept
+    }
+
     void permissions()
     {
         QTemporaryDir tmp;

@@ -49,8 +49,11 @@ QStringList removeIfStillEmpty(const QStringList& paths)
         struct stat st;
         if (::lstat(toNative(p).constData(), &st) != 0)
             continue;  // already gone
+        // Links go (only the link, never what it points to); a hard link only
+        // while the file still has another name, so no data is lost.
+        const bool removable = S_ISLNK(st.st_mode) || st.st_size == 0 || (S_ISREG(st.st_mode) && st.st_nlink > 1);
         const bool ok = S_ISDIR(st.st_mode) ? removeEmptyTree(p)
-                                            : (st.st_size == 0 && ::unlink(toNative(p).constData()) == 0);
+                                            : (removable && ::unlink(toNative(p).constData()) == 0);
         if (!ok)
             errors << QObject::tr("%1 is no longer empty; kept").arg(p);
     }

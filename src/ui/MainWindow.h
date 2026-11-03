@@ -97,6 +97,7 @@ private:
     void pack();
     void multiRename();
     void editPermissions();
+    void createLink();
     void renameInEditor();
     bool collectRenameItems(Panel* p, QList<RenameItem>& items, QSet<QString>& existing);
     void startEditorRename(Panel* p, const QList<RenameItem>& items, const QSet<QString>& existing);

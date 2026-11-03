@@ -943,6 +943,40 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // Ctrl+Shift+F5: a link in the other panel; Ctrl+Z takes it away again.
+    void createLinks()
+    {
+        QVERIFY(QDir().mkpath(L("lk")));
+        writeFile(L("lk/target.txt"), "t");
+        m_left->navigate(L("lk"));
+        m_right->navigate(R());
+        QTRY_COMPARE(leftModel()->path(), L("lk"));
+        QTRY_COMPARE(rightModel()->path(), R());
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "target.txt");
+        answerNextDialog([](QWidget* w) {
+            for (auto* b : w->findChildren<QToolButton*>())
+                if (b->text() == QObject::tr("Relative"))
+                    b->click();
+            acceptDialog(w);
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_F5, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(QFileInfo(R("target.txt")).isSymLink());
+        QCOMPARE(readFile(R("target.txt")), QByteArray("t"));
+        QVERIFY(!QFileInfo(R("target.txt")).symLinkTarget().isEmpty());
+        QTRY_VERIFY(rightModel()->rowOf("target.txt") >= 0);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_Z, Qt::ControlModifier);
+        QTRY_VERIFY(!QFileInfo(R("target.txt")).exists() && !QFileInfo(R("target.txt")).isSymLink());
+        QCOMPARE(readFile(L("lk/target.txt")), QByteArray("t"));
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
     // Ctrl+,: settings; keys can be changed, conflicts resolved, defaults restored.
     void settingsAndKeys()
     {
