@@ -88,6 +88,12 @@ settings, bookmarks and folder history there instead of the usual places, as
 plain INI files on every platform: a synced folder shares them between
 computers. Changes from another computer apply at the next start.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow (fork, branch, pull
+request) and [AGENTS.md](AGENTS.md) for the rules the code follows. Both
+apply to coding agents too.
+
 ## License
 
 GPL-3.0-or-later

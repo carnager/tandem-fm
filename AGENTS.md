@@ -124,7 +124,19 @@ ctest --test-dir build --output-on-failure
   `QT_QPA_PLATFORM=offscreen TANDEM_SCREENSHOT=/tmp/shot.png ./build/tandem-fm`
   (with `TANDEM_CONFIG_DIR=/tmp/somewhere` to keep real settings out).
 
-## Commits
+## Branches, commits, pull requests
 
-Small, one subject each, message in plain words: what changed for the user
-and why. All tests pass, German is complete, nothing unrelated is in it.
+The full workflow, with every command, is in
+[CONTRIBUTING.md](CONTRIBUTING.md). In short:
+
+- **Never commit or push to `main`.** Work on a branch made from the newest
+  `upstream/main`, one branch per feature, in the contributor's fork.
+- **Commits** are small, one subject each, the message in plain words:
+  what changed for the user and why.
+- **One pull request per feature**, based on `main`, not stacked on another
+  pull request. If it truly depends on another, say so and keep it a draft.
+- Keep the branch current with `git rebase upstream/main`, not merges.
+- Before saying a change is done: it builds, all tests pass, German is
+  complete (0 unfinished), and `git diff upstream/main` shows nothing but
+  this feature. Say in the description what was tested, and on which
+  system.
