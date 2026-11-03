@@ -16,11 +16,20 @@
 
 int main(int argc, char** argv)
 {
-    QApplication app(argc, argv);
-    QApplication::setApplicationName(QStringLiteral("tandem-fm"));
-    QApplication::setOrganizationName(QStringLiteral("tandem-fm"));
-    QStringList paths = app.arguments().mid(1);
+    QCoreApplication::setApplicationName(QStringLiteral("tandem-fm"));
+    QCoreApplication::setOrganizationName(QStringLiteral("tandem-fm"));
+    QStringList paths;
+    for (int i = 1; i < argc; ++i)
+        paths << QString::fromLocal8Bit(argv[i]);
     tandem::setupConfigDir(paths);  // before anything reads settings
+
+    // Interface size (Settings › Appearance): Qt's own scaling of everything,
+    // read before the application starts. QT_SCALE_FACTOR set by hand wins.
+    const int scale = QSettings().value(QStringLiteral("view/interfaceScale"), 100).toInt();
+    if (scale != 100 && scale >= 50 && scale <= 300 && qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR"))
+        qputenv("QT_SCALE_FACTOR", QByteArray::number(scale / 100.0));
+
+    QApplication app(argc, argv);
     QApplication::setApplicationDisplayName(QStringLiteral("Tandem"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
     QGuiApplication::setDesktopFileName(QStringLiteral("tandem-fm"));

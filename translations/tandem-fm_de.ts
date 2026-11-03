@@ -4101,6 +4101,18 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Menüleiste zeigen (Strg+Umschalt+M)</translation>
     </message>
     <message>
+        <source>The interface size changes the next time Tandem starts</source>
+        <translation>Die Oberflächengröße ändert sich beim nächsten Start von Tandem</translation>
+    </message>
+    <message>
+        <source>Interface size</source>
+        <translation>Oberflächengröße</translation>
+    </message>
+    <message>
+        <source>Everything: text, icons, spacing. Takes effect the next time Tandem starts. Only the file lists: Ctrl+= and Ctrl+−.</source>
+        <translation>Alles: Text, Symbole, Abstände. Wirkt beim nächsten Start von Tandem. Nur die Dateilisten: Strg+= und Strg+−.</translation>
+    </message>
+    <message>
         <source>Keyboard</source>
         <translation>Tastatur</translation>
     </message>
