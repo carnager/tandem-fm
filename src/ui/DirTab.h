@@ -41,6 +41,10 @@ public:
     bool inArchive() const { return m_inArchive; }
     QString gitBranch() const { return m_gitBranch; }
     bool isRemote() const { return m_remote; }  // listed through a Backend (sftp://, …)
+    // Folders whose changes inotify can't see (servers, NFS, sshfs …) are
+    // looked at again now and then while shown; this is one such look.
+    bool needsPolling() const { return (m_remote || m_networkFs) && !m_inArchive && !m_inSearch; }
+    void poll();
 
     // Search results as a virtual folder: entries are paths relative to the
     // searched folder, so every file operation keeps working on them.
@@ -104,6 +108,8 @@ private:
     bool m_showHidden = false;
     bool m_inArchive = false;
     bool m_refreshAfterLoad = false;
+    bool m_networkFs = false;
+    bool m_polling = false;
     QString m_gitBranch;
     bool m_remote = false;
     SearchSpec m_search;

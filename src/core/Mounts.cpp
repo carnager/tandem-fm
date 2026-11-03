@@ -1,5 +1,7 @@
 #include "core/Mounts.h"
 
+#include <sys/vfs.h>
+
 #include <QFile>
 #include <QSet>
 
@@ -78,6 +80,26 @@ QList<MountPoint> listMounts()
         out.append(m);
     }
     return out;
+}
+
+bool isNetworkFilesystem(const QString& path)
+{
+    struct statfs sf;
+    if (::statfs(QFile::encodeName(path).constData(), &sf) != 0)
+        return false;
+    switch (uint32_t(sf.f_type)) {
+    case 0x6969:      // NFS
+    case 0x517B:      // SMB
+    case 0xFF534D42:  // CIFS
+    case 0xFE534D42:  // SMB2
+    case 0x65735546:  // FUSE: sshfs, rclone, GVfs …
+    case 0x00C36400:  // Ceph
+    case 0x01021997:  // 9p
+    case 0x5346414F:  // AFS
+        return true;
+    default:
+        return false;
+    }
 }
 
 }  // namespace tandem

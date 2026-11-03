@@ -69,6 +69,7 @@ public:
     void setFilter(const QString& text);
     QString filter() const { return m_filter; }
     int hiddenByFilter() const { return int(m_hidden.size()); }
+    const std::vector<FileEntry>& filteredOut() const { return m_hidden; }
 
     void setGitStatus(const QHash<QString, char>& status);
     char gitStatus(const QString& name) const { return m_git.value(name, 0); }

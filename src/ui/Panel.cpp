@@ -35,6 +35,7 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QTabBar>
+#include <QTimer>
 #include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -248,6 +249,18 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_pathBar, &PathBar::focused, this, [this] { emit activated(this); });
 
     connect(m_mountButton, &QToolButton::clicked, this, &Panel::showLocations);
+
+    // Servers and network mounts: inotify doesn't see other machines' changes,
+    // so the shown folder is looked at again every few seconds.
+    auto* poll = new QTimer(this);
+    poll->setInterval(5000);
+    connect(poll, &QTimer::timeout, this, [this] {
+        DirTab* t = tab();
+        QWidget* w = window();
+        if (t && w && w->isVisible() && !w->isMinimized())
+            t->poll();
+    });
+    poll->start();
 
     connect(m_view, &FileView::focused, this, [this] { emit activated(this); });
     connect(m_view, &FileView::cursorMoved, this, [this] { emit cursorChanged(this); });

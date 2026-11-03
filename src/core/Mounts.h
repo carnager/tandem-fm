@@ -17,4 +17,8 @@ struct MountPoint {
 // drops pseudo filesystems nobody wants to browse.
 QList<MountPoint> listMounts();
 
+// NFS, SMB/CIFS, FUSE (sshfs, rclone, GVfs), Ceph, 9p: changes made by other
+// machines don't reach inotify there. Blocking (statfs); call from a worker.
+bool isNetworkFilesystem(const QString& path);
+
 }  // namespace tandem

@@ -1,6 +1,7 @@
 #include "ui/DirTab.h"
 
 #include "core/Backend.h"
+#include "core/Mounts.h"
 #include "core/Remote.h"
 
 #include "core/DirWatcher.h"
@@ -112,6 +113,52 @@ void DirTab::refresh()
     startListing(path(), cursorName(), History::None, true);
 }
 
+namespace {
+// What a listing looks like, to notice changes cheaply. Folder sizes are left
+// out (computed ones would differ from a fresh listing).
+size_t listingSignature(const std::vector<const FileEntry*>& entries)
+{
+    QStringList parts;
+    parts.reserve(qsizetype(entries.size()));
+    for (const FileEntry* e : entries)
+        parts << QStringLiteral("%1\t%2\t%3\t%4").arg(e->name).arg(e->isDir).arg(e->isDir ? -1 : e->size).arg(e->mtime);
+    parts.sort();
+    return qHash(parts.join(QLatin1Char('\n')));
+}
+}  // namespace
+
+void DirTab::poll()
+{
+    if (m_polling || m_loading || !needsPolling() || path().isEmpty())
+        return;
+    std::vector<const FileEntry*> shown;
+    for (int r = 0; r < m_model->count(); ++r)
+        if (!m_model->entry(r)->isParent)
+            shown.push_back(m_model->entry(r));
+    for (const FileEntry& e : m_model->filteredOut())  // a filter hides, it doesn't remove
+        shown.push_back(&e);
+    const size_t before = listingSignature(shown);
+    m_polling = true;
+    const QString dir = path();
+    ListOptions opt;
+    opt.showHidden = m_showHidden;
+    QPointer<DirTab> self(this);
+    ioPool()->start([self, dir, opt, before] {
+        const ListResult l = listLocation(dir, opt);
+        std::vector<const FileEntry*> now;
+        for (const FileEntry& e : l.entries)
+            now.push_back(&e);
+        const bool changed = !l.error && listingSignature(now) != before;
+        postToUi([self, dir, changed] {
+            if (!self)
+                return;
+            self->m_polling = false;
+            if (changed && !self->m_loading && self->path() == dir)
+                self->refresh();
+        });
+    });
+}
+
 void DirTab::goUp()
 {
     if (m_inSearch) {  // leave the results: back to where the search started
@@ -195,7 +242,8 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
     auto cancel = m_cancel;
     ioPool()->start([self, gen, path, focus, history, marks, opt, cancel] {
         auto result = std::make_shared<ListResult>(listLocation(path, opt, cancel.get()));
-        postToUi([self, gen, focus, history, marks, result] {
+        const bool networkFs = !result->error && !result->remote && !result->inArchive && isNetworkFilesystem(path);
+        postToUi([self, gen, focus, history, marks, result, networkFs] {
             if (!self || gen != self->m_gen) {
                 DirWatcher::instance()->removeWatch(result->watch);
                 return;
@@ -254,6 +302,7 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
             t->setWatch(result->watch);
             t->m_inArchive = result->inArchive;
             t->m_remote = result->remote;
+            t->m_networkFs = networkFs;
             t->m_archivePath = result->archivePath;
             t->m_free = result->freeBytes;
             t->m_total = result->totalBytes;

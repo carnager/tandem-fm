@@ -944,6 +944,37 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // Server folders notice changes made elsewhere (polled while shown).
+    void serverFolderRefreshes()
+    {
+        QTemporaryDir serverDir;
+        writeFile(serverDir.filePath("a.txt"), "a");
+        writeFile(serverDir.filePath("b.txt"), "b");
+        auto backend = std::make_shared<TestBackend>(serverDir.path());
+        registerBackend("test", backend);
+        m_right->navigate("test://srv/");
+        QTRY_COMPARE(rightModel()->path(), QString("test://srv/"));
+        QTRY_VERIFY(rightModel()->rowOf("b.txt") >= 0);
+        QVERIFY(m_right->tab()->needsPolling());
+        m_right->view()->setCurrentRow(rightModel()->rowOf("b.txt"));
+
+        const int before = backend->calls;
+        m_right->tab()->poll();  // nothing changed: one listing, no reload
+        QTRY_VERIFY(backend->calls > before);
+        QTest::qWait(100);
+        QCOMPARE(m_right->currentName(), QString("b.txt"));
+
+        writeFile(serverDir.filePath("new-from-elsewhere.txt"), "n");  // someone else
+        m_right->tab()->poll();
+        QTRY_VERIFY(rightModel()->rowOf("new-from-elsewhere.txt") >= 0);
+        QCOMPARE(m_right->currentName(), QString("b.txt"));  // the cursor stays
+        QVERIFY(!m_left->tab()->needsPolling());              // local folders have inotify
+
+        m_right->navigate(R());
+        QTRY_COMPARE(rightModel()->path(), R());
+        registerBackend("test", nullptr);
+    }
+
     // The trash window: lists what's there, restores, deletes for good.
     void trashWindow()
     {
