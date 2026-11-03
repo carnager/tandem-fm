@@ -10,33 +10,32 @@
 
 namespace tandem {
 
-// Total Commander style multi-rename. Pure logic: build a plan, check it,
-// then execute it (blocking; call from a worker).
+// Multi-rename. Pure logic: build a plan, check it, then execute it
+// (blocking; call from a worker).
 //
-// Mask placeholders (name and extension masks):
-//   [N] name without extension     [E] extension      [P] parent folder name
-//   [N3] 3rd character             [N2-5] chars 2..5  [N2,3] 3 chars from 2nd
-//   [N-3-] last three chars        [N2-] from 2nd on  (same ranges work for [E])
-//   [C] counter (start/step/digits from the options); [C10+5:3] inline override
-//   [Y] [M] [D] [h] [m] [s] parts of the modification time, [YMD] [hms] combined
-//   [[] and []] for literal brackets
+// The template describes the whole new name; {field} parts are filled in:
+//   {name} name without extension   {ext} extension with its dot (".jpg")
+//   {file} the full old name        {folder} the parent folder's name
+//   {n} counter: {n:01} pads to 2 digits, {n:100} starts at 100, {n:1+10} steps by 10
+//   {date} modified, {date:yyyy-MM-dd HH.mm} in any format
+//   {taken} when a photo was taken (EXIF; else modified), formats as {date}
+// Parts of a field: {name[0:4]} first four characters, {name[-3:]} last
+// three. Filters: {name|lower} upper title trim. {{ and }} are braces.
+// Then find/replace runs on the result, then the case style.
 struct RenameOptions {
-    QString nameMask = QStringLiteral("[N]");
-    QString extMask = QStringLiteral("[E]");
-    QString search;
+    QString pattern = QStringLiteral("{name}{ext}");
+    QString find;
     QString replace;
     bool regex = false;
-    bool caseSensitive = false;
-    enum class Case { Keep, Lower, Upper, FirstUpper, Title } caseMode = Case::Keep;
-    int counterStart = 1;
-    int counterStep = 1;
-    int counterDigits = 1;
+    bool matchCase = false;
+    enum class Case { Keep, Lower, Upper, Title, Sentence } caseMode = Case::Keep;
 };
 
 struct RenameItem {
     QString name;  // current file name
     bool isDir = false;
     int64_t mtime = 0;
+    int64_t taken = 0;  // photo date (EXIF), 0 if unknown
 };
 
 struct RenameRow {

@@ -14,6 +14,7 @@
 #include "core/Fuzzy.h"
 #include "core/IoScheduler.h"
 #include "core/MultiRename.h"
+#include "core/ExifDate.h"
 #include "core/Sorting.h"
 
 #include <QDateTime>
@@ -549,10 +550,10 @@ private slots:
         QCOMPARE(archiveStem("photos.tar.gz"), QString("photos"));
     }
 
-    void renameMasks()
+    void renameTemplates()
     {
-        const QList<RenameItem> items = {{"IMG_0042.JPG", false, 1700000000}, {"notes.tar.gz", false, 0},
-                                         {"Folder.v2", true, 0}};
+        const QList<RenameItem> items = {{"IMG_0042.JPG", false, 1700000000, 1600000000}, {"notes.tar.gz", false, 0, 0},
+                                         {"Folder.v2", true, 0, 0}};
         auto names = [&](const RenameOptions& o) {
             const RenamePlan p = buildRenamePlan(items, "Trip", o, {});
             QStringList out;
@@ -560,42 +561,70 @@ private slots:
                 out << r.newName;
             return p.error.isEmpty() ? out : QStringList{p.error};
         };
+        auto with = [](const QString& pattern) {
+            RenameOptions o;
+            o.pattern = pattern;
+            return o;
+        };
+        QCOMPARE(names({}), QStringList({"IMG_0042.JPG", "notes.tar.gz", "Folder.v2"}));  // unchanged
+        QCOMPARE(names(with("{folder} {n:001}{ext}")), QStringList({"Trip 001.JPG", "Trip 002.tar.gz", "Trip 003"}));  // folders: no ext
+        QCOMPARE(names(with("{n:10+5}")), QStringList({"10", "15", "20"}));
+        QCOMPARE(names(with("{name[-4:]}_{name[0:3]|lower}{ext|lower}")).first(), QString("0042_img.jpg"));
+        QCOMPARE(names(with("{name[2]}")).first(), QString("G"));
+        QCOMPARE(names(with("{{{n}}}")).first(), QString("{1}"));
+        QCOMPARE(names(with("{date:yyyyMMdd}-{name}")).first(),
+                 QDateTime::fromSecsSinceEpoch(1700000000).toString("yyyyMMdd") + "-IMG_0042");
+        QCOMPARE(names(with("{taken}")).first(), QDateTime::fromSecsSinceEpoch(1600000000).toString("yyyy-MM-dd"));
+        QCOMPARE(names(with("{taken:yyyy}")).at(1), QDateTime::fromSecsSinceEpoch(0).toString("yyyy"));  // no EXIF: modified
+
         RenameOptions o;
-        QCOMPARE(names(o), QStringList({"IMG_0042.JPG", "notes.tar.gz", "Folder.v2"}));  // unchanged
-        o.nameMask = "[P]_[C]";
-        o.counterDigits = 3;
-        QCOMPARE(names(o), QStringList({"Trip_001.JPG", "Trip_002.tar.gz", "Trip_003"}));  // folders have no ext
-        o = {};
-        o.nameMask = "[N5-]_[N1,3]";
-        o.extMask = "[E1]";
-        QCOMPARE(names(o).first(), QString("0042_IMG.J"));
-        o = {};
-        o.nameMask = "[N-4-][[][C10+5:2][]]";
-        QCOMPARE(names(o), QStringList({"0042[10].JPG", "otes[15].tar.gz", "r.v2[20]"}));
-        o = {};
-        o.nameMask = "[YMD]-[N]";
-        o.extMask = "[E]";
-        QVERIFY(names(o).first().startsWith(QDateTime::fromSecsSinceEpoch(1700000000).toString("yyyyMMdd") + "-IMG"));
-        o = {};
-        o.search = "img_(\\d+)";
+        o.find = "img_(\\d+)";
         o.replace = "photo-$1";
         o.regex = true;
         QCOMPARE(names(o).first(), QString("photo-0042.JPG"));
         o.regex = false;
-        o.search = ".";
+        o.find = ".";
         o.replace = "\\1";  // plain text: no regex magic
         QCOMPARE(names(o).at(1), QString("notes\\1tar\\1gz"));
         o = {};
         o.caseMode = RenameOptions::Case::Lower;
-        QCOMPARE(names(o).first(), QString("img_0042.jpg"));
+        QCOMPARE(names(o).first(), QString("img_0042.JPG"));  // the extension keeps its case
+        o = with("my holiday's best{ext}");
         o.caseMode = RenameOptions::Case::Title;
-        QCOMPARE(names({.nameMask = "my holiday's best", .caseMode = RenameOptions::Case::Title}).first(),
-                 QString("My Holiday's Best.JPG"));
-        o = {};
-        o.nameMask = "[Q]";
-        QCOMPARE(names(o), QStringList({"Unknown placeholder [Q]"}));
-        o.nameMask = "[N";
-        QCOMPARE(names(o), QStringList({"Missing ] in the mask"}));
+        QCOMPARE(names(o).first(), QString("My Holiday's Best.JPG"));
+
+        QCOMPARE(names(with("{nope}")), QStringList({"Unknown field {nope}"}));
+        QCOMPARE(names(with("{name")), QStringList({"A { is not closed"}));
+        QCOMPARE(names(with("{name|shout}")).first(), QString("Unknown filter |shout (lower, upper, title, trim)"));
+    }
+
+    void exifDate()
+    {
+        // A minimal JPEG: SOI, APP1 "Exif" with a little-endian TIFF holding
+        // IFD0 -> Exif IFD -> DateTimeOriginal.
+        QByteArray tiff;
+        auto u16 = [&](int v) { tiff.append(char(v & 0xff)).append(char(v >> 8 & 0xff)); };
+        auto u32 = [&](uint32_t v) { for (int i = 0; i < 4; ++i) tiff.append(char(v >> (8 * i) & 0xff)); };
+        tiff += "II";
+        u16(42);
+        u32(8);         // IFD0 at 8
+        u16(1);         // one entry
+        u16(0x8769); u16(4); u32(1); u32(26);  // Exif IFD at 26
+        u32(0);
+        u16(1);         // Exif IFD: one entry
+        u16(0x9003); u16(2); u32(20); u32(44);  // DateTimeOriginal at 44
+        u32(0);
+        tiff += QByteArray("2021:06:15 14:30:05", 19) + '\0';
+        QByteArray jpeg("\xFF\xD8", 2);
+        const QByteArray app1 = QByteArray("Exif\0\0", 6) + tiff;
+        jpeg += QByteArray("\xFF\xE1", 2) + char((app1.size() + 2) >> 8) + char((app1.size() + 2) & 0xff) + app1;
+        jpeg += QByteArray("\xFF\xDA\x00\x02", 4);
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("p.jpg"), jpeg);
+        QCOMPARE(exifTakenTime(tmp.filePath("p.jpg")),
+                 QDateTime::fromString("2021-06-15 14:30:05", "yyyy-MM-dd HH:mm:ss").toSecsSinceEpoch());
+        writeFile(tmp.filePath("plain.txt"), "no exif here");
+        QCOMPARE(exifTakenTime(tmp.filePath("plain.txt")), int64_t(0));
     }
 
     void renameConflictsAndSwap()
@@ -609,14 +638,14 @@ private slots:
 
         // a -> other collides with a file that stays.
         RenameOptions o;
-        o.search = "a";
+        o.find = "a";
         o.replace = "other";
         RenamePlan p = buildRenamePlan({{"a", false, 0}}, "", o, existing);
         QCOMPARE(p.problems, 1);
         QVERIFY(!p.canRun());
         // Two files to the same name.
-        o.nameMask = "x";
-        o.search.clear();
+        o.pattern = "x";
+        o.find.clear();
         p = buildRenamePlan({{"a", false, 0}, {"b", false, 0}}, "", o, existing);
         QCOMPARE(p.problems, 2);
 

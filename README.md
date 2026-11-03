@@ -63,7 +63,7 @@ Visual check without a display:
 | Num + / Num − / Num * | Mark group / unmark group / invert |
 | F3 / F4 | Built-in viewer / edit (default app; set `tools/editor` in the config for F4) |
 | F5 / F6 | Copy / move to the other panel (`name/` = into that folder) |
-| Shift+F6 / Ctrl+M / Ctrl+E | Rename in place / multi-rename tool / rename in your text editor (vidir-style) |
+| Shift+F6 / Ctrl+M / Ctrl+E | Rename in place / rename many (template + live preview) / rename in your text editor (vidir-style) |
 | F7 / Shift+F4 | New folder (`a/b/c` creates nested folders) / new file |
 | F8, Del / Shift+F8, Shift+Del | Move to trash / delete permanently |
 | Ctrl+T / Ctrl+W / Ctrl+Tab | New / close / next tab (double-click a tab closes it) |
@@ -140,6 +140,24 @@ compression) and swaps it in: the old one stays intact if anything fails, and
 one batch (say 200 files copied in) is one rewrite. rar, iso, deb and rpm stay
 read-only, and so do archives with encrypted members.
 
+## Renaming many files (Ctrl+M)
+
+One template describes the new name, and the preview shows every result
+with the changed part highlighted, before anything happens:
+
+    {taken} Lisbon {n:001}{ext|lower}   →   2024-07-11 Lisbon 001.jpg
+
+Fields: `{name}` (without extension), `{ext}` (with its dot), `{n}` counter
+written like its first number (`{n:001}`, `{n:10+5}` counts 10, 15, 20),
+`{date}` modified and `{taken}` photo date from EXIF (both take a format:
+`{taken:yyyyMMdd_HHmm}`), `{folder}`, `{file}`. Parts: `{name[0:4]}`,
+`{name[-3:]}`. Filters: `|lower`, `|upper`, `|title`, `|trim`. Typing `{`
+pops up what fits there (fields, then date formats, counter styles or
+filters); the chips under the template insert the common ones. Then an
+optional find → replace (`.*` for regex with `$1`, `Aa` to match case) and a
+case style. Recent templates are one click away; Ctrl+E hands the names to
+your text editor instead.
+
 ## Viewer (F3) and preview (Ctrl+Q)
 
 Both show the same things: text with syntax highlighting (KSyntaxHighlighting, optional; files up to 1 MiB),
@@ -181,6 +199,6 @@ bench/      tandem-bench
 ## Roadmap
 
 1. ✅ Dual panels, tabs, keyboard flow, quick search, background F5–F8, watcher, benchmarks
-2. ✅ Built-in viewer (F3) · ✅ archives as folders (libarchive), writable · multi-rename, compare/sync folders
+2. ✅ Built-in viewer (F3) · ✅ archives as folders (libarchive), writable · ✅ multi-rename with templates, compare/sync folders
 3. Network backends (SFTP, SMB, WebDAV, S3), connection manager, button bar, command line
 4. Plugins, themes, configurable keys

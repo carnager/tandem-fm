@@ -19,117 +19,131 @@ namespace tandem {
 namespace {
 
 struct Context {
-    QString name, ext, parent;
-    QDateTime time;
+    QString file, name, ext, folder;
+    int64_t mtime = 0, taken = 0;
     int index = 0;
-    const RenameOptions* opt = nullptr;
 };
 
-// Substring by TC rules: 1-based, negative = counted from the end.
-QString part(const QString& s, const QString& spec, bool* ok)
+// Python-style slice "[a:b]" / "[a]" of s; ok=false when malformed.
+QString slice(const QString& s, const QString& spec, bool* ok)
 {
-    *ok = true;
-    if (spec.isEmpty())
-        return s;
-    const int n = int(s.size());
-    auto pos = [n](int v) { return v < 0 ? n + v + 1 : v; };  // -1 = last char
-    static const QRegularExpression range(QStringLiteral("^(-?\\d+)(?:(-)(-?\\d+)?|,(\\d+))?$"));
-    const auto m = range.match(spec);
-    if (!m.hasMatch()) {
+    static const QRegularExpression rx(QStringLiteral("^(-?\\d*)(?::(-?\\d*))?$"));
+    const auto m = rx.match(spec);
+    if (!m.hasMatch() || spec.isEmpty()) {
         *ok = false;
         return {};
     }
-    int from = pos(m.captured(1).toInt());
-    int to;
-    if (!m.captured(4).isEmpty())
-        to = from + m.captured(4).toInt() - 1;   // [N2,3]
-    else if (!m.captured(3).isEmpty())
-        to = pos(m.captured(3).toInt());         // [N2-5]
-    else if (!m.captured(2).isEmpty())
-        to = n;                                  // [N2-]
-    else
-        to = from;                               // [N3]
-    from = qMax(1, from);
-    to = qMin(n, to);
-    if (to < from)
-        return {};
-    return s.mid(from - 1, to - from + 1);
+    const int n = int(s.size());
+    auto clamp = [n](int v) { return qBound(0, v < 0 ? n + v : v, n); };
+    if (!m.hasCaptured(2)) {  // single index
+        const int i = m.captured(1).toInt();
+        const int at = i < 0 ? n + i : i;
+        return at >= 0 && at < n ? s.mid(at, 1) : QString();
+    }
+    const int from = m.captured(1).isEmpty() ? 0 : clamp(m.captured(1).toInt());
+    const int to = m.captured(2).isEmpty() ? n : clamp(m.captured(2).toInt());
+    return to > from ? s.mid(from, to - from) : QString();
 }
 
-QString expandMask(const QString& mask, const Context& c, QString* error)
+QString titleCase(const QString& s)
+{
+    QString out = s.toLower();
+    bool start = true;
+    for (QChar& ch : out) {
+        if (start && ch.isLetter())
+            ch = ch.toUpper();
+        start = !ch.isLetterOrNumber() && ch != QLatin1Char('\'');
+    }
+    return out;
+}
+
+// One {field[slice]:arg|filter|…}; error set on unknown parts.
+QString expandField(const QString& body, const Context& c, QString* error)
+{
+    static const QRegularExpression rx(QStringLiteral("^([a-z]+)(?:\\[([^\\]]*)\\])?(?::([^|]*))?((?:\\|[^|]*)*)$"));
+    const auto m = rx.match(body.trimmed());
+    if (!m.hasMatch()) {
+        *error = QObject::tr("Can't read {%1}").arg(body);
+        return {};
+    }
+    const QString key = m.captured(1), arg = m.captured(3);
+    QString v;
+    if (key == QLatin1String("name"))
+        v = c.name;
+    else if (key == QLatin1String("ext"))
+        v = c.ext;
+    else if (key == QLatin1String("file"))
+        v = c.file;
+    else if (key == QLatin1String("folder"))
+        v = c.folder;
+    else if (key == QLatin1String("date") || key == QLatin1String("taken")) {
+        const int64_t t = key == QLatin1String("taken") && c.taken ? c.taken : c.mtime;
+        v = QDateTime::fromSecsSinceEpoch(t).toString(arg.isEmpty() ? QStringLiteral("yyyy-MM-dd") : arg);
+    } else if (key == QLatin1String("n")) {
+        // "{n:007+2}": start 7, 3 digits, step 2 — written like the first number.
+        static const QRegularExpression nr(QStringLiteral("^(\\d*)(?:\\+(-?\\d+))?$"));
+        const auto nm = nr.match(arg);
+        if (!nm.hasMatch()) {
+            *error = QObject::tr("Write the counter like the first number: {n:001}, {n:10+5}");
+            return {};
+        }
+        const QString first = nm.captured(1);
+        const qint64 start = first.isEmpty() ? 1 : first.toLongLong();
+        const qint64 step = nm.captured(2).isEmpty() ? 1 : nm.captured(2).toLongLong();
+        v = QStringLiteral("%1").arg(start + c.index * step, qMax(1, int(first.size())), 10, QLatin1Char('0'));
+    } else {
+        *error = QObject::tr("Unknown field {%1}").arg(key);
+        return {};
+    }
+    if (m.hasCaptured(2)) {
+        bool ok = true;
+        v = slice(v, m.captured(2), &ok);
+        if (!ok) {
+            *error = QObject::tr("Write parts like {name[0:4]} or {name[-3:]}");
+            return {};
+        }
+    }
+    for (const QString& f : m.captured(4).split(QLatin1Char('|'), Qt::SkipEmptyParts)) {
+        const QString filter = f.trimmed();
+        if (filter == QLatin1String("lower"))
+            v = v.toLower();
+        else if (filter == QLatin1String("upper"))
+            v = v.toUpper();
+        else if (filter == QLatin1String("title"))
+            v = titleCase(v);
+        else if (filter == QLatin1String("trim"))
+            v = v.trimmed();
+        else {
+            *error = QObject::tr("Unknown filter |%1 (lower, upper, title, trim)").arg(filter);
+            return {};
+        }
+    }
+    return v;
+}
+
+QString expandTemplate(const QString& t, const Context& c, QString* error)
 {
     QString out;
-    for (int i = 0; i < mask.size(); ++i) {
-        const QChar ch = mask[i];
-        if (ch != QLatin1Char('[')) {
+    for (int i = 0; i < t.size(); ++i) {
+        const QChar ch = t[i];
+        if ((ch == QLatin1Char('{') || ch == QLatin1Char('}')) && i + 1 < t.size() && t[i + 1] == ch) {
+            out += ch;  // {{ and }}
+            ++i;
+            continue;
+        }
+        if (ch != QLatin1Char('{')) {
             out += ch;
             continue;
         }
-        const int close = int(mask.indexOf(QLatin1Char(']'), i + 1));
+        const int close = int(t.indexOf(QLatin1Char('}'), i + 1));
         if (close < 0) {
-            *error = QObject::tr("Missing ] in the mask");
+            *error = QObject::tr("A { is not closed");
             return {};
         }
-        // "[[]" and "[]]" are literal brackets.
-        if (close == i + 1 && i + 2 < mask.size() && mask[i + 2] == QLatin1Char(']')) {
-            out += QLatin1Char(']');
-            i += 2;
-            continue;
-        }
-        const QString tok = mask.mid(i + 1, close - i - 1);
+        out += expandField(t.mid(i + 1, close - i - 1), c, error);
+        if (!error->isEmpty())
+            return {};
         i = close;
-        if (tok == QLatin1String("[")) {
-            out += QLatin1Char('[');
-            continue;
-        }
-        bool ok = true;
-        const QDateTime& t = c.time;
-        if (tok == QLatin1String("YMD"))
-            out += t.toString(QStringLiteral("yyyyMMdd"));
-        else if (tok == QLatin1String("hms"))
-            out += t.toString(QStringLiteral("HHmmss"));
-        else if (tok == QLatin1String("Y"))
-            out += t.toString(QStringLiteral("yyyy"));
-        else if (tok == QLatin1String("M"))
-            out += t.toString(QStringLiteral("MM"));
-        else if (tok == QLatin1String("D"))
-            out += t.toString(QStringLiteral("dd"));
-        else if (tok == QLatin1String("h"))
-            out += t.toString(QStringLiteral("HH"));
-        else if (tok == QLatin1String("m"))
-            out += t.toString(QStringLiteral("mm"));
-        else if (tok == QLatin1String("s"))
-            out += t.toString(QStringLiteral("ss"));
-        else if (tok == QLatin1String("P"))
-            out += c.parent;
-        else if (tok.startsWith(QLatin1Char('N')))
-            out += part(c.name, tok.mid(1), &ok);
-        else if (tok.startsWith(QLatin1Char('E')))
-            out += part(c.ext, tok.mid(1), &ok);
-        else if (tok.startsWith(QLatin1Char('C'))) {
-            int start = c.opt->counterStart, step = c.opt->counterStep, digits = c.opt->counterDigits;
-            if (tok.size() > 1) {  // [C10+5:3]
-                static const QRegularExpression cr(QStringLiteral("^C(\\d+)?(?:\\+(-?\\d+))?(?::(\\d+))?$"));
-                const auto m = cr.match(tok);
-                if (!m.hasMatch()) {
-                    ok = false;
-                } else {
-                    if (!m.captured(1).isEmpty())
-                        start = m.captured(1).toInt();
-                    if (!m.captured(2).isEmpty())
-                        step = m.captured(2).toInt();
-                    if (!m.captured(3).isEmpty())
-                        digits = m.captured(3).toInt();
-                }
-            }
-            out += QStringLiteral("%1").arg(start + c.index * step, qBound(1, digits, 12), 10, QLatin1Char('0'));
-        } else {
-            ok = false;
-        }
-        if (!ok) {
-            *error = QObject::tr("Unknown placeholder [%1]").arg(tok);
-            return {};
-        }
     }
     return out;
 }
@@ -143,18 +157,10 @@ QString applyCase(const QString& s, RenameOptions::Case mode)
         return s.toLower();
     case RenameOptions::Case::Upper:
         return s.toUpper();
-    case RenameOptions::Case::FirstUpper:
+    case RenameOptions::Case::Sentence:
         return s.isEmpty() ? s : s.left(1).toUpper() + s.mid(1).toLower();
-    case RenameOptions::Case::Title: {
-        QString out = s.toLower();
-        bool start = true;
-        for (QChar& ch : out) {
-            if (start && ch.isLetter())
-                ch = ch.toUpper();
-            start = !ch.isLetterOrNumber() && ch != QLatin1Char('\'');
-        }
-        return out;
-    }
+    case RenameOptions::Case::Title:
+        return titleCase(s);
     }
     return s;
 }
@@ -203,7 +209,7 @@ RenamePlan buildRenamePlan(const QList<RenameItem>& items, const QString& parent
     QRegularExpression rx;
     QString replacement = opt.replace;
     if (opt.regex) {
-        // TC and most tools write groups as $1; Qt wants \1.
+        // Groups are written $1 (like most tools); Qt wants \1.
         QString converted;
         for (int i = 0; i < replacement.size(); ++i) {
             if (replacement[i] == QLatin1Char('$') && i + 1 < replacement.size() && replacement[i + 1].isDigit())
@@ -213,10 +219,10 @@ RenamePlan buildRenamePlan(const QList<RenameItem>& items, const QString& parent
         }
         replacement = converted;
     }
-    if (!opt.search.isEmpty()) {
-        const QString pattern = opt.regex ? opt.search : QRegularExpression::escape(opt.search);
-        rx = QRegularExpression(pattern, opt.caseSensitive ? QRegularExpression::NoPatternOption
-                                                           : QRegularExpression::CaseInsensitiveOption);
+    if (!opt.find.isEmpty()) {
+        const QString pattern = opt.regex ? opt.find : QRegularExpression::escape(opt.find);
+        rx = QRegularExpression(pattern, opt.matchCase ? QRegularExpression::NoPatternOption
+                                                       : QRegularExpression::CaseInsensitiveOption);
         if (!rx.isValid()) {
             plan.error = QObject::tr("Invalid regular expression: %1").arg(rx.errorString());
             return plan;
@@ -226,35 +232,33 @@ RenamePlan buildRenamePlan(const QList<RenameItem>& items, const QString& parent
     for (int i = 0; i < items.size(); ++i) {
         const RenameItem& it = items[i];
         Context c;
-        c.ext = it.isDir ? QString() : extensionOf(it.name).toString();
-        c.name = c.ext.isEmpty() ? it.name : it.name.left(it.name.size() - c.ext.size() - 1);
-        c.parent = parentFolderName;
-        c.time = QDateTime::fromSecsSinceEpoch(it.mtime);
+        c.file = it.name;
+        const QString e = it.isDir ? QString() : extensionOf(it.name).toString();
+        c.ext = e.isEmpty() ? QString() : QLatin1Char('.') + e;
+        c.name = it.name.left(it.name.size() - c.ext.size());
+        c.folder = parentFolderName;
+        c.mtime = it.mtime;
+        c.taken = it.taken;
         c.index = i;
-        c.opt = &opt;
 
         QString error;
-        const QString name = expandMask(opt.nameMask, c, &error);
-        const QString ext = error.isEmpty() ? expandMask(opt.extMask, c, &error) : QString();
+        QString full = expandTemplate(opt.pattern, c, &error);
         if (!error.isEmpty()) {
             plan.error = error;
             plan.rows.clear();
             return plan;
         }
-        QString full = ext.isEmpty() ? name : name + QLatin1Char('.') + ext;
-        if (!opt.search.isEmpty()) {
+        if (!opt.find.isEmpty()) {
             if (opt.regex)
                 full.replace(rx, replacement);
             else
-                full.replace(opt.search, opt.replace, opt.caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive);
+                full.replace(opt.find, opt.replace, opt.matchCase ? Qt::CaseSensitive : Qt::CaseInsensitive);
         }
-        if (opt.caseMode == RenameOptions::Case::FirstUpper || opt.caseMode == RenameOptions::Case::Title) {
-            // Word-style casing is for the name; ".Jpg" helps nobody.
-            const QString e = it.isDir ? QString() : extensionOf(full).toString();
-            const QString stem = e.isEmpty() ? full : full.left(full.size() - e.size() - 1);
-            full = applyCase(stem, opt.caseMode) + (e.isEmpty() ? QString() : QLatin1Char('.') + e);
-        } else {
-            full = applyCase(full, opt.caseMode);
+        if (opt.caseMode != RenameOptions::Case::Keep) {
+            // The style is for the name; ".Jpg" or ".JPG" helps nobody.
+            const QString x = it.isDir ? QString() : extensionOf(full).toString();
+            const QString stem = x.isEmpty() ? full : full.left(full.size() - x.size() - 1);
+            full = applyCase(stem, opt.caseMode) + (x.isEmpty() ? QString() : QLatin1Char('.') + x);
         }
 
         RenameRow row;

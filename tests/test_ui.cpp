@@ -41,6 +41,7 @@
 #include <QSettings>
 #include <QImage>
 #include <QImageReader>
+#include <QListWidget>
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QMenu>
@@ -621,8 +622,26 @@ private slots:
         answerNextDialog([](QWidget* w) {
             auto* dlg = qobject_cast<MultiRenameDialog*>(w);
             QVERIFY(dlg);
-            dlg->nameMaskEdit()->setText("img_[C]");
+            // Typing "{" offers the fields; Tab takes the highlighted one.
+            dlg->templateEdit()->clear();
+            dlg->templateEdit()->setFocus();
+            QTest::keyClicks(dlg->templateEdit(), "img_{n");
+            QTRY_VERIFY(dlg->completionPopup()->isVisible());
+            QVERIFY(dlg->completionPopup()->currentItem()->text().startsWith("name"));
+            QTest::keyClick(dlg->templateEdit(), Qt::Key_Escape);  // closes the list, not the dialog
+            QVERIFY(!dlg->completionPopup()->isVisible());
+            QVERIFY(dlg->isVisible());
+            QTest::keyClicks(dlg->templateEdit(), ":");
+            QTRY_VERIFY(dlg->completionPopup()->isVisible());  // counter styles
+            dlg->templateEdit()->setText("img_{n}{e");
+            dlg->templateEdit()->setCursorPosition(dlg->templateEdit()->text().size());
+            dlg->templateEdit()->setFocus();
+            QTest::keyClicks(dlg->templateEdit(), "x");
+            QTRY_VERIFY(dlg->completionPopup()->isVisible());
+            QTest::keyClick(dlg->templateEdit(), Qt::Key_Tab);
+            QCOMPARE(dlg->templateEdit()->text(), QString("img_{n}{ext}"));
             QTRY_VERIFY(dlg->renameButton()->isEnabled());
+            QCOMPARE(dlg->renameButton()->text(), QString("Rename 3"));
             dlg->renameButton()->click();
         });
         QTest::keyClick(m_left->view(), Qt::Key_M, Qt::ControlModifier);
@@ -641,7 +660,7 @@ private slots:
         answerNextDialog([clashChecked](QWidget* w) {
             auto* dlg = qobject_cast<MultiRenameDialog*>(w);
             QVERIFY(dlg);
-            dlg->nameMaskEdit()->setText("same");
+            dlg->templateEdit()->setText("same");
             QTest::qWait(100);
             *clashChecked = !dlg->renameButton()->isEnabled();
             dlg->reject();

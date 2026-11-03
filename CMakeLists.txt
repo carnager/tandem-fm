@@ -25,6 +25,7 @@ add_library(tandem_core STATIC
   src/core/Archive.h src/core/Archive.cpp
   src/core/Vfs.cpp
   src/core/MultiRename.h src/core/MultiRename.cpp
+  src/core/ExifDate.h src/core/ExifDate.cpp
   src/core/IoScheduler.h src/core/IoScheduler.cpp
   src/core/Fuzzy.h src/core/Fuzzy.cpp
   src/core/FolderHistory.h src/core/FolderHistory.cpp

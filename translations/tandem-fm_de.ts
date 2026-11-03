@@ -75,12 +75,28 @@
         <translation>Archive in Archiven: zuerst entpacken (F5)</translation>
     </message>
     <message>
-        <source>Missing ] in the mask</source>
-        <translation>Fehlende ] in der Maske</translation>
+        <source>Can&apos;t read {%1}</source>
+        <translation>{%1} ist nicht lesbar</translation>
     </message>
     <message>
-        <source>Unknown placeholder [%1]</source>
-        <translation>Unbekannter Platzhalter [%1]</translation>
+        <source>Write the counter like the first number: {n:001}, {n:10+5}</source>
+        <translation>Zähler wie die erste Zahl schreiben: {n:001}, {n:10+5}</translation>
+    </message>
+    <message>
+        <source>Unknown field {%1}</source>
+        <translation>Unbekanntes Feld {%1}</translation>
+    </message>
+    <message>
+        <source>Write parts like {name[0:4]} or {name[-3:]}</source>
+        <translation>Teile so schreiben: {name[0:4]} oder {name[-3:]}</translation>
+    </message>
+    <message>
+        <source>Unknown filter |%1 (lower, upper, title, trim)</source>
+        <translation>Unbekannter Filter |%1 (lower, upper, title, trim)</translation>
+    </message>
+    <message>
+        <source>A { is not closed</source>
+        <translation>Eine { ist nicht geschlossen</translation>
     </message>
     <message>
         <source>not a valid file name</source>
@@ -93,6 +109,10 @@
     <message>
         <source>a file with this name exists</source>
         <translation>eine Datei mit diesem Namen existiert bereits</translation>
+    </message>
+    <message>
+        <source>name without extension</source>
+        <translation>Name ohne Endung</translation>
     </message>
     <message>
         <source>Invalid regular expression: %1</source>
@@ -474,6 +494,62 @@
     <message>
         <source>Access denied by %1</source>
         <translation>Zugriff verweigert von %1</translation>
+    </message>
+    <message>
+        <source>extension, with its dot</source>
+        <translation>Endung, mit Punkt</translation>
+    </message>
+    <message>
+        <source>counter — {n:001} pads, {n:10+5} starts at 10, steps 5</source>
+        <translation>Zähler — {n:001} füllt auf, {n:10+5} beginnt bei 10, Schritt 5</translation>
+    </message>
+    <message>
+        <source>date the photo was taken (else modified)</source>
+        <translation>Aufnahmedatum des Fotos (sonst Änderungsdatum)</translation>
+    </message>
+    <message>
+        <source>date modified — {date:yyyyMMdd} for other formats</source>
+        <translation>Änderungsdatum — {date:yyyyMMdd} für andere Formate</translation>
+    </message>
+    <message>
+        <source>name of the folder</source>
+        <translation>Name des Ordners</translation>
+    </message>
+    <message>
+        <source>the whole current name</source>
+        <translation>der ganze bisherige Name</translation>
+    </message>
+    <message>
+        <source>01, 02, 03 …</source>
+        <translation>01, 02, 03 …</translation>
+    </message>
+    <message>
+        <source>001, 002, 003 …</source>
+        <translation>001, 002, 003 …</translation>
+    </message>
+    <message>
+        <source>0001, 0002 …</source>
+        <translation>0001, 0002 …</translation>
+    </message>
+    <message>
+        <source>10, 20, 30 …</source>
+        <translation>10, 20, 30 …</translation>
+    </message>
+    <message>
+        <source>lowercase</source>
+        <translation>kleinbuchstaben</translation>
+    </message>
+    <message>
+        <source>UPPERCASE</source>
+        <translation>GROSSBUCHSTABEN</translation>
+    </message>
+    <message>
+        <source>Title Case</source>
+        <translation>Jedes Wort Groß</translation>
+    </message>
+    <message>
+        <source>no spaces at the ends</source>
+        <translation>keine Leerzeichen an den Enden</translation>
     </message>
 </context>
 <context>
@@ -2002,76 +2078,146 @@ F3 lädt es herunter und öffnet es</translation>
 </context>
 <context>
     <name>tandem::MultiRenameDialog</name>
-    <message numerus="yes">
-        <source>Multi-rename %n item(s)</source>
-        <translation>
-            <numerusform>Mehrfach-Umbenennen von %n Element</numerusform>
-            <numerusform>Mehrfach-Umbenennen von %n Elementen</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>[N] name, [N2-5] part, [C] counter, [P] folder, [YMD] date …</source>
-        <translation>[N] Name, [N2-5] Teil, [C] Zähler, [P] Ordner, [YMD] Datum …</translation>
-    </message>
-    <message>
-        <source>Name</source>
-        <translation>Name</translation>
-    </message>
-    <message>
-        <source>Extension</source>
-        <translation>Erweiterung</translation>
-    </message>
-    <message>
-        <source>Regex ($1 = group)</source>
-        <translation>Regex ($1 = Gruppe)</translation>
-    </message>
     <message>
         <source>Match case</source>
         <translation>Groß-/Kleinschreibung beachten</translation>
     </message>
     <message>
-        <source>Search</source>
-        <translation>Suchen</translation>
-    </message>
-    <message>
         <source>Replace</source>
         <translation>Ersetzen</translation>
     </message>
+    <message numerus="yes">
+        <source>Rename %n item(s)</source>
+        <translation>
+            <numerusform>%n Element umbenennen</numerusform>
+            <numerusform>%n Elemente umbenennen</numerusform>
+        </translation>
+    </message>
     <message>
-        <source>Unchanged</source>
-        <translation>Unverändert</translation>
+        <source>recent</source>
+        <translation>zuletzt</translation>
+    </message>
+    <message>
+        <source>Recent templates</source>
+        <translation>Zuletzt benutzte Vorlagen</translation>
+    </message>
+    <message>
+        <source>Templates you use show up here</source>
+        <translation>Benutzte Vorlagen erscheinen hier</translation>
+    </message>
+    <message>
+        <source>New name</source>
+        <translation>Neuer Name</translation>
+    </message>
+    <message>
+        <source>name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <source>Name without extension</source>
+        <translation>Name ohne Endung</translation>
+    </message>
+    <message>
+        <source>extension</source>
+        <translation>Endung</translation>
+    </message>
+    <message>
+        <source>Extension with its dot, e.g. .jpg</source>
+        <translation>Endung mit Punkt, z. B. .jpg</translation>
+    </message>
+    <message>
+        <source>number</source>
+        <translation>Nummer</translation>
+    </message>
+    <message>
+        <source>Counter: {n:001} has 3 digits, {n:10+5} counts 10, 15, 20 …</source>
+        <translation>Zähler: {n:001} hat 3 Stellen, {n:10+5} zählt 10, 15, 20 …</translation>
+    </message>
+    <message>
+        <source>date taken</source>
+        <translation>Aufnahmedatum</translation>
+    </message>
+    <message>
+        <source>When a photo was taken (from the camera), else the modified date</source>
+        <translation>Wann ein Foto aufgenommen wurde (von der Kamera), sonst das Änderungsdatum</translation>
+    </message>
+    <message>
+        <source>date modified</source>
+        <translation>Änderungsdatum</translation>
+    </message>
+    <message>
+        <source>Modified date; {date:yyyyMMdd_HHmm} for another format</source>
+        <translation>Änderungsdatum; {date:yyyyMMdd_HHmm} für ein anderes Format</translation>
+    </message>
+    <message>
+        <source>folder</source>
+        <translation>Ordner</translation>
+    </message>
+    <message>
+        <source>Name of the folder the items are in</source>
+        <translation>Name des Ordners, in dem die Elemente liegen</translation>
+    </message>
+    <message>
+        <source>type { for more · {name[0:4]} first 4 letters · {name|lower}</source>
+        <translation>{ tippen für mehr · {name[0:4]} erste 4 Zeichen · {name|lower}</translation>
+    </message>
+    <message>
+        <source>find</source>
+        <translation>suchen</translation>
+    </message>
+    <message>
+        <source>replace with</source>
+        <translation>ersetzen durch</translation>
+    </message>
+    <message>
+        <source>Regular expression ($1 is the first group)</source>
+        <translation>Regulärer Ausdruck ($1 ist die erste Gruppe)</translation>
     </message>
     <message>
         <source>lowercase</source>
         <translation>kleinbuchstaben</translation>
     </message>
     <message>
+        <source>as is</source>
+        <translation>wie es ist</translation>
+    </message>
+    <message>
         <source>UPPERCASE</source>
         <translation>GROSSBUCHSTABEN</translation>
     </message>
+    <message numerus="yes">
+        <source>%n name(s) can&apos;t be used</source>
+        <translation>
+            <numerusform>%n Name kann nicht verwendet werden</numerusform>
+            <numerusform>%n Namen können nicht verwendet werden</numerusform>
+        </translation>
+    </message>
     <message>
-        <source>First letter upper</source>
-        <translation>Erster Buchstabe groß</translation>
+        <source>Reading photo dates …</source>
+        <translation>Lese Aufnahmedaten …</translation>
+    </message>
+    <message>
+        <source>%1 of %2 change</source>
+        <translation>%1 von %2 ändern sich</translation>
+    </message>
+    <message numerus="yes">
+        <source>Rename %n</source>
+        <translation>
+            <numerusform>%n umbenennen</numerusform>
+            <numerusform>%n umbenennen</numerusform>
+        </translation>
     </message>
     <message>
         <source>Title Case</source>
         <translation>Wortanfänge Groß</translation>
     </message>
     <message>
+        <source>Sentence case</source>
+        <translation>Satzanfang groß</translation>
+    </message>
+    <message>
         <source>Case</source>
         <translation>Schreibweise</translation>
-    </message>
-    <message>
-        <source>Counter [C]: start</source>
-        <translation>Zähler [C]: Start</translation>
-    </message>
-    <message>
-        <source>step</source>
-        <translation>Schritt</translation>
-    </message>
-    <message>
-        <source>digits</source>
-        <translation>Stellen</translation>
     </message>
     <message>
         <source>Edit names in editor…</source>
@@ -2082,10 +2228,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Mit dem Texteditor umbenennen, ein Name pro Zeile (Ctrl+E)</translation>
     </message>
     <message>
-        <source>Reset</source>
-        <translation>Zurücksetzen</translation>
-    </message>
-    <message>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
@@ -2094,58 +2236,8 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Umbenennen</translation>
     </message>
     <message>
-        <source>Insert a placeholder</source>
-        <translation>Platzhalter einfügen</translation>
-    </message>
-    <message>
-        <source>Characters 1 to 8 of the name</source>
-        <translation>Zeichen 1 bis 8 des Namens</translation>
-    </message>
-    <message>
-        <source>3 characters from the 2nd</source>
-        <translation>3 Zeichen ab dem 2.</translation>
-    </message>
-    <message>
-        <source>Last 3 characters</source>
-        <translation>Letzte 3 Zeichen</translation>
-    </message>
-    <message>
-        <source>Counter</source>
-        <translation>Zähler</translation>
-    </message>
-    <message>
-        <source>Parent folder name</source>
-        <translation>Name des übergeordneten Ordners</translation>
-    </message>
-    <message>
-        <source>Date modified (yyyymmdd)</source>
-        <translation>Änderungsdatum (JJJJMMTT)</translation>
-    </message>
-    <message>
-        <source>Time modified (hhmmss)</source>
-        <translation>Änderungszeit (hhmmss)</translation>
-    </message>
-    <message>
-        <source>Date with dashes</source>
-        <translation>Datum mit Bindestrichen</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n name(s) can&apos;t be used — fix the mask or search/replace</source>
-        <translation>
-            <numerusform>%n Name kann nicht verwendet werden — Maske oder Suchen/Ersetzen korrigieren</numerusform>
-            <numerusform>%n Namen können nicht verwendet werden — Maske oder Suchen/Ersetzen korrigieren</numerusform>
-        </translation>
-    </message>
-    <message>
         <source>Nothing changes yet</source>
         <translation>Noch keine Änderungen</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n item(s) will be renamed</source>
-        <translation>
-            <numerusform>%n Element wird umbenannt</numerusform>
-            <numerusform>%n Elemente werden umbenannt</numerusform>
-        </translation>
     </message>
 </context>
 <context>
@@ -2502,24 +2594,23 @@ Eingehängt über GVfs, andere Programme sehen es also auch. Passwörter können
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
-    <message>
-        <source>Rename</source>
-        <translation>Umbenennen</translation>
+    <message numerus="yes">
+        <source>Rename %n</source>
+        <translation>
+            <numerusform>%n umbenennen</numerusform>
+            <numerusform>%n umbenennen</numerusform>
+        </translation>
     </message>
 </context>
 <context>
     <name>tandem::RenamePreviewModel</name>
     <message>
-        <source>Current name</source>
-        <translation>Aktueller Name</translation>
+        <source>Now</source>
+        <translation>Jetzt</translation>
     </message>
     <message>
-        <source>New name</source>
-        <translation>Neuer Name</translation>
-    </message>
-    <message>
-        <source>Problem</source>
-        <translation>Problem</translation>
+        <source>After</source>
+        <translation>Danach</translation>
     </message>
 </context>
 <context>

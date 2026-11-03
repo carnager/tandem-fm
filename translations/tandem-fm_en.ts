@@ -117,21 +117,21 @@
 <context>
     <name>tandem::MultiRenameDialog</name>
     <message numerus="yes">
-        <source>Multi-rename %n item(s)</source>
+        <source>Rename %n item(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
             <numerusform></numerusform>
         </translation>
     </message>
     <message numerus="yes">
-        <source>%n name(s) can&apos;t be used — fix the mask or search/replace</source>
+        <source>%n name(s) can&apos;t be used</source>
         <translation type="unfinished">
             <numerusform></numerusform>
             <numerusform></numerusform>
         </translation>
     </message>
     <message numerus="yes">
-        <source>%n item(s) will be renamed</source>
+        <source>Rename %n</source>
         <translation type="unfinished">
             <numerusform></numerusform>
             <numerusform></numerusform>
@@ -149,6 +149,13 @@
     </message>
     <message numerus="yes">
         <source>%n item(s) will be renamed</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Rename %n</source>
         <translation type="unfinished">
             <numerusform></numerusform>
             <numerusform></numerusform>

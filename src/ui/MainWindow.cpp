@@ -1501,7 +1501,7 @@ void MainWindow::multiRename()
     QSet<QString> existing;
     if (!collectRenameItems(p, items, existing))
         return;
-    MultiRenameDialog dlg(items, baseName(p->path()), existing, this);
+    MultiRenameDialog dlg(items, p->path(), existing, this);
     const int result = dlg.exec();
     if (result == MultiRenameDialog::EditInEditor)
         startEditorRename(p, items, existing);
