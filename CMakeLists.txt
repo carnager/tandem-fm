@@ -65,6 +65,7 @@ add_library(tandem_ui STATIC
   src/ui/CommandBar.h src/ui/CommandBar.cpp
   src/ui/SyncDialog.h src/ui/SyncDialog.cpp
   src/ui/PermissionsDialog.h src/ui/PermissionsDialog.cpp
+  src/ui/ShortcutsDialog.h src/ui/ShortcutsDialog.cpp
   src/ui/Network.h src/ui/Network.cpp
   src/ui/AuthDialogs.h src/ui/AuthDialogs.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp

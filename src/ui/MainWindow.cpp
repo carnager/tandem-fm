@@ -19,6 +19,7 @@
 #include "ui/EditNames.h"
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
+#include "ui/ShortcutsDialog.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ViewerWindow.h"
@@ -897,57 +898,8 @@ void MainWindow::openInPanel(Panel* target)
 
 void MainWindow::showShortcuts()
 {
-    static const char* rows[][2] = {
-        {"Tab", QT_TR_NOOP("Switch panel")},
-        {"Enter / Backspace", QT_TR_NOOP("Open / parent folder")},
-        {"Type letters", QT_TR_NOOP("Quick search (Up/Down: next match)")},
-        {"Insert, Space, Shift+↑↓", QT_TR_NOOP("Mark (Space also sizes folders)")},
-        {"Num + / Num - / Num *", QT_TR_NOOP("Mark group / unmark group / invert")},
-        {"F3 / F4", QT_TR_NOOP("Viewer (Esc closes, N/P next file, 1/3/4 modes) / edit")},
-        {"F5 / F6", QT_TR_NOOP("Copy / move to other panel")},
-        {"Shift+F6 / Ctrl+M / Ctrl+E", QT_TR_NOOP("Rename in place / multi-rename / in your text editor")},
-        {"F7 / Shift+F4", QT_TR_NOOP("New folder / new file")},
-        {"F8, Del / Shift+F8", QT_TR_NOOP("Trash / delete permanently")},
-        {"Ctrl+T / Ctrl+W / Ctrl+Tab", QT_TR_NOOP("New / close / next tab")},
-        {"Alt+1 … Alt+9", QT_TR_NOOP("Go to tab 1 … 9, creating it here if it doesn't exist")},
-        {"Alt+← / Alt+→", QT_TR_NOOP("History back / forward")},
-        {"Ctrl+PgUp / Ctrl+\\ / Ctrl+`", QT_TR_NOOP("Parent / root / home")},
-        {"Ctrl+L", QT_TR_NOOP("Type a path")},
-        {"Alt+F1 / Alt+F2", QT_TR_NOOP("Locations for left / right panel")},
-        {"Ctrl+← / Ctrl+→", QT_TR_NOOP("Show folder in left / right panel")},
-        {"Ctrl+U", QT_TR_NOOP("Swap panels")},
-        {"Ctrl+F3…F6", QT_TR_NOOP("Sort by name / ext / date / size")},
-        {"Ctrl+H", QT_TR_NOOP("Show hidden files")},
-        {"Ctrl+C / X / V", QT_TR_NOOP("Clipboard (works with other apps)")},
-        {"Alt+Shift+Enter", QT_TR_NOOP("Calculate all folder sizes")},
-        {"Ctrl+Z", QT_TR_NOOP("Undo the last operation (move, copy, trash, rename, new folder)")},
-        {"Ctrl+Alt+T", QT_TR_NOOP("Open terminal here")},
-        {"Alt+F5 / Alt+F9", QT_TR_NOOP("Pack / unpack archives")},
-        {"Ctrl+PgDn", QT_TR_NOOP("Enter folder, or browse any file as archive")},
-        {"Menu key, Shift+F10", QT_TR_NOOP("Context menu")},
-        {"Ctrl+Q", QT_TR_NOOP("Preview: below each panel, below both or on the right (View > Preview position)")},
-        {"Ctrl+K", QT_TR_NOOP("Connect to a server (sftp, smb, WebDAV, ftp; via GVfs). Typing sftp://… or user@host:path in the path bar works too")},
-        {"Shift+F2", QT_TR_NOOP("Compare the two panels: marks what is newer or missing on the other side")},
-        {"Ctrl+Shift+S", QT_TR_NOOP("Synchronize folders: compare both trees, choose directions, copy (or mirror)")},
-        {"Ctrl+;", QT_TR_NOOP("Run a shell command: %s marked files, %f file, %d folder, %D other panel; Ctrl+Enter in a terminal")},
-        {"Alt+F7", QT_TR_NOOP("Search names (fd) or contents (rg) here and below; results are a folder you can work in")},
-        {"Ctrl+I", QT_TR_NOOP("Previews show details: type, dates, permissions, owner, checksum…")},
-        {"Alt+F4", QT_TR_NOOP("Quit")},
-        {"Ctrl+D / Ctrl+Shift+D", QT_TR_NOOP("Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder")},
-        {"Ctrl+J", QT_TR_NOOP("Jump to any visited folder (fuzzy)")},
-        {"Vim keys (View menu)", QT_TR_NOOP("j k move · h l out/in · gg G top/bottom · Ctrl+D/U half page · / n N search · v mark · : palette · ' or g<key> bookmarks · m set bookmark")},
-        {"Esc", QT_TR_NOOP("Cancel a slow folder load")},
-    };
-    QString html = QStringLiteral("<table cellspacing='0' cellpadding='4'>");
-    for (const auto& r : rows)
-        html += QStringLiteral("<tr><td style='color:%1'><b>%2</b></td><td>%3</td></tr>")
-                    .arg(theme().accent.name(), QString::fromUtf8(r[0]).toHtmlEscaped(), tr(r[1]));
-    html += QStringLiteral("</table>");
-    QMessageBox box(this);
-    box.setWindowTitle(tr("Keyboard shortcuts"));
-    box.setTextFormat(Qt::RichText);
-    box.setText(html);
-    box.exec();
+    ShortcutsDialog dlg(this);
+    dlg.exec();
 }
 
 // --------------------------------------------------------------- quick view

@@ -23,6 +23,7 @@
 #include "ui/MainWindow.h"
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
+#include "ui/ShortcutsDialog.h"
 #include "ui/Panel.h"
 #include "ui/PathBar.h"
 #include "ui/Theme.h"
@@ -938,6 +939,21 @@ private slots:
         }
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // F1: grouped shortcuts in columns, with a filter.
+    void shortcutsDialog()
+    {
+        ShortcutsDialog dlg(m_window.get());
+        dlg.show();
+        const int all = dlg.visibleEntries();
+        QVERIFY(all > 40);
+        dlg.filterEdit()->setText("rename");
+        QVERIFY(dlg.visibleEntries() >= 2 && dlg.visibleEntries() < all);
+        dlg.filterEdit()->setText("F5");
+        QVERIFY(dlg.visibleEntries() >= 1);
+        dlg.filterEdit()->setText("zzzz");
+        QCOMPARE(dlg.visibleEntries(), 0);
     }
 
     // The keyboard always ends up back in a file list, and Esc closes things.

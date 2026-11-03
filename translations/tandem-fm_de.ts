@@ -661,6 +661,309 @@
     </message>
 </context>
 <context>
+    <name>Shortcuts</name>
+    <message>
+        <source>Moving around</source>
+        <translation>Bewegen</translation>
+    </message>
+    <message>
+        <source>Switch panel</source>
+        <translation>Seite wechseln</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Öffnen</translation>
+    </message>
+    <message>
+        <source>Parent folder</source>
+        <translation>Übergeordneter Ordner</translation>
+    </message>
+    <message>
+        <source>Quick search: type letters (↑ ↓ next match)</source>
+        <translation>Schnellsuche: Buchstaben tippen (↑ ↓ nächster Treffer)</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>Zurück</translation>
+    </message>
+    <message>
+        <source>Forward</source>
+        <translation>Vorwärts</translation>
+    </message>
+    <message>
+        <source>Root folder</source>
+        <translation>Wurzelordner</translation>
+    </message>
+    <message>
+        <source>Home folder</source>
+        <translation>Persönlicher Ordner</translation>
+    </message>
+    <message>
+        <source>Type a path or server address</source>
+        <translation>Pfad oder Serveradresse eingeben</translation>
+    </message>
+    <message>
+        <source>Places, drives and servers (left / right panel)</source>
+        <translation>Orte, Laufwerke und Server (linke / rechte Seite)</translation>
+    </message>
+    <message>
+        <source>Jump to any folder you visited (fuzzy)</source>
+        <translation>Zu jedem besuchten Ordner springen (unscharf)</translation>
+    </message>
+    <message>
+        <source>Bookmark keys (chains like cp)</source>
+        <translation>Lesezeichen-Tasten (Ketten wie cp)</translation>
+    </message>
+    <message>
+        <source>Bookmark this folder</source>
+        <translation>Lesezeichen für diesen Ordner</translation>
+    </message>
+    <message>
+        <source>Enter a folder, or browse any file as an archive</source>
+        <translation>Ordner betreten oder jede Datei als Archiv durchsuchen</translation>
+    </message>
+    <message>
+        <source>Selecting</source>
+        <translation>Auswählen</translation>
+    </message>
+    <message>
+        <source>Mark</source>
+        <translation>Markieren</translation>
+    </message>
+    <message>
+        <source>Mark (and size a folder)</source>
+        <translation>Markieren (und Ordnergröße berechnen)</translation>
+    </message>
+    <message>
+        <source>Mark while moving</source>
+        <translation>Beim Bewegen markieren</translation>
+    </message>
+    <message>
+        <source>Mark / unmark a group (*.jpg …)</source>
+        <translation>Gruppe markieren / demarkieren (*.jpg …)</translation>
+    </message>
+    <message>
+        <source>Invert the marks</source>
+        <translation>Markierung umkehren</translation>
+    </message>
+    <message>
+        <source>Mark all</source>
+        <translation>Alles markieren</translation>
+    </message>
+    <message>
+        <source>Mark none</source>
+        <translation>Nichts markieren</translation>
+    </message>
+    <message>
+        <source>Calculate all folder sizes</source>
+        <translation>Alle Ordnergrößen berechnen</translation>
+    </message>
+    <message>
+        <source>Files</source>
+        <translation>Dateien</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>Ansehen</translation>
+    </message>
+    <message>
+        <source>Edit (on servers and in archives: a copy that saves back)</source>
+        <translation>Bearbeiten (auf Servern und in Archiven: eine Kopie, die zurückspeichert)</translation>
+    </message>
+    <message>
+        <source>Copy to the other panel (into archives too)</source>
+        <translation>Auf die andere Seite kopieren (auch in Archive)</translation>
+    </message>
+    <message>
+        <source>Move to the other panel</source>
+        <translation>Auf die andere Seite verschieben</translation>
+    </message>
+    <message>
+        <source>New folder</source>
+        <translation>Neuer Ordner</translation>
+    </message>
+    <message>
+        <source>New file</source>
+        <translation>Neue Datei</translation>
+    </message>
+    <message>
+        <source>Move to the trash</source>
+        <translation>In den Papierkorb</translation>
+    </message>
+    <message>
+        <source>Delete permanently</source>
+        <translation>Endgültig löschen</translation>
+    </message>
+    <message>
+        <source>Rename in place</source>
+        <translation>Direkt umbenennen</translation>
+    </message>
+    <message>
+        <source>Rename many with a template</source>
+        <translation>Viele mit einer Vorlage umbenennen</translation>
+    </message>
+    <message>
+        <source>Rename in your text editor</source>
+        <translation>Im Texteditor umbenennen</translation>
+    </message>
+    <message>
+        <source>Permissions, extra people and groups (ACLs), flags</source>
+        <translation>Berechtigungen, zusätzliche Personen und Gruppen (ACLs), Flags</translation>
+    </message>
+    <message>
+        <source>Copy, cut, paste (works with other apps)</source>
+        <translation>Kopieren, ausschneiden, einfügen (auch mit anderen Programmen)</translation>
+    </message>
+    <message>
+        <source>Undo the last move, copy, trash, rename or new folder</source>
+        <translation>Letztes Verschieben, Kopieren, Löschen, Umbenennen oder Anlegen rückgängig machen</translation>
+    </message>
+    <message>
+        <source>Pack into an archive</source>
+        <translation>In ein Archiv packen</translation>
+    </message>
+    <message>
+        <source>Unpack</source>
+        <translation>Entpacken</translation>
+    </message>
+    <message>
+        <source>Context menu</source>
+        <translation>Kontextmenü</translation>
+    </message>
+    <message>
+        <source>Tabs and panels</source>
+        <translation>Tabs und Seiten</translation>
+    </message>
+    <message>
+        <source>New tab</source>
+        <translation>Neuer Tab</translation>
+    </message>
+    <message>
+        <source>Close tab</source>
+        <translation>Tab schließen</translation>
+    </message>
+    <message>
+        <source>Next tab</source>
+        <translation>Nächster Tab</translation>
+    </message>
+    <message>
+        <source>Tab 1 … 9, created here if it doesn&apos;t exist</source>
+        <translation>Tab 1 … 9, hier angelegt, falls es ihn nicht gibt</translation>
+    </message>
+    <message>
+        <source>Show this folder in the left / right panel</source>
+        <translation>Diesen Ordner links / rechts zeigen</translation>
+    </message>
+    <message>
+        <source>Swap panels</source>
+        <translation>Seiten tauschen</translation>
+    </message>
+    <message>
+        <source>Preview (below each panel, below both or on the right)</source>
+        <translation>Vorschau (unter jeder Seite, unter beiden oder rechts)</translation>
+    </message>
+    <message>
+        <source>Previews show details: type, dates, permissions, checksum</source>
+        <translation>Vorschauen zeigen Details: Typ, Zeiten, Berechtigungen, Prüfsumme</translation>
+    </message>
+    <message>
+        <source>Show hidden files</source>
+        <translation>Versteckte Dateien zeigen</translation>
+    </message>
+    <message>
+        <source>Sort by name / extension / date / size</source>
+        <translation>Nach Name / Endung / Datum / Größe sortieren</translation>
+    </message>
+    <message>
+        <source>Command palette: every command by name</source>
+        <translation>Befehlspalette: jeder Befehl nach Namen</translation>
+    </message>
+    <message>
+        <source>Search and compare</source>
+        <translation>Suchen und vergleichen</translation>
+    </message>
+    <message>
+        <source>Search names or contents here and below; the results are a folder</source>
+        <translation>Namen oder Inhalte hier und darunter suchen; die Treffer sind ein Ordner</translation>
+    </message>
+    <message>
+        <source>Filter this folder</source>
+        <translation>Diesen Ordner filtern</translation>
+    </message>
+    <message>
+        <source>Compare the panels: mark what&apos;s newer or missing</source>
+        <translation>Seiten vergleichen: Neueres oder Fehlendes markieren</translation>
+    </message>
+    <message>
+        <source>Synchronize folders, with a preview of the plan</source>
+        <translation>Ordner abgleichen, mit Vorschau des Plans</translation>
+    </message>
+    <message>
+        <source>Stop a search or load, close the search bar, clear the filter, leave results</source>
+        <translation>Suche oder Laden stoppen, Suchleiste schließen, Filter leeren, Treffer verlassen</translation>
+    </message>
+    <message>
+        <source>Servers and tools</source>
+        <translation>Server und Werkzeuge</translation>
+    </message>
+    <message>
+        <source>Connect to a server: sftp and smb built in, WebDAV and ftp via GVfs</source>
+        <translation>Mit Server verbinden: sftp und smb eingebaut, WebDAV und ftp über GVfs</translation>
+    </message>
+    <message>
+        <source>Run a command on the selection (%s files, %f file, %d folder, %D other panel)</source>
+        <translation>Befehl auf die Auswahl anwenden (%s Dateien, %f Datei, %d Ordner, %D andere Seite)</translation>
+    </message>
+    <message>
+        <source>Terminal here</source>
+        <translation>Terminal hier</translation>
+    </message>
+    <message>
+        <source>These shortcuts</source>
+        <translation>Diese Tastenkürzel</translation>
+    </message>
+    <message>
+        <source>Quit</source>
+        <translation>Beenden</translation>
+    </message>
+    <message>
+        <source>Vim keys (View menu)</source>
+        <translation>Vim-Tasten (Menü Ansicht)</translation>
+    </message>
+    <message>
+        <source>Down / up</source>
+        <translation>Runter / hoch</translation>
+    </message>
+    <message>
+        <source>Out of / into a folder</source>
+        <translation>Aus dem / in den Ordner</translation>
+    </message>
+    <message>
+        <source>Top / bottom</source>
+        <translation>Anfang / Ende</translation>
+    </message>
+    <message>
+        <source>Half a page down / up</source>
+        <translation>Halbe Seite runter / hoch</translation>
+    </message>
+    <message>
+        <source>Search, next, previous</source>
+        <translation>Suchen, nächster, vorheriger</translation>
+    </message>
+    <message>
+        <source>Command palette</source>
+        <translation>Befehlspalette</translation>
+    </message>
+    <message>
+        <source>Go to a bookmark</source>
+        <translation>Zu einem Lesezeichen</translation>
+    </message>
+    <message>
+        <source>Set a bookmark</source>
+        <translation>Lesezeichen setzen</translation>
+    </message>
+</context>
+<context>
     <name>tandem::ArchiveUpdateJob</name>
     <message>
         <source>Update %1</source>
@@ -1625,142 +1928,6 @@
             <numerusform>%n Pfad kopiert</numerusform>
             <numerusform>%n Pfade kopiert</numerusform>
         </translation>
-    </message>
-    <message>
-        <source>Switch panel</source>
-        <translation>Panel wechseln</translation>
-    </message>
-    <message>
-        <source>Open / parent folder</source>
-        <translation>Öffnen / übergeordneter Ordner</translation>
-    </message>
-    <message>
-        <source>Quick search (Up/Down: next match)</source>
-        <translation>Schnellsuche (Up/Down: nächster Treffer)</translation>
-    </message>
-    <message>
-        <source>Mark (Space also sizes folders)</source>
-        <translation>Markieren (Space berechnet auch Ordnergrößen)</translation>
-    </message>
-    <message>
-        <source>Mark group / unmark group / invert</source>
-        <translation>Gruppe markieren / Gruppe demarkieren / umkehren</translation>
-    </message>
-    <message>
-        <source>Viewer (Esc closes, N/P next file, 1/3/4 modes) / edit</source>
-        <translation>Betrachter (Esc schließt, N/P nächste Datei, 1/3/4 Modi) / bearbeiten</translation>
-    </message>
-    <message>
-        <source>Copy / move to other panel</source>
-        <translation>In anderes Panel kopieren / verschieben</translation>
-    </message>
-    <message>
-        <source>Rename in place / multi-rename / in your text editor</source>
-        <translation>Direkt umbenennen / Mehrfach-Umbenennen / im Texteditor</translation>
-    </message>
-    <message>
-        <source>New folder / new file</source>
-        <translation>Neuer Ordner / neue Datei</translation>
-    </message>
-    <message>
-        <source>Trash / delete permanently</source>
-        <translation>Papierkorb / endgültig löschen</translation>
-    </message>
-    <message>
-        <source>New / close / next tab</source>
-        <translation>Tab: neu / schließen / nächster</translation>
-    </message>
-    <message>
-        <source>Go to tab 1 … 9, creating it here if it doesn&apos;t exist</source>
-        <translation>Zu Tab 1 … 9 wechseln, fehlende Tabs hier anlegen</translation>
-    </message>
-    <message>
-        <source>History back / forward</source>
-        <translation>Verlauf zurück / vorwärts</translation>
-    </message>
-    <message>
-        <source>Parent / root / home</source>
-        <translation>Übergeordneter Ordner / Wurzel / persönlicher Ordner</translation>
-    </message>
-    <message>
-        <source>Type a path</source>
-        <translation>Pfad eingeben</translation>
-    </message>
-    <message>
-        <source>Locations for left / right panel</source>
-        <translation>Orte für linkes / rechtes Panel</translation>
-    </message>
-    <message>
-        <source>Show folder in left / right panel</source>
-        <translation>Ordner im linken / rechten Panel anzeigen</translation>
-    </message>
-    <message>
-        <source>Sort by name / ext / date / size</source>
-        <translation>Sortieren nach Name / Erw. / Datum / Größe</translation>
-    </message>
-    <message>
-        <source>Clipboard (works with other apps)</source>
-        <translation>Zwischenablage (funktioniert mit anderen Anwendungen)</translation>
-    </message>
-    <message>
-        <source>Undo the last operation (move, copy, trash, rename, new folder)</source>
-        <translation>Letzten Vorgang rückgängig machen (Verschieben, Kopieren, Papierkorb, Umbenennen, neuer Ordner)</translation>
-    </message>
-    <message>
-        <source>Pack / unpack archives</source>
-        <translation>Archive packen / entpacken</translation>
-    </message>
-    <message>
-        <source>Enter folder, or browse any file as archive</source>
-        <translation>Ordner öffnen oder beliebige Datei als Archiv durchsuchen</translation>
-    </message>
-    <message>
-        <source>Context menu</source>
-        <translation>Kontextmenü</translation>
-    </message>
-    <message>
-        <source>Preview: below each panel, below both or on the right (View &gt; Preview position)</source>
-        <translation>Vorschau: unter jedem Panel, unter beiden oder rechts (Ansicht &gt; Position der Vorschau)</translation>
-    </message>
-    <message>
-        <source>Connect to a server (sftp, smb, WebDAV, ftp; via GVfs). Typing sftp://… or user@host:path in the path bar works too</source>
-        <translation>Mit einem Server verbinden (sftp, smb, WebDAV, ftp; über GVfs). sftp://… oder benutzer@host:pfad in der Pfadleiste geht auch</translation>
-    </message>
-    <message>
-        <source>Compare the two panels: marks what is newer or missing on the other side</source>
-        <translation>Beide Panels vergleichen: markiert, was auf der anderen Seite neuer ist oder fehlt</translation>
-    </message>
-    <message>
-        <source>Synchronize folders: compare both trees, choose directions, copy (or mirror)</source>
-        <translation>Ordner synchronisieren: beide Bäume vergleichen, Richtungen wählen, kopieren (oder spiegeln)</translation>
-    </message>
-    <message>
-        <source>Run a shell command: %s marked files, %f file, %d folder, %D other panel; Ctrl+Enter in a terminal</source>
-        <translation>Shell-Befehl ausführen: %s markierte Dateien, %f Datei, %d Ordner, %D anderes Panel; Strg+Enter im Terminal</translation>
-    </message>
-    <message>
-        <source>Search names (fd) or contents (rg) here and below; results are a folder you can work in</source>
-        <translation>Namen (fd) oder Inhalte (rg) ab hier suchen; die Treffer sind ein Ordner, in dem man arbeiten kann</translation>
-    </message>
-    <message>
-        <source>Previews show details: type, dates, permissions, owner, checksum…</source>
-        <translation>Vorschauen zeigen Details: Typ, Zeiten, Berechtigungen, Eigentümer, Prüfsumme…</translation>
-    </message>
-    <message>
-        <source>Bookmark keys (h ~, d Downloads, chains like cp) / bookmark this folder</source>
-        <translation>Lesezeichen-Tasten (h ~, d Downloads, Folgen wie cp) / Lesezeichen für diesen Ordner</translation>
-    </message>
-    <message>
-        <source>Jump to any visited folder (fuzzy)</source>
-        <translation>Zu jedem besuchten Ordner springen (unscharfe Suche)</translation>
-    </message>
-    <message>
-        <source>j k move · h l out/in · gg G top/bottom · Ctrl+D/U half page · / n N search · v mark · : palette · &apos; or g&lt;key&gt; bookmarks · m set bookmark</source>
-        <translation>j k bewegen · h l raus/rein · gg G Anfang/Ende · Ctrl+D/U halbe Seite · / n N suchen · v markieren · : Palette · &apos; oder g&lt;Taste&gt; Lesezeichen · m Lesezeichen setzen</translation>
-    </message>
-    <message>
-        <source>Cancel a slow folder load</source>
-        <translation>Langsames Laden eines Ordners abbrechen</translation>
     </message>
     <message>
         <source>Move the cursor onto a file</source>
@@ -3138,6 +3305,21 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>After</source>
         <translation>Danach</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::ShortcutsDialog</name>
+    <message>
+        <source>Keyboard shortcuts</source>
+        <translation>Tastenkürzel</translation>
+    </message>
+    <message>
+        <source>Find a shortcut: type what you want to do, or a key</source>
+        <translation>Tastenkürzel finden: tippen, was du tun willst, oder eine Taste</translation>
+    </message>
+    <message>
+        <source>No shortcut matches “%1”</source>
+        <translation>Kein Tastenkürzel passt zu „%1“</translation>
     </message>
 </context>
 <context>
