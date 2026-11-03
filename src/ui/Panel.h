@@ -101,6 +101,8 @@ signals:
     void stateChanged();
     void contextMenuRequested(Panel* panel, const QPoint& globalPos, bool onItem);
     void renamed(const QString& dir, const QString& from, const QString& to);
+    // Inside an archive renames are archive rewrites, which MainWindow queues.
+    void archiveRenameRequested(const QString& from, const QString& to);
     void cursorChanged(Panel* panel);
     void paletteRequested();
     void bookmarkJumpRequested(const QString& keys);

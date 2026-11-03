@@ -523,12 +523,6 @@ private slots:
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_right->view()->setFocus();
 
-        // Read-only: delete is refused, nothing disappears.
-        QTest::keyClick(m_right->view(), Qt::Key_F8);
-        QTest::qWait(100);
-        QVERIFY(QApplication::activeModalWidget() == nullptr);
-        QVERIFY(rightModel()->rowOf("inner.txt") >= 0);
-
         // F5 extracts into the other panel.
         QVERIFY(QDir().mkpath(L("unpacked")));
         m_left->navigate(L("unpacked"));
@@ -536,6 +530,60 @@ private slots:
         answerNextDialog(acceptDialog);
         QTest::keyClick(m_right->view(), Qt::Key_F5);
         QTRY_VERIFY(QFile::exists(L("unpacked/inner.txt")));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+
+        // Archives are writable: F5 from outside adds, F7 makes a folder,
+        // rename and F8 change members. Each is one rewrite of the archive.
+        writeFile(L("unpacked/added.txt"), "added");
+        QTRY_VERIFY(leftModel()->rowOf("added.txt") >= 0);
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "added.txt");
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_left->view(), Qt::Key_F5);
+        QTRY_VERIFY(rightModel()->rowOf("added.txt") >= 0);
+        QVERIFY(QFile::exists(L("unpacked/added.txt")));  // copied, not moved
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+        QTRY_VERIFY(m_right->isActive());
+
+        answerNextDialog([](QWidget* w) {
+            w->findChild<QLineEdit*>()->setText("made");
+            acceptDialog(w);
+        });
+        QTest::keyClick(m_right->view(), Qt::Key_F7);
+        QTRY_VERIFY(rightModel()->rowOf("made") >= 0);
+
+        m_right->doRename("added.txt", "renamed.txt");
+        QTRY_VERIFY(rightModel()->rowOf("renamed.txt") >= 0);
+        QVERIFY(rightModel()->rowOf("added.txt") < 0);
+
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+        moveCursorTo(m_right, "inner.txt");
+        answerNextDialog(acceptDialog);
+        QTest::keyClick(m_right->view(), Qt::Key_F8);
+        QTRY_VERIFY(rightModel()->rowOf("inner.txt") < 0);
+        QString err;
+        QCOMPARE(readFile(extractToCache(R("pack.zip"), "sub/renamed.txt", &err)), QByteArray("added"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+
+        // F4 edits a copy; every save goes back into the archive.
+        const QString editorScript = m_tmp.filePath("archive-editor.sh");
+        writeFile(editorScript, "#!/bin/sh\nprintf 'edited in zip' > \"$1\"\n");
+        QFile::setPermissions(editorScript, QFile::permissions(editorScript) | QFile::ExeOwner);
+        QSettings().setValue("tools/editor", editorScript);
+        moveCursorTo(m_right, "renamed.txt");
+        QTest::keyClick(m_right->view(), Qt::Key_F4);
+        QTRY_COMPARE_WITH_TIMEOUT(readFile(extractToCache(R("pack.zip"), "sub/renamed.txt", &err)),
+                                  QByteArray("edited in zip"), 10000);
+        QSettings().remove("tools/editor");
+        QTRY_VERIFY(rightModel()->rowOf("renamed.txt") >= 0);
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_right->view()->setFocus();

@@ -103,6 +103,12 @@ void DirTab::refresh()
         });
         return;
     }
+    if (m_loading) {
+        // A navigation is under way: refreshing the old folder now would win
+        // over it. Refresh whatever it lands on instead.
+        m_refreshAfterLoad = true;
+        return;
+    }
     startListing(path(), cursorName(), History::None, true);
 }
 
@@ -192,6 +198,10 @@ void DirTab::startListing(const QString& path, const QString& focus, History his
                 return;
             }
             DirTab* t = self.data();
+            if (t->m_refreshAfterLoad) {  // something changed while this was loading
+                t->m_refreshAfterLoad = false;
+                QMetaObject::invokeMethod(t, &DirTab::refresh, Qt::QueuedConnection);
+            }
             t->m_loading = false;
             t->m_loadingPath.clear();
             emit t->loadingChanged(false);

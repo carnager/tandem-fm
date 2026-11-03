@@ -25,6 +25,9 @@
 #include <QAbstractButton>
 #include <QActionGroup>
 #include <QApplication>
+#include <QDateTime>
+#include <QStandardPaths>
+#include <QCryptographicHash>
 #include <QClipboard>
 #include <QDBusConnection>
 #include <QDBusInterface>
@@ -189,14 +192,18 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::openFileRequested, this, [this, p](const QString& path) { openFrom(p, path); });
         connect(p, &Panel::dropRequested, this,
                 [this, p](const QList<QUrl>& urls, const QString& dir, Qt::DropAction action) {
-                    if (!refuseInArchive(p))
-                        handleDrop(urls, dir, action);
+                    handleDrop(urls, dir, action);
                 });
         connect(p, &Panel::contextMenuRequested, this, &MainWindow::showContextMenu);
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
         connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
         connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
         connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
+        connect(p, &Panel::archiveRenameRequested, this, [this, p](const QString& from, const QString& to) {
+            ArchiveChanges c;
+            c.rename.append({p->innerPath(from), p->innerPath(to)});
+            changeArchive(p, c, tr("Rename in %1").arg(baseName(p->archivePath())));
+        });
         connect(p, &Panel::renamed, this, [this](const QString& dir, const QString& from, const QString& to) {
             pushUndo({UndoEntry::Kind::Rename, tr("rename of %1").arg(from), dir, {{to, from}}});
         });
@@ -500,28 +507,47 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
     const QStringList paths = src->selectedPaths();
     if (paths.isEmpty())
         return;
-    if (dst->inArchive()) {
-        dst->showMessage(tr("Adding to an existing archive isn't supported yet. Alt+F5 packs into a new one."), true);
-        return;
-    }
     if (src->inArchive()) {
-        if (mode == CopyJob::Mode::Move) {
-            refuseInArchive(src);
+        if (dst->inArchive()) {
+            src->showMessage(tr("From one archive into another: extract first (F5)"), true);
+            return;
+        }
+        const bool move = mode == CopyJob::Mode::Move;
+        QString why;
+        if (move && !canUpdateArchive(src->archivePath(), &why)) {
+            src->showMessage(why, true);
             return;
         }
         bool now = false;
-        const QString dest = askDestination(this, tr("Extract"),
-                                            tr("Extract %1 to:").arg(describeItems(paths)), dst->path(), &now);
+        const QString dest = askDestination(this, move ? tr("Move out") : tr("Extract"),
+                                            (move ? tr("Move %1 out of the archive to:") : tr("Extract %1 to:")).arg(describeItems(paths)),
+                                            dst->path(), &now);
         if (dest.isEmpty())
             return;
         QStringList inner;
         for (const QString& p : paths)
             inner.append(src->innerPath(p));
-        auto* job = new ExtractJob(src->archivePath(), inner, expandUserPath(dest));
+        const QString archive = src->archivePath();
+        auto* job = new ExtractJob(archive, inner, expandUserPath(dest));
         job->setStartImmediately(now);
+        if (move) {  // then take them out of the archive, if all went well
+            connect(job, &Job::finished, this, [this, job, archive, inner] {
+                if (job->snapshot().state != Job::State::Done || !job->errors().isEmpty())
+                    return;
+                ArchiveChanges c;
+                c.remove = inner;
+                auto* rm = new ArchiveUpdateJob(archive, c, tr("Remove from %1").arg(baseName(archive)));
+                rm->setStartImmediately(true);
+                m_jobs->add(rm);
+            });
+        }
         m_jobs->add(job);
         if (!src->hasSelectionOverride())
             src->unmarkAll();
+        return;
+    }
+    if (dst->inArchive() && src->isRemote()) {
+        dst->showMessage(tr("Only local files can go into an archive: download them first"), true);
         return;
     }
     const QString title = mode == CopyJob::Mode::Copy ? tr("Copy") : tr("Move");
@@ -543,6 +569,14 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
     if (intoDir && paths.size() == 1)
         dest = joinPath(dest, baseName(paths.first()));
 
+    if (Panel* ap = archivePanelFor(dest)) {  // into an archive
+        QString inner = ap->innerPath(intoDir && paths.size() == 1 ? parentPath(dest) : dest);
+        if (!addToArchive(ap, paths, inner, mode == CopyJob::Mode::Move))
+            return;
+        if (!src->hasSelectionOverride())
+            src->unmarkAll();
+        return;
+    }
     auto* job = new CopyJob(mode, paths, dest);
     job->setStartImmediately(now);
     m_jobs->add(job);
@@ -554,8 +588,26 @@ void MainWindow::deleteSelected(bool permanent)
 {
     Panel* p = active();
     const QStringList paths = p->selectedPaths();
-    if (paths.isEmpty() || refuseInArchive(p))
+    if (paths.isEmpty())
         return;
+    if (p->inArchive()) {
+        QString why;
+        if (!canUpdateArchive(p->archivePath(), &why)) {
+            p->showMessage(why, true);
+            return;
+        }
+        if (QMessageBox::question(this, tr("Delete from archive"),
+                                  tr("Delete %1 from %2? This cannot be undone.")
+                                      .arg(describeItems(paths), baseName(p->archivePath()))) != QMessageBox::Yes)
+            return;
+        ArchiveChanges c;
+        for (const QString& path : paths)
+            c.remove << p->innerPath(path);
+        changeArchive(p, c, tr("Delete from %1").arg(baseName(p->archivePath())));
+        if (!p->hasSelectionOverride())
+            p->unmarkAll();
+        return;
+    }
     if (p->isRemote())
         permanent = true;  // servers have no trash
     QMessageBox box(this);
@@ -578,14 +630,24 @@ void MainWindow::deleteSelected(bool permanent)
 void MainWindow::makeFolder()
 {
     Panel* p = active();
-    if (refuseInArchive(p))
+    QString why;
+    if (p->inArchive() && !canUpdateArchive(p->archivePath(), &why)) {
+        p->showMessage(why, true);
         return;
+    }
     bool ok = false;
     const QString name = QInputDialog::getText(this, tr("New folder"), tr("Name (use / for nested folders):"),
                                                QLineEdit::Normal, QString(), &ok)
                              .trimmed();
     if (!ok || name.isEmpty())
         return;
+    if (p->inArchive()) {
+        ArchiveChanges c;
+        c.mkdir << joinPath(p->innerPath(p->path()), name);
+        if (changeArchive(p, c, tr("New folder in %1").arg(baseName(p->archivePath()))))
+            p->expectName(name.section(QLatin1Char('/'), 0, 0, QString::SectionSkipEmpty));
+        return;
+    }
     const QString full = name.startsWith(QLatin1Char('/')) && !p->isRemote() ? name : joinPath(p->path(), name);
     const QString first = name.section(QLatin1Char('/'), 0, 0, QString::SectionSkipEmpty);
     QPointer<Panel> panel(p);
@@ -652,7 +714,7 @@ void MainWindow::editCurrent()
     if (path.isEmpty() || !e || e->isDir)
         return;
     if (active()->inArchive()) {
-        openFrom(active(), path);  // a read-only copy; archives can't be edited in place
+        editInArchive(active(), path);
         return;
     }
     if (isRemoteLocation(path)) {
@@ -706,6 +768,10 @@ void MainWindow::handleDrop(const QList<QUrl>& urls, const QString& targetDir, Q
     if (paths.isEmpty())
         return;
     const auto mode = action == Qt::MoveAction ? CopyJob::Mode::Move : CopyJob::Mode::Copy;
+    if (Panel* ap = archivePanelFor(targetDir)) {
+        addToArchive(ap, paths, ap->innerPath(targetDir), mode == CopyJob::Mode::Move);
+        return;
+    }
     m_jobs->add(new CopyJob(mode, paths, targetDir));
 }
 
@@ -745,8 +811,7 @@ void MainWindow::copyPathsAsText()
 
 void MainWindow::paste()
 {
-    if (!refuseInArchive(active()))
-        pasteInto(active()->path());
+    pasteInto(active()->path());
 }
 
 void MainWindow::pasteInto(const QString& dir)
@@ -759,6 +824,11 @@ void MainWindow::pasteInto(const QString& dir)
         return;
     const bool cut = mime->data(QStringLiteral("x-special/gnome-copied-files")).startsWith("cut") ||
                      mime->data(QStringLiteral("application/x-kde-cutselection")) == "1";
+    if (Panel* ap = archivePanelFor(dir)) {
+        if (addToArchive(ap, paths, ap->innerPath(dir), cut) && cut)
+            QApplication::clipboard()->clear();
+        return;
+    }
     m_jobs->add(new CopyJob(cut ? CopyJob::Mode::Move : CopyJob::Mode::Copy, paths, dir));
     if (cut)
         QApplication::clipboard()->clear();
@@ -1102,8 +1172,49 @@ bool MainWindow::refuseInArchive(Panel* p)
 {
     if (!p->inArchive())
         return false;
-    p->showMessage(tr("Archives are read-only in Tandem for now. F5 extracts, Alt+F5 packs."), true);
+    p->showMessage(tr("This doesn't work inside archives. F5 extracts."), true);
     return true;
+}
+
+Panel* MainWindow::archivePanelFor(const QString& path) const
+{
+    for (Panel* p : {active(), other()})
+        if (p->inArchive() && (path == p->archivePath() || path.startsWith(p->archivePath() + QLatin1Char('/'))))
+            return p;
+    return nullptr;
+}
+
+bool MainWindow::changeArchive(Panel* p, ArchiveChanges changes, const QString& title)
+{
+    QString why;
+    if (!canUpdateArchive(p->archivePath(), &why)) {
+        p->showMessage(why, true);
+        return false;
+    }
+    auto* job = new ArchiveUpdateJob(p->archivePath(), std::move(changes), title);
+    job->setStartImmediately(true);  // small edits shouldn't wait behind a big copy
+    m_jobs->add(job);
+    return true;
+}
+
+bool MainWindow::addToArchive(Panel* p, const QStringList& localPaths, const QString& innerDir, bool move)
+{
+    for (const QString& s : localPaths) {
+        if (isRemoteLocation(s) || !QFileInfo::exists(s)) {
+            p->showMessage(tr("Only local files can go into an archive"), true);
+            return false;
+        }
+        if (s == p->archivePath()) {
+            p->showMessage(tr("An archive can't go into itself"), true);
+            return false;
+        }
+    }
+    ArchiveChanges c;
+    for (const QString& s : localPaths)
+        c.add.append({s, joinPath(innerDir, baseName(s))});
+    c.moveSources = move;
+    const QString name = baseName(p->archivePath());
+    return changeArchive(p, c, move ? tr("Move into %1").arg(name) : tr("Copy into %1").arg(name));
 }
 
 void MainWindow::withExtracted(Panel* p, const QString& path, std::function<void(const QString&)> fn)
@@ -1195,6 +1306,16 @@ void MainWindow::uploadEdited()
             continue;  // mid-save; the new file triggers again
         if (!m_editWatch->files().contains(f))
             m_editWatch->addPath(f);
+        if (const auto it = m_editedArchive.constFind(f); it != m_editedArchive.cend()) {
+            ArchiveChanges c;
+            c.add.append({f, it->second});
+            c.replaceExisting = true;
+            auto* job = new ArchiveUpdateJob(it->first, c, tr("Save %1 into %2").arg(baseName(it->second), baseName(it->first)));
+            job->setStartImmediately(true);
+            m_jobs->add(job);
+            active()->showMessage(tr("Saving %1 into %2 …").arg(baseName(it->second), baseName(it->first)));
+            continue;
+        }
         const QString remote = m_editedRemote.value(f);
         if (remote.isEmpty())
             continue;
@@ -1220,34 +1341,74 @@ void MainWindow::editRemote(Panel* p, const QString& path)
         return;
     }
     withLocalCopy(p, path, [this, path](const QString& local) {
-        if (!m_editWatch) {
-            m_editWatch = new QFileSystemWatcher(this);
-            m_uploadTimer = new QTimer(this);
-            m_uploadTimer->setSingleShot(true);
-            m_uploadTimer->setInterval(400);  // editors write in several steps
-            connect(m_editWatch, &QFileSystemWatcher::fileChanged, this, &MainWindow::editedFileChanged);
-            // Editors that save by writing a new file and renaming it drop the
-            // file watch; the folder watch catches those.
-            connect(m_editWatch, &QFileSystemWatcher::directoryChanged, this, [this](const QString& dir) {
-                for (auto it = m_editedRemote.cbegin(); it != m_editedRemote.cend(); ++it)
-                    if (parentPath(it.key()) == dir && !m_editWatch->files().contains(it.key()))
-                        editedFileChanged(it.key());
-            });
-            connect(m_uploadTimer, &QTimer::timeout, this, &MainWindow::uploadEdited);
-        }
         m_editedRemote.insert(local, path);
-        m_editWatch->addPath(local);
-        m_editWatch->addPath(parentPath(local));
-        const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
-        if (!editor.isEmpty()) {
-            QStringList args = QProcess::splitCommand(editor);
-            const QString program = args.takeFirst();
-            args.append(local);
-            if (QProcess::startDetached(program, args, parentPath(local)))
-                return;
-        }
-        openFile(local);
+        watchEdit(local);
     }, editCopy);
+}
+
+// Watches an edit copy (every save goes back) and opens it in the editor.
+void MainWindow::watchEdit(const QString& local)
+{
+    if (!m_editWatch) {
+        m_editWatch = new QFileSystemWatcher(this);
+        m_uploadTimer = new QTimer(this);
+        m_uploadTimer->setSingleShot(true);
+        m_uploadTimer->setInterval(400);  // editors write in several steps
+        connect(m_editWatch, &QFileSystemWatcher::fileChanged, this, &MainWindow::editedFileChanged);
+        // Editors that save by writing a new file and renaming it drop the
+        // file watch; the folder watch catches those.
+        connect(m_editWatch, &QFileSystemWatcher::directoryChanged, this, [this](const QString& dir) {
+            for (const QString& f : m_editedRemote.keys() + m_editedArchive.keys())
+                if (parentPath(f) == dir && !m_editWatch->files().contains(f))
+                    editedFileChanged(f);
+        });
+        connect(m_uploadTimer, &QTimer::timeout, this, &MainWindow::uploadEdited);
+    }
+    m_editWatch->addPath(local);
+    m_editWatch->addPath(parentPath(local));
+    const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
+    if (!editor.isEmpty()) {
+        QStringList args = QProcess::splitCommand(editor);
+        const QString program = args.takeFirst();
+        args.append(local);
+        if (QProcess::startDetached(program, args, parentPath(local)))
+            return;
+    }
+    openFile(local);
+}
+
+// F4 inside an archive: edit a copy; every save is written back into the archive.
+void MainWindow::editInArchive(Panel* p, const QString& path)
+{
+    QString why;
+    if (!canUpdateArchive(p->archivePath(), &why)) {
+        p->showMessage(tr("%1. Opening a read-only copy.").arg(why), true);
+        openFrom(p, path);
+        return;
+    }
+    const QString archive = p->archivePath();
+    const QString inner = p->innerPath(path);
+    const QString editCopy =
+        QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + QStringLiteral("/tandem-fm/edit/archive/") +
+        QString::fromLatin1(QCryptographicHash::hash((archive + QLatin1Char('\n') + inner).toUtf8(), QCryptographicHash::Sha1)
+                                .toHex()
+                                .left(16)) +
+        QLatin1Char('/') + baseName(inner);
+    if (m_editedArchive.value(editCopy) == qMakePair(archive, inner) && QFileInfo::exists(editCopy)) {
+        watchEdit(editCopy);  // already being edited: reopen, don't extract over changes
+        return;
+    }
+    withExtracted(p, path, [this, editCopy, archive, inner](const QString& extracted) {
+        QDir().mkpath(parentPath(editCopy));
+        QFile::remove(editCopy);
+        if (!QFile::copy(extracted, editCopy)) {
+            active()->showMessage(tr("Cannot copy %1 for editing").arg(baseName(inner)), true);
+            return;
+        }
+        QFile::setPermissions(editCopy, QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup | QFile::ReadOther);
+        m_editedArchive.insert(editCopy, {archive, inner});
+        watchEdit(editCopy);
+    });
 }
 
 void MainWindow::pack()
@@ -1955,8 +2116,11 @@ void MainWindow::openTerminal(const QString& dir)
 void MainWindow::makeFile()
 {
     Panel* p = active();
-    if (refuseInArchive(p))
+    QString why;
+    if (p->inArchive() && !canUpdateArchive(p->archivePath(), &why)) {
+        p->showMessage(why, true);
         return;
+    }
     bool ok = false;
     const QString name =
         QInputDialog::getText(this, tr("New file"), tr("File name:"), QLineEdit::Normal, QString(), &ok).trimmed();
@@ -1964,6 +2128,22 @@ void MainWindow::makeFile()
         return;
     if (name.contains(QLatin1Char('/'))) {
         p->showMessage(tr("A name cannot contain '/'"), true);
+        return;
+    }
+    if (p->inArchive()) {  // an empty file goes in like any other
+        const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) +
+                            QStringLiteral("/tandem-fm/new/") + QString::number(QDateTime::currentMSecsSinceEpoch());
+        QDir().mkpath(dir);
+        const QString empty = joinPath(dir, name);
+        if (createEmptyFile(empty) != 0) {
+            p->showMessage(tr("Cannot create %1").arg(name), true);
+            return;
+        }
+        ArchiveChanges c;
+        c.add.append({empty, joinPath(p->innerPath(p->path()), name)});
+        c.moveSources = true;  // the temp copy goes away afterwards
+        if (changeArchive(p, c, tr("New file in %1").arg(baseName(p->archivePath()))))
+            p->expectName(name);
         return;
     }
     const QString full = joinPath(p->path(), name);

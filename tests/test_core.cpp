@@ -382,6 +382,111 @@ private slots:
         QCOMPARE(readFile(cached), QByteArray("hello"));
     }
 
+    void archiveUpdate_data()
+    {
+        QTest::addColumn<QString>("ext");
+        QTest::newRow("zip") << ".zip";
+        QTest::newRow("7z") << ".7z";
+        QTest::newRow("tar") << ".tar";
+        QTest::newRow("tar.gz") << ".tar.gz";
+        QTest::newRow("tar.zst") << ".tar.zst";
+    }
+
+    // Changing an existing archive: remove, rename, new folder, add, replace.
+    void archiveUpdate()
+    {
+        QFETCH(QString, ext);
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("src/docs/deep")));
+        writeFile(tmp.filePath("src/readme.txt"), "hello");
+        writeFile(tmp.filePath("src/docs/a.txt"), "aaa");
+        writeFile(tmp.filePath("src/docs/deep/b.bin"), QByteArray(200000, 'b'));
+        QVERIFY(::symlink("readme.txt", QFile::encodeName(tmp.filePath("src/link")).constData()) == 0);
+        const QString arc = tmp.filePath("out" + ext);
+        PackJob pack({tmp.filePath("src")}, arc);
+        QVERIFY(runJob(pack));
+        QVERIFY(listLocation(arc + "/src", {}).error == 0);  // index cached now
+
+        QVERIFY(QDir().mkpath(tmp.filePath("more/inner")));
+        writeFile(tmp.filePath("more/inner/m.txt"), "more");
+        writeFile(tmp.filePath("extra.txt"), "extra");
+        ArchiveChanges c;
+        c.remove << "src/docs/deep";
+        c.rename << qMakePair(QString("src/readme.txt"), QString("src/README.txt"));  // same size: cache must not lie
+        c.mkdir << "src/new/sub";
+        c.add << qMakePair(tmp.filePath("extra.txt"), QString("src/docs/extra.txt"))
+              << qMakePair(tmp.filePath("more"), QString("src/more"));
+        c.moveSources = true;
+        ArchiveUpdateJob job(arc, c);
+        QVERIFY(runJob(job));
+        QVERIFY2(job.errors().isEmpty(), qPrintable(job.errors().join('\n')));
+        QCOMPARE(job.snapshot().state, Job::State::Done);
+        QVERIFY(!QFile::exists(tmp.filePath("extra.txt")));  // moved in
+        QVERIFY(!QFile::exists(tmp.filePath("more")));
+        QCOMPARE(QDir(tmp.path()).entryList({".out*"}, QDir::Hidden | QDir::Files), QStringList());  // no temp left
+
+        auto names = [&](const QString& inner) {
+            QStringList n;
+            const ListResult l = listLocation(arc + "/" + inner, {.showHidden = true});
+            for (const FileEntry& e : l.entries)
+                n << e.name + (e.isLink ? "@" : "");
+            n.sort();
+            return n;
+        };
+        QCOMPARE(names("src"), QStringList({"README.txt", "docs", "link@", "more", "new"}));
+        QCOMPARE(names("src/docs"), QStringList({"a.txt", "extra.txt"}));
+        QCOMPARE(names("src/new"), QStringList({"sub"}));
+        QString err;
+        QCOMPARE(readFile(extractToCache(arc, "src/README.txt", &err)), QByteArray("hello"));
+        QCOMPARE(readFile(extractToCache(arc, "src/more/inner/m.txt", &err)), QByteArray("more"));
+        QCOMPARE(readFile(extractToCache(arc, "src/docs/extra.txt", &err)), QByteArray("extra"));
+
+        // Adding a name that exists: asked; "rename" keeps both.
+        writeFile(tmp.filePath("a.txt"), "second");
+        int prompts = 0;
+        ArchiveChanges c2;
+        c2.add << qMakePair(tmp.filePath("a.txt"), QString("src/docs/a.txt"));
+        ArchiveUpdateJob renameJob(arc, c2);
+        renameJob.setSyncPromptHandler([&](const PromptRequest& r) {
+            ++prompts;
+            return r.kind == PromptRequest::Kind::Conflict ? Answer::Rename : Answer::Cancel;
+        });
+        QVERIFY(runJob(renameJob));
+        QCOMPARE(prompts, 1);
+        QCOMPARE(names("src/docs"), QStringList({"a (2).txt", "a.txt", "extra.txt"}));
+        QCOMPARE(readFile(extractToCache(arc, "src/docs/a (2).txt", &err)), QByteArray("second"));
+        QVERIFY(QFile::exists(tmp.filePath("a.txt")));  // a copy, not a move
+
+        // Saving an edited member replaces it without asking.
+        writeFile(tmp.filePath("a.txt"), "edited!");
+        ArchiveChanges c3;
+        c3.add << qMakePair(tmp.filePath("a.txt"), QString("src/docs/a.txt"));
+        c3.replaceExisting = true;
+        ArchiveUpdateJob replaceJob(arc, c3);
+        replaceJob.setSyncPromptHandler([&](const PromptRequest&) { ++prompts; return Answer::Cancel; });
+        QVERIFY(runJob(replaceJob));
+        QCOMPARE(prompts, 1);
+        QCOMPARE(names("src/docs"), QStringList({"a (2).txt", "a.txt", "extra.txt"}));
+        QCOMPARE(readFile(extractToCache(arc, "src/docs/a.txt", &err)), QByteArray("edited!"));
+    }
+
+    void archiveUpdateRefuses()
+    {
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("one.txt"), "x");
+        QVERIFY(QProcess::execute("gzip", {"-k", tmp.filePath("one.txt")}) == 0);
+        QString why;
+        QVERIFY(!canUpdateArchive(tmp.filePath("one.txt.gz"), &why));
+        QVERIFY(!canUpdateArchive(tmp.filePath("x.rar"), &why));
+        QVERIFY(canUpdateArchive(tmp.filePath("x.tar.xz")));
+        ArchiveChanges c;
+        c.mkdir << "d";
+        ArchiveUpdateJob job(tmp.filePath("one.txt.gz"), c);
+        job.setSyncPromptHandler([](const PromptRequest&) { return Answer::Cancel; });
+        QVERIFY(runJob(job));
+        QCOMPARE(job.snapshot().state, Job::State::Failed);
+    }
+
     void extractConflictsAndSmartFolder()
     {
         QTemporaryDir tmp;

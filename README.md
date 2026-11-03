@@ -128,9 +128,17 @@ Inside an archive: F3 and Enter work on a cached extracted copy, F5 extracts
 (conflict prompts as usual), and folder sizes are shown right away.
 Alt+F9 unpacks whole archives (into their own folder unless the archive has
 a single top-level folder); Alt+F5 packs into a new archive whose format
-follows the extension. Archives are read-only for now: deleting, renaming or
-adding inside an existing archive comes later. Member paths with `..` and
-writes through links the archive itself created are refused.
+follows the extension. Member paths with `..` and writes through links the
+archive itself created are refused.
+
+zip, 7z, tar (plain or compressed) and cpio archives are writable: F5/F6,
+paste and drag & drop add files, F6 out of an archive moves members out, F7
+and Shift+F4 create folders and files, rename and F8 work on members, and F4
+edits a copy whose every save goes back in. libarchive can't edit in place,
+so each change writes a new archive next to the old one (same format and
+compression) and swaps it in: the old one stays intact if anything fails, and
+one batch (say 200 files copied in) is one rewrite. rar, iso, deb and rpm stay
+read-only, and so do archives with encrypted members.
 
 ## Viewer (F3) and preview (Ctrl+Q)
 
@@ -173,6 +181,6 @@ bench/      tandem-bench
 ## Roadmap
 
 1. ✅ Dual panels, tabs, keyboard flow, quick search, background F5–F8, watcher, benchmarks
-2. ✅ Built-in viewer (F3) · ✅ archives as folders (libarchive) · multi-rename, compare/sync folders
+2. ✅ Built-in viewer (F3) · ✅ archives as folders (libarchive), writable · multi-rename, compare/sync folders
 3. Network backends (SFTP, SMB, WebDAV, S3), connection manager, button bar, command line
 4. Plugins, themes, configurable keys

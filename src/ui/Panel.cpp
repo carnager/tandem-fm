@@ -873,8 +873,9 @@ void Panel::computeAllSizes()
 
 void Panel::startRename()
 {
-    if (inArchive()) {
-        showMessage(tr("Archives are read-only in Tandem for now."), true);
+    QString why;
+    if (inArchive() && !canUpdateArchive(archivePath(), &why)) {
+        showMessage(why, true);
         return;
     }
     const FileEntry* e = currentEntry();
@@ -901,6 +902,12 @@ void Panel::doRename(const QString& from, const QString& to)
         return;
     }
     const QString dir = path();
+    if (inArchive()) {
+        emit archiveRenameRequested(joinPath(dir, from), joinPath(dir, to));
+        if (DirTab* t = tab())
+            t->expectName(to);
+        return;
+    }
     QPointer<Panel> self(this);
     QPointer<DirTab> t(tab());
     ioPool()->start([self, t, dir, from, to] {

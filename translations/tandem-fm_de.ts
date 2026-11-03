@@ -59,6 +59,14 @@
         <translation>Nicht im Archiv gefunden</translation>
     </message>
     <message>
+        <source>This is one compressed file, not an archive: unpack it, then pack again</source>
+        <translation>Das ist eine einzelne komprimierte Datei, kein Archiv: entpacken und neu packen</translation>
+    </message>
+    <message>
+        <source>Tandem can&apos;t write %1 archives</source>
+        <translation>Tandem kann keine %1-Archive schreiben</translation>
+    </message>
+    <message>
         <source>Tandem can&apos;t open %1 locations</source>
         <translation>Tandem kann %1-Orte nicht öffnen</translation>
     </message>
@@ -466,6 +474,85 @@
     <message>
         <source>Access denied by %1</source>
         <translation>Zugriff verweigert von %1</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::ArchiveUpdateJob</name>
+    <message>
+        <source>Update %1</source>
+        <translation>%1 aktualisieren</translation>
+    </message>
+    <message>
+        <source>Cannot change the archive</source>
+        <translation>Archiv kann nicht geändert werden</translation>
+    </message>
+    <message>
+        <source>Cannot read the archive</source>
+        <translation>Archiv kann nicht gelesen werden</translation>
+    </message>
+    <message>
+        <source>It has encrypted files, which Tandem can&apos;t write back</source>
+        <translation>Es enthält verschlüsselte Dateien, die Tandem nicht zurückschreiben kann</translation>
+    </message>
+    <message>
+        <source>%1 is not in the archive</source>
+        <translation>%1 ist nicht im Archiv</translation>
+    </message>
+    <message>
+        <source>%1 exists already</source>
+        <translation>%1 existiert bereits</translation>
+    </message>
+    <message>
+        <source>Cannot move %1 into itself</source>
+        <translation>%1 kann nicht in sich selbst verschoben werden</translation>
+    </message>
+    <message>
+        <source>Cannot read: %1 (%2)</source>
+        <translation>Nicht lesbar: %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Tandem can&apos;t write this kind of archive</source>
+        <translation>Tandem kann diese Art Archiv nicht schreiben</translation>
+    </message>
+    <message>
+        <source>write error</source>
+        <translation>Schreibfehler</translation>
+    </message>
+    <message>
+        <source>Cannot write</source>
+        <translation>Schreiben nicht möglich</translation>
+    </message>
+    <message>
+        <source>Cannot read</source>
+        <translation>Lesen nicht möglich</translation>
+    </message>
+    <message>
+        <source>Damaged archive</source>
+        <translation>Beschädigtes Archiv</translation>
+    </message>
+    <message>
+        <source>Cannot create folder</source>
+        <translation>Ordner kann nicht erstellt werden</translation>
+    </message>
+    <message>
+        <source>Cannot add</source>
+        <translation>Hinzufügen nicht möglich</translation>
+    </message>
+    <message>
+        <source>Cannot finish the archive</source>
+        <translation>Archiv kann nicht abgeschlossen werden</translation>
+    </message>
+    <message>
+        <source>Cannot replace the archive</source>
+        <translation>Archiv kann nicht ersetzt werden</translation>
+    </message>
+    <message>
+        <source>%1 was kept: not all of it went into the archive</source>
+        <translation>%1 wurde behalten: nicht alles kam ins Archiv</translation>
+    </message>
+    <message>
+        <source>Cannot remove %1 (%2)</source>
+        <translation>%1 kann nicht entfernt werden (%2)</translation>
     </message>
 </context>
 <context>
@@ -1261,20 +1348,44 @@
         <translation>Löschen</translation>
     </message>
     <message>
-        <source>Adding to an existing archive isn&apos;t supported yet. Alt+F5 packs into a new one.</source>
-        <translation>Hinzufügen zu einem bestehenden Archiv wird noch nicht unterstützt. Alt+F5 packt in ein neues.</translation>
-    </message>
-    <message>
         <source>Extract</source>
         <translation>Entpacken</translation>
+    </message>
+    <message>
+        <source>Move out</source>
+        <translation>Herausverschieben</translation>
     </message>
     <message>
         <source>Extract %1 to:</source>
         <translation>%1 entpacken nach:</translation>
     </message>
     <message>
+        <source>Move %1 out of the archive to:</source>
+        <translation>%1 aus dem Archiv verschieben nach:</translation>
+    </message>
+    <message>
+        <source>Remove from %1</source>
+        <translation>Aus %1 entfernen</translation>
+    </message>
+    <message>
+        <source>Only local files can go into an archive: download them first</source>
+        <translation>Nur lokale Dateien können ins Archiv: zuerst herunterladen</translation>
+    </message>
+    <message>
         <source>%1 %2 to:</source>
         <translation>%1: %2 nach:</translation>
+    </message>
+    <message>
+        <source>Delete from archive</source>
+        <translation>Aus Archiv löschen</translation>
+    </message>
+    <message>
+        <source>Delete %1 from %2? This cannot be undone.</source>
+        <translation>%1 aus %2 löschen? Das kann nicht rückgängig gemacht werden.</translation>
+    </message>
+    <message>
+        <source>Delete from %1</source>
+        <translation>Aus %1 löschen</translation>
     </message>
     <message>
         <source>Permanently delete %1?</source>
@@ -1295,6 +1406,10 @@
     <message>
         <source>Name (use / for nested folders):</source>
         <translation>Name (/ für verschachtelte Ordner):</translation>
+    </message>
+    <message>
+        <source>New folder in %1</source>
+        <translation>Neuer Ordner in %1</translation>
     </message>
     <message>
         <source>new folder %1</source>
@@ -1524,10 +1639,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Wird geladen…</translation>
     </message>
     <message>
-        <source>Archives are read-only in Tandem for now. F5 extracts, Alt+F5 packs.</source>
-        <translation>Archive sind in Tandem vorerst schreibgeschützt. F5 entpackt, Alt+F5 packt.</translation>
-    </message>
-    <message>
         <source>Extracting %1 …</source>
         <translation>%1 wird entpackt …</translation>
     </message>
@@ -1548,8 +1659,24 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>%1 kann nicht heruntergeladen werden: %2</translation>
     </message>
     <message>
+        <source>Save %1 into %2</source>
+        <translation>%1 in %2 speichern</translation>
+    </message>
+    <message>
+        <source>Saving %1 into %2 …</source>
+        <translation>%1 wird in %2 gespeichert …</translation>
+    </message>
+    <message>
         <source>Uploading %1 …</source>
         <translation>Lade %1 hoch …</translation>
+    </message>
+    <message>
+        <source>%1. Opening a read-only copy.</source>
+        <translation>%1. Öffne eine schreibgeschützte Kopie.</translation>
+    </message>
+    <message>
+        <source>Cannot copy %1 for editing</source>
+        <translation>%1 kann nicht zum Bearbeiten kopiert werden</translation>
     </message>
     <message>
         <source>Extract first (F5), then pack.</source>
@@ -1681,6 +1808,34 @@ F3 lädt es herunter und öffnet es</translation>
             <numerusform>%n Element</numerusform>
             <numerusform>%n Elemente</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>Rename in %1</source>
+        <translation>In %1 umbenennen</translation>
+    </message>
+    <message>
+        <source>From one archive into another: extract first (F5)</source>
+        <translation>Von einem Archiv in ein anderes: zuerst entpacken (F5)</translation>
+    </message>
+    <message>
+        <source>This doesn&apos;t work inside archives. F5 extracts.</source>
+        <translation>Das geht in Archiven nicht. F5 entpackt.</translation>
+    </message>
+    <message>
+        <source>Only local files can go into an archive</source>
+        <translation>Nur lokale Dateien können ins Archiv</translation>
+    </message>
+    <message>
+        <source>An archive can&apos;t go into itself</source>
+        <translation>Ein Archiv kann nicht in sich selbst</translation>
+    </message>
+    <message>
+        <source>Move into %1</source>
+        <translation>In %1 verschieben</translation>
+    </message>
+    <message>
+        <source>Copy into %1</source>
+        <translation>In %1 kopieren</translation>
     </message>
     <message>
         <source>Undo: %1</source>
@@ -1820,6 +1975,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>A name cannot contain &apos;/&apos;</source>
         <translation>Ein Name darf kein „/“ enthalten</translation>
+    </message>
+    <message>
+        <source>Cannot create %1</source>
+        <translation>%1 kann nicht erstellt werden</translation>
+    </message>
+    <message>
+        <source>New file in %1</source>
+        <translation>Neue Datei in %1</translation>
     </message>
     <message>
         <source>new file %1</source>
@@ -2140,10 +2303,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Patterns, separated by spaces or &apos;;&apos;. Add a trailing / for folders (e.g. build/):</source>
         <translation>Muster, getrennt durch Leerzeichen oder „;“. Ein abschließendes / steht für Ordner (z. B. build/):</translation>
-    </message>
-    <message>
-        <source>Archives are read-only in Tandem for now.</source>
-        <translation>Archive sind in Tandem vorerst schreibgeschützt.</translation>
     </message>
     <message>
         <source>A name cannot contain &apos;/&apos;</source>

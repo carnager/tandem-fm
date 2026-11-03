@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/Archive.h"
+
 #include "core/FileOps.h"
 #include "core/MultiRename.h"
 #include "core/Undo.h"
@@ -63,6 +65,13 @@ private:
     void openTerminal(const QString& dir = {});
     void pasteInto(const QString& dir);
     bool refuseInArchive(Panel* p);
+    // Archive changes run as one rewrite job. false (with a message) when the
+    // archive's format can't be written.
+    bool changeArchive(Panel* p, ArchiveChanges changes, const QString& title);
+    bool addToArchive(Panel* p, const QStringList& localPaths, const QString& innerDir, bool move);
+    Panel* archivePanelFor(const QString& path) const;
+    void editInArchive(Panel* p, const QString& path);
+    void watchEdit(const QString& local);
     bool refuseOnServer(Panel* p, const QString& what);
     // Archives: extract; servers: download (cached). Then fn(local path).
     // `local` overrides where a server file is put (edit copies live apart
@@ -76,6 +85,7 @@ private:
     QTimer* m_uploadTimer = nullptr;
     QSet<QString> m_changedEdits;
     QHash<QString, QString> m_editedRemote;  // local copy -> server location
+    QHash<QString, QPair<QString, QString>> m_editedArchive;  // local copy -> (archive, member)
     // Extracts a file from the panel's archive to the cache (off-thread), then calls fn.
     void withExtracted(Panel* p, const QString& path, std::function<void(const QString& local)> fn);
     void openFrom(Panel* p, const QString& path);

@@ -75,6 +75,39 @@ private:
     bool m_smart;
 };
 
+// Changes to an existing archive, applied in one go. libarchive can't edit an
+// archive in place: the job writes a new one next to it (copying every member
+// it keeps) and swaps it in, so one job per batch, never one per file.
+struct ArchiveChanges {
+    QStringList remove;                     // inner paths; folders with their contents
+    QList<QPair<QString, QString>> rename;  // inner path -> new inner path
+    QStringList mkdir;                      // inner folder paths
+    QList<QPair<QString, QString>> add;     // local file or folder -> inner path
+    bool moveSources = false;               // delete the added local items afterwards
+    bool replaceExisting = false;           // added files replace members without asking
+    bool isEmpty() const { return remove.isEmpty() && rename.isEmpty() && mkdir.isEmpty() && add.isEmpty(); }
+};
+
+// Whether Tandem can rewrite this archive (zip, 7z, tar and compressed tars,
+// cpio). Name-based, no I/O. *why says what isn't possible.
+bool canUpdateArchive(const QString& archivePath, QString* why = nullptr);
+
+class ArchiveUpdateJob : public Job {
+public:
+    ArchiveUpdateJob(QString archivePath, ArchiveChanges changes, QString title = {});
+    QString archivePath() const { return m_archive; }
+
+protected:
+    void run() override;
+
+private:
+    QString m_archive;
+    ArchiveChanges m_changes;
+};
+
+// Drops the cached table of contents (after the archive changed).
+void forgetArchiveIndex(const QString& archivePath);
+
 // Alt+F5: creates an archive from local files. The format follows the
 // extension (.zip, .7z, .tar, .tar.gz/.tgz, .tar.xz, .tar.zst, .tar.bz2).
 class PackJob : public Job {

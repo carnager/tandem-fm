@@ -103,6 +103,7 @@ private:
     int64_t m_free = -1, m_total = -1;
     bool m_showHidden = false;
     bool m_inArchive = false;
+    bool m_refreshAfterLoad = false;
     QString m_gitBranch;
     bool m_remote = false;
     SearchSpec m_search;

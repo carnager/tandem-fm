@@ -8,10 +8,13 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QMutex>
+#include <QSet>
 #include <QStandardPaths>
 
 #include <archive.h>
 #include <archive_entry.h>
+
+#include <filesystem>
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -728,6 +731,450 @@ void PackJob::run()
         setState(State::Failed);
     } else if (!replaced) {
         recordUndo(fromNative(target));
+    }
+}
+
+// ------------------------------------------------------------ archive update
+
+void forgetArchiveIndex(const QString& archivePath)
+{
+    QMutexLocker lock(&g_cacheMutex);
+    g_cache.removeIf([&](const CachedIndex& c) { return c.path == archivePath; });
+}
+
+bool canUpdateArchive(const QString& archivePath, QString* why)
+{
+    const QString n = baseName(archivePath).toLower();
+    if (isSingleCompressed(n)) {
+        if (why)
+            *why = QObject::tr("This is one compressed file, not an archive: unpack it, then pack again");
+        return false;
+    }
+    for (const char* e : {".rar", ".iso", ".cab", ".rpm", ".deb", ".lha", ".lzh", ".xar", ".ar"}) {
+        if (n.endsWith(QLatin1String(e))) {
+            if (why)
+                *why = QObject::tr("Tandem can't write %1 archives").arg(QString::fromLatin1(e + 1).toUpper());
+            return false;
+        }
+    }
+    return true;  // zip, 7z, the tar family, cpio, and zip-based files (jar, odt, …)
+}
+
+namespace {
+
+bool isUnder(const QString& path, const QString& root)
+{
+    return path == root || (path.size() > root.size() && path.startsWith(root) && path[root.size()] == QLatin1Char('/'));
+}
+
+QString replacePrefix(const QString& path, const QString& from, const QString& to)
+{
+    return to + path.mid(from.size());
+}
+
+// "a/b.txt" -> "a/b (2).txt", the first name nothing in the archive uses.
+QString uniqueInner(const QString& path, const std::function<bool(const QString&)>& taken)
+{
+    const int slash = int(path.lastIndexOf(QLatin1Char('/')));
+    const QString dir = path.left(slash + 1);
+    const QString name = path.mid(slash + 1);
+    int dot = int(name.lastIndexOf(QLatin1Char('.')));
+    if (dot <= 0)
+        dot = int(name.size());
+    for (int i = 2;; ++i) {
+        const QString c = dir + name.left(dot) + QStringLiteral(" (%1)").arg(i) + name.mid(dot);
+        if (!taken(c))
+            return c;
+    }
+}
+
+// Writer in the same format as the reader (which has read its first header).
+archive* writerLike(archive* in, bool haveHeader, const QByteArray& nameForExt)
+{
+    archive* out = archive_write_new();
+    if (haveHeader) {
+        int fmt = archive_format(in);
+        if ((fmt & ARCHIVE_FORMAT_BASE_MASK) == ARCHIVE_FORMAT_TAR)
+            fmt = ARCHIVE_FORMAT_TAR_PAX_RESTRICTED;  // ustar can't hold long names
+        bool ok = archive_write_set_format(out, fmt) == ARCHIVE_OK ||
+                  archive_write_set_format(out, fmt & ARCHIVE_FORMAT_BASE_MASK) == ARCHIVE_OK;
+        for (int i = archive_filter_count(in) - 1; ok && i >= 0; --i) {
+            const int code = archive_filter_code(in, i);
+            if (code != ARCHIVE_FILTER_NONE)
+                ok = archive_write_add_filter(out, code) == ARCHIVE_OK;
+        }
+        if (ok)
+            return out;
+        archive_write_free(out);
+        out = archive_write_new();
+    }
+    if (archive_write_set_format_filter_by_ext(out, nameForExt.constData()) == ARCHIVE_OK)
+        return out;
+    archive_write_free(out);
+    return nullptr;
+}
+
+}  // namespace
+
+ArchiveUpdateJob::ArchiveUpdateJob(QString archivePath, ArchiveChanges changes, QString title)
+    : Job(title.isEmpty() ? tr("Update %1").arg(baseName(archivePath)) : title),
+      m_archive(std::move(archivePath)),
+      m_changes(std::move(changes))
+{
+}
+
+void ArchiveUpdateJob::run()
+{
+    QStringList touched{m_archive};
+    for (const auto& a : std::as_const(m_changes.add))
+        touched << a.first;
+    if (!waitForTurn(touched))
+        return;
+    setState(State::Scanning);
+    auto fail = [&](const QString& what, const QString& why) {
+        askErrorText(what, m_archive, why);
+        setState(State::Failed);
+    };
+    QString why;
+    if (!canUpdateArchive(m_archive, &why))
+        return fail(tr("Cannot change the archive"), why);
+    QString error;
+    const auto idx = loadArchiveIndex(m_archive, &error);
+    if (!idx)
+        return fail(tr("Cannot read the archive"), error);
+    for (const ArchiveEntry& e : idx->entries)
+        if (e.encrypted)
+            return fail(tr("Cannot change the archive"),
+                        tr("It has encrypted files, which Tandem can't write back"));
+
+    // What goes and what moves.
+    QStringList removed;
+    for (const QString& r : std::as_const(m_changes.remove))
+        if (const QString n = normalizeArchivePath(r); !n.isEmpty())
+            removed << n;
+    QList<QPair<QString, QString>> renames;
+    for (const auto& rn : std::as_const(m_changes.rename)) {
+        const QString from = normalizeArchivePath(rn.first), to = normalizeArchivePath(rn.second);
+        if (from.isEmpty() || to.isEmpty() || from == to)
+            continue;
+        if (!idx->find(from))
+            addError(tr("%1 is not in the archive").arg(from));
+        else if (idx->find(to))
+            addError(tr("%1 exists already").arg(to));
+        else if (isUnder(to, from))
+            addError(tr("Cannot move %1 into itself").arg(from));
+        else
+            renames.append({from, to});
+    }
+    QStringList replaced;  // members (with contents) that added files replace
+    auto mapped = [&](const QString& p) -> QString {  // a member's new path; empty: it goes
+        for (const QString& r : std::as_const(removed))
+            if (isUnder(p, r))
+                return {};
+        QString to = p;
+        for (const auto& rn : std::as_const(renames))
+            if (isUnder(p, rn.first)) {
+                to = replacePrefix(p, rn.first, rn.second);
+                break;
+            }
+        for (const QString& r : std::as_const(replaced))
+            if (isUnder(to, r))
+                return {};
+        return to;
+    };
+    QHash<QString, const ArchiveEntry*> members;  // by their path after removes and renames
+    for (const ArchiveEntry& e : idx->entries)
+        if (const QString m = mapped(e.path); !m.isEmpty())
+            members.insert(m, &e);
+
+    // What comes in: the local items, folders walked.
+    struct Item {
+        QByteArray abs;
+        QString inner;
+        struct stat st;
+    };
+    std::vector<Item> items;
+    std::function<void(const QByteArray&, const QString&)> walk = [&](const QByteArray& abs, const QString& inner) {
+        if (isCancelled())
+            return;
+        Item it{abs, inner, {}};
+        if (::lstat(abs.constData(), &it.st) != 0) {
+            addError(tr("Cannot read: %1 (%2)").arg(fromNative(abs), errnoString(errno)));
+            return;
+        }
+        items.push_back(it);
+        if (!S_ISDIR(it.st.st_mode))
+            return;
+        const QStringList names = QDir(fromNative(abs)).entryList(
+            QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System, QDir::Name);
+        for (const QString& n : names)
+            walk(joinPath(abs, toNative(n)), inner + QLatin1Char('/') + n);
+    };
+    for (const auto& a : std::as_const(m_changes.add))
+        if (const QString inner = normalizeArchivePath(a.second); !inner.isEmpty())
+            walk(toNative(a.first), inner);
+    if (isCancelled())
+        return;
+
+    // Clashes with members that stay.
+    QSet<QString> newPaths;
+    auto taken = [&](const QString& p) { return members.contains(p) || newPaths.contains(p); };
+    QList<QPair<QString, QString>> renamedRoots;
+    QStringList skippedRoots;  // inner paths
+    QList<QByteArray> skippedSources;
+    std::vector<Item> adding;
+    int64_t bytes = 0;
+    for (Item& it : items) {
+        bool skip = false;
+        for (const QString& s : std::as_const(skippedRoots))
+            skip = skip || isUnder(it.inner, s);
+        if (skip)
+            continue;
+        for (const auto& rr : std::as_const(renamedRoots))
+            if (isUnder(it.inner, rr.first)) {
+                it.inner = replacePrefix(it.inner, rr.first, rr.second);
+                break;
+            }
+        const bool dir = S_ISDIR(it.st.st_mode);
+        if (const ArchiveEntry* old = members.value(it.inner)) {
+            if (dir && old->isDir)
+                continue;  // folders merge
+            if (m_changes.replaceExisting) {
+                replaced << it.inner;
+            } else {
+                QByteArray dst = toNative(joinPath(m_archive, it.inner));
+                const auto res = resolveConflict({fromNative(it.abs), dir ? -1 : int64_t(it.st.st_size), int64_t(it.st.st_mtime)},
+                                                 dst, {joinPath(m_archive, it.inner), old->isDir ? -1 : old->size, old->mtime});
+                if (!res)
+                    return;  // cancelled
+                if (*res == Resolution::Skip) {
+                    skippedRoots << it.inner;
+                    skippedSources << it.abs;
+                    continue;
+                }
+                if (*res == Resolution::Rename) {
+                    const QString fresh = uniqueInner(it.inner, taken);
+                    renamedRoots.append({it.inner, fresh});
+                    it.inner = fresh;
+                } else {
+                    replaced << it.inner;
+                }
+            }
+        }
+        newPaths.insert(it.inner);
+        if (S_ISREG(it.st.st_mode))
+            bytes += it.st.st_size;
+        adding.push_back(it);
+    }
+    QStringList mkdirs;
+    for (const QString& d : std::as_const(m_changes.mkdir)) {
+        const QString n = normalizeArchivePath(d);
+        if (n.isEmpty())
+            continue;
+        if (taken(n))
+            addError(tr("%1 exists already").arg(n));
+        else {
+            mkdirs << n;
+            newPaths.insert(n);
+        }
+    }
+    int64_t files = int64_t(adding.size() + size_t(mkdirs.size()));
+    for (const ArchiveEntry& e : idx->entries) {
+        if (mapped(e.path).isEmpty())
+            continue;
+        files += 1;
+        if (!e.isDir)
+            bytes += e.size;
+    }
+    m_filesTotal = files;
+    m_bytesTotal = bytes;
+
+    // Write the new archive next to the old one, then swap.
+    archive* in = openReader(m_archive, &error);
+    if (!in)
+        return fail(tr("Cannot read the archive"), error);
+    archive_entry* entry = nullptr;
+    int r = archive_read_next_header(in, &entry);
+    const QByteArray target = toNative(m_archive);
+    const QByteArray temp = joinPath(toNative(parentPath(m_archive)),
+                                     "." + toNative(baseName(m_archive)) + ".tandem-" +
+                                         QByteArray::number(QDateTime::currentMSecsSinceEpoch()));
+    archive* out = writerLike(in, r == ARCHIVE_OK || r == ARCHIVE_WARN, target);
+    if (!out) {
+        archive_read_free(in);
+        return fail(tr("Cannot change the archive"), tr("Tandem can't write this kind of archive"));
+    }
+    if (archive_write_open_filename(out, temp.constData()) != ARCHIVE_OK) {
+        const QString w = archiveErrorText(out, tr("write error"));
+        archive_write_free(out);
+        archive_read_free(in);
+        return fail(tr("Cannot change the archive"), w);
+    }
+    setState(State::Running);
+
+    std::vector<char> buf(1 << 20);
+    bool ok = true;
+    for (; ok && (r == ARCHIVE_OK || r == ARCHIVE_WARN); r = archive_read_next_header(in, &entry)) {
+        if (checkpoint()) {
+            ok = false;
+            break;
+        }
+        const QString path = memberPath(entry, m_archive);
+        if (!path.isEmpty()) {  // unsafe names ("../x") stay as they are
+            const QString to = mapped(path);
+            if (to.isEmpty())
+                continue;  // removed or replaced: the next header skips its data
+            setCurrent(to);
+            if (to != path)
+                archive_entry_set_pathname_utf8(
+                    entry, (to + (archive_entry_filetype(entry) == AE_IFDIR ? QStringLiteral("/") : QString())).toUtf8().constData());
+            if (const char* hl = archive_entry_hardlink_utf8(entry)) {
+                const QString h = normalizeArchivePath(QString::fromUtf8(hl));
+                if (const QString hm = h.isEmpty() ? h : mapped(h); !hm.isEmpty() && hm != h)
+                    archive_entry_set_hardlink_utf8(entry, hm.toUtf8().constData());
+            }
+        }
+        if (archive_write_header(out, entry) < ARCHIVE_WARN) {
+            askErrorText(tr("Cannot write"), path, archiveErrorText(out, tr("write error")));
+            ok = false;
+            break;
+        }
+        for (;;) {
+            const la_ssize_t n = archive_read_data(in, buf.data(), buf.size());
+            if (n == 0)
+                break;
+            if (n < 0) {
+                askErrorText(tr("Cannot read"), path, archiveErrorText(in, tr("Damaged archive")));
+                ok = false;
+                break;
+            }
+            if (archive_write_data(out, buf.data(), size_t(n)) < 0) {
+                askErrorText(tr("Cannot write"), path, archiveErrorText(out, tr("write error")));
+                ok = false;
+                break;
+            }
+            m_bytesDone += n;
+            if (checkpoint()) {
+                ok = false;
+                break;
+            }
+        }
+        m_filesDone += 1;
+    }
+    if (ok && r < ARCHIVE_WARN && r != ARCHIVE_EOF) {
+        askErrorText(tr("Cannot read the archive"), m_archive, archiveErrorText(in, tr("Damaged archive")));
+        ok = false;
+    }
+    archive_read_free(in);
+
+    const int64_t now = QDateTime::currentSecsSinceEpoch();
+    for (const QString& d : std::as_const(mkdirs)) {
+        if (!ok)
+            break;
+        archive_entry* e = archive_entry_new();
+        archive_entry_set_pathname_utf8(e, (d + QLatin1Char('/')).toUtf8().constData());
+        archive_entry_set_filetype(e, AE_IFDIR);
+        archive_entry_set_perm(e, 0755);
+        archive_entry_set_mtime(e, now, 0);
+        if (archive_write_header(out, e) < ARCHIVE_WARN) {
+            askErrorText(tr("Cannot create folder"), d, archiveErrorText(out, tr("write error")));
+            ok = false;
+        }
+        archive_entry_free(e);
+        m_filesDone += 1;
+    }
+
+    archive* disk = archive_read_disk_new();
+    archive_read_disk_set_standard_lookup(disk);
+    for (const Item& it : adding) {
+        if (!ok || checkpoint()) {
+            ok = false;
+            break;
+        }
+        setCurrent(fromNative(it.abs));
+        archive_entry* e = archive_entry_new();
+        archive_entry_copy_sourcepath(e, it.abs.constData());
+        const int fd = S_ISREG(it.st.st_mode) ? ::open(it.abs.constData(), O_RDONLY | O_CLOEXEC) : -1;
+        archive_read_disk_entry_from_file(disk, e, fd, &it.st);
+        archive_entry_set_pathname_utf8(e, it.inner.toUtf8().constData());
+        if (S_ISREG(it.st.st_mode) && fd < 0) {
+            const int err = errno;
+            archive_entry_free(e);
+            if (askError(tr("Cannot read"), fromNative(it.abs), err) == Answer::Skip) {
+                skippedSources << it.abs;
+                continue;
+            }
+            ok = false;
+            break;
+        }
+        if (archive_write_header(out, e) < ARCHIVE_WARN) {
+            const QString w = archiveErrorText(out, tr("write error"));
+            archive_entry_free(e);
+            if (fd >= 0)
+                ::close(fd);
+            askErrorText(tr("Cannot add"), fromNative(it.abs), w);
+            ok = false;
+            break;
+        }
+        for (; fd >= 0;) {
+            const ssize_t n = ::read(fd, buf.data(), buf.size());
+            if (n <= 0)
+                break;
+            if (archive_write_data(out, buf.data(), size_t(n)) < 0) {
+                askErrorText(tr("Cannot add"), fromNative(it.abs), archiveErrorText(out, tr("write error")));
+                ok = false;
+                break;
+            }
+            m_bytesDone += n;
+            if (checkpoint()) {
+                ok = false;
+                break;
+            }
+        }
+        if (fd >= 0)
+            ::close(fd);
+        archive_entry_free(e);
+        m_filesDone += 1;
+    }
+    archive_read_free(disk);
+    if (ok && archive_write_close(out) != ARCHIVE_OK) {
+        askErrorText(tr("Cannot finish the archive"), m_archive, archiveErrorText(out, tr("write error")));
+        ok = false;
+    }
+    archive_write_free(out);
+    if (!ok) {
+        ::unlink(temp.constData());
+        if (!isCancelled())
+            setState(State::Failed);
+        return;
+    }
+    struct stat orig;
+    if (::stat(target.constData(), &orig) == 0)
+        ::chmod(temp.constData(), orig.st_mode & 07777);
+    if (::rename(temp.constData(), target.constData()) != 0) {
+        const int err = errno;
+        ::unlink(temp.constData());
+        askError(tr("Cannot replace the archive"), m_archive, err);
+        setState(State::Failed);
+        return;
+    }
+    forgetArchiveIndex(m_archive);
+
+    if (m_changes.moveSources) {  // only what fully went in
+        for (const auto& a : std::as_const(m_changes.add)) {
+            const QByteArray src = toNative(a.first);
+            bool partial = false;
+            for (const QByteArray& s : std::as_const(skippedSources))
+                partial = partial || s == src || s.startsWith(src + '/');
+            if (partial) {
+                addError(tr("%1 was kept: not all of it went into the archive").arg(a.first));
+                continue;
+            }
+            std::error_code ec;
+            std::filesystem::remove_all(std::filesystem::path(src.toStdString()), ec);
+            if (ec)
+                addError(tr("Cannot remove %1 (%2)").arg(a.first, QString::fromStdString(ec.message())));
+        }
     }
 }
 
