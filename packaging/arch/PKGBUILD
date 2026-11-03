@@ -18,7 +18,8 @@ optdepends=('libssh: built-in SFTP (needed if it was there at build time)'
             'ffmpeg: video and audio previews, video thumbnails'
             'ripgrep: searching file contents'
             'fd: fast name search'
-            'meld: comparing two files from the sync dialog')
+            'meld: comparing two files from the sync dialog'
+            'pocketlink: "Send to phone" plugin')
 provides=('tandem-fm')
 conflicts=('tandem-fm')
 source=("tandem-fm::git+https://github.com/carnager/tandem-fm.git")
@@ -40,4 +41,5 @@ check() {
 
 package() {
   DESTDIR="$pkgdir" cmake --install build
+  install -Dm644 tandem-fm/README.md tandem-fm/docs/plugins.md -t "$pkgdir/usr/share/doc/tandem-fm/"
 }
