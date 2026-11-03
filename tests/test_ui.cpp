@@ -597,6 +597,27 @@ private slots:
         QVERIFY(m_left->view()->isColumnHidden(FileModel::ColAttr));
     }
 
+    // The F-key bar says how many go, and where to.
+    void fkeysNameTheTarget()
+    {
+        m_left->navigate(L());
+        m_right->navigate(R());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTRY_COMPARE(rightModel()->path(), R());
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+        auto* f5 = m_window->findChild<QAbstractButton*>("fkey-F5");
+        QVERIFY(f5);
+        QTRY_COMPARE(f5->accessibleName(), "Copy → " + baseName(R()));
+        leftModel()->setMarkedNames({"file1.txt", "file2.txt"});
+        QTRY_COMPARE(f5->accessibleName(), "Copy 2 → " + baseName(R()));
+        QTRY_COMPARE(m_window->findChild<QAbstractButton*>("fkey-F8")->accessibleName(), QString("Trash 2"));
+        leftModel()->markAll(false);
+        m_right->view()->setFocus();  // the other way round
+        QTRY_COMPARE(f5->accessibleName(), "Copy → " + baseName(L()));
+        m_left->view()->setFocus();
+    }
+
     void quickSearch()
     {
         m_left->view()->setCurrentRow(0);

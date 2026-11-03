@@ -81,21 +81,43 @@ namespace tandem {
 
 namespace {
 
-// Bottom bar button: "F5" in accent color followed by the command name.
+// Bottom bar button: the key as a key cap, the command, and where it goes
+// ("F5  Copy 4  → Projects").
 class FKeyButton : public QAbstractButton {
 public:
-    FKeyButton(const QString& key, const QString& label, QWidget* parent)
-        : QAbstractButton(parent), m_key(key), m_label(label)
+    FKeyButton(const QString& keys, const QString& label, QWidget* parent)
+        : QAbstractButton(parent), m_keys(keys.split(QLatin1Char('+'))), m_label(label)
     {
+        setObjectName(QStringLiteral("fkey-") + keys);
+        setAccessibleName(label);
         setFocusPolicy(Qt::NoFocus);
         setCursor(Qt::PointingHandCursor);
         setAttribute(Qt::WA_Hover);
-        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    }
+    void setKeys(const QString& keys)
+    {
+        const QStringList k = keys.split(QLatin1Char('+'));
+        if (k == m_keys)
+            return;
+        m_keys = k;
+        updateGeometry();
+        update();
+    }
+    void setText(const QString& label, const QString& detail = {})
+    {
+        if (label == m_label && detail == m_detail)
+            return;
+        m_label = label;
+        m_detail = detail;
+        setAccessibleName(text());  // what screen readers (and tests) read
+        updateGeometry();
+        update();
     }
     QSize sizeHint() const override
     {
         const QFontMetrics fm(font());
-        return {fm.horizontalAdvance(m_key + QStringLiteral("  ") + m_label) + 24, fm.height() + 12};
+        return {capsWidth() + 8 + fm.horizontalAdvance(text()) + 24, fm.height() + 16};
     }
 
 protected:
@@ -105,27 +127,55 @@ protected:
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
         if (isDown() || underMouse()) {
-            p.setPen(Qt::NoPen);
+            p.setPen(QPen(t.border, 1));
             p.setBrush(isDown() ? t.cursorActive : t.header);
-            p.drawRoundedRect(QRectF(rect()).adjusted(1, 1, -1, -1), 6, 6);
+            p.drawRoundedRect(QRectF(rect()).adjusted(1.5, 1.5, -1.5, -1.5), 8, 8);
         }
-        QFont kf = font();
-        kf.setWeight(QFont::Bold);
-        const QFontMetrics kfm(kf);
         const QFontMetrics fm(font());
-        const int total = kfm.horizontalAdvance(m_key) + 6 + fm.horizontalAdvance(m_label);
-        int x = (width() - total) / 2;
+        QFont kf = font();
+        kf.setPointSizeF(kf.pointSizeF() * 0.82);
+        kf.setWeight(QFont::DemiBold);
+        const QFontMetrics kfm(kf);
+        int x = 12;
+        const int capH = kfm.height() + 4;
+        const int capY = (height() - capH) / 2;
         p.setFont(kf);
-        p.setPen(t.accent);
-        p.drawText(QRect(x, 0, width(), height()), Qt::AlignLeft | Qt::AlignVCenter, m_key);
-        x += kfm.horizontalAdvance(m_key) + 6;
+        for (const QString& k : m_keys) {  // key caps, like the keys on the keyboard
+            const int w = qMax(capH, kfm.horizontalAdvance(k) + 10);
+            const QRectF cap(x, capY, w, capH);
+            p.setPen(QPen(t.control, 1));
+            p.setBrush(t.header);
+            p.drawRoundedRect(cap.adjusted(0.5, 0.5, -0.5, -0.5), 4.5, 4.5);
+            p.setPen(t.text);
+            p.drawText(cap, Qt::AlignCenter, k);
+            x += w + 3;
+        }
+        x += 5;
         p.setFont(font());
         p.setPen(t.text);
-        p.drawText(QRect(x, 0, width(), height()), Qt::AlignLeft | Qt::AlignVCenter, m_label);
+        p.drawText(QRect(x, 0, width() - x, height()), Qt::AlignLeft | Qt::AlignVCenter, m_label);
+        if (!m_detail.isEmpty()) {
+            x += fm.horizontalAdvance(m_label + QLatin1Char(' '));
+            p.setPen(t.dimText);
+            p.drawText(QRect(x, 0, width() - x, height()), Qt::AlignLeft | Qt::AlignVCenter, m_detail);
+        }
     }
 
 private:
-    QString m_key, m_label;
+    QString text() const { return m_detail.isEmpty() ? m_label : m_label + QLatin1Char(' ') + m_detail; }
+    int capsWidth() const
+    {
+        QFont kf = font();
+        kf.setPointSizeF(kf.pointSizeF() * 0.82);
+        const QFontMetrics kfm(kf);
+        int w = 0;
+        for (const QString& k : m_keys)
+            w += qMax(kfm.height() + 4, kfm.horizontalAdvance(k) + 10) + 3;
+        return w;
+    }
+
+    QStringList m_keys;
+    QString m_label, m_detail;
 };
 
 QStringList localPaths(const QList<QUrl>& urls)
@@ -295,6 +345,7 @@ void MainWindow::setActive(Panel* p)
     m_active = p;
     m_left->setActive(p == m_left);
     m_right->setActive(p == m_right);
+    scheduleFKeyUpdate();
     if (m_quickView)
         m_quickTimer->start();
     setWindowTitle(QStringLiteral("Tandem — %1").arg(p->path()));
@@ -624,10 +675,10 @@ QWidget* MainWindow::createFKeyBar()
     auto* bar = new QWidget(this);
     auto* l = new QHBoxLayout(bar);
     l->setContentsMargins(0, 0, 0, 0);
-    l->setSpacing(4);
+    l->setSpacing(2);
     const std::pair<const char*, const char*> keys[] = {
         {"F3", QT_TR_NOOP("View")}, {"F4", QT_TR_NOOP("Edit")},       {"F5", QT_TR_NOOP("Copy")},
-        {"F6", QT_TR_NOOP("Move")}, {"F7", QT_TR_NOOP("New folder")}, {"F8", QT_TR_NOOP("Delete")},
+        {"F6", QT_TR_NOOP("Move")}, {"F7", QT_TR_NOOP("New folder")}, {"F8", QT_TR_NOOP("Trash")},
     };
     const std::function<void()> fns[] = {
         [this] { viewCurrent(); },
@@ -641,8 +692,60 @@ QWidget* MainWindow::createFKeyBar()
         auto* b = new FKeyButton(QLatin1String(keys[i].first), tr(keys[i].second), bar);
         connect(b, &QAbstractButton::clicked, this, fns[i]);
         l->addWidget(b);
+        m_fkeys[QLatin1String(keys[i].first)] = b;
     }
+    l->addStretch(1);
+    // All the other commands are a key away (the key is filled in by updateFKeys).
+    auto* all = new FKeyButton(QStringLiteral("Ctrl+Shift+P"), tr("All commands"), bar);
+    connect(all, &QAbstractButton::clicked, this, [this] { commandPalette(); });
+    l->addWidget(all);
+    m_fkeys[QStringLiteral("all")] = all;
+    // The labels follow the selection and the other panel's folder.
+    for (Panel* p : {m_left, m_right})
+        connect(p, &Panel::statusChanged, this, &MainWindow::scheduleFKeyUpdate);
+    scheduleFKeyUpdate();
     return bar;
+}
+
+void MainWindow::scheduleFKeyUpdate()
+{
+    if (m_fkeyUpdatePending)
+        return;
+    m_fkeyUpdatePending = true;
+    QTimer::singleShot(0, this, [this] {
+        m_fkeyUpdatePending = false;
+        updateFKeys();
+    });
+}
+
+// "Copy 4 → Projects": how many go, and the folder they go to.
+void MainWindow::updateFKeys()
+{
+    if (!m_left || !m_right || m_fkeys.isEmpty())
+        return;
+    Panel* src = active();
+    Panel* dst = other();
+    int marked = 0;
+    if (DirTab* t = src->tab()) {
+        const FileModel::Stats s = t->model()->stats();
+        marked = s.markedFiles + s.markedDirs;
+    }
+    QString target = dst->path();
+    if (dst->inArchive())
+        target = baseName(dst->archivePath());
+    else if (target == QDir::homePath())
+        target = QStringLiteral("~");
+    else if (target != QLatin1String("/"))
+        target = baseName(target.endsWith(QLatin1Char('/')) ? target.chopped(1) : target);
+    const QString to = target.isEmpty() ? QString() : QStringLiteral("→ ") + target;
+    auto count = [marked](const QString& verb) { return marked > 0 ? QStringLiteral("%1 %2").arg(verb).arg(marked) : verb; };
+    static_cast<FKeyButton*>(m_fkeys.value(QStringLiteral("F5")))->setText(count(tr("Copy")), to);
+    static_cast<FKeyButton*>(m_fkeys.value(QStringLiteral("F6")))->setText(count(tr("Move")), to);
+    static_cast<FKeyButton*>(m_fkeys.value(QStringLiteral("F8")))->setText(count(tr("Trash")));
+    for (QAction* a : actions())
+        if (a->property("commandId").toString() == QLatin1String("command-palette") && !a->shortcut().isEmpty())
+            static_cast<FKeyButton*>(m_fkeys.value(QStringLiteral("all")))
+                ->setKeys(a->shortcut().toString(QKeySequence::NativeText));
 }
 
 // The panel a preview belongs to, if w is (inside) one.

@@ -15,6 +15,7 @@
 
 #include <functional>
 
+class QAbstractButton;
 class QMenu;
 class QSplitter;
 class QVBoxLayout;
@@ -53,6 +54,8 @@ private:
                         const QString& id);
     void createMenus();
     QWidget* createFKeyBar();
+    void scheduleFKeyUpdate();
+    void updateFKeys();
 
     void copyOrMove(CopyJob::Mode mode);
     void deleteSelected(bool permanent);
@@ -170,6 +173,8 @@ private:
     QList<Plugin> m_plugins;
     QList<QAction*> m_pluginActions;
     QMenu* m_pluginMenu = nullptr;
+    QHash<QString, QAbstractButton*> m_fkeys;  // F3 … F8
+    bool m_fkeyUpdatePending = false;
     QList<UndoEntry> m_undo;
 };
 

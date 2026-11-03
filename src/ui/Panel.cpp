@@ -1131,6 +1131,7 @@ void Panel::updateStatus()
     QPalette pal = m_status->palette();
     pal.setColor(QPalette::WindowText, color);
     m_status->setPalette(pal);
+    emit statusChanged();
 }
 
 void Panel::showMessage(const QString& text, bool error)

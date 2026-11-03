@@ -116,6 +116,7 @@ signals:
     void commandIdRequested(const QString& id);  // modal keys
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void stateChanged();
+    void statusChanged();  // folder, tab or selection: what the status line shows changed
     void contextMenuRequested(Panel* panel, const QPoint& globalPos, bool onItem);
     void renamed(const QString& dir, const QString& from, const QString& to);
     // Inside an archive renames are archive rewrites, which MainWindow queues.

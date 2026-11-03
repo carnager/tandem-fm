@@ -2417,10 +2417,6 @@
         <translation>Neuer Ordner</translation>
     </message>
     <message>
-        <source>Delete</source>
-        <translation>Löschen</translation>
-    </message>
-    <message>
         <source>Extract</source>
         <translation>Entpacken</translation>
     </message>
@@ -2731,6 +2727,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Normal size</source>
         <translation>Normale Größe</translation>
+    </message>
+    <message>
+        <source>Trash</source>
+        <translation>Papierkorb</translation>
+    </message>
+    <message>
+        <source>All commands</source>
+        <translation>Alle Befehle</translation>
     </message>
     <message>
         <source>The folder changed while editing; nothing renamed</source>
