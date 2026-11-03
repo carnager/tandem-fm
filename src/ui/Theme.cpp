@@ -292,10 +292,22 @@ const Role kRoles[] = {
 
 QString builtinFolder() { return QStringLiteral(":/themes"); }
 
+// Where themes are looked for: the user's own folder, folders that packages
+// install themes into (/usr/share/tandem-fm/themes), the shipped ones.
+QStringList themeFolders()
+{
+    QStringList out{themesFolder()};
+    for (const QString& d : QStandardPaths::locateAll(QStandardPaths::GenericDataLocation,
+                                                      QStringLiteral("tandem-fm/themes"), QStandardPaths::LocateDirectory))
+        if (!out.contains(d))
+            out << d;
+    return out << builtinFolder();
+}
+
 // The file for a theme id: the user's own first, then the shipped one.
 QString themeFile(const QString& id)
 {
-    for (const QString& dir : {themesFolder(), builtinFolder()}) {
+    for (const QString& dir : themeFolders()) {
         const QString f = dir + QLatin1Char('/') + id + QStringLiteral(".json");
         if (QFileInfo::exists(f))
             return f;
@@ -309,7 +321,7 @@ QString themesFolder()
 {
     if (!configDir().isEmpty())
         return QFileInfo(QSettings().fileName()).path() + QStringLiteral("/themes");
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/themes");
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/tandem-fm/themes");
 }
 
 bool loadThemeFile(const QString& path, Theme& out, QString* error)
@@ -397,7 +409,7 @@ QList<ThemeInfo> availableThemes()
                          {QStringLiteral("tandem-light"), QStringLiteral("Tandem Light"), false, true}};
     QSet<QString> seen{out[0].id, out[1].id};
     QList<ThemeInfo> more;
-    for (const QString& dir : {themesFolder(), builtinFolder()}) {
+    for (const QString& dir : themeFolders()) {
         const bool builtIn = dir == builtinFolder();
         for (const QFileInfo& fi : QDir(dir).entryInfoList({QStringLiteral("*.json")}, QDir::Files)) {
             Theme t;
