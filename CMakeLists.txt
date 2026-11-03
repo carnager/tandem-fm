@@ -161,6 +161,9 @@ else()
   message(STATUS "Viewer syntax highlighting: disabled (KF6SyntaxHighlighting not found)")
 endif()
 target_compile_options(tandem_ui PRIVATE -Wall -Wextra)
+# Shipped themes, as the same JSON files users write (:/themes/<id>.json).
+file(GLOB TANDEM_THEMES CONFIGURE_DEPENDS data/themes/*.json)
+qt_add_resources(tandem_ui "themes" PREFIX "/themes" BASE data/themes FILES ${TANDEM_THEMES})
 
 add_executable(tandem-fm src/main.cpp)
 target_link_libraries(tandem-fm PRIVATE tandem_ui)

@@ -1,0 +1,21 @@
+{
+  "name": "Catppuccin Latte",
+  "dark": false,
+  "colors": {
+    "window": "#e6e9ef",
+    "base": "#eff1f5",
+    "header": "#dce0e8",
+    "border": "#ccd0da",
+    "control": "#acb0be",
+    "text": "#4c4f69",
+    "dimText": "#6c6f85",
+    "accent": "#8839ef",
+    "accentText": "#eff1f5",
+    "mark": "#fe640b",
+    "error": "#d20f39",
+    "success": "#40a02b",
+    "gitModified": "#df8e1d",
+    "gitAdded": "#40a02b",
+    "gitUntracked": "#179299"
+  }
+}

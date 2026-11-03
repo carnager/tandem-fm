@@ -36,11 +36,10 @@ ChecksumDialog::ChecksumDialog(QStringList paths, QWidget* parent) : QDialog(par
     m_base = parentPath(m_paths.first());
     setWindowTitle(m_verify ? tr("Check checksums") : tr("Checksums"));
     resize(900, 560);
-    const Theme& t = theme();
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, QStringLiteral(
         "QToolButton#segment { padding: 5px 12px; border: 1px solid @control; background: @base; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
-        "QTreeWidget::item { padding: 3px 2px; }")));
+        "QTreeWidget::item { padding: 3px 2px; }"));
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 16, 18, 14);
     layout->setSpacing(10);
@@ -82,7 +81,7 @@ ChecksumDialog::ChecksumDialog(QStringList paths, QWidget* parent) : QDialog(par
 
     auto* bottom = new QHBoxLayout;
     m_status = new QLabel(this);
-    m_status->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(m_status, QStringLiteral("color: @dimText;"));
     bottom->addWidget(m_status, 1);
     auto* copy = new QPushButton(m_verify ? tr("Copy report") : tr("Copy"), this);
     copy->setToolTip(m_verify ? QString() : tr("As \"checksum  name\" lines, like sha256sum prints them"));
@@ -266,7 +265,7 @@ void ChecksumDialog::verifyAll()
             bool bad = false;
             for (int i = 0; i < self->m_list->topLevelItemCount(); ++i)
                 bad |= self->m_list->topLevelItem(i)->data(Value, Qt::UserRole).toInt() != 0;
-            self->m_status->setStyleSheet(theme().css(bad ? QStringLiteral("color: @error;") : QStringLiteral("color: @text;")));
+            setThemeStyle(self->m_status, bad ? QStringLiteral("color: @error;") : QStringLiteral("color: @text;"));
         });
     });
 }

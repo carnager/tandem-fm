@@ -1,0 +1,21 @@
+{
+  "name": "Kanagawa",
+  "dark": true,
+  "colors": {
+    "window": "#16161d",
+    "base": "#1f1f28",
+    "header": "#1a1a22",
+    "border": "#2a2a37",
+    "control": "#54546d",
+    "text": "#dcd7ba",
+    "dimText": "#9a9784",
+    "accent": "#7e9cd8",
+    "accentText": "#1f1f28",
+    "mark": "#ffa066",
+    "error": "#e46876",
+    "success": "#98bb6c",
+    "gitModified": "#e6c384",
+    "gitAdded": "#98bb6c",
+    "gitUntracked": "#7aa89f"
+  }
+}

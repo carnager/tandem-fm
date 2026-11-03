@@ -1,0 +1,21 @@
+{
+  "name": "Rosé Pine Dawn",
+  "dark": false,
+  "colors": {
+    "window": "#faf4ed",
+    "base": "#fffaf3",
+    "header": "#f2e9e1",
+    "border": "#dfdad9",
+    "control": "#cecacd",
+    "text": "#575279",
+    "dimText": "#797593",
+    "accent": "#907aa9",
+    "accentText": "#fffaf3",
+    "mark": "#ea9d34",
+    "error": "#b4637a",
+    "success": "#286983",
+    "gitModified": "#ea9d34",
+    "gitAdded": "#56949f",
+    "gitUntracked": "#d7827e"
+  }
+}

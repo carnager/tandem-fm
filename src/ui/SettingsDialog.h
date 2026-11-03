@@ -30,6 +30,7 @@ public:
 
 private:
     QWidget* appearancePage();
+    QWidget* themeChooser();
     QWidget* behaviourPage();
     QWidget* toolsPage();
     QWidget* keysPage();

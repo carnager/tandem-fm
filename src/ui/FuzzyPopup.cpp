@@ -171,13 +171,13 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
 {
     const Theme& t = theme();
     setObjectName(QStringLiteral("fuzzyPopup"));
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, QStringLiteral(
         "#fuzzyPopup { background: @header; border: 1px solid @border; border-radius: 12px; }"
         "QLineEdit { background: @base; color: @text; border: 1px solid @border; border-radius: 8px;"
         "  padding: 7px 10px; font-size: 11pt; }"
         "QLineEdit:focus { border-color: @accent; }"
         "QListView { background: transparent; border: none; outline: none; }"
-        "QLabel { color: @dimText; }")));
+        "QLabel { color: @dimText; }"));
     auto* shadow = new QGraphicsDropShadowEffect(this);
     shadow->setBlurRadius(32);
     shadow->setOffset(0, 8);

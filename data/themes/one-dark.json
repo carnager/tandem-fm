@@ -1,0 +1,21 @@
+{
+  "name": "One Dark",
+  "dark": true,
+  "colors": {
+    "window": "#21252b",
+    "base": "#282c34",
+    "header": "#252930",
+    "border": "#3a3f4b",
+    "control": "#4b5263",
+    "text": "#abb2bf",
+    "dimText": "#7f848e",
+    "accent": "#61afef",
+    "accentText": "#21252b",
+    "mark": "#d19a66",
+    "error": "#e06c75",
+    "success": "#98c379",
+    "gitModified": "#e5c07b",
+    "gitAdded": "#98c379",
+    "gitUntracked": "#56b6c2"
+  }
+}

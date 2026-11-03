@@ -1,0 +1,21 @@
+{
+  "name": "Nord",
+  "dark": true,
+  "colors": {
+    "window": "#2e3440",
+    "base": "#3b4252",
+    "header": "#353c4a",
+    "border": "#434c5e",
+    "control": "#4c566a",
+    "text": "#eceff4",
+    "dimText": "#a3abbb",
+    "accent": "#88c0d0",
+    "accentText": "#2e3440",
+    "mark": "#ebcb8b",
+    "error": "#bf616a",
+    "success": "#a3be8c",
+    "gitModified": "#ebcb8b",
+    "gitAdded": "#a3be8c",
+    "gitUntracked": "#8fbcbb"
+  }
+}

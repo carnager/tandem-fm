@@ -66,7 +66,6 @@ DiskUsageDialog::DiskUsageDialog(QString root, bool remote, QWidget* parent)
 {
     setWindowTitle(tr("Disk usage"));
     resize(900, 640);
-    const Theme& t = theme();
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 16, 18, 14);
     layout->setSpacing(10);
@@ -74,7 +73,7 @@ DiskUsageDialog::DiskUsageDialog(QString root, bool remote, QWidget* parent)
     m_crumbs->setSpacing(2);
     layout->addLayout(m_crumbs);
     m_summary = new QLabel(this);
-    m_summary->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(m_summary, QStringLiteral("color: @dimText;"));
     layout->addWidget(m_summary);
 
     m_list = new QTreeWidget(this);
@@ -98,7 +97,7 @@ DiskUsageDialog::DiskUsageDialog(QString root, bool remote, QWidget* parent)
     auto* keys = new QLabel(m_remote ? tr("Enter goes in · Backspace goes up · Del deletes (no trash on servers)")
                                      : tr("Enter goes in · Backspace goes up · Del moves to the trash"),
                             this);
-    keys->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(keys, QStringLiteral("color: @dimText;"));
     bottom->addWidget(keys, 1);
     m_show = new QPushButton(tr("Show in panel"), this);
     m_delete = new QPushButton(m_remote ? tr("Delete") : tr("Move to trash"), this);

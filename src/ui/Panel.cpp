@@ -48,7 +48,6 @@ namespace tandem {
 
 Panel::Panel(QWidget* parent) : QFrame(parent)
 {
-    const Theme& t = theme();
     setContentsMargins(1, 1, 1, 1);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(1, 1, 1, 1);
@@ -60,12 +59,12 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_tabBar->setMovable(false);  // order is the tab numbers
     m_tabBar->setFocusPolicy(Qt::NoFocus);
     m_tabBar->setElideMode(Qt::ElideMiddle);
-    m_tabBar->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_tabBar, QStringLiteral(
         "QTabBar { background: transparent; }"
         "QTabBar::tab { background: transparent; color: @dimText; padding: 5px 14px; border: none;"
         "  border-bottom: 2px solid transparent; max-width: 220px; }"
         "QTabBar::tab:selected { color: @text; border-bottom: 2px solid @accent; }"
-        "QTabBar::tab:hover { color: @text; }")));
+        "QTabBar::tab:hover { color: @text; }"));
     m_tabBar->hide();
     layout->addWidget(m_tabBar);
 
@@ -111,10 +110,10 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_filterBar = new QWidget(this);
     m_filterBar->setObjectName(QStringLiteral("filterBar"));
     m_filterBar->setAttribute(Qt::WA_StyledBackground);
-    m_filterBar->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_filterBar, QStringLiteral(
         "#filterBar { background: @header; border-top: 1px solid @border; }"
         "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 6px; padding: 2px 8px; }"
-        "QLabel { color: @dimText; }")));
+        "QLabel { color: @dimText; }"));
     auto* fl = new QHBoxLayout(m_filterBar);
     fl->setContentsMargins(8, 4, 8, 4);
     auto* filterLabel = new QLabel(tr("Filter"), m_filterBar);
@@ -144,12 +143,12 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_searchBar = new QWidget(this);
     m_searchBar->setObjectName(QStringLiteral("searchBarPanel"));
     m_searchBar->setAttribute(Qt::WA_StyledBackground);
-    m_searchBar->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_searchBar, QStringLiteral(
         "#searchBarPanel { background: @header; border-top: 1px solid @border; }"
         "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 6px; padding: 2px 8px; }"
         "QToolButton { color: @dimText; border: none; padding: 2px 8px; border-radius: 9px; }"
         "QToolButton:checked { color: @text; background: @border; }"
-        "QLabel, QCheckBox { color: @dimText; }")));
+        "QLabel, QCheckBox { color: @dimText; }"));
     auto* sbl = new QHBoxLayout(m_searchBar);
     sbl->setContentsMargins(8, 4, 8, 4);
     sbl->setSpacing(6);
@@ -188,9 +187,9 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_search->setPlaceholderText(tr("Search"));
     m_search->hide();
     m_search->installEventFilter(this);
-    m_search->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_search, QStringLiteral(
         "QLineEdit { background: @header; color: @text; border: 1px solid @accent; border-radius: 12px;"
-        "  padding: 3px 10px; }")));
+        "  padding: 3px 10px; }"));
     connect(m_search, &QLineEdit::textEdited, this, [this] { quickSearchFind(1, true); });
 
     m_loadingTimer.setSingleShot(true);
@@ -278,6 +277,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_view, &FileView::openRequested, this, &Panel::openCurrent);
     connect(m_view, &FileView::parentRequested, this, &Panel::goUp);
     connect(m_view, &FileView::intoRequested, this, &Panel::stepInto);
+    connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, &Panel::updateStatus);
     connect(m_view, &FileView::switchPanelRequested, this, &Panel::switchRequested);
     // Esc in the list closes one thing at a time, innermost first.
     connect(m_view, &FileView::escapePressed, this, [this] {
@@ -948,16 +948,16 @@ void Panel::quickSearchFind(int direction, bool includeCurrent)
             if (hit && !e->isParent) {
                 m_view->setCurrentRow(row);
                 m_search->setProperty("miss", false);
-                m_search->setStyleSheet(theme().css(QStringLiteral(
+                setThemeStyle(m_search, QStringLiteral(
                     "QLineEdit { background: @header; color: @text; border: 1px solid @accent;"
-                    "  border-radius: 12px; padding: 3px 10px; }")));
+                    "  border-radius: 12px; padding: 3px 10px; }"));
                 return;
             }
         }
     }
-    m_search->setStyleSheet(theme().css(QStringLiteral(
+    setThemeStyle(m_search, QStringLiteral(
         "QLineEdit { background: @header; color: @error; border: 1px solid @error;"
-        "  border-radius: 12px; padding: 3px 10px; }")));
+        "  border-radius: 12px; padding: 3px 10px; }"));
 }
 
 void Panel::endQuickSearch()
@@ -984,8 +984,7 @@ void Panel::setActive(bool active)
 
 void Panel::updateActiveStyle()
 {
-    const Theme& t = theme();
-    m_header->setStyleSheet(t.css(m_active ? QStringLiteral(
+    setThemeStyle(m_header, m_active ? QStringLiteral(
         "#panelHeader { background: @headerActive; border-top-left-radius: 7px; border-top-right-radius: 7px; }"
         "QLineEdit { background: transparent; color: @text; font-weight: 600; }"
         "QToolButton#crumb { color: @text; border: none; padding: 1px 4px; border-radius: 4px; }"
@@ -1000,7 +999,7 @@ void Panel::updateActiveStyle()
         "QToolButton#crumb:hover { background: @border; color: @text; }"
         "QLabel { color: @dimText; }"
         "QLabel#branch { color: @dimText; padding-right: 8px; }"
-        "QToolButton#searchChip { color: @text; background: @border; border: none; border-radius: 9px; padding: 1px 8px; }")));
+        "QToolButton#searchChip { color: @text; background: @border; border: none; border-radius: 9px; padding: 1px 8px; }"));
 }
 
 void Panel::paintEvent(QPaintEvent*)
@@ -1408,7 +1407,7 @@ void Panel::connectDialog()
                                "davs://cloud.example.com/remote.php/dav/files/me  ·  ftp://host\n"
                                "sftp and smb are built in; the others are mounted with GVfs (other apps see those too)."),
                             &dlg);
-    hint->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(hint, QStringLiteral("color: @dimText;"));
     hint->setWordWrap(true);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     buttons->button(QDialogButtonBox::Ok)->setText(tr("Connect"));

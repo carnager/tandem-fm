@@ -30,14 +30,14 @@ KeyChordPopup::KeyChordPopup(QWidget* window) : QFrame(window)
     const Theme& t = theme();
     setObjectName(QStringLiteral("chordPopup"));
     setFocusPolicy(Qt::StrongFocus);
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, QStringLiteral(
         "#chordPopup { background: @header; border: 1px solid @border; border-radius: 12px; }"
         "QLabel { color: @text; }"
         "QLabel#dim { color: @dimText; }"
         "QLabel#cap { color: @accent; background: @window; border: 1px solid @border; border-radius: 4px;"
         "  padding: 1px 6px; font-weight: 600; }"
         "QLabel#capTyped { color: @accentText; background: @accent; border-radius: 4px; padding: 1px 6px;"
-        "  font-weight: 600; }")));
+        "  font-weight: 600; }"));
     auto* shadow = new QGraphicsDropShadowEffect(this);
     shadow->setBlurRadius(28);
     shadow->setOffset(0, 6);

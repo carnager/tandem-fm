@@ -15,6 +15,7 @@ keys, modern tools, Qt 6.
 - Permissions editor with ACLs and filesystem flags, locally and over SFTP
 - Find duplicates, disk usage, checksums, links, trash, thumbnails
 - Command palette (Ctrl+Shift+P), every key changeable, optional Vim keys, Git status
+- Themes: Nord, Dracula, Gruvbox, Catppuccin, Solarized, Tokyo Night and more, or your own; can follow the desktop's light and dark mode
 
 F1 lists all keys.
 
@@ -46,6 +47,24 @@ At run time it uses `ffmpeg` for video and audio, `fd` and `rg` for search
 if installed.
 
 Tests: `ctest --test-dir build`.
+
+## Themes
+
+Settings → Appearance picks a theme, or one for light and one for dark mode
+that follow the desktop. Own themes are JSON files in
+`~/.local/share/tandem-fm/themes/`; Tandem applies them as soon as they are
+saved. Only the colours you want to change are needed:
+
+```json
+{
+  "name": "My theme",
+  "dark": true,
+  "colors": { "window": "#1e1e2e", "base": "#24273a", "text": "#cad3f5", "accent": "#f5a97f" }
+}
+```
+
+"Copy to edit" in Settings writes the current theme with every colour as a
+starting point. A file named like a shipped theme (`nord.json`) replaces it.
 
 ## Settings in another folder
 

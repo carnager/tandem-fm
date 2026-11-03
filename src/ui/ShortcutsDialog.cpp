@@ -198,7 +198,7 @@ ShortcutsDialog::ShortcutsDialog(QWidget* parent) : QDialog(parent)
     scroll->setWidget(m_page);
     layout->addWidget(scroll, 1);
     auto* note = new QLabel(tr("These are the default keys. Change them in Settings › Keys (Ctrl+,)."), this);
-    note->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(note, QStringLiteral("color: @dimText;"));
     layout->addWidget(note);
     connect(m_filter, &QLineEdit::textChanged, this, &ShortcutsDialog::rebuild);
     rebuild();
@@ -213,7 +213,6 @@ void ShortcutsDialog::resizeEvent(QResizeEvent* e)
 
 void ShortcutsDialog::rebuild()
 {
-    const Theme& t = theme();
     const QString q = m_filter->text().trimmed();
     m_columns = qMax(1, (width() - 44) / 380);
 
@@ -255,7 +254,7 @@ void ShortcutsDialog::rebuild()
     }
     if (sections.isEmpty()) {
         auto* none = new QLabel(tr("No shortcut matches “%1”").arg(q), m_page);
-        none->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+        setThemeStyle(none, QStringLiteral("color: @dimText;"));
         cols.first()->addWidget(none, 0, 0, 1, 2);
     }
     for (const auto& [name, entries] : sections) {
@@ -267,8 +266,7 @@ void ShortcutsDialog::rebuild()
         hf.setBold(true);
         hf.setLetterSpacing(QFont::PercentageSpacing, 108);
         head->setFont(hf);
-        head->setStyleSheet(t.css(QStringLiteral("color: @accent; padding-top: %1px; padding-bottom: 2px;"))
-                                .arg(heights[c] ? 14 : 0));
+        setThemeStyle(head, QStringLiteral("color: @accent; padding-top: %1px; padding-bottom: 2px;").arg(heights[c] ? 14 : 0));
         cols[c]->addWidget(head, rows[c]++, 0, 1, 2);
         for (const Entry* e : entries) {
             cols[c]->addWidget(new KeyCaps(QString::fromUtf8(e->keys), m_page), rows[c], 0, Qt::AlignLeft | Qt::AlignTop);

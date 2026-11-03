@@ -277,7 +277,7 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString folder, QS
     layout->setSpacing(10);
     auto dim = [this, &t](const QString& text) {
         auto* l = new QLabel(text, this);
-        l->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+        setThemeStyle(l, QStringLiteral("color: @dimText;"));
         return l;
     };
 
@@ -378,11 +378,11 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString folder, QS
     grid->addLayout(caseRow, 3, 1);
     grid->setColumnStretch(1, 1);
     layout->addLayout(grid);
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, QStringLiteral(
         "QToolButton#segment { padding: 4px 12px; border: 1px solid @border; background: @base; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
         "QToolButton#chip { padding: 2px 10px; border: 1px solid @border; border-radius: 10px; background: @altBase; }"
-        "QToolButton#chip:hover { border-color: @accent; }")));
+        "QToolButton#chip:hover { border-color: @accent; }"));
 
     m_model = new RenamePreviewModel(this);
     m_table = makeRenamePreview(m_model, this);
@@ -414,10 +414,10 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString folder, QS
     m_completions->setObjectName(QStringLiteral("renameCompletions"));
     m_completions->setFocusPolicy(Qt::NoFocus);
     m_completions->setUniformItemSizes(true);
-    m_completions->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_completions, QStringLiteral(
         "QListWidget { border: 1px solid @accent; border-radius: 6px; background: @base; padding: 3px; }"
         "QListWidget::item { padding: 4px 8px; border-radius: 4px; }"
-        "QListWidget::item:selected { background: @accent; color: @accentText; }")));
+        "QListWidget::item:selected { background: @accent; color: @accentText; }"));
     m_completions->hide();
     connect(m_completions, &QListWidget::itemClicked, this, [this] { acceptCompletion(); });
     m_template->installEventFilter(this);

@@ -265,6 +265,60 @@ private slots:
         m_left->setArrowFolders(true);
     }
 
+    void themes()
+    {
+        // Every shipped theme loads, and the list knows light from dark.
+        const QList<ThemeInfo> all = availableThemes();
+        QVERIFY(all.size() >= 16);
+        for (const ThemeInfo& i : all) {
+            if (i.id.startsWith("tandem-"))
+                continue;
+            Theme t;
+            QString error;
+            QVERIFY2(loadThemeFile(":/themes/" + i.id + ".json", t, &error), qPrintable(i.id + ": " + error));
+            QCOMPARE(t.dark, t.base.lightness() < 128);
+        }
+
+        // A few colours are enough; the rest follow them, unknown keys are ignored.
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("mini.json"),
+                  "{\"colors\": {\"base\": \"#ffffff\", \"text\": \"#000000\", \"accent\": \"#ff0000\","
+                  " \"glow\": \"#123456\"}, \"future\": true}");
+        Theme mini;
+        QVERIFY(loadThemeFile(tmp.filePath("mini.json"), mini));
+        QCOMPARE(mini.id, QString("mini"));
+        QVERIFY(!mini.dark);  // told by the background
+        QCOMPARE(mini.accent, QColor("#ff0000"));
+        QCOMPARE(mini.cursorActive, QColor(255, 0, 0, 50));
+        QVERIFY(mini.dimText != mini.text);
+        writeFile(tmp.filePath("broken.json"), "{ nope");
+        QVERIFY(!loadThemeFile(tmp.filePath("broken.json"), mini));
+
+        // Switching restyles what is already shown.
+        QDir().mkpath(QFileInfo(themesFolder()).path());
+        auto restore = qScopeGuard([] {
+            QSettings().remove("view/theme");
+            applyTheme(*qApp);
+        });
+        QLabel label;
+        setThemeStyle(&label, "color: @accent;");
+        QSignalSpy changed(&ThemeNotifier::instance(), &ThemeNotifier::changed);
+        QSettings().setValue("view/theme", "nord");
+        applyTheme(*qApp);
+        QCOMPARE(theme().id, QString("nord"));
+        QCOMPARE(changed.size(), 1);
+        QVERIFY2(label.styleSheet().contains("rgba(136,192,208"), qPrintable(label.styleSheet()));
+
+        // An own file with a shipped theme's name replaces it, and saving it applies it.
+        QDir().mkpath(themesFolder());
+        QTest::qWait(300);  // the new folder is noticed and watched
+        const QString own = themesFolder() + "/nord.json";
+        auto removeOwn = qScopeGuard([own] { QFile::remove(own); });
+        writeFile(own, "{\"name\": \"My Nord\", \"dark\": true, \"colors\": {\"accent\": \"#00ff00\"}}");
+        QTRY_COMPARE(theme().name, QString("My Nord"));  // picked up by watching the folder
+        QVERIFY(label.styleSheet().contains("rgba(0,255,0"));
+    }
+
     void quickSearch()
     {
         m_left->view()->setCurrentRow(0);

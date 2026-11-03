@@ -1,0 +1,21 @@
+{
+  "name": "Solarized Dark",
+  "dark": true,
+  "colors": {
+    "window": "#00212b",
+    "base": "#002b36",
+    "header": "#073642",
+    "border": "#0a4050",
+    "control": "#586e75",
+    "text": "#93a1a1",
+    "dimText": "#6f8a91",
+    "accent": "#268bd2",
+    "accentText": "#fdf6e3",
+    "mark": "#cb4b16",
+    "error": "#dc322f",
+    "success": "#859900",
+    "gitModified": "#b58900",
+    "gitAdded": "#859900",
+    "gitUntracked": "#2aa198"
+  }
+}

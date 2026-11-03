@@ -59,7 +59,6 @@ TrashDialog::TrashDialog(QWidget* parent) : QDialog(parent)
 {
     setWindowTitle(tr("Trash"));
     resize(980, 620);
-    const Theme& t = theme();
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 16, 18, 14);
     layout->setSpacing(10);
@@ -96,12 +95,12 @@ TrashDialog::TrashDialog(QWidget* parent) : QDialog(parent)
 
     auto* bottom = new QHBoxLayout;
     m_empty = new QPushButton(tr("Empty trash…"), this);
-    m_empty->setStyleSheet(t.css(QStringLiteral("QPushButton { color: @error; } QPushButton:disabled { color: @dimText; }")));
+    setThemeStyle(m_empty, QStringLiteral("QPushButton { color: @error; } QPushButton:disabled { color: @dimText; }"));
     m_empty->setAutoDefault(false);
     bottom->addWidget(m_empty);
     bottom->addWidget(new QLabel(QStringLiteral("  "), this));
     auto* keys = new QLabel(tr("Enter restores · Del deletes for good"), this);
-    keys->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(keys, QStringLiteral("color: @dimText;"));
     bottom->addWidget(keys, 1);
     m_delete = new QPushButton(tr("Delete permanently"), this);
     m_delete->setAutoDefault(false);

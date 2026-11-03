@@ -1,0 +1,21 @@
+{
+  "name": "Gruvbox Light",
+  "dark": false,
+  "colors": {
+    "window": "#f2e5bc",
+    "base": "#fbf1c7",
+    "header": "#ebdbb2",
+    "border": "#d5c4a1",
+    "control": "#bdae93",
+    "text": "#3c3836",
+    "dimText": "#7c6f64",
+    "accent": "#076678",
+    "accentText": "#fbf1c7",
+    "mark": "#af3a03",
+    "error": "#9d0006",
+    "success": "#79740e",
+    "gitModified": "#b57614",
+    "gitAdded": "#79740e",
+    "gitUntracked": "#427b58"
+  }
+}

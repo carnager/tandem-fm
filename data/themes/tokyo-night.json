@@ -1,0 +1,21 @@
+{
+  "name": "Tokyo Night",
+  "dark": true,
+  "colors": {
+    "window": "#16161e",
+    "base": "#1a1b26",
+    "header": "#1d1e2a",
+    "border": "#292e42",
+    "control": "#414868",
+    "text": "#c0caf5",
+    "dimText": "#8189b0",
+    "accent": "#7aa2f7",
+    "accentText": "#1a1b26",
+    "mark": "#ff9e64",
+    "error": "#f7768e",
+    "success": "#9ece6a",
+    "gitModified": "#e0af68",
+    "gitAdded": "#9ece6a",
+    "gitUntracked": "#73daca"
+  }
+}

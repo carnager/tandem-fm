@@ -148,13 +148,13 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     auto* top = new QWidget(this);
     top->setObjectName(QStringLiteral("viewerTop"));
     top->setAttribute(Qt::WA_StyledBackground);
-    top->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(top, QStringLiteral(
         "#viewerTop { background: %1; %2 }"
         "QToolButton { color: @dimText; border: none; padding: 2px 8px; border-radius: 9px; }"
         "QToolButton:checked { color: @text; background: @border; }"
         "QToolButton:hover:!checked { color: @text; }")
                                 .arg(embedded ? QStringLiteral("transparent") : QStringLiteral("@header"),
-                                     embedded ? QString() : QStringLiteral("border-bottom: 1px solid @border;"))));
+                                     embedded ? QString() : QStringLiteral("border-bottom: 1px solid @border;")));
     auto* tl = new QHBoxLayout(top);
     tl->setContentsMargins(10, 5, 8, 5);
     tl->setSpacing(4);
@@ -179,7 +179,7 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
         cf.setWeight(QFont::DemiBold);
         cf.setLetterSpacing(QFont::PercentageSpacing, 112);
         caption->setFont(cf);
-        caption->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+        setThemeStyle(caption, QStringLiteral("color: @dimText;"));
         titles->addWidget(caption);
         titles->addWidget(m_title);
         tl->addLayout(titles, 1);
@@ -250,7 +250,7 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_info->setTextFormat(Qt::PlainText);
     m_info->setContentsMargins(12, 8, 12, 8);
     m_info->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    m_info->setStyleSheet(t.css(QStringLiteral("color: @text; background: @header; border-top: 1px solid @border;")));
+    setThemeStyle(m_info, QStringLiteral("color: @text; background: @header; border-top: 1px solid @border;"));
     ml->addWidget(m_image, 1);
     ml->addWidget(m_info);
     m_doc = new DocBrowser(m_stack);
@@ -301,7 +301,7 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_message = new QLabel(m_noteBox);
     m_message->setAlignment(Qt::AlignCenter);
     m_message->setWordWrap(true);
-    m_message->setStyleSheet(t.css(QStringLiteral("color: @dimText; padding: 8px 24px;")));
+    setThemeStyle(m_message, QStringLiteral("color: @dimText; padding: 8px 24px;"));
     nl->addWidget(m_noteIcon);
     nl->addWidget(m_message);
     nl->addStretch(1);
@@ -326,11 +326,11 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_searchBar = new QWidget(this);
     m_searchBar->setObjectName(QStringLiteral("searchBar"));
     m_searchBar->setAttribute(Qt::WA_StyledBackground);
-    m_searchBar->setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(m_searchBar, QStringLiteral(
         "#searchBar { background: @header; border-top: 1px solid @border; }"
         "QLineEdit { background: @base; color: @text; border: 1px solid @border; border-radius: 6px; padding: 3px 8px; }"
         "QLineEdit:focus { border-color: @accent; }"
-        "QLabel { color: @dimText; }")));
+        "QLabel { color: @dimText; }"));
     auto* sl = new QHBoxLayout(m_searchBar);
     sl->setContentsMargins(10, 5, 10, 5);
     m_searchEdit = new QLineEdit(m_searchBar);
@@ -345,26 +345,37 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
 
     m_status = new QLabel(this);
     m_status->setContentsMargins(10, 4, 10, 5);
-    m_status->setStyleSheet(t.css(QStringLiteral("color: @dimText; background: @window;")));
+    setThemeStyle(m_status, QStringLiteral("color: @dimText; background: @window;"));
     if (embedded) {
         m_status->setContentsMargins(16, 6, 16, 8);
         m_status->setWordWrap(true);
     }
     auto* statusRow = new QWidget(this);
-    statusRow->setStyleSheet(t.css(QStringLiteral("background: @window; color: @dimText;")));
+    setThemeStyle(statusRow, QStringLiteral("background: @window; color: @dimText;"));
     auto* sr = new QHBoxLayout(statusRow);
     sr->setContentsMargins(0, 0, embedded ? 14 : 10, 0);
     sr->setSpacing(6);
     sr->addWidget(m_status, 1);
     sr->addWidget(m_wrapButton, 0, Qt::AlignVCenter);
     layout->addWidget(statusRow);
+#ifdef TANDEM_HAVE_KSYNTAXHIGHLIGHTING
+    connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, [this] {
+        if (!m_highlighter)
+            return;
+        m_highlighter->setTheme(repository().defaultTheme(theme().dark ? KSyntaxHighlighting::Repository::DarkTheme
+                                                                        : KSyntaxHighlighting::Repository::LightTheme));
+        m_highlighter->rehighlight();
+    });
+#endif
     if (embedded) {
         m_image->setBackground(t.window);  // pictures float on the background
+        connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this,
+                [this] { m_image->setBackground(theme().window); });
         m_image->setPadding(4);
         // The column is narrow: wrap long lines rather than scroll sideways.
         m_text->setLineWrapMode(QPlainTextEdit::WidgetWidth);
         m_big->setWrap(true);
-        m_info->setStyleSheet(t.css(QStringLiteral("color: @text; background: @window;")));
+        setThemeStyle(m_info, QStringLiteral("color: @text; background: @window;"));
         m_info->setContentsMargins(4, 10, 4, 0);
         m_doc->viewport()->setAutoFillBackground(false);
         m_list->viewport()->setAutoFillBackground(false);
@@ -416,8 +427,8 @@ void ViewerWindow::updateSheet()
         return;
     QWidget* page = m_stack->currentWidget();
     const bool floating = page == m_mediaPage || page == m_noteBox;
-    m_sheet->setStyleSheet(theme().css(floating ? QStringLiteral("#sheet { background: transparent; }")
-                                                : QStringLiteral("#sheet { background: @base; border-radius: 10px; }")));
+    setThemeStyle(m_sheet, floating ? QStringLiteral("#sheet { background: transparent; }")
+                                                : QStringLiteral("#sheet { background: @base; border-radius: 10px; }"));
 }
 
 void ViewerWindow::resizeEvent(QResizeEvent* e)
@@ -750,7 +761,6 @@ void ViewerWindow::loadInfo()
 
 void ViewerWindow::fillInfo(const FileInfo& info)
 {
-    const Theme& t = theme();
     while (QLayoutItem* item = m_infoGrid->takeAt(0)) {
         if (QWidget* w = item->widget()) {
             w->hide();
@@ -762,7 +772,7 @@ void ViewerWindow::fillInfo(const FileInfo& info)
     int row = 0;
     auto addRow = [&](const QString& key, QWidget* value) {
         auto* k = new QLabel(key, body);
-        k->setStyleSheet(t.css(QStringLiteral("color: @dimText;")));
+        setThemeStyle(k, QStringLiteral("color: @dimText;"));
         k->setAlignment(Qt::AlignRight | Qt::AlignTop);
         k->show();
         value->show();
@@ -788,7 +798,7 @@ void ViewerWindow::fillInfo(const FileInfo& info)
             f.setWeight(QFont::DemiBold);
             f.setLetterSpacing(QFont::PercentageSpacing, 112);
             title->setFont(f);
-            title->setStyleSheet(t.css(QStringLiteral("color: @accent; padding-top: %1px;").arg(row ? 10 : 0)));
+            setThemeStyle(title, QStringLiteral("color: @accent; padding-top: %1px;").arg(row ? 10 : 0));
             title->show();
             m_infoGrid->addWidget(title, row++, 0, 1, 2);
             continue;
@@ -817,7 +827,7 @@ void ViewerWindow::fillInfo(const FileInfo& info)
         auto* compute = new QPushButton(tr("Compute"), body);
         compute->setFlat(true);
         compute->setCursor(Qt::PointingHandCursor);
-        compute->setStyleSheet(t.css(QStringLiteral("QPushButton { color: @accent; text-align: left; padding: 0; border: none; }")));
+        setThemeStyle(compute, QStringLiteral("QPushButton { color: @accent; text-align: left; padding: 0; border: none; }"));
         addRow(QStringLiteral("SHA-256"), compute);
         QPointer<QPushButton> button(compute);
         connect(compute, &QPushButton::clicked, this, [path, cancel, button] {

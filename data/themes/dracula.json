@@ -1,0 +1,21 @@
+{
+  "name": "Dracula",
+  "dark": true,
+  "colors": {
+    "window": "#21222c",
+    "base": "#282a36",
+    "header": "#2b2d3a",
+    "border": "#343746",
+    "control": "#44475a",
+    "text": "#f8f8f2",
+    "dimText": "#9ea8c7",
+    "accent": "#bd93f9",
+    "accentText": "#282a36",
+    "mark": "#ffb86c",
+    "error": "#ff5555",
+    "success": "#50fa7b",
+    "gitModified": "#f1fa8c",
+    "gitAdded": "#50fa7b",
+    "gitUntracked": "#8be9fd"
+  }
+}

@@ -58,11 +58,11 @@ CommandBar::CommandBar(QWidget* window) : QFrame(window)
 {
     const Theme& t = theme();
     setObjectName(QStringLiteral("commandBar"));
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, QStringLiteral(
         "#commandBar { background: @header; border: 1px solid @border; border-radius: 12px; }"
         "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 8px; padding: 6px 10px;"
         "  font-family: monospace; }"
-        "QLabel, QCheckBox { color: @dimText; }")));
+        "QLabel, QCheckBox { color: @dimText; }"));
     auto* shadow = new QGraphicsDropShadowEffect(this);
     shadow->setBlurRadius(28);
     shadow->setOffset(0, 6);

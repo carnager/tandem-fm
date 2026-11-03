@@ -1,0 +1,21 @@
+{
+  "name": "Solarized Light",
+  "dark": false,
+  "colors": {
+    "window": "#eee8d5",
+    "base": "#fdf6e3",
+    "header": "#e6dfca",
+    "border": "#ddd6c1",
+    "control": "#93a1a1",
+    "text": "#586e75",
+    "dimText": "#839496",
+    "accent": "#268bd2",
+    "accentText": "#fdf6e3",
+    "mark": "#cb4b16",
+    "error": "#dc322f",
+    "success": "#859900",
+    "gitModified": "#b58900",
+    "gitAdded": "#859900",
+    "gitUntracked": "#2aa198"
+  }
+}

@@ -6,9 +6,15 @@
 #include "ui/Theme.h"
 
 #include <QAction>
+#include <QApplication>
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDesktopServices>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QUrl>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeySequenceEdit>
@@ -86,7 +92,7 @@ QLabel* hint(const QString& text, QWidget* parent)
 {
     auto* l = new QLabel(text, parent);
     l->setWordWrap(true);
-    l->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    setThemeStyle(l, QStringLiteral("color: @dimText;"));
     return l;
 }
 
@@ -194,14 +200,13 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
 {
     setWindowTitle(tr("Settings"));
     resize(860, 600);
-    const Theme& t = theme();
-    setStyleSheet(t.css(QStringLiteral(
+    setThemeStyle(this, QStringLiteral(
         "QListWidget#nav { background: transparent; border: none; outline: none; }"
         "QListWidget#nav::item { padding: 8px 12px; border-radius: 6px; color: @text; }"
         "QListWidget#nav::item:selected { background: @headerActive; color: @text; }"
         "QTreeWidget::item { padding: 4px 2px; }"
         "QToolButton#segment { padding: 5px 14px; border: 1px solid @control; background: @base; }"
-        "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }")));
+        "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"));
 
     auto* outer = new QVBoxLayout(this);
     outer->setContentsMargins(16, 16, 16, 12);
@@ -244,19 +249,110 @@ void SettingsDialog::showPage(int index)
     m_nav->setCurrentRow(index);
 }
 
+// Theme: one for always, or one for light and one for dark following the
+// desktop. Applied at once; own themes are JSON files in the themes folder.
+QWidget* SettingsDialog::themeChooser()
+{
+    auto* box = new QWidget(this);
+    auto* v = new QVBoxLayout(box);
+    v->setContentsMargins(0, 0, 0, 0);
+    v->setSpacing(6);
+    auto* main = new QComboBox(box);
+    main->setObjectName(QStringLiteral("theme"));
+    auto* pair = new QWidget(box);
+    auto* ph = new QHBoxLayout(pair);
+    ph->setContentsMargins(0, 0, 0, 0);
+    auto* light = new QComboBox(pair);
+    auto* dark = new QComboBox(pair);
+    ph->addWidget(new QLabel(tr("Light:"), pair));
+    ph->addWidget(light, 1);
+    ph->addSpacing(12);
+    ph->addWidget(new QLabel(tr("Dark:"), pair));
+    ph->addWidget(dark, 1);
+    for (QComboBox* c : {main, light, dark})
+        c->setMaximumWidth(320);
+    pair->setMaximumWidth(560);
+
+    auto fill = [main, light, dark] {
+        const QSettings s;
+        const QSignalBlocker b1(main), b2(light), b3(dark);
+        main->clear();
+        light->clear();
+        dark->clear();
+        main->addItem(tr("Like the desktop"), QStringLiteral("system"));
+        for (const ThemeInfo& t : availableThemes()) {
+            main->addItem(t.name, t.id);
+            (t.dark ? dark : light)->addItem(t.name, t.id);
+        }
+        QString chosen = s.value(QStringLiteral("view/theme"), QStringLiteral("system")).toString();
+        if (chosen == QLatin1String("dark") || chosen == QLatin1String("light"))
+            chosen = QStringLiteral("tandem-") + chosen;
+        main->setCurrentIndex(qMax(0, main->findData(chosen)));
+        light->setCurrentIndex(qMax(0, light->findData(s.value(QStringLiteral("view/themeLight"), QStringLiteral("tandem-light")))));
+        dark->setCurrentIndex(qMax(0, dark->findData(s.value(QStringLiteral("view/themeDark"), QStringLiteral("tandem-dark")))));
+    };
+    fill();
+    pair->setVisible(main->currentIndex() == 0);
+    auto apply = [] { applyTheme(*qApp); };
+    connect(main, &QComboBox::currentIndexChanged, this, [main, pair, apply] {
+        QSettings().setValue(QStringLiteral("view/theme"), main->currentData());
+        pair->setVisible(main->currentIndex() == 0);
+        apply();
+    });
+    connect(light, &QComboBox::currentIndexChanged, this, [light, apply] {
+        QSettings().setValue(QStringLiteral("view/themeLight"), light->currentData());
+        apply();
+    });
+    connect(dark, &QComboBox::currentIndexChanged, this, [dark, apply] {
+        QSettings().setValue(QStringLiteral("view/themeDark"), dark->currentData());
+        apply();
+    });
+
+    auto* tools = new QWidget(box);
+    auto* th = new QHBoxLayout(tools);
+    th->setContentsMargins(0, 0, 0, 0);
+    auto* copy = new QPushButton(tr("Copy to edit"), tools);
+    copy->setToolTip(tr("Saves the current theme with all its colours as your own theme, to change in a text editor"));
+    auto* folder = new QPushButton(tr("Open themes folder"), tools);
+    th->addWidget(copy);
+    th->addWidget(folder);
+    th->addStretch(1);
+    connect(folder, &QPushButton::clicked, this, [] {
+        QDir().mkpath(themesFolder());
+        QDesktopServices::openUrl(QUrl::fromLocalFile(themesFolder()));
+    });
+    connect(copy, &QPushButton::clicked, this, [this, main, fill] {
+        Theme t = theme();
+        t.name = tr("%1 (copy)").arg(t.name);
+        QString id = theme().id + QStringLiteral("-copy");
+        for (int i = 2; QFileInfo::exists(themesFolder() + QLatin1Char('/') + id + QStringLiteral(".json")); ++i)
+            id = theme().id + QStringLiteral("-copy-%1").arg(i);
+        QDir().mkpath(themesFolder());
+        QFile f(themesFolder() + QLatin1Char('/') + id + QStringLiteral(".json"));
+        if (!f.open(QIODevice::WriteOnly) || f.write(themeJson(t)) < 0) {
+            m_window->active()->showMessage(tr("Cannot write %1: %2").arg(f.fileName(), f.errorString()), true);
+            return;
+        }
+        f.close();
+        fill();
+        main->setCurrentIndex(main->findData(id));  // applies it
+        QDesktopServices::openUrl(QUrl::fromLocalFile(f.fileName()));
+    });
+
+    v->addWidget(main);
+    v->addWidget(pair);
+    v->addWidget(tools);
+    v->addWidget(hint(tr("Changes apply at once. Your own themes are JSON files in the themes folder; they are "
+                         "reloaded as soon as you save them."),
+                      box));
+    return box;
+}
+
 QWidget* SettingsDialog::appearancePage()
 {
     Page page(this);
     QSettings s;
-    page.add(tr("Theme"),
-             segments(this, {{QStringLiteral("system"), tr("Like the desktop")}, {QStringLiteral("dark"), tr("Dark")},
-                             {QStringLiteral("light"), tr("Light")}},
-                      s.value(QStringLiteral("view/theme"), QStringLiteral("system")).toString(),
-                      [this](const QString& code) {
-                          QSettings().setValue(QStringLiteral("view/theme"), code);
-                          m_window->active()->showMessage(tr("The theme changes the next time Tandem starts"));
-                      }),
-             tr("Takes effect the next time Tandem starts."));
+    page.add(tr("Theme"), themeChooser());
 
     auto* language = new QComboBox(this);
     language->addItem(tr("Like the system"), QString());

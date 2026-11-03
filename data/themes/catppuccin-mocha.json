@@ -1,0 +1,21 @@
+{
+  "name": "Catppuccin Mocha",
+  "dark": true,
+  "colors": {
+    "window": "#181825",
+    "base": "#1e1e2e",
+    "header": "#1f1f30",
+    "border": "#313244",
+    "control": "#585b70",
+    "text": "#cdd6f4",
+    "dimText": "#a6adc8",
+    "accent": "#cba6f7",
+    "accentText": "#1e1e2e",
+    "mark": "#fab387",
+    "error": "#f38ba8",
+    "success": "#a6e3a1",
+    "gitModified": "#f9e2af",
+    "gitAdded": "#a6e3a1",
+    "gitUntracked": "#94e2d5"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "Everforest",
+  "dark": true,
+  "colors": {
+    "window": "#232a2e",
+    "base": "#2d353b",
+    "header": "#293136",
+    "border": "#3d484d",
+    "control": "#4f585e",
+    "text": "#d3c6aa",
+    "dimText": "#9da9a0",
+    "accent": "#a7c080",
+    "accentText": "#2d353b",
+    "mark": "#e69875",
+    "error": "#e67e80",
+    "success": "#a7c080",
+    "gitModified": "#dbbc7f",
+    "gitAdded": "#a7c080",
+    "gitUntracked": "#83c092"
+  }
+}

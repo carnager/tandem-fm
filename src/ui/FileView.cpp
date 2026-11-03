@@ -117,8 +117,8 @@ QWidget* FileDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem&
 {
     auto* ed = new QLineEdit(parent);
     ed->setFrame(false);
-    ed->setStyleSheet(theme().css(QStringLiteral(
-        "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 4px; padding: 0 4px; }")));
+    setThemeStyle(ed, QStringLiteral(
+        "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 4px; padding: 0 4px; }"));
     return ed;
 }
 
@@ -176,10 +176,10 @@ FileView::FileView(QWidget* parent) : QTreeView(parent)
     h->setMinimumSectionSize(30);
     h->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(h, &QHeaderView::customContextMenuRequested, this, &FileView::showHeaderMenu);
-    h->setStyleSheet(theme().css(QStringLiteral(
+    setThemeStyle(h, QStringLiteral(
         "QHeaderView { background: @base; border: none; border-bottom: 1px solid @border; }"
         "QHeaderView::section { background: @base; color: @dimText; border: none; padding: 4px 6px; }"
-        "QHeaderView::section:hover { color: @text; }")));
+        "QHeaderView::section:hover { color: @text; }"));
 }
 
 FileModel* FileView::fileModel() const

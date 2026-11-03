@@ -698,6 +698,10 @@
         <source>%1: could not delete everything</source>
         <translation>%1: konnte nicht alles löschen</translation>
     </message>
+    <message>
+        <source>no &quot;colors&quot;</source>
+        <translation>kein &quot;colors&quot;</translation>
+    </message>
 </context>
 <context>
     <name>Shortcuts</name>
@@ -3795,6 +3799,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Schließen</translation>
     </message>
     <message>
+        <source>%1 (copy)</source>
+        <translation>%1 (Kopie)</translation>
+    </message>
+    <message>
         <source>Theme</source>
         <translation>Farbschema</translation>
     </message>
@@ -3803,24 +3811,40 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Wie der Desktop</translation>
     </message>
     <message>
-        <source>Dark</source>
-        <translation>Dunkel</translation>
-    </message>
-    <message>
-        <source>Light</source>
-        <translation>Hell</translation>
-    </message>
-    <message>
-        <source>The theme changes the next time Tandem starts</source>
-        <translation>Das Farbschema ändert sich beim nächsten Start von Tandem</translation>
-    </message>
-    <message>
         <source>Takes effect the next time Tandem starts.</source>
         <translation>Wirkt beim nächsten Start von Tandem.</translation>
     </message>
     <message>
         <source>Like the system</source>
         <translation>Wie das System</translation>
+    </message>
+    <message>
+        <source>Light:</source>
+        <translation>Hell:</translation>
+    </message>
+    <message>
+        <source>Dark:</source>
+        <translation>Dunkel:</translation>
+    </message>
+    <message>
+        <source>Copy to edit</source>
+        <translation>Als Kopie bearbeiten</translation>
+    </message>
+    <message>
+        <source>Saves the current theme with all its colours as your own theme, to change in a text editor</source>
+        <translation>Speichert das aktuelle Farbschema mit allen Farben als eigenes, zum Ändern in einem Texteditor</translation>
+    </message>
+    <message>
+        <source>Open themes folder</source>
+        <translation>Ordner der Farbschemata öffnen</translation>
+    </message>
+    <message>
+        <source>Cannot write %1: %2</source>
+        <translation>%1 kann nicht geschrieben werden: %2</translation>
+    </message>
+    <message>
+        <source>Changes apply at once. Your own themes are JSON files in the themes folder; they are reloaded as soon as you save them.</source>
+        <translation>Änderungen wirken sofort. Eigene Farbschemata sind JSON-Dateien im Ordner der Farbschemata; sie werden neu geladen, sobald du sie speicherst.</translation>
     </message>
     <message>
         <source>Language</source>
