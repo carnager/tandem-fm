@@ -396,10 +396,6 @@
         <translation>Für die Inhaltssuche ripgrep (rg) installieren</translation>
     </message>
     <message>
-        <source>&lt;DIR&gt;</source>
-        <translation>&lt;DIR&gt;</translation>
-    </message>
-    <message>
         <source>Connect</source>
         <translation>Verbinden</translation>
     </message>
@@ -550,6 +546,78 @@
     <message>
         <source>no spaces at the ends</source>
         <translation>keine Leerzeichen an den Enden</translation>
+    </message>
+    <message>
+        <source>%1 s</source>
+        <translation>%1 s</translation>
+    </message>
+    <message>
+        <source>%1 min</source>
+        <translation>%1 min</translation>
+    </message>
+    <message>
+        <source>%1 h</source>
+        <translation>%1 h</translation>
+    </message>
+    <message>
+        <source>%1 days</source>
+        <translation>%1 Tage</translation>
+    </message>
+    <message>
+        <source>identical</source>
+        <translation>identisch</translation>
+    </message>
+    <message>
+        <source>newer on the left (by %1)</source>
+        <translation>links neuer (um %1)</translation>
+    </message>
+    <message>
+        <source>newer on the right (by %1)</source>
+        <translation>rechts neuer (um %1)</translation>
+    </message>
+    <message>
+        <source>only on the left</source>
+        <translation>nur links</translation>
+    </message>
+    <message>
+        <source>only on the right</source>
+        <translation>nur rechts</translation>
+    </message>
+    <message>
+        <source>same time, different contents: choose a side</source>
+        <translation>gleiche Zeit, anderer Inhalt: Seite wählen</translation>
+    </message>
+    <message>
+        <source>a file on one side, a folder on the other</source>
+        <translation>auf einer Seite Datei, auf der anderen Ordner</translation>
+    </message>
+    <message>
+        <source>copy →</source>
+        <translation>kopieren →</translation>
+    </message>
+    <message>
+        <source>← copy</source>
+        <translation>← kopieren</translation>
+    </message>
+    <message>
+        <source>delete left</source>
+        <translation>links löschen</translation>
+    </message>
+    <message>
+        <source>delete right</source>
+        <translation>rechts löschen</translation>
+    </message>
+    <message>
+        <source>same</source>
+        <translation>gleich</translation>
+    </message>
+    <message>
+        <source>decide</source>
+        <translation>entscheiden</translation>
+    </message>
+    <message>
+        <source>skip</source>
+        <translation>auslassen</translation>
     </message>
 </context>
 <context>
@@ -2620,68 +2688,8 @@ Eingehängt über GVfs, andere Programme sehen es also auch. Passwörter können
         <translation>Ordner synchronisieren</translation>
     </message>
     <message>
-        <source>Subfolders</source>
-        <translation>Unterordner</translation>
-    </message>
-    <message>
-        <source>Compare contents</source>
-        <translation>Inhalte vergleichen</translation>
-    </message>
-    <message>
-        <source>Read files with equal sizes byte by byte instead of trusting their times (slower)</source>
-        <translation>Gleich große Dateien Byte für Byte lesen, statt den Zeitstempeln zu trauen (langsamer)</translation>
-    </message>
-    <message>
-        <source>Hidden files</source>
-        <translation>Versteckte Dateien</translation>
-    </message>
-    <message>
-        <source>Both ways (newer wins)</source>
-        <translation>In beide Richtungen (neuere gewinnt)</translation>
-    </message>
-    <message>
-        <source>Mirror left → right</source>
-        <translation>Links → rechts spiegeln</translation>
-    </message>
-    <message>
-        <source>Mirror right → left</source>
-        <translation>Rechts → links spiegeln</translation>
-    </message>
-    <message>
-        <source>Mirroring makes the target like the source: it also overwrites newer files and deletes extra ones (to the trash)</source>
-        <translation>Spiegeln macht das Ziel gleich der Quelle: auch neuere Dateien werden überschrieben und überzählige gelöscht (in den Papierkorb)</translation>
-    </message>
-    <message>
         <source>Compare again</source>
         <translation>Erneut vergleichen</translation>
-    </message>
-    <message>
-        <source>Show:</source>
-        <translation>Zeigen:</translation>
-    </message>
-    <message>
-        <source>Copied to the right</source>
-        <translation>Wird nach rechts kopiert</translation>
-    </message>
-    <message>
-        <source>Copied to the left</source>
-        <translation>Wird nach links kopiert</translation>
-    </message>
-    <message>
-        <source>Different, but left alone</source>
-        <translation>Unterschiedlich, bleibt aber unberührt</translation>
-    </message>
-    <message>
-        <source>Identical</source>
-        <translation>Identisch</translation>
-    </message>
-    <message>
-        <source>Deleted (to the trash)</source>
-        <translation>Wird gelöscht (Papierkorb)</translation>
-    </message>
-    <message>
-        <source>← → direction · Space: leave alone · Del: delete · Enter: diff · Ctrl+Enter: synchronize</source>
-        <translation>← → Richtung · Leertaste: nicht anfassen · Entf: löschen · Enter: Diff · Strg+Enter: synchronisieren</translation>
     </message>
     <message>
         <source>Synchronize</source>
@@ -2692,10 +2700,6 @@ Eingehängt über GVfs, andere Programme sehen es also auch. Passwörter können
         <translation>Schließen</translation>
     </message>
     <message>
-        <source>Comparing…</source>
-        <translation>Vergleiche…</translation>
-    </message>
-    <message>
         <source>Comparing %1 …</source>
         <translation>Vergleiche %1 …</translation>
     </message>
@@ -2704,28 +2708,111 @@ Eingehängt über GVfs, andere Programme sehen es also auch. Passwörter können
         <translation>Vergleich nicht möglich: %1</translation>
     </message>
     <message>
-        <source>%1 → right (%2)</source>
-        <translation>%1 → rechts (%2)</translation>
+        <source>⇄  both ways</source>
+        <translation>⇄  beide Richtungen</translation>
     </message>
     <message>
-        <source>%1 ← left (%2)</source>
-        <translation>%1 ← links (%2)</translation>
+        <source>Newer files win on both sides; nothing is deleted</source>
+        <translation>Neuere Dateien gewinnen auf beiden Seiten; nichts wird gelöscht</translation>
     </message>
     <message>
-        <source>%1 to the trash</source>
-        <translation>%1 in den Papierkorb</translation>
+        <source>→  make right like left</source>
+        <translation>→  rechts wie links machen</translation>
     </message>
     <message>
-        <source>The folders are in sync</source>
-        <translation>Die Ordner sind synchron</translation>
+        <source>The right side becomes a copy of the left: newer files there are overwritten, extra ones go to the trash</source>
+        <translation>Die rechte Seite wird eine Kopie der linken: neuere Dateien dort werden überschrieben, zusätzliche kommen in den Papierkorb</translation>
     </message>
     <message>
-        <source>Nothing selected to synchronize</source>
-        <translation>Nichts zum Synchronisieren ausgewählt</translation>
+        <source>←  make left like right</source>
+        <translation>←  links wie rechts machen</translation>
     </message>
     <message>
-        <source>Synchronizing…</source>
-        <translation>Synchronisiere…</translation>
+        <source>The left side becomes a copy of the right: newer files there are overwritten, extra ones go to the trash</source>
+        <translation>Die linke Seite wird eine Kopie der rechten: neuere Dateien dort werden überschrieben, zusätzliche kommen in den Papierkorb</translation>
+    </message>
+    <message>
+        <source>Options</source>
+        <translation>Optionen</translation>
+    </message>
+    <message>
+        <source>Include subfolders</source>
+        <translation>Unterordner einbeziehen</translation>
+    </message>
+    <message>
+        <source>Include hidden files</source>
+        <translation>Versteckte Dateien einbeziehen</translation>
+    </message>
+    <message>
+        <source>Compare contents (slower, exact)</source>
+        <translation>Inhalte vergleichen (langsamer, genau)</translation>
+    </message>
+    <message>
+        <source>Read files with equal sizes byte by byte instead of trusting their times</source>
+        <translation>Gleich große Dateien Byte für Byte lesen, statt den Zeiten zu trauen</translation>
+    </message>
+    <message>
+        <source>Show or hide these lines</source>
+        <translation>Diese Zeilen ein- oder ausblenden</translation>
+    </message>
+    <message>
+        <source>→ ← direction · Space skip · Del delete · Enter show differences · Ctrl+Enter sync</source>
+        <translation>→ ← Richtung · Leertaste auslassen · Entf löschen · Enter Unterschiede zeigen · Strg+Enter abgleichen</translation>
+    </message>
+    <message>
+        <source>Sync</source>
+        <translation>Abgleichen</translation>
+    </message>
+    <message>
+        <source>Comparing …</source>
+        <translation>Vergleiche …</translation>
+    </message>
+    <message>
+        <source>→ %1 to the right · %2</source>
+        <translation>→ %1 nach rechts · %2</translation>
+    </message>
+    <message>
+        <source>→ none to the right</source>
+        <translation>→ nichts nach rechts</translation>
+    </message>
+    <message>
+        <source>← %1 to the left · %2</source>
+        <translation>← %1 nach links · %2</translation>
+    </message>
+    <message>
+        <source>← none to the left</source>
+        <translation>← nichts nach links</translation>
+    </message>
+    <message>
+        <source>%1 skipped or to decide</source>
+        <translation>%1 ausgelassen oder zu entscheiden</translation>
+    </message>
+    <message>
+        <source>= %1 identical</source>
+        <translation>= %1 identisch</translation>
+    </message>
+    <message>
+        <source>✕ %1 to the trash</source>
+        <translation>✕ %1 in den Papierkorb</translation>
+    </message>
+    <message>
+        <source>Synchronizing …</source>
+        <translation>Gleiche ab …</translation>
+    </message>
+    <message>
+        <source>✓ The folders are in sync</source>
+        <translation>✓ Die Ordner sind abgeglichen</translation>
+    </message>
+    <message>
+        <source>Nothing chosen to sync</source>
+        <translation>Nichts zum Abgleichen gewählt</translation>
+    </message>
+    <message numerus="yes">
+        <source>Sync %n item(s)</source>
+        <translation>
+            <numerusform>%n Element abgleichen</numerusform>
+            <numerusform>%n Elemente abgleichen</numerusform>
+        </translation>
     </message>
     <message>
         <source>Copy to the right  →</source>
@@ -2766,48 +2853,24 @@ Eingehängt über GVfs, andere Programme sehen es also auch. Passwörter können
 <context>
     <name>tandem::SyncModel</name>
     <message>
-        <source>Name</source>
-        <translation>Name</translation>
+        <source>What happens</source>
+        <translation>Was passiert</translation>
     </message>
     <message>
-        <source>Left size</source>
-        <translation>Größe links</translation>
+        <source>Item</source>
+        <translation>Element</translation>
     </message>
     <message>
-        <source>Modified</source>
-        <translation>Geändert</translation>
+        <source>Why</source>
+        <translation>Warum</translation>
     </message>
     <message>
-        <source>Right size</source>
-        <translation>Größe rechts</translation>
+        <source>Size</source>
+        <translation>Größe</translation>
     </message>
     <message>
-        <source>Same on both sides</source>
-        <translation>Auf beiden Seiten gleich</translation>
-    </message>
-    <message>
-        <source>Newer on the left</source>
-        <translation>Links neuer</translation>
-    </message>
-    <message>
-        <source>Newer on the right</source>
-        <translation>Rechts neuer</translation>
-    </message>
-    <message>
-        <source>Only on the left</source>
-        <translation>Nur links</translation>
-    </message>
-    <message>
-        <source>Only on the right</source>
-        <translation>Nur rechts</translation>
-    </message>
-    <message>
-        <source>Same time, different contents: decide yourself</source>
-        <translation>Gleiche Zeit, anderer Inhalt: selbst entscheiden</translation>
-    </message>
-    <message>
-        <source>A file on one side, a folder on the other: not synchronized</source>
-        <translation>Auf einer Seite eine Datei, auf der anderen ein Ordner: wird nicht synchronisiert</translation>
+        <source>Click to change · → ← direction · Space skip · Del delete</source>
+        <translation>Klicken zum Ändern · → ← Richtung · Leertaste auslassen · Entf löschen</translation>
     </message>
 </context>
 <context>

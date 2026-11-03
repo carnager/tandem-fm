@@ -1352,15 +1352,14 @@ private slots:
 
         // Mirror right → left removes what the right side doesn't have.
         writeFile(L("cmp/extra.txt"), "x");
-        auto* modeBox = dlg->findChild<QComboBox*>();
-        modeBox->setCurrentIndex(2);
+        dlg->setMode(SyncMode::MirrorToLeft);
         dlg->compare();
         QTRY_VERIFY(!dlg->isComparing() && m->rowOf("extra.txt") >= 0);
         QCOMPARE(m->action(m->rowOf("extra.txt")), SyncAction::DeleteLeft);
         answerNextDialog(acceptDialog);
         dlg->synchronize();
         QTRY_VERIFY(!QFile::exists(L("cmp/extra.txt")));
-        modeBox->setCurrentIndex(0);
+        dlg->setMode(SyncMode::TwoWay);
         dlg->close();
 
         m_left->navigate(L());

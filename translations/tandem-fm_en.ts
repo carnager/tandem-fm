@@ -165,6 +165,13 @@
 <context>
     <name>tandem::SyncDialog</name>
     <message numerus="yes">
+        <source>Sync %n item(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>Move %n item(s) to the trash?</source>
         <translation type="unfinished">
             <numerusform></numerusform>

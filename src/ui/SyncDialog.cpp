@@ -5,8 +5,8 @@
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
 
-#include <QCheckBox>
-#include <QComboBox>
+#include <QButtonGroup>
+#include <QPainter>
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
@@ -124,41 +124,56 @@ bool SyncModel::setAction(int row, SyncAction a)
 
 QVariant SyncModel::headerData(int section, Qt::Orientation o, int role) const
 {
-    if (o != Qt::Horizontal)
-        return {};
-    if (role == Qt::TextAlignmentRole)
-        return section == Name ? int(Qt::AlignLeft | Qt::AlignVCenter)
-                               : section == Action ? int(Qt::AlignCenter)
-                                                   : section == LeftSize || section == RightSize
-                                                         ? int(Qt::AlignRight | Qt::AlignVCenter)
-                                                         : int(Qt::AlignLeft | Qt::AlignVCenter);
-    if (role != Qt::DisplayRole)
+    if (o != Qt::Horizontal || role != Qt::DisplayRole)
         return {};
     switch (section) {
-    case Name: return tr("Name");
-    case LeftSize: return tr("Left size");
-    case LeftTime: return tr("Modified");
-    case Action: return QString();
-    case RightTime: return tr("Modified");
-    case RightSize: return tr("Right size");
+    case Action: return tr("What happens");
+    case Item: return tr("Item");
+    case Why: return tr("Why");
+    case Size: return tr("Size");
     }
     return {};
 }
 
-static QString sizeText(const CompareSide& s)
+static QString ago(int64_t secs)
 {
-    if (!s.exists)
-        return {};
-    if (s.isDir)
-        return s.size >= 0 ? formatSize(s.size) : QObject::tr("<DIR>");
-    return formatSize(s.size);
+    secs = qAbs(secs);
+    if (secs < 120)
+        return QObject::tr("%1 s").arg(secs);
+    if (secs < 7200)
+        return QObject::tr("%1 min").arg(secs / 60);
+    if (secs < 2 * 86400)
+        return QObject::tr("%1 h").arg(secs / 3600);
+    return QObject::tr("%1 days").arg(secs / 86400);
 }
 
-static QString timeText(const CompareSide& s)
+// Why an item is listed, in words.
+static QString reason(const CompareItem& it)
 {
-    if (!s.exists)
-        return {};
-    return QDateTime::fromSecsSinceEpoch(s.mtime).toString(QStringLiteral("yyyy-MM-dd HH:mm"));
+    switch (it.diff) {
+    case Diff::Equal: return QObject::tr("identical");
+    case Diff::LeftNewer: return QObject::tr("newer on the left (by %1)").arg(ago(it.left.mtime - it.right.mtime));
+    case Diff::RightNewer: return QObject::tr("newer on the right (by %1)").arg(ago(it.right.mtime - it.left.mtime));
+    case Diff::LeftOnly: return QObject::tr("only on the left");
+    case Diff::RightOnly: return QObject::tr("only on the right");
+    case Diff::Differs: return QObject::tr("same time, different contents: choose a side");
+    case Diff::TypeMismatch: return QObject::tr("a file on one side, a folder on the other");
+    }
+    return {};
+}
+
+QString actionLabel(SyncAction a, Diff d)
+{
+    switch (a) {
+    case SyncAction::ToRight: return QObject::tr("copy →");
+    case SyncAction::ToLeft: return QObject::tr("← copy");
+    case SyncAction::DeleteLeft: return QObject::tr("delete left");
+    case SyncAction::DeleteRight: return QObject::tr("delete right");
+    case SyncAction::None:
+        return d == Diff::Equal ? QObject::tr("same")
+               : d == Diff::Differs || d == Diff::TypeMismatch ? QObject::tr("decide") : QObject::tr("skip");
+    }
+    return {};
 }
 
 QVariant SyncModel::data(const QModelIndex& index, int role) const
@@ -169,29 +184,25 @@ QVariant SyncModel::data(const QModelIndex& index, int role) const
     const SyncAction a = action(index.row());
     const Theme& t = theme();
     const int col = index.column();
-
+    // What a copy carries: the source side's size.
+    const CompareSide& from = a == SyncAction::ToLeft || (a == SyncAction::None && !it.left.exists) ||
+                                      a == SyncAction::DeleteRight
+                                  ? it.right
+                                  : it.left;
     switch (role) {
     case Qt::DisplayRole:
         switch (col) {
-        case Name: return it.rel;
-        case LeftSize: return sizeText(it.left);
-        case LeftTime: return timeText(it.left);
-        case RightTime: return timeText(it.right);
-        case RightSize: return sizeText(it.right);
-        case Action:
-            switch (a) {
-            case SyncAction::ToRight: return QStringLiteral("→");
-            case SyncAction::ToLeft: return QStringLiteral("←");
-            case SyncAction::DeleteLeft: return QStringLiteral("✕  ");
-            case SyncAction::DeleteRight: return QStringLiteral("  ✕");
-            case SyncAction::None:
-                return it.diff == Diff::Equal ? QStringLiteral("=")
-                       : it.diff == Diff::TypeMismatch ? QStringLiteral("!") : QStringLiteral("≠");
-            }
+        case Action: return actionLabel(a, it.diff);
+        case Item: return it.rel;
+        case Why: return reason(it);
+        case Size:
+            if (!from.exists || (from.isDir && from.size < 0))
+                return QString();
+            return formatSize(from.size);
         }
         return {};
     case Qt::DecorationRole:
-        if (col == Name) {
+        if (col == Item) {
             FileEntry e;
             e.name = it.rel.section(QLatin1Char('/'), -1);
             e.isDir = (it.left.exists ? it.left.isDir : it.right.isDir);
@@ -200,52 +211,100 @@ QVariant SyncModel::data(const QModelIndex& index, int role) const
         }
         return {};
     case Qt::TextAlignmentRole:
-        if (col == Action)
-            return int(Qt::AlignCenter);
-        if (col == LeftSize || col == RightSize)
-            return int(Qt::AlignRight | Qt::AlignVCenter);
-        return int(Qt::AlignLeft | Qt::AlignVCenter);
+        return col == Size ? int(Qt::AlignRight | Qt::AlignVCenter) : int(Qt::AlignLeft | Qt::AlignVCenter);
     case Qt::FontRole:
-        if (col == Action) {
-            QFont f = t.listFont;
-            f.setBold(true);
-            return f;
-        }
-        if (col != Name)
-            return t.numberFont;
-        return {};
+        return col == Size ? QVariant(t.numberFont) : QVariant();
     case Qt::ForegroundRole:
-        if (col == Action) {
-            switch (a) {
-            case SyncAction::ToRight:
-            case SyncAction::ToLeft: return t.accent;
-            case SyncAction::DeleteLeft:
-            case SyncAction::DeleteRight: return t.error;
-            case SyncAction::None: return it.diff == Diff::Equal ? t.dimText : t.gitModified;
-            }
-        }
-        // The side that will be replaced or removed is dimmed.
-        if (col == LeftSize || col == LeftTime)
-            return a == SyncAction::ToLeft || a == SyncAction::DeleteLeft ? t.dimText : QColor();
-        if (col == RightSize || col == RightTime)
-            return a == SyncAction::ToRight || a == SyncAction::DeleteRight ? t.dimText : QColor();
-        if (col == Name && a == SyncAction::None && it.diff == Diff::Equal)
+        if (col == Why || col == Size)
             return t.dimText;
         return {};
     case Qt::ToolTipRole:
-        switch (it.diff) {
-        case Diff::Equal: return tr("Same on both sides");
-        case Diff::LeftNewer: return tr("Newer on the left");
-        case Diff::RightNewer: return tr("Newer on the right");
-        case Diff::LeftOnly: return tr("Only on the left");
-        case Diff::RightOnly: return tr("Only on the right");
-        case Diff::Differs: return tr("Same time, different contents: decide yourself");
-        case Diff::TypeMismatch: return tr("A file on one side, a folder on the other: not synchronized");
-        }
-        return {};
+        if (col == Action)
+            return tr("Click to change · → ← direction · Space skip · Del delete");
+        return QStringLiteral("%1\n%2").arg(it.rel, reason(it));
     default:
         return {};
     }
+}
+
+void SyncDelegate::paint(QPainter* p, const QStyleOptionViewItem& option, const QModelIndex& index) const
+{
+    if (index.column() != SyncModel::Action && index.column() != SyncModel::Item) {
+        QStyledItemDelegate::paint(p, option, index);
+        return;
+    }
+    QStyleOptionViewItem opt = option;
+    initStyleOption(&opt, index);
+    const QString text = opt.text;
+    opt.text.clear();
+    if (index.column() == SyncModel::Action)
+        opt.icon = QIcon();
+    opt.widget->style()->drawControl(QStyle::CE_ItemViewItem, &opt, p, opt.widget);
+    const Theme& t = theme();
+    p->save();
+    p->setRenderHint(QPainter::Antialiasing);
+    if (index.column() == SyncModel::Action) {
+        const auto* m = static_cast<const SyncModel*>(index.model());
+        const SyncAction a = m->action(index.row());
+        const Diff d = m->item(index.row()).diff;
+        QColor c = t.dimText;
+        bool strong = false;
+        if (a == SyncAction::ToRight || a == SyncAction::ToLeft) {
+            c = t.accent;
+            strong = true;
+        } else if (a == SyncAction::DeleteLeft || a == SyncAction::DeleteRight) {
+            c = t.error;
+            strong = true;
+        } else if (d == Diff::Differs || d == Diff::TypeMismatch) {
+            c = t.gitModified;
+            strong = true;
+        }
+        if (opt.state & QStyle::State_Selected)
+            c = opt.palette.color(QPalette::HighlightedText);  // the row is already accent-colored
+        QFont f = opt.font;
+        f.setBold(strong);
+        p->setFont(f);
+        const QFontMetrics fm(f);
+        const int ph = fm.height() + 6;
+        const QRect pill(opt.rect.left() + 6, opt.rect.top() + (opt.rect.height() - ph) / 2, fm.horizontalAdvance(text) + 20, ph);
+        QColor bg = c;
+        bg.setAlpha(strong ? (t.dark ? 55 : 35) : 0);
+        p->setBrush(bg);
+        QColor border = c;
+        border.setAlpha(strong ? 140 : 70);
+        p->setPen(QPen(border, 1));
+        p->drawRoundedRect(QRectF(pill).adjusted(0.5, 0.5, -0.5, -0.5), pill.height() / 2.0, pill.height() / 2.0);
+        p->setPen(strong || (opt.state & QStyle::State_Selected) ? c : t.dimText);
+        p->drawText(pill, Qt::AlignCenter, text);
+    } else {
+        // Icon, then "folder/" dimmed and the name in full strength.
+        const int iconSize = opt.decorationSize.width();
+        QRect r = opt.rect.adjusted(6, 0, -4, 0);
+        if (!opt.icon.isNull()) {
+            opt.icon.paint(p, QRect(r.left(), r.top() + (r.height() - iconSize) / 2, iconSize, iconSize));
+            r.setLeft(r.left() + iconSize + 6);
+        }
+        const int slash = int(text.lastIndexOf(QLatin1Char('/')));
+        const QString dir = slash >= 0 ? text.left(slash + 1) : QString();
+        const QString name = text.mid(slash + 1);
+        const QFontMetrics fm(opt.font);
+        p->setFont(opt.font);
+        const bool selected = opt.state & QStyle::State_Selected;
+        const QString dirShown = fm.elidedText(dir, Qt::ElideMiddle, qMax(0, r.width() - fm.horizontalAdvance(name)));
+        p->setPen(selected ? opt.palette.color(QPalette::HighlightedText) : t.dimText);
+        p->drawText(r, Qt::AlignVCenter | Qt::AlignLeft, dirShown);
+        p->setPen(selected ? opt.palette.color(QPalette::HighlightedText) : t.text);
+        p->drawText(r.adjusted(fm.horizontalAdvance(dirShown), 0, 0, 0), Qt::AlignVCenter | Qt::AlignLeft,
+                    fm.elidedText(name, Qt::ElideRight, r.width() - fm.horizontalAdvance(dirShown)));
+    }
+    p->restore();
+}
+
+QSize SyncDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
+{
+    QSize sz = QStyledItemDelegate::sizeHint(option, index);
+    sz.setHeight(qMax(sz.height(), option.fontMetrics.height() + 14));  // room for the pills
+    return sz;
 }
 
 // ----------------------------------------------------------------- dialog
@@ -255,51 +314,81 @@ SyncDialog::SyncDialog(const QString& left, const QString& right, Runner runner,
 {
     const Theme& t = theme();
     setWindowTitle(tr("Synchronize folders"));
-    resize(1100, 680);
+    resize(1040, 680);
     setStyleSheet(t.css(QStringLiteral(
-        "QToolButton#show { color: @dimText; border: 1px solid @border; border-radius: 10px; padding: 2px 10px; }"
-        "QToolButton#show:checked { color: @text; background: @border; }"
-        "QLabel#paths { font-weight: 600; }"
-        "QLabel#summary { color: @dimText; }")));
+        "QToolButton#segment { padding: 5px 14px; border: 1px solid @border; background: @base; }"
+        "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
+        "QToolButton#show { color: @dimText; border: 1px solid transparent; border-radius: 12px; padding: 3px 12px; }"
+        "QToolButton#show:checked { color: @text; background: @altBase; border-color: @border; }"
+        "QToolButton#show:hover { border-color: @accent; }"
+        "QLabel#paths { font-weight: 600; font-size: 11pt; }"
+        "QLabel#status, QLabel#keys { color: @dimText; }")));
 
     auto* layout = new QVBoxLayout(this);
-    layout->setSpacing(8);
+    layout->setContentsMargins(18, 16, 18, 14);
+    layout->setSpacing(10);
 
+    // Top: the two folders, the direction, the rest tucked into a menu.
+    auto* top = new QHBoxLayout;
+    top->setSpacing(10);
     m_paths = new QLabel(this);
     m_paths->setObjectName(QStringLiteral("paths"));
     m_paths->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     m_paths->setToolTip(QStringLiteral("%1\n%2").arg(left, right));
-    layout->addWidget(m_paths);
+    top->addWidget(m_paths, 1);
 
     QSettings s;
-    auto* options = new QHBoxLayout;
-    m_recursive = new QCheckBox(tr("Subfolders"), this);
-    m_recursive->setChecked(s.value(QStringLiteral("sync/recursive"), true).toBool());
-    m_contents = new QCheckBox(tr("Compare contents"), this);
-    m_contents->setToolTip(tr("Read files with equal sizes byte by byte instead of trusting their times (slower)"));
-    m_contents->setChecked(s.value(QStringLiteral("sync/contents"), false).toBool());
-    m_hidden = new QCheckBox(tr("Hidden files"), this);
-    m_hidden->setChecked(s.value(QStringLiteral("sync/hidden"), true).toBool());
-    m_mode = new QComboBox(this);
-    m_mode->addItem(tr("Both ways (newer wins)"));
-    m_mode->addItem(tr("Mirror left → right"));
-    m_mode->addItem(tr("Mirror right → left"));
-    m_mode->setToolTip(tr("Mirroring makes the target like the source: it also overwrites newer files and deletes extra ones (to the trash)"));
-    m_mode->setCurrentIndex(qBound(0, s.value(QStringLiteral("sync/mode"), 0).toInt(), 2));
-    m_compareButton = new QPushButton(tr("Compare again"), this);
-    m_compareButton->setAutoDefault(false);
-    options->addWidget(m_recursive);
-    options->addWidget(m_contents);
-    options->addWidget(m_hidden);
-    options->addSpacing(12);
-    options->addWidget(m_mode);
-    options->addStretch(1);
-    options->addWidget(m_compareButton);
-    layout->addLayout(options);
+    m_mode = new QButtonGroup(this);
+    m_mode->setExclusive(true);
+    auto* segments = new QHBoxLayout;
+    segments->setSpacing(0);
+    const QList<std::tuple<SyncMode, QString, QString>> modes = {
+        {SyncMode::TwoWay, tr("⇄  both ways"), tr("Newer files win on both sides; nothing is deleted")},
+        {SyncMode::MirrorToRight, tr("→  make right like left"),
+         tr("The right side becomes a copy of the left: newer files there are overwritten, extra ones go to the trash")},
+        {SyncMode::MirrorToLeft, tr("←  make left like right"),
+         tr("The left side becomes a copy of the right: newer files there are overwritten, extra ones go to the trash")}};
+    for (const auto& [m, label, tip] : modes) {
+        auto* b = new QToolButton(this);
+        b->setObjectName(QStringLiteral("segment"));
+        b->setText(label);
+        b->setToolTip(tip);
+        b->setCheckable(true);
+        b->setFocusPolicy(Qt::NoFocus);
+        m_mode->addButton(b, int(m));
+        segments->addWidget(b);
+    }
+    if (QAbstractButton* b = m_mode->button(qBound(0, s.value(QStringLiteral("sync/mode"), 0).toInt(), 2)))
+        b->setChecked(true);
+    top->addLayout(segments);
 
+    auto* more = new QToolButton(this);
+    more->setText(QStringLiteral("⋯"));
+    more->setToolTip(tr("Options"));
+    more->setPopupMode(QToolButton::InstantPopup);
+    more->setFocusPolicy(Qt::NoFocus);
+    auto* menu = new QMenu(more);
+    auto option = [&](const QString& text, const QString& key, bool def, const QString& tip = {}) {
+        QAction* a = menu->addAction(text);
+        a->setCheckable(true);
+        a->setChecked(s.value(key, def).toBool());
+        a->setToolTip(tip);
+        return a;
+    };
+    m_recursive = option(tr("Include subfolders"), QStringLiteral("sync/recursive"), true);
+    m_hidden = option(tr("Include hidden files"), QStringLiteral("sync/hidden"), true);
+    m_contents = option(tr("Compare contents (slower, exact)"), QStringLiteral("sync/contents"), false,
+                        tr("Read files with equal sizes byte by byte instead of trusting their times"));
+    menu->setToolTipsVisible(true);
+    menu->addSeparator();
+    menu->addAction(tr("Compare again"), QKeySequence(Qt::Key_F5), this, &SyncDialog::compare);
+    more->setMenu(menu);
+    top->addWidget(more);
+    layout->addLayout(top);
+
+    // The plan in numbers; each one also shows or hides its lines.
     auto* filters = new QHBoxLayout;
-    filters->setSpacing(6);
-    filters->addWidget(new QLabel(tr("Show:"), this));
+    filters->setSpacing(4);
     m_model = new SyncModel(this);
     for (int g = 0; g < SyncModel::GroupCount; ++g) {
         m_show[g] = new QToolButton(this);
@@ -307,25 +396,22 @@ SyncDialog::SyncDialog(const QString& left, const QString& right, Runner runner,
         m_show[g]->setCheckable(true);
         m_show[g]->setChecked(m_model->isShown(g));
         m_show[g]->setFocusPolicy(Qt::NoFocus);
+        m_show[g]->setToolTip(tr("Show or hide these lines"));
         filters->addWidget(m_show[g]);
         connect(m_show[g], &QToolButton::toggled, this, [this, g](bool on) {
             m_model->setShown(g, on);
             updateSummary();
         });
     }
-    m_show[SyncModel::GroupToRight]->setToolTip(tr("Copied to the right"));
-    m_show[SyncModel::GroupToLeft]->setToolTip(tr("Copied to the left"));
-    m_show[SyncModel::GroupDiffers]->setToolTip(tr("Different, but left alone"));
-    m_show[SyncModel::GroupEqual]->setToolTip(tr("Identical"));
-    m_show[SyncModel::GroupDelete]->setToolTip(tr("Deleted (to the trash)"));
     filters->addStretch(1);
-    auto* keys = new QLabel(tr("← → direction · Space: leave alone · Del: delete · Enter: diff · Ctrl+Enter: synchronize"), this);
-    keys->setObjectName(QStringLiteral("summary"));
-    filters->addWidget(keys);
+    m_status = new QLabel(this);
+    m_status->setObjectName(QStringLiteral("status"));
+    filters->addWidget(m_status);
     layout->addLayout(filters);
 
     m_view = new QTreeView(this);
     m_view->setModel(m_model);
+    m_view->setItemDelegate(new SyncDelegate(m_view));
     m_view->setRootIsDecorated(false);
     m_view->setUniformRowHeights(true);
     m_view->setAlternatingRowColors(true);
@@ -336,36 +422,35 @@ SyncDialog::SyncDialog(const QString& left, const QString& right, Runner runner,
     m_view->installEventFilter(this);
     QHeaderView* h = m_view->header();
     h->setStretchLastSection(false);
-    h->setSectionResizeMode(SyncModel::Name, QHeaderView::Stretch);
-    h->setSectionResizeMode(SyncModel::Action, QHeaderView::Fixed);
-    h->resizeSection(SyncModel::Action, 56);
-    for (int c : {SyncModel::LeftSize, SyncModel::RightSize})
-        h->resizeSection(c, 100);
-    for (int c : {SyncModel::LeftTime, SyncModel::RightTime})
-        h->resizeSection(c, 150);
+    h->setSectionResizeMode(SyncModel::Item, QHeaderView::Stretch);
+    h->resizeSection(SyncModel::Action, 130);
+    h->resizeSection(SyncModel::Why, 330);
+    h->resizeSection(SyncModel::Size, 90);
     layout->addWidget(m_view, 1);
 
     auto* bottom = new QHBoxLayout;
-    m_summary = new QLabel(this);
-    m_summary->setObjectName(QStringLiteral("summary"));
-    m_syncButton = new QPushButton(tr("Synchronize"), this);
+    auto* keys = new QLabel(tr("→ ← direction · Space skip · Del delete · Enter show differences · Ctrl+Enter sync"), this);
+    keys->setObjectName(QStringLiteral("keys"));
+    m_syncButton = new QPushButton(tr("Sync"), this);
     m_syncButton->setDefault(true);
+    m_syncButton->setMinimumWidth(140);
     auto* close = new QPushButton(tr("Close"), this);
     close->setAutoDefault(false);
-    bottom->addWidget(m_summary, 1);
-    bottom->addWidget(m_syncButton);
+    bottom->addWidget(keys, 1);
     bottom->addWidget(close);
+    bottom->addWidget(m_syncButton);
     layout->addLayout(bottom);
 
     connect(close, &QPushButton::clicked, this, &QDialog::reject);
     connect(m_syncButton, &QPushButton::clicked, this, &SyncDialog::synchronize);
-    connect(m_compareButton, &QPushButton::clicked, this, &SyncDialog::compare);
-    for (QCheckBox* c : {m_recursive, m_contents, m_hidden})
-        connect(c, &QCheckBox::toggled, this, [this] {
+    for (QAction* a : {m_recursive, m_contents, m_hidden})
+        connect(a, &QAction::toggled, this, [this] {
             saveOptions();
             compare();
         });
-    connect(m_mode, &QComboBox::currentIndexChanged, this, [this] {
+    connect(m_mode, &QButtonGroup::idToggled, this, [this](int, bool on) {
+        if (!on)
+            return;
         saveOptions();
         m_model->applyMode(mode());
         updateSummary();
@@ -381,6 +466,12 @@ SyncDialog::SyncDialog(const QString& left, const QString& right, Runner runner,
     connect(m_view, &QTreeView::customContextMenuRequested, this, &SyncDialog::showContextMenu);
 
     compare();
+}
+
+void SyncDialog::setMode(SyncMode m)
+{
+    if (QAbstractButton* b = m_mode->button(int(m)))
+        b->setChecked(true);
 }
 
 SyncDialog::~SyncDialog()
@@ -413,7 +504,7 @@ void SyncDialog::done(int r)
 
 SyncMode SyncDialog::mode() const
 {
-    return SyncMode(m_mode->currentIndex());
+    return SyncMode(qMax(0, m_mode->checkedId()));
 }
 
 void SyncDialog::saveOptions()
@@ -422,7 +513,7 @@ void SyncDialog::saveOptions()
     s.setValue(QStringLiteral("sync/recursive"), m_recursive->isChecked());
     s.setValue(QStringLiteral("sync/contents"), m_contents->isChecked());
     s.setValue(QStringLiteral("sync/hidden"), m_hidden->isChecked());
-    s.setValue(QStringLiteral("sync/mode"), m_mode->currentIndex());
+    s.setValue(QStringLiteral("sync/mode"), m_mode->checkedId());
 }
 
 void SyncDialog::compare()
@@ -432,7 +523,7 @@ void SyncDialog::compare()
     m_cancel = std::make_shared<std::atomic<bool>>(false);
     m_comparing = true;
     m_syncButton->setEnabled(false);
-    m_summary->setText(tr("Comparing…"));
+    m_status->setText(tr("Comparing …"));
     CompareOptions opt;
     opt.recursive = m_recursive->isChecked();
     opt.contents = m_contents->isChecked();
@@ -450,7 +541,7 @@ void SyncDialog::compare()
             tick.restart();
             postToUi([self, gen, rel] {
                 if (self && gen == self->m_gen)
-                    self->m_summary->setText(tr("Comparing %1 …").arg(rel));
+                    self->m_status->setText(tr("Comparing %1 …").arg(rel));
             });
         };
         auto result = std::make_shared<CompareResult>(compareFolders(left, right, opt, cancel.get(), progress));
@@ -462,7 +553,7 @@ void SyncDialog::compare()
             self->m_comparing = false;
             if (!result->error.isEmpty()) {
                 self->m_model->setItems({}, self->mode());
-                self->m_summary->setText(tr("Cannot compare: %1").arg(result->error));
+                self->m_status->setText(tr("Cannot compare: %1").arg(result->error));
                 return;
             }
             self->m_model->setItems(std::move(result->items), self->mode());
@@ -477,9 +568,26 @@ void SyncDialog::compare()
 
 void SyncDialog::updateFilters()
 {
-    static const char* const symbols[] = {"→", "←", "≠", "=", "✕"};
-    for (int g = 0; g < SyncModel::GroupCount; ++g)
-        m_show[g]->setText(QStringLiteral("%1  %2").arg(QString::fromUtf8(symbols[g])).arg(m_model->groupCount(g)));
+    int64_t bytes[SyncModel::GroupCount] = {};
+    int count[SyncModel::GroupCount] = {};
+    for (size_t i = 0; i < m_model->items().size(); ++i) {
+        const int g = m_model->groupOf(i);
+        const CompareItem& it = m_model->items()[i];
+        count[g] += 1;
+        if (g == SyncModel::GroupToRight)
+            bytes[g] += qMax<int64_t>(0, it.left.size);
+        else if (g == SyncModel::GroupToLeft)
+            bytes[g] += qMax<int64_t>(0, it.right.size);
+    }
+    m_show[SyncModel::GroupToRight]->setText(
+        count[0] ? tr("→ %1 to the right · %2").arg(count[0]).arg(formatSize(bytes[0])) : tr("→ none to the right"));
+    m_show[SyncModel::GroupToLeft]->setText(
+        count[1] ? tr("← %1 to the left · %2").arg(count[1]).arg(formatSize(bytes[1])) : tr("← none to the left"));
+    m_show[SyncModel::GroupDiffers]->setText(tr("%1 skipped or to decide").arg(count[2]));
+    m_show[SyncModel::GroupEqual]->setText(tr("= %1 identical").arg(count[3]));
+    m_show[SyncModel::GroupDelete]->setText(tr("✕ %1 to the trash").arg(count[4]));
+    for (int g : {int(SyncModel::GroupDiffers), int(SyncModel::GroupDelete)})
+        m_show[g]->setVisible(count[g] > 0);
 }
 
 void SyncDialog::updateSummary()
@@ -488,32 +596,18 @@ void SyncDialog::updateSummary()
     if (m_comparing)
         return;
     const SyncPlan plan = buildSyncPlan(m_left, m_right, m_model->items(), m_model->actions());
-    int toRight = 0, toLeft = 0;
-    int64_t rightBytes = 0, leftBytes = 0;
-    for (size_t i = 0; i < m_model->items().size(); ++i) {
-        const CompareItem& it = m_model->items()[i];
-        if (m_model->actions()[i] == SyncAction::ToRight) {
-            ++toRight;
-            rightBytes += qMax<int64_t>(0, it.left.size);
-        } else if (m_model->actions()[i] == SyncAction::ToLeft) {
-            ++toLeft;
-            leftBytes += qMax<int64_t>(0, it.right.size);
-        }
-    }
-    QStringList parts;
-    if (toRight)
-        parts << tr("%1 → right (%2)").arg(toRight).arg(formatSize(rightBytes));
-    if (toLeft)
-        parts << tr("%1 ← left (%2)").arg(toLeft).arg(formatSize(leftBytes));
-    if (!plan.deletions.isEmpty())
-        parts << tr("%1 to the trash").arg(plan.deletions.size());
-    if (parts.isEmpty())
-        parts << (m_model->items().empty() || m_model->groupCount(SyncModel::GroupEqual) == int(m_model->items().size())
-                      ? tr("The folders are in sync")
-                      : tr("Nothing selected to synchronize"));
+    const int n = int(plan.copies.size() + plan.deletions.size());
     const bool busy = !m_running.isEmpty();
-    m_summary->setText(busy ? tr("Synchronizing…") : parts.join(QStringLiteral("   ·   ")));
-    m_syncButton->setEnabled(!busy && (!plan.copies.isEmpty() || !plan.deletions.isEmpty()));
+    if (busy)
+        m_status->setText(tr("Synchronizing …"));
+    else if (n == 0)
+        m_status->setText(m_model->items().empty() || m_model->groupCount(SyncModel::GroupEqual) == int(m_model->items().size())
+                              ? tr("✓ The folders are in sync")
+                              : tr("Nothing chosen to sync"));
+    else
+        m_status->clear();
+    m_syncButton->setEnabled(!busy && n > 0);
+    m_syncButton->setText(n > 0 ? plural(tr("Sync %n item(s)", nullptr, n), n) : tr("Sync"));
 }
 
 void SyncDialog::setActionOnSelection(SyncAction a)

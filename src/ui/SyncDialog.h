@@ -5,12 +5,13 @@
 #include <QAbstractTableModel>
 #include <QDialog>
 #include <QPointer>
+#include <QStyledItemDelegate>
 
 #include <functional>
 #include <memory>
 
-class QCheckBox;
-class QComboBox;
+class QAction;
+class QButtonGroup;
 class QLabel;
 class QPushButton;
 class QToolButton;
@@ -23,7 +24,7 @@ class Job;
 class SyncModel : public QAbstractTableModel {
     Q_OBJECT
 public:
-    enum Column { Name, LeftSize, LeftTime, Action, RightTime, RightSize, ColCount };
+    enum Column { Action, Item, Why, Size, ColCount };
     // Row groups for the "show" toggles.
     enum Group { GroupToRight, GroupToLeft, GroupDiffers, GroupEqual, GroupDelete, GroupCount };
 
@@ -58,8 +59,18 @@ private:
     bool m_shown[GroupCount] = {true, true, true, false, true};
 };
 
-// Compare two folder trees and copy (or delete) what differs, TC's
-// "Synchronize directories". Comparing runs off the UI thread.
+// Pill for the action, the path with its folder dimmed.
+class SyncDelegate : public QStyledItemDelegate {
+    Q_OBJECT
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+    void paint(QPainter* p, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+};
+
+// Compare two folder trees and copy (or delete) what differs. The list is
+// the plan: one line per difference, what will happen and why. Comparing
+// runs off the UI thread and again whenever an option changes.
 class SyncDialog : public QDialog {
     Q_OBJECT
 public:
@@ -72,6 +83,7 @@ public:
     SyncModel* model() const { return m_model; }
     QTreeView* view() const { return m_view; }
     void synchronize();
+    void setMode(SyncMode mode);  // the direction toggle
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;
@@ -92,14 +104,13 @@ private:
     Runner m_runner;
     SyncModel* m_model;
     QTreeView* m_view;
-    QCheckBox* m_recursive;
-    QCheckBox* m_contents;
-    QCheckBox* m_hidden;
-    QComboBox* m_mode;
+    QAction* m_recursive;
+    QAction* m_contents;
+    QAction* m_hidden;
+    QButtonGroup* m_mode;
     QToolButton* m_show[5];
-    QLabel* m_summary;
+    QLabel* m_status;
     QLabel* m_paths;
-    QPushButton* m_compareButton;
     QPushButton* m_syncButton;
     bool m_comparing = false;
     std::shared_ptr<std::atomic<bool>> m_cancel;
