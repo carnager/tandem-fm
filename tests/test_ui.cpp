@@ -2114,6 +2114,28 @@ private slots:
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickViewRight") == nullptr);
         QSettings().setValue("view/preview", false);
 
+        // Alt+A on the server: its own permissions tools, its users.
+        ::chmod(QFile::encodeName(L("remote/readme.txt")).constData(), 0600);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+        m_right->refresh();
+        QTRY_VERIFY(rightModel()->rowOf("readme.txt") >= 0);
+        moveCursorTo(m_right, "readme.txt");
+        auto permsChecked = std::make_shared<bool>(false);
+        answerNextDialog([permsChecked](QWidget* w) {
+            auto* dlg = qobject_cast<PermissionsDialog*>(w);
+            QVERIFY(dlg);
+            QCOMPARE(dlg->octalEdit()->text(), QString("600"));
+            QVERIFY(dlg->addEdit());  // extra people and groups: the server has getfacl
+            dlg->bitBox(1, 1)->click();  // group may write
+            *permsChecked = true;
+            dlg->applyButton()->click();
+        });
+        QTest::keyClick(m_right->view(), Qt::Key_A, Qt::AltModifier);
+        QTRY_VERIFY_WITH_TIMEOUT(*permsChecked, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(readPermissions(L("remote/readme.txt")).mode, 0620u, 10000);
+
         // A bare address opens the login's home folder.
         m_right->connectTo(server.location().chopped(1));
         QTRY_COMPARE_WITH_TIMEOUT(rightModel()->path(), server.location(QDir::homePath()), 10000);

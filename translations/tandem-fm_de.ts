@@ -1137,7 +1137,7 @@
     </message>
     <message>
         <source>As &quot;checksum  name&quot; lines, like sha256sum prints them</source>
-        <translation>Als Zeilen "prüfsumme  name", wie sha256sum sie ausgibt</translation>
+        <translation>Als Zeilen &quot;prüfsumme  name&quot;, wie sha256sum sie ausgibt</translation>
     </message>
     <message>
         <source>Save next to each file</source>
@@ -3528,10 +3528,6 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Ordner darin bleiben zu öffnen, wo sie lesbar sind; Dateien behalten ihr Ausführrecht, außer du setzt es hier</translation>
     </message>
     <message>
-        <source>On a server only these basic permissions can be changed.</source>
-        <translation>Auf einem Server lassen sich nur diese grundlegenden Berechtigungen ändern.</translation>
-    </message>
-    <message>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
@@ -3566,6 +3562,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Remove</source>
         <translation>Entfernen</translation>
+    </message>
+    <message>
+        <source>This server only lets Tandem change the basic permissions (no shell login).</source>
+        <translation>Dieser Server lässt Tandem nur die grundlegenden Berechtigungen ändern (kein Shell-Login).</translation>
     </message>
     <message>
         <source> (group)</source>

@@ -9,6 +9,7 @@
 
 #include "core/Backend.h"
 #include "core/Keyring.h"
+#include "core/Permissions.h"
 #include "core/Util.h"
 
 #ifdef TANDEM_HAVE_LIBSSH
@@ -617,13 +618,19 @@ public:
     // One "find" on the server instead of a listing per folder: what rsync
     // does too. Needs a shell login with GNU find; sftp-only accounts and
     // BusyBox say no (or stay silent), and the caller walks instead.
-    bool listTree(const QString& path, bool hidden, Tree& out, const std::atomic<bool>* cancel) override
+    // A command on the server over the same SSH connection (when it lets us:
+    // sftp-only accounts don't, and a forced sftp-server never answers).
+    struct RunResult {
+        bool ran = false;
+        int status = -1;
+        QByteArray out, err;
+    };
+    RunResult runCommand(const QString& location, const QByteArray& cmd, const std::atomic<bool>* cancel = nullptr)
     {
+        RunResult r;
         if (qEnvironmentVariableIsSet("TANDEM_SFTP_NO_EXEC"))
-            return false;
-        QByteArray data;
-        bool ok = false;
-        withConn(path, [&](Conn* c) {
+            return r;
+        withConn(location, [&](Conn* c) {
             ssh_channel ch = ssh_channel_new(c->ssh);
             if (!ch)
                 return EIO;
@@ -631,33 +638,29 @@ public:
                 ssh_channel_free(ch);
                 return ENOTSUP;
             }
-            QByteArray dir = remotePath(path);
-            dir.replace('\'', "'\\''");
-            const QByteArray cmd = "LC_ALL=C find '" + dir + "' -mindepth 1 " +
-                                   (hidden ? QByteArray() : QByteArray("\\( -name '.*' -prune \\) -o ")) +
-                                   "-printf '%y %Y %s %T@ %m %P\\0'";
             if (ssh_channel_request_exec(ch, cmd.constData()) != SSH_OK) {
                 ssh_channel_close(ch);
                 ssh_channel_free(ch);
                 return ENOTSUP;
             }
             char buf[65536];
-            QElapsedTimer silent;  // a forced sftp-server never answers: give up then
+            QElapsedTimer silent;
             silent.start();
             while (!(cancel && cancel->load())) {
                 const int n = ssh_channel_read_timeout(ch, buf, sizeof buf, 0, 500);
-                if (n > 0) {
-                    data.append(buf, n);
+                bool got = n > 0;
+                if (n > 0)
+                    r.out.append(buf, n);
+                for (int e; (e = ssh_channel_read_timeout(ch, buf, sizeof buf, 1, 0)) > 0;) {
+                    r.err.append(buf, e);
+                    got = true;
+                }
+                if (got)
                     silent.restart();
-                } else if (n == SSH_ERROR) {
+                else if (n == SSH_ERROR || ssh_channel_is_eof(ch))
                     break;
-                } else if (ssh_channel_is_eof(ch)) {
+                else if (r.out.isEmpty() && r.err.isEmpty() && silent.elapsed() > 8000)
                     break;
-                } else if (data.isEmpty() && silent.elapsed() > 8000) {
-                    break;
-                }
-                while (ssh_channel_read_timeout(ch, buf, sizeof buf, 1, 0) > 0) {  // drain stderr
-                }
             }
             const bool eof = ssh_channel_is_eof(ch);
             ssh_channel_send_eof(ch);
@@ -665,13 +668,230 @@ public:
             uint32_t code = 0;
             char* signal = nullptr;
             int core = 0;
-            const int status = eof && ssh_channel_get_exit_state(ch, &code, &signal, &core) == SSH_OK && !signal ? int(code) : -1;
+            r.status = eof && ssh_channel_get_exit_state(ch, &code, &signal, &core) == SSH_OK && !signal ? int(code) : -1;
             ssh_string_free_char(signal);
             ssh_channel_free(ch);
-            // Unreadable subfolders make find exit 1 but the rest is fine.
-            ok = eof && (status == 0 || (status == 1 && !data.isEmpty()));
+            r.ran = eof;
             return 0;
         });
+        return r;
+    }
+    static QByteArray shellQuote(QByteArray s)
+    {
+        s.replace('\'', "'\\''");
+        return '\'' + s + '\'';
+    }
+
+    // ---------------------------------------------------------- permissions
+    // stat and getfacl/setfacl run on the server: its users, its ACLs.
+
+    static uint32_t rwxBits(const QByteArray& s)
+    {
+        return (s.contains('r') ? PermRead : 0) | (s.contains('w') ? PermWrite : 0) | (s.contains('x') ? PermExec : 0);
+    }
+    static QByteArray rwxText(uint32_t p, bool smartX = false)
+    {
+        QByteArray t;
+        t += (p & PermRead) ? 'r' : '-';
+        t += (p & PermWrite) ? 'w' : '-';
+        t += (p & PermExec) ? (smartX ? 'X' : 'x') : '-';
+        return t;
+    }
+
+    bool readPermissions(const QString& path, PermInfo& info) override
+    {
+        const QByteArray q = shellQuote(remotePath(path));
+        const QByteArray script = "LC_ALL=C; export LC_ALL; stat -L -c '%a|%u|%g|%U|%G|%F' -- " + q +
+                                  " || exit 3; command -v getfacl >/dev/null 2>&1 || exit 0; "
+                                  "echo ::A; getfacl -cpn -- " + q + "; echo ::a; getfacl -cp -- " + q +
+                                  "; echo ::D; getfacl -cpdn -- " + q + "; echo ::d; getfacl -cpd -- " + q;
+        const RunResult r = runCommand(path, "sh -c " + shellQuote(script));
+        if (!r.ran || r.status != 0)
+            return false;
+        const QList<QByteArray> lines = r.out.split('\n');
+        const QList<QByteArray> st = lines.value(0).split('|');
+        if (st.size() < 6)
+            return false;
+        info = PermInfo{};
+        info.mode = st[0].toUInt(nullptr, 8) & 07777;
+        info.uid = st[1].toUInt();
+        info.gid = st[2].toUInt();
+        info.owner = QString::fromUtf8(st[3]);
+        info.group = QString::fromUtf8(st[4]);
+        info.isDir = st[5].contains("directory");
+        info.fsName = QStringLiteral("sftp");
+        // Sections: ::A numeric, ::a names (same lines), ::D/::d the defaults.
+        QHash<QByteArray, QList<QByteArray>> sec;
+        QByteArray cur;
+        for (int i = 1; i < lines.size(); ++i) {
+            const QByteArray l = lines[i].trimmed();
+            if (l.startsWith("::"))
+                cur = l.mid(2);
+            else if (!l.isEmpty() && !cur.isEmpty())
+                sec[cur] << l;
+        }
+        info.aclSupported = sec.contains("A") || sec.contains("a");
+        auto parse = [](const QList<QByteArray>& num, const QList<QByteArray>& names, uint32_t* base, int* mask) {
+            QList<AclEntry> named;
+            *mask = -1;
+            for (int i = 0; i < num.size(); ++i) {
+                const QList<QByteArray> f = num[i].split(':');
+                if (f.size() < 3)
+                    continue;
+                const uint32_t p = rwxBits(f[2]);
+                if (f[0] == "mask") {
+                    *mask = int(p);
+                } else if (f[1].isEmpty()) {
+                    if (f[0] == "user")
+                        *base |= p << 6;
+                    else if (f[0] == "group")
+                        *base |= p << 3;
+                    else if (f[0] == "other")
+                        *base |= p;
+                } else if (f[0] == "user" || f[0] == "group") {
+                    AclEntry e;
+                    e.isGroup = f[0] == "group";
+                    e.id = f[1].toUInt();
+                    const QList<QByteArray> n = names.value(i).split(':');
+                    e.name = QString::fromUtf8(n.value(1, f[1]));
+                    e.perms = p;
+                    named << e;
+                }
+            }
+            if (*mask >= 0) {  // as it applies
+                *base = (*base & ~0070u) | (*base & (uint32_t(*mask) << 3));
+                for (AclEntry& e : named)
+                    e.perms &= uint32_t(*mask);
+            }
+            return named;
+        };
+        uint32_t base = 0;
+        int mask = -1;
+        info.acl = parse(sec.value("A"), sec.value("a"), &base, &mask);
+        if (!info.acl.isEmpty())
+            info.mode = (info.mode & ~0070u) | (base & 0070);
+        if (info.isDir && !sec.value("D").isEmpty()) {
+            uint32_t dbase = 0;
+            int dmask = -1;
+            info.defaultAcl = parse(sec.value("D"), sec.value("d"), &dbase, &dmask);
+            info.hasDefault = true;
+            info.defaultBase = dbase;
+        }
+        return true;
+    }
+
+    int applyPermissions(const QString& path, const PermChange& c, QString* what) override
+    {
+        const QByteArray q = shellQuote(remotePath(path));
+        const QByteArray R = c.recursive ? "-R " : "";
+        const bool smart = c.recursive && c.smartExec;
+        QList<QByteArray> steps;
+        if (c.uid)
+            steps << "chown " + R + QByteArray::number(*c.uid) + " -- " + q;
+        if (c.gid)
+            steps << "chgrp " + R + QByteArray::number(*c.gid) + " -- " + q;
+        // Bits as chmod's symbolic form, so each item keeps what isn't mentioned.
+        QList<QByteArray> sym;
+        const char who[] = {'u', 'g', 'o'};
+        for (int k = 0; k < 3; ++k) {
+            const int shift = 6 - 3 * k;
+            for (const auto& [bits, sign] : {std::pair{c.setBits, '+'}, std::pair{c.clearBits, '-'}}) {
+                QByteArray part;
+                if (bits & (4u << shift))
+                    part += 'r';
+                if (bits & (2u << shift))
+                    part += 'w';
+                if (bits & (1u << shift))
+                    part += (smart && sign == '+') ? 'X' : 'x';
+                if (!part.isEmpty())
+                    sym << QByteArray(1, who[k]) + sign + part;
+            }
+        }
+        for (const auto& [bit, spec] : {std::pair{04000u, "u%cs"}, std::pair{02000u, "g%cs"}, std::pair{01000u, "%ct"}}) {
+            if (c.setBits & bit)
+                sym << QByteArray(spec).replace("%c", "+");
+            if (c.clearBits & bit)
+                sym << QByteArray(spec).replace("%c", "-");
+        }
+        if (!sym.isEmpty())
+            steps << "chmod " + R + sym.join(',') + " -- " + q;
+        auto spec = [&](const QList<AclEntry>& list, bool withPerms) {
+            QList<QByteArray> parts;
+            for (const AclEntry& e : list)
+                parts << QByteArray(e.isGroup ? "g:" : "u:") + QByteArray::number(e.id) +
+                             (withPerms ? ":" + rwxText(e.perms, smart) : QByteArray());
+            return parts.join(',');
+        };
+        if (c.clearAcl)
+            steps << "setfacl " + R + "-b -- " + q;
+        if (!c.aclRemove.isEmpty())
+            steps << "setfacl " + R + "-x " + shellQuote(spec(c.aclRemove, false)) + " -- " + q;
+        if (!c.aclSet.isEmpty())
+            steps << "setfacl " + R + "-m " + shellQuote(spec(c.aclSet, true)) + " -- " + q;
+        // Defaults belong to folders: in a tree, to every folder in it.
+        auto onFolders = [&](const QByteArray& args) {
+            return c.recursive ? "find " + q + " -type d -exec setfacl " + args + " {} +" : "setfacl " + args + " -- " + q;
+        };
+        if (c.defaultEnabled && !*c.defaultEnabled)
+            steps << onFolders("-k");
+        if (!c.defaultRemove.isEmpty())
+            steps << onFolders("-d -x " + shellQuote(spec(c.defaultRemove, false)));
+        if (!c.defaultSet.isEmpty())
+            steps << onFolders("-d -m " + shellQuote(spec(c.defaultSet, true)));
+        if (steps.isEmpty())
+            return 0;
+        const RunResult r = runCommand(path, "sh -c " + shellQuote("LC_ALL=C; export LC_ALL; " + steps.join(" && ")));
+        if (!r.ran)
+            return ENOTSUP;
+        if (r.status == 0)
+            return 0;
+        const QString err = QString::fromUtf8(r.err).trimmed().section(QLatin1Char('\n'), 0, 0);
+        if (what)
+            *what = err;
+        if (err.contains(QLatin1String("not permitted")))
+            return EPERM;
+        if (err.contains(QLatin1String("not supported")))
+            return EOPNOTSUPP;
+        return EIO;
+    }
+
+    bool listAccounts(const QString& location, QList<QPair<QString, uint32_t>>& users,
+                      QList<QPair<QString, uint32_t>>& groups) override
+    {
+        const RunResult r = runCommand(location, "sh -c " + shellQuote("{ getent passwd || cat /etc/passwd; } | cut -d: -f1,3; "
+                                                                      "echo ::G; { getent group || cat /etc/group; } | cut -d: -f1,3"));
+        if (!r.ran || r.status != 0)
+            return false;
+        bool inGroups = false;
+        for (const QByteArray& line : r.out.split('\n')) {
+            if (line == "::G") {
+                inGroups = true;
+                continue;
+            }
+            const int colon = int(line.indexOf(':'));
+            if (colon <= 0)
+                continue;
+            (inGroups ? groups : users).append({QString::fromUtf8(line.left(colon)), line.mid(colon + 1).toUInt()});
+        }
+        auto person = [](uint32_t id) { return id >= 1000 && id < 60000; };
+        for (auto* list : {&users, &groups})
+            std::sort(list->begin(), list->end(), [&](const auto& a, const auto& b) {
+                if (person(a.second) != person(b.second))
+                    return person(a.second);
+                return a.first.compare(b.first, Qt::CaseInsensitive) < 0;
+            });
+        return !users.isEmpty();
+    }
+
+    bool listTree(const QString& path, bool hidden, Tree& out, const std::atomic<bool>* cancel) override
+    {
+        const QByteArray cmd = "LC_ALL=C find " + shellQuote(remotePath(path)) + " -mindepth 1 " +
+                               (hidden ? QByteArray() : QByteArray("\\( -name '.*' -prune \\) -o ")) +
+                               "-printf '%y %Y %s %T@ %m %P\\0'";
+        const RunResult run = runCommand(path, cmd, cancel);
+        // Unreadable subfolders make find exit 1 but the rest is fine.
+        const bool ok = run.ran && (run.status == 0 || (run.status == 1 && !run.out.isEmpty()));
+        const QByteArray& data = run.out;
         if (!ok || (cancel && cancel->load()))
             return false;
         out.clear();

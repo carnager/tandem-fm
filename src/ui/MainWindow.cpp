@@ -1703,9 +1703,13 @@ void MainWindow::editPermissions()
     QPointer<Panel> panel(p);
     ioPool()->start([self, panel, paths, remote] {
         auto infos = std::make_shared<QList<PermInfo>>();
+        auto accounts = std::make_shared<PermAccounts>(remote ? PermAccounts{} : PermAccounts::local());
+        Backend* b = remote ? backendFor(paths.first()) : nullptr;
         for (const QString& path : paths) {
-            if (remote) {
-                PermInfo i;
+            PermInfo i;
+            if (!remote) {
+                i = readPermissions(path);
+            } else if (!b || !b->readPermissions(path, i)) {  // no shell there: what stat says
                 FileStat st;
                 i.error = statAt(path, st);
                 i.isDir = st.isDir;
@@ -1716,12 +1720,12 @@ void MainWindow::editPermissions()
                     i.posixPerms = false;
                     i.fsName = tr("a Windows (SMB) share");
                 }
-                infos->append(i);
-            } else {
-                infos->append(readPermissions(path));
             }
+            infos->append(i);
         }
-        postToUi([self, panel, paths, remote, infos] {
+        if (b && !infos->isEmpty() && infos->first().aclSupported)
+            b->listAccounts(paths.first(), accounts->users, accounts->groups);
+        postToUi([self, panel, paths, remote, infos, accounts] {
             if (!self || !panel)
                 return;
             for (int k = 0; k < infos->size(); ++k)
@@ -1729,7 +1733,7 @@ void MainWindow::editPermissions()
                     panel->showMessage(tr("Cannot read %1: %2").arg(baseName(paths[k]), errnoString(infos->at(k).error)), true);
                     return;
                 }
-            PermissionsDialog dlg(paths, *infos, remote, self);
+            PermissionsDialog dlg(paths, *infos, remote, *accounts, self);
             if (dlg.exec() != QDialog::Accepted)
                 return;
             const PermChange change = dlg.change();
@@ -1741,14 +1745,19 @@ void MainWindow::editPermissions()
                 self->m_jobs->add(job);
                 return;
             }
-            // Servers: the mode bits, one item at a time.
+            // Servers: their own tools when they let us, else the mode bits one by one.
             ioPool()->start([panel, paths, infos, change] {
                 QStringList errors;
                 for (int k = 0; k < paths.size(); ++k) {
                     Backend* b = backendFor(paths[k]);
-                    const uint32_t mode = ((infos->at(k).mode & ~change.clearBits) | change.setBits) & 07777;
-                    if (const int e = b ? b->chmod(paths[k], mode) : ENOTSUP)
-                        errors << tr("%1: %2").arg(baseName(paths[k]), errnoString(e));
+                    QString what;
+                    int e = b ? b->applyPermissions(paths[k], change, &what) : ENOTSUP;
+                    if (e == ENOTSUP && b) {
+                        what.clear();
+                        e = b->chmod(paths[k], ((infos->at(k).mode & ~change.clearBits) | change.setBits) & 07777);
+                    }
+                    if (e)
+                        errors << tr("%1: %2").arg(baseName(paths[k]), what.isEmpty() ? errnoString(e) : what);
                 }
                 postToUi([panel, errors] {
                     if (!panel)

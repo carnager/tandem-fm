@@ -4,6 +4,8 @@
 
 #include <QDialog>
 
+#include <optional>
+
 class QCheckBox;
 class QComboBox;
 class QGridLayout;
@@ -14,13 +16,24 @@ class QVBoxLayout;
 
 namespace tandem {
 
+// Who can be picked as owner, group or extra entry: this machine's accounts,
+// or a server's.
+struct PermAccounts {
+    QList<QPair<QString, uint32_t>> users, groups;
+    QList<uint32_t> pickableGroups;  // groups the owner may hand items to; empty: all
+    bool canChangeOwner = false;
+    static PermAccounts local();
+};
+
 // Alt+A: who may read, change and run the selected items, the extra users
 // and groups (ACLs) and filesystem flags, with a preview of the change.
-// Items on servers get the basic bits only.
+// On SFTP servers with a shell the server's own tools do it (its users,
+// its ACLs); elsewhere on servers the basic bits only.
 class PermissionsDialog : public QDialog {
     Q_OBJECT
 public:
-    PermissionsDialog(QStringList paths, QList<PermInfo> infos, bool remote, QWidget* parent = nullptr);
+    PermissionsDialog(QStringList paths, QList<PermInfo> infos, bool remote, PermAccounts accounts = PermAccounts::local(),
+                      QWidget* parent = nullptr);
 
     PermChange change() const;
     // For tests.
@@ -46,6 +59,8 @@ private:
     QStringList m_paths;
     QList<PermInfo> m_infos;
     bool m_remote;
+    PermAccounts m_accounts;
+    std::optional<uint32_t> idOf(const QString& name, bool group) const;
     bool m_editable = true;
     QCheckBox* m_bits[12] = {};  // 0..8: rwx for owner/group/other, 9 setuid, 10 setgid, 11 sticky
     Qt::CheckState m_initial[12] = {};

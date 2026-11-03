@@ -1539,6 +1539,32 @@ private slots:
         QVERIFY(same.error.isEmpty());
         for (const CompareItem& it : same.items)
             QVERIFY2(it.diff == Diff::Equal, qPrintable(it.rel));
+        // Permissions as the server sees them, changed with its own tools.
+        writeFile(base + "/srv/perm.txt", "p");
+        ::chmod(QFile::encodeName(base + "/srv/perm.txt").constData(), 0600);
+        PermInfo remote;
+        QVERIFY(b->readPermissions(S + "/perm.txt", remote));
+        QCOMPARE(remote.mode, 0600u);
+        QCOMPARE(remote.owner, readPermissions(base + "/srv/perm.txt").owner);
+        PermChange pc;
+        pc.setBits = 0040;
+        if (remote.aclSupported && readPermissions(base + "/srv/perm.txt").aclSupported)
+            pc.aclSet << AclEntry{false, 65534, QString(), PermRead | PermWrite};
+        QString what;
+        QCOMPARE(b->applyPermissions(S + "/perm.txt", pc, &what), 0);
+        const PermInfo after = readPermissions(base + "/srv/perm.txt");
+        QCOMPARE(after.mode, 0640u);
+        if (!pc.aclSet.isEmpty()) {
+            QCOMPARE(after.acl.size(), 1);
+            QVERIFY(b->readPermissions(S + "/perm.txt", remote));
+            QCOMPARE(remote.acl.size(), 1);
+            QCOMPARE(remote.acl[0].id, 65534u);
+            QCOMPARE(remote.mode, 0640u);  // the group's bits, not the mask
+        }
+        QList<QPair<QString, uint32_t>> users, groups;
+        QVERIFY(b->listAccounts(S, users, groups));
+        QVERIFY(std::any_of(users.begin(), users.end(), [](const auto& u) { return u.first == qEnvironmentVariable("USER"); }));
+
         qputenv("TANDEM_SFTP_NO_EXEC", "1");  // servers without a shell: walked folder by folder
         QVERIFY(!b->listTree(S, false, tree, nullptr));
         QCOMPARE(directorySizeAt(S + "/sub", nullptr), int64_t(8));

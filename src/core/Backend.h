@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cerrno>
+
 #include <QHash>
 
 #include "core/DirLister.h"
@@ -78,6 +80,27 @@ public:
     virtual bool listTree(const QString& path, bool hidden, Tree& out, const std::atomic<bool>* cancel)
     {
         (void)path, (void)hidden, (void)out, (void)cancel;
+        return false;
+    }
+
+    // Permissions the way the server sees them (its users, its ACLs); false:
+    // can't here, the plain mode from stat() is all there is.
+    virtual bool readPermissions(const QString& path, struct PermInfo& out)
+    {
+        (void)path, (void)out;
+        return false;
+    }
+    // ENOTSUP when readPermissions can't either.
+    virtual int applyPermissions(const QString& path, const struct PermChange& change, QString* what)
+    {
+        (void)path, (void)change, (void)what;
+        return ENOTSUP;
+    }
+    // The server's users and groups (name, id), for pickers.
+    virtual bool listAccounts(const QString& location, QList<QPair<QString, uint32_t>>& users,
+                              QList<QPair<QString, uint32_t>>& groups)
+    {
+        (void)location, (void)users, (void)groups;
         return false;
     }
 

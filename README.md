@@ -178,8 +178,10 @@ their own read/write/run, and for folders "new items inside get the same"
 locked for root). "Also change everything inside" keeps folders openable and
 never makes files executable by accident. FAT/exFAT say they have no Linux
 permissions instead of failing; NFS, SMB and sshfs mounts get the mode bits
-(their own ACL formats are not edited yet); on SFTP servers the mode bits
-are changed directly. libacl is optional at build time.
+(their own ACL formats are not edited yet). On SFTP servers with a shell
+login the editor works in full with the server's own stat, getfacl,
+setfacl, chmod and chown, and offers the server's users and groups; servers
+without a shell get the mode bits. libacl is optional at build time.
 
 ## Viewer (F3) and preview (Ctrl+Q)
 

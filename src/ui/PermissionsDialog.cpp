@@ -65,12 +65,31 @@ QLabel* dimLabel(const QString& text, QWidget* parent)
 
 }  // namespace
 
-PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, bool remote, QWidget* parent)
-    : QDialog(parent), m_paths(std::move(paths)), m_infos(std::move(infos)), m_remote(remote)
+PermAccounts PermAccounts::local()
+{
+    PermAccounts a;
+    a.users = listUsers();
+    a.groups = listGroups();
+    a.canChangeOwner = ::geteuid() == 0;
+    if (!a.canChangeOwner)
+        a.pickableGroups = ownGroups();
+    return a;
+}
+
+std::optional<uint32_t> PermissionsDialog::idOf(const QString& name, bool group) const
+{
+    for (const auto& [n, id] : group ? m_accounts.groups : m_accounts.users)
+        if (n == name)
+            return id;
+    return std::nullopt;
+}
+
+PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, bool remote, PermAccounts accounts, QWidget* parent)
+    : QDialog(parent), m_paths(std::move(paths)), m_infos(std::move(infos)), m_remote(remote), m_accounts(std::move(accounts))
 {
     const int n = int(m_infos.size());
     const PermInfo& first = m_infos.first();
-    bool anyDir = false, allDirs = true, aclOk = !remote, posix = true, sameOwner = true, sameGroup = true;
+    bool anyDir = false, allDirs = true, aclOk = true, posix = true, sameOwner = true, sameGroup = true;
     uint32_t offered = remote ? 0 : ~0u;
     for (const PermInfo& i : std::as_const(m_infos)) {
         anyDir |= i.isDir;
@@ -81,11 +100,11 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
         sameOwner &= i.uid == first.uid;
         sameGroup &= i.gid == first.gid;
     }
-    const bool root = ::geteuid() == 0;
+    const bool root = m_accounts.canChangeOwner;
     bool mine = true;
     for (const PermInfo& i : std::as_const(m_infos))
         mine &= i.uid == ::geteuid();
-    m_editable = posix && (remote || root || mine);
+    m_editable = posix && (remote || root || mine);  // a server says no itself if it must
 
     setWindowTitle(n == 1 ? tr("Permissions of %1").arg(baseName(m_paths.first()))
                           : plural(tr("Permissions of %n item(s)", nullptr, n), n));
@@ -111,7 +130,7 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
     names->addWidget(title);
     QStringList where;
     where << (n == 1 ? parentPath(m_paths.first()) : tr("in %1").arg(parentPath(m_paths.first())));
-    if (!first.fsName.isEmpty() && !remote)
+    if (!first.fsName.isEmpty())
         where << first.fsName;
     names->addWidget(dimLabel(where.join(QStringLiteral("  ·  ")), this));
     head->addLayout(names, 1);
@@ -163,8 +182,8 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
     // Owner and group are picked right in their rows.
     auto accountBox = [&](bool users, bool same, bool canChange) -> QWidget* {
         const QString cur = same ? (users ? first.owner : first.group) : tr("(mixed)");
-        if (!canChange || remote) {
-            auto* l = new QLabel(remote ? QString() : cur, this);
+        if (!canChange || (users ? m_accounts.users : m_accounts.groups).isEmpty()) {
+            auto* l = new QLabel(cur, this);
             l->setContentsMargins(9, 0, 0, 0);  // lines up with the text in a drop-down
             l->setToolTip(users ? tr("Only root can give files to someone else") : QString());
             return l;
@@ -174,12 +193,11 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
         box->setInsertPolicy(QComboBox::NoInsert);
         QStringList names;
         if (users) {
-            for (const auto& u : listUsers())
+            for (const auto& u : std::as_const(m_accounts.users))
                 names << u.first;
         } else {
-            const QList<uint32_t> mineGroups = ownGroups();
-            for (const auto& g : listGroups())
-                if (root || mineGroups.contains(g.second))
+            for (const auto& g : std::as_const(m_accounts.groups))
+                if (m_accounts.pickableGroups.isEmpty() || m_accounts.pickableGroups.contains(g.second))
                     names << g.first;
         }
         if (same && !names.contains(cur))
@@ -195,8 +213,8 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
     const QStringList rowNames = {tr("Owner"), tr("Group"), tr("Everyone else")};
     for (int r = 0; r < 3; ++r) {
         grid->addWidget(new QLabel(rowNames[r], this), r, 0);
-        QWidget* account = r == 0 ? accountBox(true, sameOwner, root)
-                                  : r == 1 ? accountBox(false, sameGroup, root || mine) : new QWidget(this);
+        QWidget* account = r == 0 ? accountBox(true, sameOwner, root || (remote && !m_accounts.users.isEmpty()))
+                                  : r == 1 ? accountBox(false, sameGroup, root || mine || remote) : new QWidget(this);
         account->setFixedWidth(180);
         if (r == 0)
             m_owner = qobject_cast<QComboBox*>(account);
@@ -288,9 +306,9 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
         m_add = new QLineEdit(this);
         m_add->setPlaceholderText(tr("Add a person or group: type a name"));
         QStringList people;
-        for (const auto& u : listUsers())
+        for (const auto& u : std::as_const(m_accounts.users))
             people << tr("%1 (person)").arg(u.first);
-        for (const auto& g : listGroups())
+        for (const auto& g : std::as_const(m_accounts.groups))
             people << tr("%1 (group)").arg(g.first);
         auto* completer = new QCompleter(people, m_add);
         completer->setFilterMode(Qt::MatchContains);
@@ -314,7 +332,7 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
             connect(m_inherit, &QCheckBox::toggled, this, &PermissionsDialog::updatePreview);
             layout->addWidget(m_inherit);
         }
-    } else if (!remote && posix) {
+    } else if (posix) {
         layout->addWidget(dimLabel(first.fsName.isEmpty() || first.fsName == QLatin1String("nfs")
                                        ? tr("Extra people and groups (ACLs) aren't available here.")
                                        : tr("Extra people and groups (ACLs) aren't available on %1.").arg(first.fsName),
@@ -360,7 +378,7 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
         layout->addLayout(flagGrid);
     }
 
-    if (anyDir && !remote && posix) {
+    if (anyDir && posix && (!remote || aclOk)) {
         m_recursive = new QCheckBox(tr("Also change everything inside"), this);
         m_recursive->setToolTip(tr("Folders inside stay openable where they can be read; files keep their run "
                                    "permission as it is unless you set it here"));
@@ -373,8 +391,8 @@ PermissionsDialog::PermissionsDialog(QStringList paths, QList<PermInfo> infos, b
     m_preview = dimLabel(QString(), this);
     m_preview->setTextFormat(Qt::PlainText);
     layout->addWidget(m_preview);
-    if (remote)
-        layout->addWidget(dimLabel(tr("On a server only these basic permissions can be changed."), this));
+    if (remote && !aclOk)
+        layout->addWidget(dimLabel(tr("This server only lets Tandem change the basic permissions (no shell login)."), this));
 
     auto* buttons = new QHBoxLayout;
     buttons->addStretch();
@@ -459,17 +477,16 @@ void PermissionsDialog::addPerson(const QString& textIn)
         }
     }
     AclEntry e;
-    const QByteArray n = text.toLocal8Bit();
     if (!wantGroup) {
-        if (struct passwd* p = ::getpwnam(n.constData())) {
-            e.id = p->pw_uid;
+        if (const auto id = idOf(text, false)) {
+            e.id = *id;
             e.name = text;
         }
     }
     if (e.name.isEmpty() && !wantUser) {
-        if (struct group* g = ::getgrnam(n.constData())) {
+        if (const auto id = idOf(text, true)) {
             e.isGroup = true;
-            e.id = g->gr_gid;
+            e.id = *id;
             e.name = text;
         }
     }
@@ -522,11 +539,11 @@ PermChange PermissionsDialog::change() const
     }
     const PermInfo& first = m_infos.first();
     if (m_owner && !m_owner->currentText().isEmpty() && m_owner->currentText() != first.owner)
-        if (struct passwd* p = ::getpwnam(m_owner->currentText().toLocal8Bit().constData()))
-            c.uid = p->pw_uid;
+        if (const auto id = idOf(m_owner->currentText(), false))
+            c.uid = *id;
     if (m_group && !m_group->currentText().isEmpty() && m_group->currentText() != first.group)
-        if (struct group* g = ::getgrnam(m_group->currentText().toLocal8Bit().constData()))
-            c.gid = g->gr_gid;
+        if (const auto id = idOf(m_group->currentText(), true))
+            c.gid = *id;
 
     if (m_aclRows) {
         QList<AclEntry> now;
