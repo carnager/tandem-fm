@@ -12,6 +12,7 @@
 class QLabel;
 class QLineEdit;
 class QCheckBox;
+class QSlider;
 class QTabBar;
 class QToolButton;
 
@@ -59,14 +60,16 @@ public:
 
     // Tabs have fixed numbers (like yazi): slot 0 takes the lowest free one.
     // Asking for a slot that exists just switches to it.
-    void addTab(const QString& path, bool activate = true, int slot = 0);
+    DirTab* addTab(const QString& path, bool activate = true, int slot = 0);
     void closeCurrentTab();
     void cycleTab(int step);
     void selectSlot(int slot);  // Alt+1…9: go to tab N, creating it here if needed
     QStringList tabPaths() const;
+    QList<bool> tabGrids() const;  // which tabs show thumbnails
     QList<int> tabSlots() const;
     int currentTabIndex() const { return m_current; }
-    void restoreTabs(const QStringList& paths, int current, const QList<int>& numbers = {});
+    void restoreTabs(const QStringList& paths, int current, const QList<int>& numbers = {},
+                     const QList<bool>& grids = {});
 
     void sortBy(SortColumn column);
     SortSpec sortSpec() const;
@@ -100,6 +103,8 @@ public:
 
     void setVimKeys(bool on);
     void setArrowFolders(bool on);
+    void zoomBy(int step);  // +1 bigger, -1 smaller, 0 back to normal
+    void syncZoom();        // the slider shows the zoom of what is shown
     QByteArray headerState() const;
     void restoreHeaderState(const QByteArray& state);
 
@@ -107,6 +112,7 @@ signals:
     void activated(Panel* panel);
     void switchRequested();
     void openFileRequested(const QString& path);
+    void zoomRequested(bool grid, int value);  // list percent, or thumbnail size
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void stateChanged();
     void contextMenuRequested(Panel* panel, const QPoint& globalPos, bool onItem);
@@ -163,6 +169,7 @@ private:
     void updateSearchUi();
     FileView* m_view;
     QLabel* m_status;
+    QSlider* m_zoom = nullptr;
     QLineEdit* m_search;
     QWidget* m_filterBar;
     QLineEdit* m_filterEdit;

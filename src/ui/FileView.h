@@ -36,6 +36,13 @@ public:
     // How much the panel that isn't active fades: 0 (not at all) to 1.
     static void setInactiveDim(double amount);
     static double inactiveDim();
+    // Zoom of the file lists, in percent (both panels alike).
+    static constexpr int kMinZoom = 80, kMaxZoom = 180, kZoomStep = 10;
+    static void setListZoom(int percent);
+    static int listZoom();
+    static QFont zoomed(QFont f);  // a list font at the current zoom
+    void zoomChanged();            // re-measures the rows
+    void columnsMadeForZoom() { m_zoomOfColumns = listZoom(); }  // after setting or restoring widths
     double fade() const { return m_active ? 0.0 : inactiveDim(); }
     void setArrowFolders(bool on) { m_arrowFolders = on; }  // Left/Right leave and enter folders
     // Header state as the user configured it (ignores columns hidden for width).
@@ -67,6 +74,7 @@ signals:
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void dragPathsRequested(QStringList& out);  // panel fills marked/current paths
     void contextMenuRequested(const QPoint& globalPos, int row);  // row -1: empty area
+    void zoomStepRequested(int step);  // Ctrl+wheel: +1 bigger, -1 smaller
 
 protected:
     bool event(QEvent* e) override;
@@ -74,6 +82,7 @@ protected:
     void keyboardSearch(const QString&) override {}
     void focusInEvent(QFocusEvent* e) override;
     void mousePressEvent(QMouseEvent* e) override;
+    void wheelEvent(QWheelEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;
     void mouseReleaseEvent(QMouseEvent* e) override;
     void mouseDoubleClickEvent(QMouseEvent* e) override;
@@ -99,6 +108,7 @@ private:
     bool m_maybeDrag = false;
     bool m_vim = false;
     bool m_arrowFolders = true;
+    int m_zoomOfColumns = 100;  // the zoom the column widths were made for
     QList<int> m_autoHidden;  // columns hidden because the panel is narrow
     qint64 m_lastG = 0;  // for "gg"
     ThumbGrid* m_grid = nullptr;

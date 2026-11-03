@@ -24,9 +24,10 @@ namespace tandem {
 
 FileDelegate::FileDelegate(QTreeView* view) : QStyledItemDelegate(view), m_view(view) {}
 
-QSize FileDelegate::sizeHint(const QStyleOptionViewItem& opt, const QModelIndex&) const
+QSize FileDelegate::sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const
 {
-    const int h = qMax(opt.fontMetrics.height() + 8, 22);
+    const int h = qMax(QFontMetrics(FileView::zoomed(theme().listFont)).height() + 8,
+                       22 * FileView::listZoom() / 100);
     return {40, h};
 }
 
@@ -59,7 +60,7 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
 
     QRect r = opt.rect.adjusted(6, 0, -6, 0);
     if (col == FileModel::ColName) {
-        const int iconSize = 16;
+        const int iconSize = 16 * FileView::listZoom() / 100;
         const QIcon ic = idx.data(Qt::DecorationRole).value<QIcon>();
         const QRect iconRect(r.left(), r.top() + (r.height() - iconSize) / 2, iconSize, iconSize);
         ic.paint(p, iconRect);
@@ -91,7 +92,7 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
             p->setPen(Qt::NoPen);
             p->setBrush(bg);
             p->drawRoundedRect(badge, 3, 3);
-            QFont bf = t.listFont;
+            QFont bf = FileView::zoomed(t.listFont);
             bf.setPointSizeF(bf.pointSizeF() * 0.78);
             bf.setWeight(QFont::Bold);
             p->setFont(bf);
@@ -102,7 +103,7 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
         }
     }
 
-    QFont f = (col == FileModel::ColSize || col == FileModel::ColTime) ? t.numberFont : t.listFont;
+    QFont f = FileView::zoomed((col == FileModel::ColSize || col == FileModel::ColTime) ? t.numberFont : t.listFont);
     if (e->isDir && col == FileModel::ColName)
         f.setWeight(QFont::DemiBold);
     if (e->marked)
@@ -127,6 +128,49 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
 
 namespace {
 double g_inactiveDim = 0.0;
+int g_listZoom = 100;
+}
+
+void FileView::setListZoom(int percent)
+{
+    g_listZoom = qBound(kMinZoom, percent, kMaxZoom);
+}
+
+int FileView::listZoom()
+{
+    return g_listZoom;
+}
+
+QFont FileView::zoomed(QFont f)
+{
+    if (g_listZoom != 100 && f.pointSizeF() > 0)
+        f.setPointSizeF(f.pointSizeF() * g_listZoom / 100.0);
+    return f;
+}
+
+void FileView::zoomChanged()
+{
+    const int iconSize = 16 * g_listZoom / 100;
+    setIconSize(QSize(iconSize, iconSize));
+    // Columns grow and shrink along, keeping widths the user chose.
+    if (model() && m_zoomOfColumns != g_listZoom) {
+        for (int c = FileModel::ColExt; c < header()->count(); ++c)
+            setColumnWidth(c, qRound(columnWidth(c) * double(g_listZoom) / m_zoomOfColumns));
+        m_zoomOfColumns = g_listZoom;
+        fitColumns();
+    }
+    scheduleDelayedItemsLayout();  // rows get their new height
+    viewport()->update();
+}
+
+void FileView::wheelEvent(QWheelEvent* e)
+{
+    if (e->modifiers() & Qt::ControlModifier) {
+        if (const int dy = e->angleDelta().y())
+            emit zoomStepRequested(dy > 0 ? 1 : -1);
+        return;
+    }
+    QTreeView::wheelEvent(e);
 }
 
 void FileView::setInactiveDim(double amount)
@@ -143,6 +187,7 @@ QWidget* FileDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem&
 {
     auto* ed = new QLineEdit(parent);
     ed->setFrame(false);
+    ed->setFont(FileView::zoomed(theme().listFont));
     setThemeStyle(ed, QStringLiteral(
         "QLineEdit { background: @base; color: @text; border: 1px solid @accent; border-radius: 4px; padding: 0 4px; }"));
     return ed;
@@ -244,6 +289,7 @@ void FileView::setThumbnails(bool on)
             m_grid->ensureVisible(currentRow());
     }
     setHeaderHidden(on);  // columns mean nothing in a grid
+    setVerticalScrollBarPolicy(on ? Qt::ScrollBarAlwaysOff : Qt::ScrollBarAsNeeded);  // the grid has its own
 }
 
 bool FileView::thumbnails() const

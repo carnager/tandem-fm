@@ -958,8 +958,16 @@
         <translation>Versteckte Dateien zeigen</translation>
     </message>
     <message>
-        <source>Thumbnails for this folder (Ctrl+wheel: bigger, smaller)</source>
-        <translation>Vorschaubilder für diesen Ordner (Strg+Mausrad: größer, kleiner)</translation>
+        <source>Thumbnails instead of the list, in this tab</source>
+        <translation>Vorschaubilder statt der Liste, in diesem Tab</translation>
+    </message>
+    <message>
+        <source>Zoom in / out (also Ctrl+wheel, or the slider)</source>
+        <translation>Vergrößern / verkleinern (auch Strg+Mausrad oder der Regler)</translation>
+    </message>
+    <message>
+        <source>Normal size</source>
+        <translation>Normale Größe</translation>
     </message>
     <message>
         <source>Sort by name / extension / date / size</source>
@@ -2199,10 +2207,6 @@
         <translation>Mit Server verbinden…</translation>
     </message>
     <message>
-        <source>Thumbnails (for this folder)</source>
-        <translation>Vorschaubilder (für diesen Ordner)</translation>
-    </message>
-    <message>
         <source>Preview: details instead of content</source>
         <translation>Vorschau: Details statt Inhalt</translation>
     </message>
@@ -2565,6 +2569,22 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>&amp;Edit</source>
         <translation>&amp;Bearbeiten</translation>
+    </message>
+    <message>
+        <source>Thumbnails</source>
+        <translation>Vorschaubilder</translation>
+    </message>
+    <message>
+        <source>Zoom in</source>
+        <translation>Vergrößern</translation>
+    </message>
+    <message>
+        <source>Zoom out</source>
+        <translation>Verkleinern</translation>
+    </message>
+    <message>
+        <source>Normal size</source>
+        <translation>Normale Größe</translation>
     </message>
     <message>
         <source>The folder changed while editing; nothing renamed</source>
@@ -3151,6 +3171,10 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Dragging out of archives isn&apos;t supported yet. Use F5 to extract.</source>
         <translation>Ziehen aus Archiven wird noch nicht unterstützt. Mit F5 entpacken.</translation>
+    </message>
+    <message>
+        <source>Zoom (Ctrl+wheel, Ctrl+= and Ctrl+−, Ctrl+0 resets)</source>
+        <translation>Zoom (Strg+Mausrad, Strg+= und Strg+−, Strg+0 setzt zurück)</translation>
     </message>
     <message>
         <source>Dragging files off a server isn&apos;t supported yet. Use F5 to copy.</source>

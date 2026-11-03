@@ -24,7 +24,11 @@ public:
     int columns() const;
     int visibleRows() const;
     void ensureVisible(int row);
-    void setCellSize(int thumb);  // 96 … 256
+    static constexpr int kMinSize = 96, kMaxSize = 256, kSizeStep = 16, kDefaultSize = 150;
+    // The size new grids start with; both panels share it.
+    static void setDefaultSize(int thumb);
+    static int defaultSize();
+    void setCellSize(int thumb);  // kMinSize … kMaxSize
     int cellSize() const { return m_thumb; }
     int rowAt(const QPoint& pos) const;
     QRect cellRect(int row) const;  // in widget coordinates
@@ -48,7 +52,7 @@ private:
     FileView* m_view;
     QScrollBar* m_scroll;
     QPointer<FileModel> m_model;
-    int m_thumb = 150;
+    int m_thumb = defaultSize();
     QHash<QString, QPixmap> m_scaled;  // path|mtime -> thumbnail at the current size
     QSet<QString> m_onScreen;
     QPoint m_pressPos;

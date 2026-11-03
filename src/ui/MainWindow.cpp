@@ -209,6 +209,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
                     handleDrop(urls, dir, action);
                 });
         connect(p, &Panel::contextMenuRequested, this, &MainWindow::showContextMenu);
+        connect(p, &Panel::zoomRequested, this, &MainWindow::setZoom);
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
         connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
         connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
@@ -434,8 +435,12 @@ void MainWindow::createMenus()
         m_right->setShowHidden(m_hiddenAction->isChecked());
     });
     m_hiddenAction->setCheckable(true);
-    addCommand(view, QT_TR_NOOP("Thumbnails (for this folder)"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_F1)},
+    addCommand(view, QT_TR_NOOP("Thumbnails"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_F1)},
                [this] { active()->toggleThumbnails(); });
+    addCommand(view, QT_TR_NOOP("Zoom in"), {K(Qt::CTRL | Qt::Key_Equal), K(Qt::CTRL | Qt::Key_Plus)},
+               [this] { active()->zoomBy(1); });
+    addCommand(view, QT_TR_NOOP("Zoom out"), {K(Qt::CTRL | Qt::Key_Minus)}, [this] { active()->zoomBy(-1); });
+    addCommand(view, QT_TR_NOOP("Normal size"), {K(Qt::CTRL | Qt::Key_0)}, [this] { active()->zoomBy(0); });
     view->addSeparator();
     addCommand(view, QT_TR_NOOP("Preview"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
     addCommand(view, QT_TR_NOOP("Preview: details instead of content"), {K(Qt::CTRL | Qt::Key_I)}, [this] {
@@ -1245,6 +1250,24 @@ void MainWindow::jumpToFolder()
 }
 
 // ------------------------------------------------------------ icon themes
+
+void MainWindow::setZoom(bool grid, int value)
+{
+    if (grid) {
+        ThumbGrid::setDefaultSize(value);
+        QSettings().setValue(QStringLiteral("view/gridSize"), ThumbGrid::defaultSize());
+    } else {
+        FileView::setListZoom(value);
+        QSettings().setValue(QStringLiteral("view/listZoom"), FileView::listZoom());
+    }
+    for (Panel* p : {m_left, m_right}) {
+        if (grid && p->view()->thumbGrid())
+            p->view()->thumbGrid()->setCellSize(ThumbGrid::defaultSize());
+        else if (!grid)
+            p->view()->zoomChanged();
+        p->syncZoom();
+    }
+}
 
 void MainWindow::repaintFileViews()
 {
@@ -2635,6 +2658,12 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     m_left->setVimKeys(vimKeys);
     m_right->setVimKeys(vimKeys);
     FileView::setInactiveDim(s.value(QStringLiteral("view/inactiveDim"), 0).toInt() / 100.0);
+    ThumbGrid::setDefaultSize(s.value(QStringLiteral("view/gridSize"), ThumbGrid::kDefaultSize).toInt());
+    FileView::setListZoom(s.value(QStringLiteral("view/listZoom"), 100).toInt());
+    for (Panel* p : {m_left, m_right}) {
+        p->view()->zoomChanged();
+        p->syncZoom();
+    }
     setFileColorsEnabled(s.value(QStringLiteral("view/fileColors"), false).toBool());
     const bool arrowFolders = s.value(QStringLiteral("input/arrowFolders"), true).toBool();
     m_actions.value(QStringLiteral("arrowFolders"))->setChecked(arrowFolders);
@@ -2666,7 +2695,10 @@ void MainWindow::loadSettings(const QStringList& startPaths)
             tabs = {expandUserPath(QDir::current().absoluteFilePath(startPaths[p.argIndex]))};
             current = 0;
         }
-        p.panel->restoreTabs(tabs, current, numbers);
+        QList<bool> grids;
+        for (const QVariant& v : s.value(QStringLiteral("tabGrids")).toList())
+            grids.append(v.toBool());
+        p.panel->restoreTabs(tabs, current, numbers, grids);
         s.endGroup();
     }
     Panel* act = s.value(QStringLiteral("window/active")).toString() == QLatin1String("right") ? m_right : m_left;
@@ -2694,6 +2726,7 @@ void MainWindow::saveSettings()
     s.setValue(QStringLiteral("window/menuBar"), menuBar()->isVisible());
     s.setValue(QStringLiteral("window/active"), m_active == m_right ? "right" : "left");
     s.setValue(QStringLiteral("view/showHidden"), m_hiddenAction->isChecked());
+    s.remove(QStringLiteral("view/thumbnailFolders"));  // older versions: thumbnails per folder
     for (auto [panel, key] : {std::pair{m_left, "left"}, std::pair{m_right, "right"}}) {
         s.beginGroup(QLatin1String(key));
         s.setValue(QStringLiteral("tabs"), panel->tabPaths());
@@ -2702,6 +2735,10 @@ void MainWindow::saveSettings()
         for (int n : panel->tabSlots())
             numbers.append(n);
         s.setValue(QStringLiteral("tabSlots"), numbers);
+        QVariantList grids;
+        for (bool g : panel->tabGrids())
+            grids.append(g);
+        s.setValue(QStringLiteral("tabGrids"), grids);
         s.setValue(QStringLiteral("sortColumn"), int(panel->sortSpec().column));
         s.setValue(QStringLiteral("sortDescending"), panel->sortSpec().descending);
         s.setValue(QStringLiteral("header"), panel->headerState());

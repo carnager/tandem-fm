@@ -76,6 +76,7 @@ public:
     QString cursorName() const { return m_cursorProvider ? m_cursorProvider() : savedCursor; }
 
     QString savedCursor;
+    bool gridView = false;  // thumbnails instead of the list; stays while moving around
     int savedScroll = 0;
     int slot = 0;  // the tab's fixed number (Alt+slot); tabs are ordered by it
 

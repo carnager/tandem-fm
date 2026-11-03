@@ -36,6 +36,8 @@ public:
     explicit MainWindow(const QStringList& startPaths);
     // "each" (below each panel), "bottom" (below both) or "right".
     void setPreviewPosition(const QString& code);
+    // Zoom of the lists (percent) or the grids (thumbnail size), in both panels; remembered.
+    void setZoom(bool grid, int value);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;

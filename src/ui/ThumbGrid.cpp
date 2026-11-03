@@ -57,9 +57,23 @@ int ThumbGrid::visibleRows() const
     return qMax(1, height() / (cell().height() + spacing()));
 }
 
+namespace {
+int g_thumbSize = ThumbGrid::kDefaultSize;
+}
+
+void ThumbGrid::setDefaultSize(int thumb)
+{
+    g_thumbSize = qBound(kMinSize, thumb, kMaxSize);
+}
+
+int ThumbGrid::defaultSize()
+{
+    return g_thumbSize;
+}
+
 void ThumbGrid::setCellSize(int thumb)
 {
-    thumb = qBound(96, thumb, 256);
+    thumb = qBound(kMinSize, thumb, kMaxSize);
     if (thumb == m_thumb)
         return;
     const int row = m_view->currentRow();
@@ -259,8 +273,9 @@ void ThumbGrid::paintEvent(QPaintEvent*)
 
 void ThumbGrid::wheelEvent(QWheelEvent* e)
 {
-    if (e->modifiers() & Qt::ControlModifier) {  // Ctrl+wheel: bigger or smaller
-        setCellSize(m_thumb + (e->angleDelta().y() > 0 ? 16 : -16));
+    if (e->modifiers() & Qt::ControlModifier) {  // Ctrl+wheel: bigger or smaller, both panels alike
+        if (const int dy = e->angleDelta().y())
+            emit m_view->zoomStepRequested(dy > 0 ? 1 : -1);
         return;
     }
     m_scroll->setValue(m_scroll->value() - e->angleDelta().y());

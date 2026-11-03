@@ -9,6 +9,7 @@
 #include "core/Remote.h"
 #include "core/Util.h"
 #include "ui/DirTab.h"
+#include "ui/ThumbGrid.h"
 #include "ui/FileModel.h"
 #include "ui/FileView.h"
 #include "ui/IconCache.h"
@@ -31,6 +32,7 @@
 #include <QMenu>
 #include <QPainter>
 #include <QPointer>
+#include <QSlider>
 #include <QProcess>
 #include <QPushButton>
 #include <QScrollBar>
@@ -178,10 +180,22 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     layout->addWidget(m_searchBar);
     connect(m_searchEdit, &QLineEdit::returnPressed, this, &Panel::runSearch);
 
+    auto* statusRow = new QHBoxLayout;
+    statusRow->setContentsMargins(0, 0, 10, 0);
+    statusRow->setSpacing(4);
     m_status = new QLabel(this);
     m_status->setContentsMargins(10, 4, 10, 5);
     m_status->setTextFormat(Qt::PlainText);
-    layout->addWidget(m_status);
+    statusRow->addWidget(m_status, 1);
+    // Zoom: the list's text and icons, or the grid's thumbnails.
+    m_zoom = new QSlider(Qt::Horizontal, this);
+    m_zoom->setFixedWidth(84);
+    m_zoom->setFocusPolicy(Qt::NoFocus);  // the keys stay with the list
+    m_zoom->setToolTip(tr("Zoom (Ctrl+wheel, Ctrl+= and Ctrl+−, Ctrl+0 resets)"));
+    connect(m_zoom, &QSlider::valueChanged, this, [this](int v) { emit zoomRequested(m_view->thumbnails(), v); });
+    statusRow->addWidget(m_zoom);
+    layout->addLayout(statusRow);
+    connect(m_view, &FileView::zoomStepRequested, this, &Panel::zoomBy);
 
     m_search = new QLineEdit(m_view);
     m_search->setPlaceholderText(tr("Search"));
@@ -415,7 +429,7 @@ int Panel::lowestFreeSlot() const
     }
 }
 
-void Panel::addTab(const QString& path, bool activate, int slot)
+DirTab* Panel::addTab(const QString& path, bool activate, int slot)
 {
     if (slot <= 0)
         slot = lowestFreeSlot();
@@ -423,11 +437,12 @@ void Panel::addTab(const QString& path, bool activate, int slot)
         if (m_tabs[size_t(i)]->slot == slot) {
             if (activate)
                 showTab(i);
-            return;
+            return m_tabs[size_t(i)];
         }
     }
     auto* t = new DirTab(this);
     t->slot = slot;
+    t->gridView = tab() && tab()->gridView;  // a new tab looks like the one it came from
     t->setShowHidden(m_showHidden);
     t->model()->setSortSpec(m_sort);
     bindTab(t);
@@ -447,6 +462,7 @@ void Panel::addTab(const QString& path, bool activate, int slot)
     if (activate || m_current < 0)
         showTab(index);
     emit stateChanged();
+    return t;
 }
 
 void Panel::closeCurrentTab()
@@ -508,13 +524,23 @@ QStringList Panel::tabPaths() const
     return out;
 }
 
-void Panel::restoreTabs(const QStringList& paths, int current, const QList<int>& numbers)
+QList<bool> Panel::tabGrids() const
+{
+    QList<bool> out;
+    for (DirTab* t : m_tabs)
+        out.append(t->gridView);
+    return out;
+}
+
+void Panel::restoreTabs(const QStringList& paths, int current, const QList<int>& numbers, const QList<bool>& grids)
 {
     for (int i = 0; i < paths.size(); ++i)
-        addTab(paths[i], false, numbers.value(i, 0));
+        if (DirTab* t = addTab(paths[i], false, numbers.value(i, 0)))
+            t->gridView = grids.value(i, false);
     if (m_tabs.empty())
         addTab(QDir::homePath(), true);
     showTab(std::clamp(current, 0, int(m_tabs.size()) - 1));
+    applyViewMode();  // the first tab was shown before its mode was known
 }
 
 void Panel::showTab(int index)
@@ -541,6 +567,7 @@ void Panel::showTab(int index)
         applyDefaultColumns();
     else
         m_view->header()->restoreState(m_headerState);
+    m_view->columnsMadeForZoom();  // saved and default widths are for the current zoom
     m_view->fitColumns();
     {
         QSignalBlocker block(m_view->header());
@@ -595,7 +622,7 @@ void Panel::onListingReady(DirTab* t, const QString& focus)
 void Panel::applyDefaultColumns()
 {
     QHeaderView* h = m_view->header();
-    const QFontMetrics fm(theme().numberFont);
+    const QFontMetrics fm(FileView::zoomed(theme().numberFont));
     h->setSectionResizeMode(FileModel::ColName, QHeaderView::Stretch);
     for (int c = FileModel::ColExt; c < FileModel::ColCount; ++c)
         h->setSectionResizeMode(c, QHeaderView::Interactive);
@@ -616,6 +643,7 @@ void Panel::restoreHeaderState(const QByteArray& state)
         return;
     m_headerState = state;
     m_view->header()->restoreState(state);
+    m_view->columnsMadeForZoom();
 }
 
 // ------------------------------------------------------------ navigation
@@ -1168,15 +1196,35 @@ void Panel::focusPathEdit()
 
 // Thumbnails are remembered per folder (turned on in ~/Pictures, they're
 // there whenever ~/Pictures is open).
-static QStringList thumbnailFolders()
-{
-    return QSettings().value(QStringLiteral("view/thumbnailFolders")).toStringList();
-}
 
 void Panel::applyViewMode()
 {
     DirTab* t = tab();
-    m_view->setThumbnails(t && !t->isSearch() && thumbnailFolders().contains(t->path()));
+    m_view->setThumbnails(t && !t->isSearch() && t->gridView);
+    syncZoom();
+}
+
+void Panel::syncZoom()
+{
+    const QSignalBlocker block(m_zoom);
+    if (m_view->thumbnails()) {
+        m_zoom->setRange(ThumbGrid::kMinSize, ThumbGrid::kMaxSize);
+        m_zoom->setValue(ThumbGrid::defaultSize());
+    } else {
+        m_zoom->setRange(FileView::kMinZoom, FileView::kMaxZoom);
+        m_zoom->setValue(FileView::listZoom());
+    }
+}
+
+void Panel::zoomBy(int step)
+{
+    const bool grid = m_view->thumbnails();
+    if (step == 0)
+        emit zoomRequested(grid, grid ? ThumbGrid::kDefaultSize : 100);
+    else if (grid)
+        emit zoomRequested(true, ThumbGrid::defaultSize() + step * ThumbGrid::kSizeStep);
+    else
+        emit zoomRequested(false, FileView::listZoom() + step * FileView::kZoomStep);
 }
 
 void Panel::toggleThumbnails()
@@ -1184,12 +1232,7 @@ void Panel::toggleThumbnails()
     DirTab* t = tab();
     if (!t)
         return;
-    QStringList folders = thumbnailFolders();
-    if (folders.contains(t->path()))
-        folders.removeAll(t->path());
-    else
-        folders.prepend(t->path());
-    QSettings().setValue(QStringLiteral("view/thumbnailFolders"), folders.mid(0, 500));
+    t->gridView = !t->gridView;
     applyViewMode();
 }
 

@@ -42,6 +42,7 @@
 #include <QPlainTextEdit>
 
 #include <sys/stat.h>
+#include <QScrollBar>
 #include <QSignalSpy>
 
 #include <QApplication>
@@ -457,6 +458,22 @@ private slots:
         QTRY_VERIFY(m_left->isActive());
         QCOMPARE(m_left->view()->fade(), 0.0);
         QCOMPARE(m_right->view()->fade(), 0.3);
+    }
+
+    // Ctrl+= / Ctrl+wheel / Ctrl+0: bigger rows in both lists, remembered.
+    void listZoom()
+    {
+        auto restore = qScopeGuard([this] { m_window->setZoom(false, 100); });
+        m_left->view()->setFocus();
+        const int row = m_left->view()->sizeHintForRow(0);
+        QTest::keyClick(m_left->view(), Qt::Key_Equal, Qt::ControlModifier);
+        QCOMPARE(FileView::listZoom(), 100 + FileView::kZoomStep);
+        QTRY_VERIFY(m_left->view()->sizeHintForRow(0) > row);
+        QTRY_VERIFY(m_right->view()->sizeHintForRow(0) > row);
+        QCOMPARE(QSettings().value("view/listZoom").toInt(), 110);
+        QTest::keyClick(m_left->view(), Qt::Key_0, Qt::ControlModifier);
+        QCOMPARE(FileView::listZoom(), 100);
+        QTRY_COMPARE(m_left->view()->sizeHintForRow(0), row);
     }
 
     void quickSearch()
@@ -1307,14 +1324,25 @@ private slots:
         QTest::keyClick(m_left->view(), Qt::Key_Down);
         QCOMPARE(m_left->view()->currentRow(), qMin(1 + grid->columns(), leftModel()->count() - 1));
 
-        // Another folder is a list again; coming back brings the grid back.
+        // The grid belongs to the tab: it stays while moving around, and a
+        // new tab opened from here starts as a grid too.
+        QVERIFY(!m_left->view()->verticalScrollBar()->isVisible());  // only the grid's own scrollbar
         moveCursorTo(m_left, "inner");
         QTest::keyClick(m_left->view(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), L("photos/inner"));
-        QTRY_VERIFY(!m_left->view()->thumbnails());
+        QVERIFY(m_left->view()->thumbnails());
         QTest::keyClick(m_left->view(), Qt::Key_Backspace);
         QTRY_COMPARE(leftModel()->path(), L("photos"));
-        QTRY_VERIFY(m_left->view()->thumbnails());
+        QVERIFY(m_left->view()->thumbnails());
+        QCOMPARE(m_left->tabGrids(), QList<bool>{true});  // saved with the tabs
+
+        // Zoom: the slider and Ctrl+= / Ctrl+0 change the grid of both panels.
+        const int before = grid->cellSize();
+        QTest::keyClick(m_left->view(), Qt::Key_Equal, Qt::ControlModifier);
+        QCOMPARE(grid->cellSize(), before + ThumbGrid::kSizeStep);
+        QTest::keyClick(m_left->view(), Qt::Key_0, Qt::ControlModifier);
+        QCOMPARE(grid->cellSize(), int(ThumbGrid::kDefaultSize));
+
         QTest::keyClick(m_left->view(), Qt::Key_F1, Qt::ControlModifier | Qt::ShiftModifier);  // off again
         QVERIFY(!m_left->view()->thumbnails());
         m_left->navigate(L());
