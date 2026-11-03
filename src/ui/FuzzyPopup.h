@@ -7,6 +7,7 @@
 #include <QStyledItemDelegate>
 
 #include <functional>
+#include <optional>
 
 class QLineEdit;
 class QListView;
@@ -22,6 +23,7 @@ struct PopupItem {
     bool matchSubtitle = false;  // match (and highlight) the subtitle instead of the title
     int bonus = 0;               // added to the fuzzy score (frecency, pins…)
     QString key;                 // caller's id (e.g. a path)
+    QString section;             // a header above the first item of each section (unfiltered lists)
     std::function<void()> run;
 };
 
@@ -31,6 +33,7 @@ public:
     struct Row {
         int item;
         QList<int> positions;
+        QString header;  // drawn above this row
     };
     using QAbstractListModel::QAbstractListModel;
     void set(const QList<PopupItem>* items, QList<Row> rows);
@@ -38,6 +41,7 @@ public:
     QVariant data(const QModelIndex& index, int role) const override;
     const PopupItem* item(int row) const;
     const QList<int>& positions(int row) const;
+    QString header(int row) const { return row >= 0 && row < m_rows.size() ? m_rows[row].header : QString(); }
 
 private:
     const QList<PopupItem>* m_items = nullptr;
@@ -59,12 +63,16 @@ public:
     explicit FuzzyPopup(QWidget* window);
 
     void open(const QString& placeholder, const QList<PopupItem>& items, const QString& footer = {});
+    // Same, as a drop-down under a widget (a button) instead of centered.
+    void openUnder(QWidget* anchor, const QString& placeholder, const QList<PopupItem>& items, const QString& footer = {});
     void setItems(const QList<PopupItem>& items);  // keeps the query (after pin/forget)
     const PopupItem* currentItem() const;
     QString query() const;
 
     // Extra keys (e.g. Ctrl+P to pin). Return true when handled.
     std::function<bool(QKeyEvent*, const PopupItem*)> keyHandler;
+    // An extra first row made from what was typed (e.g. "Go to /some/path").
+    std::function<std::optional<PopupItem>(const QString& query)> queryItem;
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;
@@ -80,7 +88,9 @@ private:
     QLabel* m_footer;
     PopupModel* m_model;
     QList<PopupItem> m_items;
+    QList<PopupItem> m_shown;  // m_items, plus the queryItem row
     QPointer<QWidget> m_returnFocus;
+    QPointer<QWidget> m_anchor;
 };
 
 }  // namespace tandem

@@ -1012,8 +1012,16 @@ void MainWindow::updatePreviewFor(ViewerWindow* preview, Panel* p)
         if (preview->property("remoteWanted").toString() == remote)
             return;
         preview->setProperty("remoteWanted", remote);
-        if (e->isDir) {
-            preview->showNote(tr("Folder on %1").arg(locationAuthority(remote)));
+        if (e->isDir) {  // its contents; the total in one request afterwards
+            preview->showFile(remote);
+            QPointer<ViewerWindow> pv(preview);
+            mediaPool()->start([pv, remote] {
+                const int64_t total = directorySizeAt(remote, nullptr);
+                postToUi([pv, remote, total] {
+                    if (pv)
+                        pv->setFolderTotal(remote, total);
+                });
+            });
             return;
         }
         if (e->size > 16 * 1024 * 1024) {

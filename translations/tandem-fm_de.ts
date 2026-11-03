@@ -1731,10 +1731,6 @@ F3 opens it in the viewer</source>
 F3 öffnet es im Betrachter</translation>
     </message>
     <message>
-        <source>Folder on %1</source>
-        <translation>Ordner auf %1</translation>
-    </message>
-    <message>
         <source>“%1” is on a server (%2)
 
 F3 downloads and opens it</source>
@@ -2409,24 +2405,8 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Persönlicher Ordner</translation>
     </message>
     <message>
-        <source>Network &amp;&amp; drives</source>
-        <translation>Netzwerk &amp;&amp; Laufwerke</translation>
-    </message>
-    <message>
-        <source>%1   (mount)</source>
-        <translation>%1   (einhängen)</translation>
-    </message>
-    <message>
         <source>Mounting…</source>
         <translation>Hänge ein…</translation>
-    </message>
-    <message>
-        <source>Connect to server…	Ctrl+K</source>
-        <translation>Mit Server verbinden…	Strg+K</translation>
-    </message>
-    <message>
-        <source>Disconnect / eject</source>
-        <translation>Trennen / auswerfen</translation>
     </message>
     <message>
         <source>Dragging out of archives isn&apos;t supported yet. Use F5 to extract.</source>
@@ -2521,6 +2501,58 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>%1 gefunden</translation>
     </message>
     <message>
+        <source>Places</source>
+        <translation>Orte</translation>
+    </message>
+    <message>
+        <source>Drives</source>
+        <translation>Laufwerke</translation>
+    </message>
+    <message>
+        <source>Network</source>
+        <translation>Netzwerk</translation>
+    </message>
+    <message>
+        <source>Computer</source>
+        <translation>Computer</translation>
+    </message>
+    <message>
+        <source>Del ⏏</source>
+        <translation>Entf ⏏</translation>
+    </message>
+    <message>
+        <source>not mounted: Enter mounts it</source>
+        <translation>nicht eingehängt: Enter hängt ein</translation>
+    </message>
+    <message>
+        <source>Del forgets</source>
+        <translation>Entf vergisst</translation>
+    </message>
+    <message>
+        <source>Connect to server…</source>
+        <translation>Mit Server verbinden…</translation>
+    </message>
+    <message>
+        <source>sftp, smb, WebDAV, ftp</source>
+        <translation>sftp, smb, WebDAV, ftp</translation>
+    </message>
+    <message>
+        <source>Go to %1</source>
+        <translation>Gehe zu %1</translation>
+    </message>
+    <message>
+        <source>Connect to %1</source>
+        <translation>Verbinden mit %1</translation>
+    </message>
+    <message>
+        <source>Where to? Type to filter, or a path or server address</source>
+        <translation>Wohin? Tippen zum Filtern, oder ein Pfad oder eine Serveradresse</translation>
+    </message>
+    <message>
+        <source>Enter opens · Del ejects a drive or forgets a server · Esc closes</source>
+        <translation>Enter öffnet · Entf wirft ein Laufwerk aus oder vergisst einen Server · Esc schließt</translation>
+    </message>
+    <message>
         <source>Tandem was built without GIO: mount with sshfs/rclone and browse the folder</source>
         <translation>Tandem wurde ohne GIO gebaut: mit sshfs/rclone einhängen und den Ordner öffnen</translation>
     </message>
@@ -2537,10 +2569,6 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Recent servers</source>
         <translation>Zuletzt benutzte Server</translation>
-    </message>
-    <message>
-        <source>Clear recent servers</source>
-        <translation>Liste leeren</translation>
     </message>
     <message>
         <source>%1: %2</source>
@@ -2926,8 +2954,8 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Details: Typ, Zeiten, Berechtigungen, Eigentümer, Prüfsumme… (I)</translation>
     </message>
     <message>
-        <source>Wrap</source>
-        <translation>Umbruch</translation>
+        <source>Wrap lines</source>
+        <translation>Zeilen umbrechen</translation>
     </message>
     <message>
         <source>Wrap long lines (W)</source>
@@ -2980,6 +3008,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Reading media…</source>
         <translation>Medien werden gelesen…</translation>
+    </message>
+    <message>
+        <source>%1  ·  %2 in all</source>
+        <translation>%1  ·  insgesamt %2</translation>
     </message>
     <message>
         <source>(empty)</source>

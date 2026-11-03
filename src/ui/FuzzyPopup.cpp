@@ -69,7 +69,8 @@ QSize PopupDelegate::sizeHint(const QStyleOptionViewItem& opt, const QModelIndex
     const auto* model = static_cast<const PopupModel*>(idx.model());
     const PopupItem* it = model->item(idx.row());
     const int line = opt.fontMetrics.height();
-    return {200, (it && !it->subtitle.isEmpty() ? line * 2 + 4 : line) + 12};
+    const int header = model->header(idx.row()).isEmpty() ? 0 : line + 14;
+    return {200, (it && !it->subtitle.isEmpty() ? line * 2 + 4 : line) + 12 + header};
 }
 
 static void drawHighlighted(QPainter* p, const QRect& r, const QString& text, const QList<int>& positions,
@@ -104,12 +105,31 @@ void PopupDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QM
     const Theme& t = theme();
     p->save();
     p->setRenderHint(QPainter::Antialiasing);
+    QStyleOptionViewItem o = opt;
+    if (const QString header = model->header(idx.row()); !header.isEmpty()) {
+        const int h = opt.fontMetrics.height() + 14;
+        QFont f = opt.font;
+        f.setPointSizeF(f.pointSizeF() * 0.85);
+        f.setBold(true);
+        f.setLetterSpacing(QFont::PercentageSpacing, 108);
+        p->setFont(f);
+        p->setPen(t.dimText);
+        p->drawText(QRect(opt.rect.left() + 14, opt.rect.top(), opt.rect.width() - 28, h - 2),
+                    Qt::AlignLeft | Qt::AlignBottom, header.toUpper());
+        if (idx.row() > 0) {
+            p->setPen(QPen(t.border, 1));
+            p->drawLine(opt.rect.left() + 10, opt.rect.top() + 3, opt.rect.right() - 10, opt.rect.top() + 3);
+        }
+        o.rect.setTop(o.rect.top() + h);
+        p->setFont(opt.font);
+    }
+    const QStyleOptionViewItem& opt2 = o;
     if (opt.state & QStyle::State_Selected) {
         p->setPen(Qt::NoPen);
         p->setBrush(t.cursorActive);
-        p->drawRoundedRect(QRectF(opt.rect).adjusted(4, 1, -4, -1), 6, 6);
+        p->drawRoundedRect(QRectF(opt2.rect).adjusted(4, 1, -4, -1), 6, 6);
     }
-    QRect r = opt.rect.adjusted(14, 6, -14, -6);
+    QRect r = opt2.rect.adjusted(14, 6, -14, -6);
     if (!it->icon.isNull()) {
         const int s = 18;
         it->icon.paint(p, QRect(r.left(), r.top() + (r.height() - s) / 2, s, s));
@@ -197,6 +217,7 @@ void FuzzyPopup::close()
     if (m_returnFocus)
         m_returnFocus->setFocus();
     hide();
+    m_anchor = nullptr;
 }
 
 void FuzzyPopup::open(const QString& placeholder, const QList<PopupItem>& items, const QString& footer)
@@ -213,6 +234,13 @@ void FuzzyPopup::open(const QString& placeholder, const QList<PopupItem>& items,
     show();
     raise();
     m_edit->setFocus();
+}
+
+void FuzzyPopup::openUnder(QWidget* anchor, const QString& placeholder, const QList<PopupItem>& items,
+                           const QString& footer)
+{
+    m_anchor = anchor;
+    open(placeholder, items, footer);
 }
 
 void FuzzyPopup::setItems(const QList<PopupItem>& items)
@@ -237,10 +265,14 @@ QString FuzzyPopup::query() const
 void FuzzyPopup::refilter()
 {
     const QString q = m_edit->text().trimmed();
+    m_shown = m_items;
+    std::optional<PopupItem> typed = queryItem && !q.isEmpty() ? queryItem(q) : std::nullopt;
     QList<PopupModel::Row> rows;
     QList<int> scores;
-    for (int i = 0; i < m_items.size(); ++i) {
-        const PopupItem& it = m_items[i];
+    if (typed)
+        m_shown.prepend(*typed);
+    for (int i = typed ? 1 : 0; i < m_shown.size(); ++i) {
+        const PopupItem& it = m_shown[i];
         QList<int> pos;
         int s = 0;
         if (!q.isEmpty()) {
@@ -260,9 +292,20 @@ void FuzzyPopup::refilter()
             sorted.append(rows[i]);
         rows = sorted;
     }
+    if (typed)
+        rows.prepend({0, {}, {}});
     if (rows.size() > kMaxRows)
         rows.resize(kMaxRows);
-    m_model->set(&m_items, rows);
+    if (q.isEmpty()) {  // section headers only make sense in the unsorted list
+        QString last;
+        for (PopupModel::Row& r : rows) {
+            const QString& sec = m_shown[r.item].section;
+            if (!sec.isEmpty() && sec != last)
+                r.header = sec;
+            last = sec;
+        }
+    }
+    m_model->set(&m_shown, rows);
     if (m_model->rowCount() > 0)
         m_list->setCurrentIndex(m_model->index(0));
     place();
@@ -277,6 +320,18 @@ void FuzzyPopup::place()
     opt.initFrom(m_list);
     for (int r = 0; r < qMin(kVisibleRows, m_model->rowCount()); ++r)
         listHeight += m_list->itemDelegate()->sizeHint(opt, m_model->index(r)).height();
+    if (m_anchor) {  // a drop-down: may show more rows, as tall as the window allows
+        listHeight = 0;
+        for (int r = 0; r < m_model->rowCount(); ++r)
+            listHeight += m_list->itemDelegate()->sizeHint(opt, m_model->index(r)).height();
+        const QPoint at = m_anchor->mapTo(w, QPoint(0, m_anchor->height() + 4));
+        const int maxList = w->height() - at.y() - 110;
+        m_list->setFixedHeight(qBound(40, listHeight + 4, qMax(120, maxList)));
+        adjustSize();
+        const int dw = qMin(480, w->width() - 20);
+        setGeometry(qBound(10, at.x() - 6, w->width() - dw - 10), at.y(), dw, sizeHint().height());
+        return;
+    }
     m_list->setFixedHeight(qMax(listHeight + 4, 40));
     adjustSize();
     setGeometry((w->width() - width) / 2, qMin(72, w->height() / 8), width, sizeHint().height());

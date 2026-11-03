@@ -1,5 +1,7 @@
 #include "ui/Panel.h"
 
+#include "ui/FuzzyPopup.h"
+
 #include "core/Archive.h"
 #include "core/Backend.h"
 #include "core/FileOps.h"
@@ -245,80 +247,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_pathBar, &PathBar::segmentMiddleClicked, this, [this](const QString& p) { addTab(p, false); });
     connect(m_pathBar, &PathBar::focused, this, [this] { emit activated(this); });
 
-    auto* menu = new QMenu(this);
-    m_mountButton->setMenu(menu);
-    m_mountButton->setPopupMode(QToolButton::InstantPopup);
-    connect(menu, &QMenu::aboutToShow, this, [this, menu] {
-        menu->clear();
-        menu->addAction(IconCache::themed("user-home", "folder"), tr("Home"),
-                        this, [this] { navigate(QDir::homePath()); });
-        menu->addAction(IconCache::themed("folder-root", "folder"), QStringLiteral("/"),
-                        this, [this] { navigate(QStringLiteral("/")); });
-        menu->addSeparator();
-        QStringList unmountable;
-        for (const MountPoint& m : listMounts()) {
-            if (m.path == QLatin1String("/"))
-                continue;
-            const char* icon = m.isNetwork ? "network-server" : (m.isRemovable ? "drive-removable-media" : "drive-harddisk");
-            QAction* a = menu->addAction(IconCache::themed(icon, "drive-harddisk"),
-                                         QStringLiteral("%1   (%2)").arg(m.path, m.fsType),
-                                         this, [this, p = m.path] { navigate(p); });
-            a->setToolTip(m.device);
-            if (m.isRemovable)
-                unmountable << m.path;
-        }
-        const QList<Place> places = Network::instance().places();
-        bool header = false;
-        for (const Place& pl : places) {
-            if (!header) {
-                menu->addSection(tr("Network && drives"));
-                header = true;
-            }
-            const QIcon icon = IconCache::themed(pl.iconName.toUtf8().constData(),
-                                                 pl.network ? "network-server" : "drive-removable-media");
-            if (!pl.path.isEmpty()) {
-                const auto r = remoteRootOf(pl.path);
-                menu->addAction(icon, r ? QStringLiteral("%1   (%2)").arg(pl.name, r->label) : pl.name, this,
-                                [this, p = pl.path] { navigate(p); });
-                unmountable << pl.path;
-            } else {
-                menu->addAction(icon, tr("%1   (mount)").arg(pl.name), this, [this, id = pl.volumeId] {
-                    showMessage(tr("Mounting…"));
-                    QPointer<Panel> self(this);
-                    Network::instance().mountVolume(id, this, [self](const QString& path, const QString& error) {
-                        if (!self)
-                            return;
-                        if (!error.isEmpty())
-                            self->showMessage(error, true);
-                        else
-                            self->navigate(path);
-                    });
-                });
-            }
-        }
-        const QStringList recent = Network::instance().recentServers();
-        if (!recent.isEmpty()) {
-            menu->addSection(tr("Recent servers"));
-            for (const QString& uri : recent)
-                menu->addAction(IconCache::themed("network-server", "folder-remote"), uri, this,
-                                [this, uri] { connectTo(uri); });
-            menu->addAction(tr("Clear recent servers"), this, [] {
-                for (const QString& uri : Network::instance().recentServers())
-                    Network::instance().forgetServer(uri);
-            });
-        }
-        menu->addSeparator();
-        if (Network::available())
-            menu->addAction(IconCache::themed("network-connect", "network-server"), tr("Connect to server…\tCtrl+K"),
-                            this, &Panel::connectDialog);
-        if (!unmountable.isEmpty()) {
-            QMenu* sub = menu->addMenu(IconCache::themed("media-eject", "media-eject"), tr("Disconnect / eject"));
-            for (const QString& p : unmountable) {
-                const auto r = remoteRootOf(p);
-                sub->addAction(r ? r->label : p, this, [this, p] { disconnectMount(p); });
-            }
-        }
-    });
+    connect(m_mountButton, &QToolButton::clicked, this, &Panel::showLocations);
 
     connect(m_view, &FileView::focused, this, [this] { emit activated(this); });
     connect(m_view, &FileView::cursorMoved, this, [this] { emit cursorChanged(this); });
@@ -1188,7 +1117,133 @@ void Panel::focusPathEdit()
 
 void Panel::showMountMenu()
 {
-    m_mountButton->showMenu();
+    showLocations();
+}
+
+// Mounts nobody browses to: system subvolumes, caches, temp space.
+static bool isSystemMount(const MountPoint& m)
+{
+    if (m.isNetwork || m.isRemovable)
+        return false;
+    if (m.fsType == QLatin1String("tmpfs") || m.fsType == QLatin1String("efivarfs"))
+        return true;
+    for (const char* p : {"/var", "/tmp", "/usr", "/opt", "/srv", "/root", "/boot/efi", "/efi", "/nix", "/snap"})
+        if (m.path == QLatin1String(p) || m.path.startsWith(QLatin1String(p) + QLatin1Char('/')))
+            return true;
+    const QString home = QDir::homePath();
+    return home == m.path || home.startsWith(m.path + QLatin1Char('/'));  // "Home" covers it
+}
+
+static QString tildePath(const QString& p)
+{
+    const QString home = QDir::homePath();
+    return p == home || p.startsWith(home + QLatin1Char('/')) ? QLatin1Char('~') + p.mid(home.size()) : p;
+}
+
+QList<PopupItem> Panel::locationItems()
+{
+    QList<PopupItem> items;
+    auto add = [&](const QString& section, const QIcon& icon, const QString& title, const QString& subtitle,
+                   const QString& key, std::function<void()> run, const QString& hint = {}) {
+        PopupItem it;
+        it.section = section;
+        it.icon = icon;
+        it.title = title;
+        it.subtitle = subtitle;
+        it.key = key;
+        it.hint = hint;
+        it.run = std::move(run);
+        items << it;
+    };
+    const QString places = tr("Places"), drives = tr("Drives"), network = tr("Network"), recent = tr("Recent servers");
+    add(places, IconCache::themed("user-home", "folder"), tr("Home"), tildePath(QDir::homePath()), {},
+        [this] { navigate(QDir::homePath()); });
+    add(places, IconCache::themed("folder-root", "folder"), tr("Computer"), QStringLiteral("/"), {},
+        [this] { navigate(QStringLiteral("/")); });
+
+    for (const MountPoint& m : listMounts()) {
+        if (m.path == QLatin1String("/") || isSystemMount(m))
+            continue;
+        const char* icon = m.isNetwork ? "network-server" : (m.isRemovable ? "drive-removable-media" : "drive-harddisk");
+        add(m.isNetwork ? network : drives, IconCache::themed(icon, "drive-harddisk"), baseName(m.path),
+            QStringLiteral("%1  ·  %2").arg(tildePath(m.path), m.fsType), QStringLiteral("mount:") + m.path,
+            [this, p = m.path] { navigate(p); }, m.isRemovable ? tr("Del ⏏") : QString());
+    }
+    for (const Place& pl : Network::instance().places()) {
+        const QIcon icon = IconCache::themed(pl.iconName.toUtf8().constData(),
+                                             pl.network ? "network-server" : "drive-removable-media");
+        if (!pl.path.isEmpty()) {
+            const auto r = remoteRootOf(pl.path);
+            add(pl.network ? network : drives, icon, pl.name, r ? r->label : tildePath(pl.path),
+                QStringLiteral("mount:") + pl.path, [this, p = pl.path] { navigate(p); }, tr("Del ⏏"));
+        } else {
+            add(pl.network ? network : drives, icon, pl.name, tr("not mounted: Enter mounts it"), {}, [this, id = pl.volumeId] {
+                showMessage(tr("Mounting…"));
+                QPointer<Panel> self(this);
+                Network::instance().mountVolume(id, this, [self](const QString& path, const QString& error) {
+                    if (!self)
+                        return;
+                    if (!error.isEmpty())
+                        self->showMessage(error, true);
+                    else
+                        self->navigate(path);
+                });
+            });
+        }
+    }
+    for (const QString& uri : Network::instance().recentServers()) {
+        const QUrl u(uri);
+        const QString title = u.host().isEmpty() ? uri : (u.userName().isEmpty() ? u.host() : u.userName() + QLatin1Char('@') + u.host());
+        add(recent, IconCache::themed("network-server", "folder-remote"), title, uri, QStringLiteral("recent:") + uri,
+            [this, uri] { connectTo(uri); }, tr("Del forgets"));
+    }
+    add(QString(), IconCache::themed("network-connect", "network-server"), tr("Connect to server…"),
+        tr("sftp, smb, WebDAV, ftp"), {}, [this] { connectDialog(); }, QStringLiteral("Ctrl+K"));
+    return items;
+}
+
+void Panel::showLocations()
+{
+    if (!m_locations) {
+        m_locations = new FuzzyPopup(window());
+        // Typing a path or a server address goes there directly.
+        m_locations->queryItem = [this](const QString& q) -> std::optional<PopupItem> {
+            const bool path = q.startsWith(QLatin1Char('/')) || q.startsWith(QLatin1Char('~'));
+            const bool server = !path && (q.contains(QLatin1String("://")) || !normalizeServerUri(q).isEmpty()) &&
+                                (q.contains(QLatin1Char('@')) || q.contains(QLatin1Char(':')));
+            if (!path && !server)
+                return std::nullopt;
+            PopupItem it;
+            it.icon = IconCache::themed(path ? "folder" : "network-connect", "folder");
+            it.title = path ? tr("Go to %1").arg(q) : tr("Connect to %1").arg(q);
+            it.run = [this, q, path] {
+                if (path)
+                    navigate(expandUserPath(q));
+                else
+                    connectTo(q.contains(QLatin1String("://")) ? q : normalizeServerUri(q));
+            };
+            return it;
+        };
+        m_locations->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
+            if (e->key() != Qt::Key_Delete || !it)
+                return false;
+            if (it->key.startsWith(QLatin1String("recent:"))) {
+                Network::instance().forgetServer(it->key.mid(7));
+                m_locations->setItems(locationItems());
+                return true;
+            }
+            if (it->key.startsWith(QLatin1String("mount:")) && !it->hint.isEmpty()) {
+                const QString p = it->key.mid(6);
+                m_locations->hide();
+                disconnectMount(p);
+                return true;
+            }
+            return false;
+        };
+    }
+    emit activated(this);
+    m_locations->openUnder(m_mountButton, tr("Where to? Type to filter, or a path or server address"),
+                           locationItems(), tr("Enter opens · Del ejects a drive or forgets a server · Esc closes"));
 }
 
 // "smb://bob:secret@nas": the backend gets the password for this session,

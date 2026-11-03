@@ -42,6 +42,7 @@
 #include <QImage>
 #include <QImageReader>
 #include <QListWidget>
+#include <QTreeWidget>
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QMenu>
@@ -892,6 +893,31 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // Alt+F1: places, drives, servers in a drop-down that also takes a typed path.
+    void locations()
+    {
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        m_left->showLocations();
+        FuzzyPopup* popup = nullptr;
+        QTRY_VERIFY([&] {
+            for (auto* p : m_window->findChildren<FuzzyPopup*>())
+                if (p->isVisible())
+                    popup = p;
+            return popup != nullptr;
+        }());
+        QCOMPARE(popup->currentItem()->title, QString("Home"));
+        auto* edit = popup->findChild<QLineEdit*>();
+        QTest::keyClicks(edit, R());
+        QTRY_COMPARE(popup->currentItem()->title, QString("Go to %1").arg(R()));
+        QTest::keyClick(edit, Qt::Key_Return);
+        QTRY_COMPARE(leftModel()->path(), R());
+        QVERIFY(!popup->isVisible());
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
     void quickView()
     {
         QVERIFY(QDir().mkpath(L("qv")));
@@ -1602,6 +1628,26 @@ private slots:
         QTest::keyClick(m_left->view(), Qt::Key_F5);
         QTRY_COMPARE(readFile(L("remote/toupload.txt")), QByteArray("uploaded"));
         QTRY_VERIFY(rightModel()->rowOf("toupload.txt") >= 0);
+
+        // The preview of a folder on the server: its contents, then the total.
+        writeFile(L("remote/docs/a.txt"), "1234");
+        QVERIFY(QDir().mkpath(L("remote/docs/deeper")));
+        writeFile(L("remote/docs/deeper/b.txt"), "123456");
+        QSettings().setValue("view/previewPosition", "each");
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_right->view()->setFocus();
+        QTRY_VERIFY(m_right->isActive());
+        moveCursorTo(m_right, "docs");
+        QTest::keyClick(m_right->view(), Qt::Key_Q, Qt::ControlModifier);
+        ViewerWindow* pv = nullptr;
+        QTRY_VERIFY((pv = m_window->findChild<ViewerWindow*>("quickViewRight")) != nullptr);
+        QTRY_COMPARE_WITH_TIMEOUT(pv->currentPath(), loc + "/docs", 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(pv->contentsList()->topLevelItemCount(), 2, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(pv->richInfo().contains("10 B"), 10000);  // 4 + 6 bytes, in one request
+        QTest::keyClick(m_right->view(), Qt::Key_Q, Qt::ControlModifier);
+        QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickViewRight") == nullptr);
+        QSettings().setValue("view/preview", false);
 
         // A bare address opens the login's home folder.
         m_right->connectTo(server.location().chopped(1));

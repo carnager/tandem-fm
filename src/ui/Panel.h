@@ -18,6 +18,8 @@ class QToolButton;
 namespace tandem {
 
 class DirTab;
+class FuzzyPopup;
+struct PopupItem;
 class PathBar;
 class FileView;
 
@@ -83,6 +85,8 @@ public:
     void startSearchBar();  // Alt+F7
     void clearFilter();
     void showMountMenu();
+    void showLocations();
+    QList<PopupItem> locationItems();
     // sftp://…, smb://…, user@host:path, …: mount through GVfs, then open.
     void connectTo(const QString& uri);
     static QString takePassword(const QString& location);
@@ -168,6 +172,7 @@ private:
     QString m_pathBeforeReset;
     int m_scrollBeforeReset = 0;
     int m_rowBeforeReset = 0;
+    FuzzyPopup* m_locations = nullptr;
 };
 
 }  // namespace tandem

@@ -1,5 +1,7 @@
 #include "ui/viewer/Previewers.h"
 
+#include "core/DirLister.h"
+
 #include "core/Archive.h"
 #include "core/DirLister.h"
 #include "core/Util.h"
@@ -290,7 +292,7 @@ RichPreview produceRichPreview(const QString& path, PreviewKind kind, QSize maxS
     case PreviewKind::Folder: {
         ListOptions opt;
         opt.showHidden = false;
-        ListResult l = listDirectory(path, opt);
+        ListResult l = listLocation(path, opt);  // servers too
         if (l.error) {
             r.error = errnoString(l.error);
             break;

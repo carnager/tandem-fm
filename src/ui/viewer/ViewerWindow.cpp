@@ -1,5 +1,7 @@
 #include "ui/viewer/ViewerWindow.h"
 
+#include "core/Backend.h"
+
 #include "core/FileOps.h"
 #include "core/Util.h"
 #include "ui/IconCache.h"
@@ -13,6 +15,7 @@
 #include <QCoreApplication>
 #include <QKeyEvent>
 #include <QFontDatabase>
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QImageReader>
 #include <QLabel>
@@ -65,6 +68,15 @@ struct Head {
 Head readHead(const QString& path)
 {
     Head h;
+    if (isRemoteLocation(path)) {  // only folders come here from servers (files are fetched first)
+        FileStat st;
+        h.error = statAt(path, st);
+        if (!h.error && !st.isDir)
+            h.error = ENOTSUP;
+        h.isDir = true;
+        h.mtime = st.mtime;
+        return h;
+    }
     const QByteArray np = toNative(path);
     // O_NONBLOCK: opening a FIFO for reading would otherwise wait for a writer.
     const int fd = ::open(np.constData(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
@@ -189,8 +201,10 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_hexButton = makeButton(tr("Hex"), tr("Hex (3)"));
     m_imageButton = makeButton(tr("Image"), tr("Image, page, frame, contents… (4)"));
     m_infoButton = makeButton(tr("Info"), tr("Details: type, dates, permissions, owner, checksum… (I)"));
-    tl->addSpacing(8);
-    m_wrapButton = makeButton(tr("Wrap"), tr("Wrap long lines (W)"));
+    // Wrapping is a text option, not a view: a checkbox by the status line.
+    m_wrapButton = new QCheckBox(tr("Wrap lines"), this);
+    m_wrapButton->setToolTip(tr("Wrap long lines (W)"));
+    m_wrapButton->setFocusPolicy(Qt::NoFocus);
     connect(m_textButton, &QToolButton::clicked, this, [this] { setMode(Mode::Text); });
     connect(m_hexButton, &QToolButton::clicked, this, [this] { setMode(Mode::Hex); });
     connect(m_imageButton, &QToolButton::clicked, this, [this] {
@@ -208,7 +222,7 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
             if (m_embedded)
                 QSettings().setValue(QStringLiteral("preview/info"), false);
         });
-    connect(m_wrapButton, &QToolButton::toggled, this, [this](bool on) {
+    connect(m_wrapButton, &QCheckBox::toggled, this, [this](bool on) {
         m_text->setLineWrapMode(on ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
         m_big->setWrap(on);
         if (!m_embedded)
@@ -336,7 +350,14 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
         m_status->setContentsMargins(16, 6, 16, 8);
         m_status->setWordWrap(true);
     }
-    layout->addWidget(m_status);
+    auto* statusRow = new QWidget(this);
+    statusRow->setStyleSheet(t.css(QStringLiteral("background: @window; color: @dimText;")));
+    auto* sr = new QHBoxLayout(statusRow);
+    sr->setContentsMargins(0, 0, embedded ? 14 : 10, 0);
+    sr->setSpacing(6);
+    sr->addWidget(m_status, 1);
+    sr->addWidget(m_wrapButton, 0, Qt::AlignVCenter);
+    layout->addWidget(statusRow);
     if (embedded) {
         m_image->setBackground(t.window);  // pictures float on the background
         m_image->setPadding(4);
@@ -483,8 +504,9 @@ void ViewerWindow::showNote(const QString& text)
     m_titleIcon->hide();
     m_title->setToolTip(QString());
     m_status->clear();
-    for (QToolButton* b : {m_textButton, m_hexButton, m_imageButton, m_infoButton, m_wrapButton})
+    for (QToolButton* b : {m_textButton, m_hexButton, m_imageButton, m_infoButton})
         b->hide();
+    m_wrapButton->hide();
     showMessage(text);
     m_noteIcon->show();  // the empty state gets the big icon
 }
@@ -890,6 +912,8 @@ void ViewerWindow::showRich(const RichPreview& r)
             items.append(row);
         }
         m_list->addTopLevelItems(items);
+        if (m_kind == PreviewKind::Folder && m_folderTotal.first == m_path)
+            m_richInfo = tr("%1  ·  %2 in all").arg(m_richInfo, formatSize(m_folderTotal.second));
         if (r.items.isEmpty())
             m_list->addTopLevelItem(new QTreeWidgetItem({tr("(empty)")}));
         page = m_list;
@@ -1014,6 +1038,17 @@ void ViewerWindow::updateStatus()
     m_status->setText(parts.join(QStringLiteral("   ·   ")) +
                       (m_embedded ? QString()
                                   : tr("        N / P: next / previous file   1 / 3 / 4: text / hex / image   F7: find")));
+}
+
+void ViewerWindow::setFolderTotal(const QString& path, qint64 bytes)
+{
+    if (bytes < 0)
+        return;
+    m_folderTotal = {path, bytes};  // may come before the listing does
+    if (path == m_path && m_kind == PreviewKind::Folder && m_imageLoaded && !m_loading) {
+        m_richInfo = tr("%1  ·  %2 in all").arg(m_richInfo, formatSize(bytes));
+        updateStatus();
+    }
 }
 
 void ViewerWindow::zoom(int steps)

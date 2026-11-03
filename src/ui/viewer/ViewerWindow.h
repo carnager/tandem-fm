@@ -10,6 +10,7 @@
 
 class QFrame;
 class QGridLayout;
+class QCheckBox;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
@@ -55,6 +56,8 @@ public:
     QTextBrowser* documentView() const { return m_doc; }
     // Prepare rich previews of these files in the background (preview column).
     void preload(const QStringList& paths);
+    // A folder's total size, worked out later (servers): added to its line.
+    void setFolderTotal(const QString& path, qint64 bytes);
     // Info instead of content (Ctrl+I in the previews); remembered.
     void setShowInfo(bool on);
     // Git state of the next file shown (the viewer doesn't know the panel).
@@ -96,6 +99,7 @@ private:
     void zoom(int steps);
 
     bool m_embedded = false;
+    QPair<QString, qint64> m_folderTotal;
     QStringList m_files;
     int m_index = -1;
     QString m_path;
@@ -143,7 +147,7 @@ private:
     QToolButton* m_textButton;
     QToolButton* m_hexButton;
     QToolButton* m_imageButton;
-    QToolButton* m_wrapButton;
+    QCheckBox* m_wrapButton;
     QWidget* m_searchBar;
     QLineEdit* m_searchEdit;
     QLabel* m_searchInfo;
