@@ -31,7 +31,7 @@ cmake --build build
 ./build/tandem-fm [left-path] [right-path]
 ```
 
-Requires Qt ≥ 6.5 (Core, Gui, Widgets, Test) and a C++20 compiler. Optional, picked up when found: GIO (GVfs network places), libssh ≥ 0.11 (SFTP), libsmbclient (SMB), libacl (ACLs in the permissions editor).
+Requires Qt ≥ 6.5 (Core, Gui, Widgets, Test) and a C++20 compiler. Optional, picked up when found: GIO (GVfs network places), libssh ≥ 0.11 (SFTP), libsmbclient (SMB), libacl (ACLs in the permissions editor), libsecret (server passwords in the desktop keyring).
 
 ## Tests and benchmarks
 

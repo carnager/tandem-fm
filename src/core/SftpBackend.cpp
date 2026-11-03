@@ -8,6 +8,7 @@
 // memory for the session, so further connections don't ask again.
 
 #include "core/Backend.h"
+#include "core/Keyring.h"
 #include "core/Util.h"
 
 #ifdef TANDEM_HAVE_LIBSSH
@@ -116,6 +117,7 @@ struct Server {
     int open = 0;
     std::mutex loginMutex;  // one login dialog at a time per server
     std::optional<QString> password;
+    bool keyringTried = false;  // asked the keyring once
     QString home;
 };
 
@@ -388,9 +390,38 @@ public:
     }
 
     // Password and keyboard-interactive logins, which ask questions.
+    // Where a login is kept in the keyring: like GVfs (sftp, host, user, port).
+    struct KeyringKey {
+        QString host, user;
+        int port;
+    };
+    static KeyringKey keyringKey(const QString& location)
+    {
+        const QUrl u(location);
+        const QString user = u.userName().isEmpty() ? QString::fromLocal8Bit(qgetenv("USER")) : u.userName();
+        return {u.host(), user, u.port(0) == 22 ? 0 : u.port(0)};
+    }
+    // A password the keyring has for this server, unless one is known already.
+    static void passwordFromKeyring(Conn* c, Server* server)
+    {
+        if (server->password || server->keyringTried)
+            return;
+        server->keyringTried = true;
+        const KeyringKey k = keyringKey(c->location);
+        if (const auto login = findLogin(QStringLiteral("sftp"), k.host, k.user, k.port))
+            server->password = login->password;
+    }
+    static void rememberPassword(Conn* c, const QString& password)
+    {
+        const KeyringKey k = keyringKey(c->location);
+        storeLogin(QStringLiteral("sftp"), k.host, {k.user, QString(), password}, k.port);
+    }
+
     int authenticate(Conn* c, Server* server, int methods, QString* errText)
     {
         int rc = SSH_AUTH_DENIED;
+        if (methods & (SSH_AUTH_METHOD_INTERACTIVE | SSH_AUTH_METHOD_PASSWORD))
+            passwordFromKeyring(c, server);
         if (methods & SSH_AUTH_METHOD_INTERACTIVE) {
             rc = keyboardInteractive(c, server);
             if (rc == SSH_AUTH_SUCCESS)
@@ -404,13 +435,16 @@ public:
         if (methods & SSH_AUTH_METHOD_PASSWORD) {
             for (int attempt = 0; attempt < 3; ++attempt) {
                 std::optional<QString> pw = attempt == 0 ? server->password : std::nullopt;
+                bool remember = false;
                 if (!pw) {
                     AuthQuestion q;
                     q.kind = AuthQuestion::Kind::Password;
+                    q.offerRemember = true;
                     q.location = c->location;
                     q.message = attempt == 0 ? QObject::tr("Password for %1").arg(c->location)
                                              : QObject::tr("Wrong password. Password for %1").arg(c->location);
                     pw = askAuth(q);
+                    remember = lastAnswerRemember();
                     if (!pw) {
                         if (errText)
                             *errText = QObject::tr("Cancelled");
@@ -420,6 +454,8 @@ public:
                 rc = ssh_userauth_password(c->ssh, nullptr, pw->toUtf8().constData());
                 if (rc == SSH_AUTH_SUCCESS) {
                     server->password = pw;
+                    if (remember)  // only once it worked
+                        rememberPassword(c, *pw);
                     return 0;
                 }
                 server->password.reset();
@@ -437,6 +473,7 @@ public:
     int keyboardInteractive(Conn* c, Server* server)
     {
         bool usedRemembered = false;
+        std::optional<QString> toRemember;
         int rc = ssh_userauth_kbdint(c->ssh, nullptr, nullptr);
         while (rc == SSH_AUTH_INFO) {
             const int n = ssh_userauth_kbdint_getnprompts(c->ssh);
@@ -451,14 +488,18 @@ public:
                 } else {
                     AuthQuestion q;
                     q.kind = passwordLike ? AuthQuestion::Kind::Password : AuthQuestion::Kind::Prompt;
+                    q.offerRemember = passwordLike;
                     q.location = c->location;
                     q.message = prompt.isEmpty() ? QObject::tr("Answer for %1").arg(c->location) : prompt;
                     q.secret = !echo;
                     answer = askAuth(q);
                     if (!answer)
                         return -2;
-                    if (passwordLike)
+                    if (passwordLike) {
                         server->password = answer;
+                        if (lastAnswerRemember())
+                            toRemember = answer;
+                    }
                 }
                 ssh_userauth_kbdint_setanswer(c->ssh, unsigned(i), answer->toUtf8().constData());
             }
@@ -466,6 +507,8 @@ public:
         }
         if (rc != SSH_AUTH_SUCCESS && usedRemembered)
             server->password.reset();
+        if (rc == SSH_AUTH_SUCCESS && toRemember)
+            rememberPassword(c, *toRemember);
         return rc;
     }
 

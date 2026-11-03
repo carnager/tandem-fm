@@ -1,10 +1,12 @@
 #include "ui/AuthDialogs.h"
 
 #include "core/Backend.h"
+#include "core/Keyring.h"
 #include "core/Util.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -35,7 +37,7 @@ QWidget* dialogParent()
     return nullptr;
 }
 
-QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut, QLineEdit** userOut)
+QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut, QLineEdit** userOut, QCheckBox** rememberOut)
 {
     auto* dlg = new QDialog(dialogParent());
     dlg->setAttribute(Qt::WA_DeleteOnClose);
@@ -85,6 +87,13 @@ QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut, QLineEdit** user
         hint->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
         layout->addWidget(hint);
     }
+    QCheckBox* remember = nullptr;
+    if (q.offerRemember && keyringAvailable()) {
+        remember = new QCheckBox(QObject::tr("Remember in the keyring"), dlg);
+        remember->setToolTip(QObject::tr("Stored by your desktop (GNOME Keyring, KWallet); file managers like Nautilus "
+                                         "find it too"));
+        layout->addWidget(remember);
+    }
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, dlg);
     buttons->button(QDialogButtonBox::Ok)->setText(hostKey ? QObject::tr("Trust and connect") : QObject::tr("Log in"));
     layout->addWidget(buttons);
@@ -92,6 +101,7 @@ QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut, QLineEdit** user
     QObject::connect(buttons, &QDialogButtonBox::rejected, dlg, &QDialog::reject);
     *editOut = edit;
     *userOut = user;
+    *rememberOut = remember;
     return dlg;
 }
 
@@ -111,16 +121,21 @@ void installAuthDialogs()
         postToUi([q, reply] {
             QLineEdit* edit = nullptr;
             QLineEdit* user = nullptr;
-            QDialog* dlg = makeDialog(q, &edit, &user);
+            QCheckBox* remember = nullptr;
+            QDialog* dlg = makeDialog(q, &edit, &user, &remember);
             QPointer<QLineEdit> e(edit);
             QPointer<QLineEdit> u(user);
-            QObject::connect(dlg, &QDialog::finished, [reply, e, u](int r) {
-                if (r != QDialog::Accepted)
+            QPointer<QCheckBox> keep(remember);
+            QObject::connect(dlg, &QDialog::finished, [reply, e, u, keep](int r) {
+                if (r != QDialog::Accepted) {
                     reply(std::nullopt);
-                else if (u)
-                    reply(u->text().trimmed() + QLatin1Char('\n') + (e ? e->text() : QString()));
-                else
-                    reply(e ? e->text() : QStringLiteral("yes"));
+                    return;
+                }
+                QString answer = u ? u->text().trimmed() + QLatin1Char('\n') + (e ? e->text() : QString())
+                                   : (e ? e->text() : QStringLiteral("yes"));
+                if (keep && keep->isChecked())
+                    answer += QLatin1String(kRememberMark);
+                reply(answer);
             });
             QObject::connect(dlg, &QObject::destroyed, [reply] { reply(std::nullopt); });
             dlg->open();

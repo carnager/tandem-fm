@@ -107,11 +107,16 @@ struct AuthQuestion {
     QString detail;    // e.g. the key fingerprint
     QString user;      // Login: the suggested user name
     bool secret = true;
+    bool offerRemember = false;  // logins and passwords: "remember in the keyring"
 };
 // nullopt: the user cancelled. For HostKey any answer means "trust it".
 using AuthHandler = std::function<std::optional<QString>(const AuthQuestion&)>;
 void setAuthHandler(AuthHandler handler);
 std::optional<QString> askAuth(const AuthQuestion& q);
+// Whether the last answer on this thread asked to be remembered (keyring).
+bool lastAnswerRemember();
+// Handlers add this to an answer when "remember" was ticked.
+inline constexpr char kRememberMark[] = "\x1Fremember";
 
 // Built-in backends (sftp, smb, …) that this build has.
 void registerBuiltinBackends();

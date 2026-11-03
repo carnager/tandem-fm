@@ -10,6 +10,7 @@
 #include "ui/Network.h"
 #include "ui/PathBar.h"
 #include "core/Backend.h"
+#include "core/Keyring.h"
 #include "core/Remote.h"
 #include "TestBackend.h"
 #include "SshServer.h"
@@ -171,6 +172,7 @@ private slots:
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);
+        setKeyringHooksForTests({});  // never the real keyring
         qputenv("XDG_CONFIG_HOME", QFile::encodeName(m_tmp.filePath("config")));
         applyTheme(*qApp);
         DirWatcher::instance();
@@ -1858,6 +1860,40 @@ private slots:
         dlg->accept();
         asker.join();
         QCOMPARE(answer, std::optional<QString>(QStringLiteral("WORK\\alice\nse cret")));
+    }
+
+    // "Remember in the keyring": offered with a keyring, and reported to the asker.
+    void loginDialogRemembers()
+    {
+        setKeyringHooksForTests({[](const QString&, const QString&, const QString&) { return std::optional<StoredLogin>{}; },
+                                 [](const QString&, const QString&, const StoredLogin&) { return true; }});
+        std::optional<QString> answer;
+        bool remembered = false;
+        std::thread asker([&] {
+            AuthQuestion q;
+            q.kind = AuthQuestion::Kind::Login;
+            q.location = QStringLiteral("smb://nas/");
+            q.user = QStringLiteral("bob");
+            q.offerRemember = true;
+            answer = askAuth(q);
+            remembered = lastAnswerRemember();
+        });
+        QDialog* dlg = nullptr;
+        QTRY_VERIFY([&] {
+            for (QWidget* w : QApplication::allWidgets())
+                if (w->objectName() == QLatin1String("authDialog") && w->isVisible())
+                    dlg = qobject_cast<QDialog*>(w);
+            return dlg != nullptr;
+        }());
+        auto* box = dlg->findChild<QCheckBox*>();
+        QVERIFY(box);
+        box->setChecked(true);
+        dlg->findChildren<QLineEdit*>().at(1)->setText("pw");
+        dlg->accept();
+        asker.join();
+        QCOMPARE(answer, std::optional<QString>(QStringLiteral("bob\npw")));  // no marker left in it
+        QVERIFY(remembered);
+        setKeyringHooksForTests({});
     }
 
     void sftpInPanel()

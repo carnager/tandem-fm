@@ -28,6 +28,7 @@ add_library(tandem_core STATIC
   src/core/ExifDate.h src/core/ExifDate.cpp
   src/core/Permissions.h src/core/Permissions.cpp
   src/core/Trash.h src/core/Trash.cpp
+  src/core/Keyring.h src/core/Keyring.cpp
   src/core/IoScheduler.h src/core/IoScheduler.cpp
   src/core/Fuzzy.h src/core/Fuzzy.cpp
   src/core/FolderHistory.h src/core/FolderHistory.cpp
@@ -115,6 +116,18 @@ if(LIBACL_FOUND)
   message(STATUS "ACLs (libacl ${LIBACL_VERSION}): enabled")
 else()
   message(STATUS "ACLs: disabled (libacl not found; permissions editor shows mode bits only)")
+endif()
+
+# Optional: the desktop keyring (Secret Service) for server passwords.
+if(PkgConfig_FOUND)
+  pkg_check_modules(LIBSECRET IMPORTED_TARGET libsecret-1)
+endif()
+if(LIBSECRET_FOUND)
+  target_link_libraries(tandem_core PRIVATE PkgConfig::LIBSECRET)
+  target_compile_definitions(tandem_core PRIVATE TANDEM_HAVE_LIBSECRET)
+  message(STATUS "Keyring (libsecret ${LIBSECRET_VERSION}): enabled")
+else()
+  message(STATUS "Keyring: disabled (libsecret-1 not found; passwords last for the session)")
 endif()
 
 # Optional: native SMB (Samba's libsmbclient).

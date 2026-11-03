@@ -16,6 +16,7 @@
 #include "core/IoScheduler.h"
 #include "core/MultiRename.h"
 #include "core/ExifDate.h"
+#include "core/Keyring.h"
 #include "core/Permissions.h"
 #include "core/Sorting.h"
 
@@ -75,6 +76,11 @@ class TestCore : public QObject {
     Q_OBJECT
 
 private slots:
+    void initTestCase()
+    {
+        setKeyringHooksForTests({});  // never the real keyring
+    }
+
     void naturalSort()
     {
         std::vector<FileEntry> v = {entry("file10"), entry("File2"), entry("b-dir", true), entry("file1"),

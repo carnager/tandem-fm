@@ -7,6 +7,7 @@
 // server and kept for the session.
 
 #include "core/Backend.h"
+#include "core/Keyring.h"
 #include "core/Util.h"
 
 #ifdef TANDEM_HAVE_SMBCLIENT
@@ -44,6 +45,8 @@ struct SmbServer {
     std::optional<Credentials> creds;  // nullopt: Kerberos / guest
     bool verified = false;             // something worked with the current login
     int generation = 0;                // bumps when the login changes
+    bool keyringTried = false;
+    bool rememberWhenVerified = false; // "remember" was ticked: store once it works
 };
 
 struct CtxData {
@@ -213,11 +216,20 @@ public:
         }
         server->open += 1;
         lock.unlock();
-        if (!server->creds && !server->verified) {
-            // First contact: a user in the location means "log in as".
-            const QString user = QUrl(locationRoot(location)).userName();
-            if (!user.isEmpty())
-                server->creds = splitUser(user, QString());
+        if (!server->creds && !server->verified && !server->keyringTried) {
+            server->keyringTried = true;
+            // First contact: what the keyring has for this server (GVfs's too),
+            // else a user in the location means "log in as".
+            const QUrl root(locationRoot(location));
+            if (const auto login = findLogin(QStringLiteral("smb"), root.host(), root.userName())) {
+                Credentials c;
+                c.user = login->user;
+                c.domain = login->domain;
+                c.password = login->password;
+                server->creds = c;
+            } else if (!root.userName().isEmpty()) {
+                server->creds = splitUser(root.userName(), QString());
+            }
         }
         SMBCCTX* c = newContext(server);
         if (!c) {
@@ -278,6 +290,7 @@ public:
         const QString where = locationRoot(location);
         AuthQuestion q;
         q.kind = AuthQuestion::Kind::Login;
+        q.offerRemember = true;
         q.location = where;
         q.message = QObject::tr("Log in to %1. Write the user as DOMAIN\\user if needed; leave both empty for guest.")
                         .arg(QUrl(where).host());
@@ -292,12 +305,14 @@ public:
         const auto answer = askAuth(q);
         if (!answer)
             return false;
+        const bool remember = lastAnswerRemember();
         const std::optional<QString> user = answer->section(QLatin1Char('\n'), 0, 0);
         const std::optional<QString> password = answer->section(QLatin1Char('\n'), 1);
         std::vector<SMBCCTX*> old;
         {
             std::lock_guard<std::mutex> lock(server->mutex);
             server->creds = splitUser(*user, *password);
+            server->rememberWhenVerified = remember && !user->isEmpty();
             server->verified = false;
             server->generation += 1;
             old.swap(server->idle);
@@ -332,8 +347,7 @@ public:
                 r = f(l.ctx(), url);
             }
             if (r == 0) {
-                std::lock_guard<std::mutex> lock(server->mutex);
-                server->verified = true;
+                loginWorked(location, server);
                 return 0;
             }
             if ((r == EACCES || r == EPERM) && !server->verified) {
@@ -350,6 +364,21 @@ public:
             return r;
         }
         return EACCES;
+    }
+
+    // Something succeeded: the login is good; keep it if that was asked for.
+    void loginWorked(const QString& location, SmbServer* server)
+    {
+        std::optional<Credentials> keep;
+        {
+            std::lock_guard<std::mutex> lock(server->mutex);
+            server->verified = true;
+            if (server->rememberWhenVerified && server->creds)
+                keep = server->creds;
+            server->rememberWhenVerified = false;
+        }
+        if (keep)
+            storeLogin(QStringLiteral("smb"), QUrl(locationRoot(location)).host(), {keep->user, keep->domain, keep->password});
     }
 
     void dropIdle(SmbServer* server)
@@ -543,10 +572,7 @@ public:
                 err = errno ? errno : EIO;
             }
             if (file) {
-                {
-                    std::lock_guard<std::mutex> lock(server->mutex);
-                    server->verified = true;
-                }
+                loginWorked(path, server);
                 err = 0;
                 out = std::move(l);
                 return file;

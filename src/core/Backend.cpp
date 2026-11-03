@@ -177,14 +177,29 @@ void setAuthHandler(AuthHandler handler)
     g_auth = std::move(handler);
 }
 
+namespace {
+thread_local bool t_remember = false;
+}
+
+bool lastAnswerRemember()
+{
+    return t_remember;
+}
+
 std::optional<QString> askAuth(const AuthQuestion& q)
 {
+    t_remember = false;
     AuthHandler h;
     {
         QMutexLocker locker(&g_authMutex);
         h = g_auth;
     }
-    return h ? h(q) : std::nullopt;
+    std::optional<QString> a = h ? h(q) : std::nullopt;
+    if (a && a->endsWith(QLatin1String(kRememberMark))) {
+        a->chop(int(qstrlen(kRememberMark)));
+        t_remember = true;
+    }
+    return a;
 }
 
 Backend* localBackend()

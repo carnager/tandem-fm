@@ -495,6 +495,14 @@
         <translation>Mit dem vergleichen, was der Admin des Servers angibt. Tandem merkt ihn sich in ~/.ssh/known_hosts, wie ssh.</translation>
     </message>
     <message>
+        <source>Remember in the keyring</source>
+        <translation>Im Schlüsselbund merken</translation>
+    </message>
+    <message>
+        <source>Stored by your desktop (GNOME Keyring, KWallet); file managers like Nautilus find it too</source>
+        <translation>Vom Desktop gespeichert (GNOME Keyring, KWallet); Dateimanager wie Nautilus finden es auch</translation>
+    </message>
+    <message>
         <source>Trust and connect</source>
         <translation>Vertrauen und verbinden</translation>
     </message>
