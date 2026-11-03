@@ -43,6 +43,7 @@
 
 #include <sys/stat.h>
 #include <QFontDatabase>
+#include <QMenuBar>
 #include <QScrollBar>
 #include <QStyle>
 
@@ -520,6 +521,48 @@ private slots:
         applyTheme(*qApp);
         QCOMPARE(QApplication::font().pointSizeF(), font);
         QVERIFY(qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR"));
+    }
+
+    // The Bookmarks menu lists bookmarks (keys on the right) and pins; a click goes there.
+    void bookmarksMenu()
+    {
+        FolderHistory& h = FolderHistory::instance();
+        QTRY_VERIFY(h.isLoaded());
+        h.setBookmark(L("sub"), "zs");
+        h.setPinned(R(), true);
+        auto restore = qScopeGuard([&h, this] {
+            h.setPinned(L("sub"), false);
+            h.setPinned(R(), false);
+        });
+        QMenu* menu = nullptr;
+        for (QAction* a : m_window->menuBar()->actions())
+            if (a->menu() && a->text().remove('&') == "Bookmarks")
+                menu = a->menu();
+        QVERIFY(menu);
+        emit menu->aboutToShow();
+        QAction* sub = nullptr;
+        bool pinned = false;
+        for (QAction* a : menu->actions()) {
+            if (a->text() == "sub\tzs")
+                sub = a;
+            pinned |= a->text() == baseName(R());
+        }
+        QVERIFY(sub);
+        QVERIFY(pinned);
+        emit menu->aboutToShow();  // filled anew, not twice
+        int count = 0;
+        for (QAction* a : menu->actions())
+            count += a->text() == "sub\tzs";
+        QCOMPARE(count, 1);
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_left->view()->setFocus();
+        for (QAction* a : menu->actions())
+            if (a->text() == "sub\tzs")
+                a->trigger();
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
     }
 
     void quickSearch()

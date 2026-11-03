@@ -2299,6 +2299,10 @@
         <translation>Mit Server verbinden…</translation>
     </message>
     <message>
+        <source>&amp;Bookmarks</source>
+        <translation>&amp;Lesezeichen</translation>
+    </message>
+    <message>
         <source>Preview: details instead of content</source>
         <translation>Vorschau: Details statt Inhalt</translation>
     </message>
@@ -2923,6 +2927,10 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Nothing to choose</source>
         <translation>Nichts zur Auswahl</translation>
+    </message>
+    <message>
+        <source>No bookmarks yet: Ctrl+Shift+D bookmarks the shown folder</source>
+        <translation>Noch keine Lesezeichen: Strg+Umschalt+D legt eins für den gezeigten Ordner an</translation>
     </message>
     <message>
         <source>Open with</source>

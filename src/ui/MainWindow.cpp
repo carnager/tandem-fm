@@ -389,9 +389,6 @@ void MainWindow::createMenus()
     addCommand(go, QT_TR_NOOP("Root"), {K(Qt::CTRL | Qt::Key_Backslash)}, [this] { active()->navigate(QStringLiteral("/")); });
     addCommand(go, QT_TR_NOOP("Go to path…"), {K(Qt::CTRL | Qt::Key_L)}, [this] { active()->focusPathEdit(); });
     go->addSeparator();
-    addCommand(go, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { m_chords->openJump(); });
-    addCommand(go, QT_TR_NOOP("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
-               [this] { m_chords->openAssign(active()->path()); });
     addCommand(go, QT_TR_NOOP("Jump to folder (search)…"), {K(Qt::CTRL | Qt::Key_J)}, [this] { jumpToFolder(); });
     go->addSeparator();
     addCommand(go, QT_TR_NOOP("Locations (left)"), {K(Qt::ALT | Qt::Key_F1)}, [this] { m_left->showMountMenu(); });
@@ -404,6 +401,15 @@ void MainWindow::createMenus()
                [this] { other()->navigate(active()->path()); });
     addCommand(go, QT_TR_NOOP("Show in left panel"), {K(Qt::CTRL | Qt::Key_Left)}, [this] { openInPanel(m_left); });
     addCommand(go, QT_TR_NOOP("Show in right panel"), {K(Qt::CTRL | Qt::Key_Right)}, [this] { openInPanel(m_right); });
+
+    // Bookmarks: the folders with a key chain and the pinned ones, for the
+    // mouse; the keys show where shortcuts go. Filled each time it opens.
+    QMenu* marks = bar->addMenu(tr("&Bookmarks"));
+    addCommand(marks, QT_TR_NOOP("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
+               [this] { m_chords->openAssign(active()->path()); });
+    addCommand(marks, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { m_chords->openJump(); });
+    marks->addSeparator();
+    connect(marks, &QMenu::aboutToShow, this, [this, marks] { fillBookmarksMenu(marks); });
 
     QMenu* tabs = bar->addMenu(tr("&Tabs"));
     addCommand(tabs, QT_TR_NOOP("New tab"), {K(Qt::CTRL | Qt::Key_T)}, [this] {
@@ -2470,6 +2476,62 @@ void MainWindow::addPluginItems(QMenu* menu, Panel* p, bool onItem)
             });
         }
     }
+}
+
+void MainWindow::fillBookmarksMenu(QMenu* menu)
+{
+    for (QAction* a : menu->actions())  // what the last opening added
+        if (a->property("bookmarkEntry").toBool())
+            delete a;
+    auto add = [&](QAction* a) {
+        a->setProperty("bookmarkEntry", true);
+        return a;
+    };
+    const FolderHistory& h = FolderHistory::instance();
+    if (!h.isLoaded()) {
+        add(menu->addAction(tr("Loading…")))->setEnabled(false);
+        return;
+    }
+    QList<QPair<QString, QString>> entries;  // path, key ("" for a plain pin)
+    for (const FolderHistory::Bookmark& b : h.bookmarks())
+        entries.append({b.path, b.key});
+    QStringList pins;
+    for (const FolderHistory::Item& it : h.items())
+        if (it.pinned && it.key.isEmpty())
+            pins << it.path;
+    if (entries.isEmpty() && pins.isEmpty()) {
+        add(menu->addAction(tr("No bookmarks yet: Ctrl+Shift+D bookmarks the shown folder")))->setEnabled(false);
+        return;
+    }
+    // Names, with the folder above when two would look the same.
+    QHash<QString, int> seen;
+    for (const auto& e : std::as_const(entries))
+        ++seen[baseName(e.first)];
+    for (const QString& p : std::as_const(pins))
+        ++seen[baseName(p)];
+    auto label = [&](const QString& path) {
+        if (path == QDir::homePath())
+            return tr("Home");
+        if (path == QLatin1String("/"))
+            return QStringLiteral("/");
+        const QString name = baseName(path);
+        return seen.value(name) > 1 ? QStringLiteral("%1  (%2)").arg(name, baseName(parentPath(path))) : name;
+    };
+    static const QIcon folder = IconCache::themed("folder");
+    static const QIcon pin = IconCache::themed("pin", "emblem-favorite");
+    auto entry = [&](const QString& path, const QString& key, const QIcon& icon) {
+        QAction* a = add(menu->addAction(icon, key.isEmpty() ? label(path) : label(path) + QLatin1Char('\t') + key));
+        a->setToolTip(tildePath(path));
+        a->setStatusTip(tildePath(path));
+        connect(a, &QAction::triggered, this, [this, path] { active()->navigate(path); });
+    };
+    for (const auto& [path, key] : std::as_const(entries))
+        entry(path, key, folder);
+    if (!entries.isEmpty() && !pins.isEmpty())
+        add(menu->addSeparator());
+    for (const QString& p : std::as_const(pins))
+        entry(p, QString(), pin);
+    menu->setToolTipsVisible(true);
 }
 
 void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)
