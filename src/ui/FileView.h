@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QStyledItemDelegate>
+#include <QSet>
 #include <QTreeView>
 #include <QUrl>
 
@@ -32,7 +33,12 @@ public:
     void setActive(bool active);
     bool isActive() const { return m_active; }
     int currentRow() const { return currentIndex().row(); }
-    void setVimKeys(bool on) { m_vim = on; }
+    void setVimKeys(bool on) { m_vim = on; if (!on) setVisual(0); }
+    // Visual mode (modal keys): 1 marks, -1 unmarks the range the cursor
+    // moves over; 0 ends it, keeping the marks.
+    void setVisual(int mode);
+    int visualMode() const { return m_visual; }
+    void setModel(QAbstractItemModel* model) override;
     // How much the panel that isn't active fades: 0 (not at all) to 1.
     static void setInactiveDim(double amount);
     static double inactiveDim();
@@ -75,6 +81,9 @@ signals:
     void dragPathsRequested(QStringList& out);  // panel fills marked/current paths
     void contextMenuRequested(const QPoint& globalPos, int row);  // row -1: empty area
     void zoomStepRequested(int step);  // Ctrl+wheel: +1 bigger, -1 smaller
+    void commandIdRequested(const QString& id);  // modal keys: run this command
+    void hintRequested(const QString& text);     // a short note for the status line ("" clears)
+    void modeChanged();                          // visual mode began or ended
 
 protected:
     bool event(QEvent* e) override;
@@ -93,6 +102,7 @@ protected:
     void dropEvent(QDropEvent* e) override;
     void contextMenuEvent(QContextMenuEvent* e) override;
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
+    void applyVisual();
     void resizeEvent(QResizeEvent* e) override;
 
 private:
@@ -107,6 +117,11 @@ private:
     QPoint m_pressPos;
     bool m_maybeDrag = false;
     bool m_vim = false;
+    int m_visual = 0;
+    QString m_visualAnchor;  // where visual mode began, by name
+    QString m_visualPath;
+    QSet<QString> m_visualBase;  // marks before visual mode began
+    bool m_pendingSort = false;  // ',' waits for the sort key
     bool m_arrowFolders = true;
     int m_zoomOfColumns = 100;  // the zoom the column widths were made for
     QList<int> m_autoHidden;  // columns hidden because the panel is narrow

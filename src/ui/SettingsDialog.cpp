@@ -440,9 +440,10 @@ QWidget* SettingsDialog::behaviourPage()
              toggle(tr("Arrow keys walk folders"), m_window->m_actions.value(QStringLiteral("arrowFolders"))),
              tr("→ enters the folder or archive under the cursor, ← goes up, like lynx or mc. → never opens a "
                 "file."));
-    page.add(QString(), toggle(tr("Vim keys"), m_window->m_actions.value(QStringLiteral("vim"))),
-             tr("j k move, h l out of and into folders, gg G, / to search, v to mark, : for the palette. Typing "
-                "letters no longer starts the quick search."));
+    page.add(QString(), toggle(tr("Modal keys (vim, yazi)"), m_window->m_actions.value(QStringLiteral("vim"))),
+             tr("Letters are commands, as in vim and yazi: j k h l to move, v for visual mode, y x p to copy, cut "
+                "and paste, d to trash, r to rename, a to create, t q for tabs, / to search, : for the palette. "
+                "F1 lists them all. Typing no longer starts the quick search."));
     page.add(tr("Notifications"),
              toggle(tr("Notify when long operations finish"), m_window->m_actions.value(QStringLiteral("notifications"))),
              tr("A desktop notification when a copy or move that took a while is done and Tandem isn't in front."));

@@ -1038,12 +1038,16 @@
         <translation>Beenden</translation>
     </message>
     <message>
-        <source>Vim keys (View menu)</source>
-        <translation>Vim-Tasten (Menü Ansicht)</translation>
+        <source>Bookmark key (gh: home)</source>
+        <translation>Lesezeichen-Taste (gh: Home)</translation>
     </message>
     <message>
         <source>Down / up</source>
         <translation>Runter / hoch</translation>
+    </message>
+    <message>
+        <source>Modal keys (Settings › Behaviour)</source>
+        <translation>Modale Tasten (Einstellungen › Verhalten)</translation>
     </message>
     <message>
         <source>Out of / into a folder</source>
@@ -1062,8 +1066,56 @@
         <translation>Suchen, nächster, vorheriger</translation>
     </message>
     <message>
+        <source>Visual mode: moving marks (V: unmarks) a range; Esc or v ends it</source>
+        <translation>Visueller Modus: Bewegen markiert einen Bereich (V: hebt auf); Esc oder v beendet ihn</translation>
+    </message>
+    <message>
+        <source>Mark and move down</source>
+        <translation>Markieren und weiter nach unten</translation>
+    </message>
+    <message>
+        <source>Copy, cut, paste (clipboard)</source>
+        <translation>Kopieren, ausschneiden, einfügen (Zwischenablage)</translation>
+    </message>
+    <message>
+        <source>Move to trash / delete permanently</source>
+        <translation>In den Papierkorb / endgültig löschen</translation>
+    </message>
+    <message>
+        <source>Rename · create (a name ending in / makes a folder)</source>
+        <translation>Umbenennen · anlegen (ein Name mit / am Ende wird ein Ordner)</translation>
+    </message>
+    <message>
+        <source>Filter · search files · jump to a folder</source>
+        <translation>Filtern · Dateien suchen · zu einem Ordner springen</translation>
+    </message>
+    <message>
+        <source>New tab · close tab</source>
+        <translation>Neuer Tab · Tab schließen</translation>
+    </message>
+    <message>
+        <source>Previous / next tab · tab number</source>
+        <translation>Voriger / nächster Tab · Tab-Nummer</translation>
+    </message>
+    <message>
+        <source>Sort by name, extension, modified, size</source>
+        <translation>Sortieren nach Name, Endung, Änderung, Größe</translation>
+    </message>
+    <message>
+        <source>Background jobs</source>
+        <translation>Hintergrundaufgaben</translation>
+    </message>
+    <message>
+        <source>Scroll the preview</source>
+        <translation>Vorschau blättern</translation>
+    </message>
+    <message>
         <source>Command palette</source>
         <translation>Befehlspalette</translation>
+    </message>
+    <message>
+        <source>Run a command</source>
+        <translation>Befehl ausführen</translation>
     </message>
     <message>
         <source>Go to a bookmark</source>
@@ -1720,6 +1772,13 @@
     </message>
 </context>
 <context>
+    <name>tandem::FileView</name>
+    <message>
+        <source>Sort by:  n name  ·  e extension  ·  m modified  ·  s size</source>
+        <translation>Sortieren nach:  n Name  ·  e Endung  ·  m Änderung  ·  s Größe</translation>
+    </message>
+</context>
+<context>
     <name>tandem::HexView</name>
     <message>
         <source>Loading…</source>
@@ -2143,18 +2202,6 @@
         <translation>Versteckte Dateien anzeigen</translation>
     </message>
     <message>
-        <source>Vim keys (j k h l gg G / n N : v)</source>
-        <translation>Vim-Tasten (j k h l gg G / n N : v)</translation>
-    </message>
-    <message>
-        <source>Vim keys on: letters are commands; / searches</source>
-        <translation>Vim-Tasten an: Buchstaben sind Befehle; / sucht</translation>
-    </message>
-    <message>
-        <source>Vim keys off</source>
-        <translation>Vim-Tasten aus</translation>
-    </message>
-    <message>
         <source>Show Git status</source>
         <translation>Git-Status anzeigen</translation>
     </message>
@@ -2233,6 +2280,18 @@
     <message>
         <source>Settings</source>
         <translation>Einstellungen</translation>
+    </message>
+    <message>
+        <source>Modal keys (vim, yazi)</source>
+        <translation>Modale Tasten (vim, yazi)</translation>
+    </message>
+    <message>
+        <source>Modal keys on: letters are commands (F1 lists them)</source>
+        <translation>Modale Tasten an: Buchstaben sind Befehle (F1 zeigt sie)</translation>
+    </message>
+    <message>
+        <source>Modal keys off</source>
+        <translation>Modale Tasten aus</translation>
     </message>
     <message>
         <source>Arrow keys walk folders (← up, → into)</source>
@@ -2865,6 +2924,18 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Ein Terminal auf dem Server: ssh benutzen (Tandem öffnet dort noch keins)</translation>
     </message>
     <message>
+        <source>Create</source>
+        <translation>Anlegen</translation>
+    </message>
+    <message>
+        <source>Name (end with / for a folder):</source>
+        <translation>Name (mit / am Ende für einen Ordner):</translation>
+    </message>
+    <message>
+        <source>No preview open (Ctrl+Q)</source>
+        <translation>Keine Vorschau offen (Strg+Q)</translation>
+    </message>
+    <message>
         <source>New file</source>
         <translation>Neue Datei</translation>
     </message>
@@ -3247,6 +3318,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>%1 files, %2 folders   ·   %3</source>
         <translation>%1 Dateien, %2 Ordner   ·   %3</translation>
+    </message>
+    <message>
+        <source>VISUAL</source>
+        <translation>VISUELL</translation>
+    </message>
+    <message>
+        <source>VISUAL (unmark)</source>
+        <translation>VISUELL (aufheben)</translation>
     </message>
     <message>
         <source>Searching on servers isn&apos;t supported yet</source>
@@ -4034,12 +4113,12 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>→ öffnet den Ordner oder das Archiv unter dem Cursor, ← geht eine Ebene hoch, wie in lynx oder mc. → startet nie eine Datei.</translation>
     </message>
     <message>
-        <source>Vim keys</source>
-        <translation>Vim-Tasten</translation>
+        <source>Modal keys (vim, yazi)</source>
+        <translation>Modale Tasten (vim, yazi)</translation>
     </message>
     <message>
-        <source>j k move, h l out of and into folders, gg G, / to search, v to mark, : for the palette. Typing letters no longer starts the quick search.</source>
-        <translation>j k bewegen, h l aus und in Ordner, gg G, / sucht, v markiert, : öffnet die Palette. Buchstaben starten dann keine Schnellsuche mehr.</translation>
+        <source>Letters are commands, as in vim and yazi: j k h l to move, v for visual mode, y x p to copy, cut and paste, d to trash, r to rename, a to create, t q for tabs, / to search, : for the palette. F1 lists them all. Typing no longer starts the quick search.</source>
+        <translation>Buchstaben sind Befehle, wie in vim und yazi: j k h l zum Bewegen, v für den visuellen Modus, y x p zum Kopieren, Ausschneiden und Einfügen, d in den Papierkorb, r zum Umbenennen, a zum Anlegen, t q für Tabs, / zum Suchen, : für die Palette. F1 zeigt alle. Tippen startet nicht mehr die Schnellsuche.</translation>
     </message>
     <message>
         <source>Notifications</source>

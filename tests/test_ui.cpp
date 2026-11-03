@@ -1734,7 +1734,7 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L("vim"));
         QAction* vim = nullptr;
         for (QAction* a : m_window->actions())
-            if (a->text().startsWith(QObject::tr("Vim keys")))
+            if (a->property("commandId").toString() == "modal-keys-vim-yazi")
                 vim = a;
         QVERIFY(vim);
         vim->trigger();
@@ -1753,7 +1753,7 @@ private slots:
         QCOMPARE(m_left->currentName(), QString("d4.txt"));
         QTest::keyClicks(v, "gg");
         QCOMPARE(m_left->currentName(), QString(".."));
-        QTest::keyClicks(v, "x");  // letters don't start quick search in vim mode
+        QTest::keyClicks(v, "u");  // letters don't start quick search in modal mode
         QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(v));
 
         // / search, Enter, then n jumps to the next match.
@@ -1768,10 +1768,50 @@ private slots:
         QTest::keyClicks(v, "N");
         QCOMPARE(m_left->currentName(), QString("a1.txt"));
 
-        // v marks, l enters, h leaves.
-        QTest::keyClicks(v, "v");
+        // v: visual mode marks what the cursor moves over; Esc ends it, the marks stay.
+        QTest::keyClicks(v, "vjj");
+        QCOMPARE(leftModel()->markedNames(), QStringList({"a1.txt", "b2.txt", "c3.txt"}));
+        QCOMPARE(v->visualMode(), 1);
+        QTest::keyClicks(v, "k");  // moving back takes marks back
+        QCOMPARE(leftModel()->markedNames(), QStringList({"a1.txt", "b2.txt"}));
+        m_left->refresh();  // a refresh of the folder keeps visual mode and its range
+        QTRY_VERIFY(!m_left->tab()->isLoading());
+        QCOMPARE(v->visualMode(), 1);
+        QTest::keyClicks(v, "j");
+        QCOMPARE(leftModel()->markedNames(), QStringList({"a1.txt", "b2.txt", "c3.txt"}));
+        QTest::keyClicks(v, "k");
+        QTest::keyClick(v, Qt::Key_Escape);
+        QCOMPARE(v->visualMode(), 0);
+        QCOMPARE(leftModel()->markedNames(), QStringList({"a1.txt", "b2.txt"}));
+        QTest::keyClicks(v, "V");  // V unmarks, from the cursor on
         QCOMPARE(leftModel()->markedNames(), QStringList({"a1.txt"}));
+        QTest::keyClick(v, Qt::Key_Escape);
+
+        // y copies to the clipboard, p pastes it into the shown folder.
+        moveCursorTo(m_left, "a1.txt");
+        QTest::keyClicks(v, "y");
         leftModel()->markAll(false);
+        moveCursorTo(m_left, "inner");
+        QTest::keyClicks(v, "l");
+        QTRY_COMPARE(leftModel()->path(), L("vim/inner"));
+        QTest::keyClicks(v, "p");
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(L("vim/inner/a1.txt")), 5000);
+        QTest::keyClicks(v, "h");
+        QTRY_COMPARE(leftModel()->path(), L("vim"));
+
+        // , then a key sorts; t and q open and close a tab.
+        QTest::keyClicks(v, ",s");
+        QCOMPARE(m_left->sortSpec().column, SortColumn::Size);
+        QTest::keyClicks(v, ",n");
+        QCOMPARE(m_left->sortSpec().column, SortColumn::Name);
+        const int tabs = m_left->tabPaths().size();
+        QTest::keyClicks(v, "t");
+        QTRY_COMPARE(m_left->tabPaths().size(), tabs + 1);
+        QTest::keyClicks(m_left->view(), "q");
+        QTRY_COMPARE(m_left->tabPaths().size(), tabs);
+        v = m_left->view();
+
+        // l enters, h leaves.
         moveCursorTo(m_left, "inner");
         QTest::keyClicks(v, "l");
         QTRY_COMPARE(leftModel()->path(), L("vim/inner"));

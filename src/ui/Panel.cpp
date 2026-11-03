@@ -196,6 +196,19 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     statusRow->addWidget(m_zoom);
     layout->addLayout(statusRow);
     connect(m_view, &FileView::zoomStepRequested, this, &Panel::zoomBy);
+    connect(m_view, &FileView::commandIdRequested, this, &Panel::commandIdRequested);
+    connect(m_view, &FileView::modeChanged, this, &Panel::updateStatus);
+    connect(m_view, &FileView::hintRequested, this, [this](const QString& text) {
+        if (text.isEmpty()) {
+            m_message.clear();
+            updateStatus();
+        } else {
+            m_message = text;
+            m_messageError = false;
+            m_messageTimer.stop();  // stays until the next key
+            updateStatus();
+        }
+    });
 
     m_search = new QLineEdit(m_view);
     m_search->setPlaceholderText(tr("Search"));
@@ -1105,6 +1118,8 @@ void Panel::updateStatus()
             text = tr("%1 files, %2 folders   ·   %3").arg(s.files).arg(s.dirs).arg(formatSize(s.bytes));
         }
     }
+    if (const int v = m_view->visualMode())  // modal keys: say which mode the keys are in
+        text = (v > 0 ? tr("VISUAL") : tr("VISUAL (unmark)")) + QStringLiteral("   ·   ") + text;
     m_status->setText(text);
     QPalette pal = m_status->palette();
     pal.setColor(QPalette::WindowText, color);

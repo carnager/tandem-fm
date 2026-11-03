@@ -56,7 +56,7 @@ private:
 
     void copyOrMove(CopyJob::Mode mode);
     void deleteSelected(bool permanent);
-    void makeFolder();
+    void makeFolder(const QString& given = {});  // asks for a name unless given
     void viewCurrent();
     void editCurrent();
     void openFile(const QString& path);
@@ -77,7 +77,9 @@ private:
     // Fills `menu` with the action's entries once they are known.
     void fillPluginChoices(QMenu* menu, const Plugin& plugin, const PluginAction& action, Panel* panel);
     void addPluginItems(QMenu* menu, Panel* panel, bool onItem);
-    void makeFile();
+    void makeFile(const QString& given = {});
+    void createNew();  // yazi's a: a file, or a folder when the name ends with /
+    void runCommandId(const QString& id);  // modal keys
     void openTerminal(const QString& dir = {});
     void pasteInto(const QString& dir);
     bool refuseInArchive(Panel* p);

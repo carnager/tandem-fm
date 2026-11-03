@@ -41,6 +41,7 @@ public:
     ViewerWindow(const QStringList& files, int index, QWidget* parent = nullptr, bool embedded = false);
     void showFile(const QString& path);
     void showNote(const QString& text);
+    void scrollPage(int direction);  // half a page down (1) or up (-1), whatever is shown
     ~ViewerWindow() override;
 
     void openIndex(int index);

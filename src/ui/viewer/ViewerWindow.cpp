@@ -1,5 +1,9 @@
 #include "ui/viewer/ViewerWindow.h"
 
+#include <QScrollBar>
+
+#include <QAbstractScrollArea>
+
 #include "core/Backend.h"
 
 #include "core/FileOps.h"
@@ -498,6 +502,18 @@ void ViewerWindow::showFile(const QString& path)
 {
     m_files = {path};
     openIndex(0);
+}
+
+void ViewerWindow::scrollPage(int direction)
+{
+    QWidget* w = m_stack->currentWidget();
+    auto* area = qobject_cast<QAbstractScrollArea*>(w);
+    if (!area && w)
+        area = w->findChild<QAbstractScrollArea*>();
+    if (!area)
+        return;
+    QScrollBar* bar = area->verticalScrollBar();
+    bar->setValue(bar->value() + direction * qMax(1, bar->pageStep() / 2));
 }
 
 void ViewerWindow::showNote(const QString& text)

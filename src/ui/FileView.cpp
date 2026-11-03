@@ -163,6 +163,60 @@ void FileView::zoomChanged()
     viewport()->update();
 }
 
+void FileView::setModel(QAbstractItemModel* model)
+{
+    setVisual(0);
+    if (QAbstractItemModel* old = this->model())
+        disconnect(old, &QAbstractItemModel::modelAboutToBeReset, this, nullptr);
+    QTreeView::setModel(model);
+    // A new listing: another folder ends visual mode, a refresh of this one keeps it.
+    if (model)
+        connect(model, &QAbstractItemModel::modelReset, this, [this] {
+            if (m_visual)
+                applyVisual();
+        });
+}
+
+void FileView::setVisual(int mode)
+{
+    FileModel* m = fileModel();
+    if (mode == m_visual || (mode && !m))
+        return;
+    m_visual = mode;
+    if (mode) {
+        const FileEntry* e = m->entry(currentRow());
+        m_visualAnchor = e ? e->name : QString();
+        m_visualPath = m->path();
+        m_visualBase = m->markedSet();
+        applyVisual();
+    }
+    emit modeChanged();
+}
+
+// The marks as they were, plus (or minus) everything between the anchor
+// and the cursor.
+void FileView::applyVisual()
+{
+    FileModel* m = fileModel();
+    const int anchor = m ? m->rowOf(m_visualAnchor) : -1;
+    if (!m || anchor < 0 || m->path() != m_visualPath) {  // another folder, or the start is gone
+        setVisual(0);
+        return;
+    }
+    QSet<QString> names = m_visualBase;
+    const int from = qMin(anchor, currentRow()), to = qMax(anchor, currentRow());
+    for (int r = qMax(0, from); r <= to; ++r) {
+        const FileEntry* e = m->entry(r);
+        if (!e || e->isParent)
+            continue;
+        if (m_visual > 0)
+            names.insert(e->name);
+        else
+            names.remove(e->name);
+    }
+    m->setMarkedNames(names);
+}
+
 void FileView::wheelEvent(QWheelEvent* e)
 {
     if (e->modifiers() & Qt::ControlModifier) {
@@ -367,6 +421,12 @@ void FileView::keyPressEvent(QKeyEvent* e)
         }
         break;
     case Qt::Key_Escape:
+        if (m_visual || m_pendingSort) {  // leaves visual mode, keeping its marks
+            m_pendingSort = false;
+            emit hintRequested(QString());
+            setVisual(0);
+            return;
+        }
         emit escapePressed();
         return;
     case Qt::Key_F10:
@@ -431,6 +491,25 @@ void FileView::keyPressEvent(QKeyEvent* e)
         }
         if (!(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
             const QString t = e->text();
+            // ,<key>: sort, like yazi.
+            if (m_pendingSort) {
+                m_pendingSort = false;
+                emit hintRequested(QString());
+                static const QHash<QString, QString> sorts = {
+                    {QStringLiteral("n"), QStringLiteral("sort-by-name")},
+                    {QStringLiteral("e"), QStringLiteral("sort-by-extension")},
+                    {QStringLiteral("m"), QStringLiteral("sort-by-date")},
+                    {QStringLiteral("s"), QStringLiteral("sort-by-size")},
+                };
+                if (sorts.contains(t))
+                    emit commandIdRequested(sorts.value(t));
+                return;
+            }
+            if (t == QLatin1String(",")) {
+                m_pendingSort = true;
+                emit hintRequested(tr("Sort by:  n name  ·  e extension  ·  m modified  ·  s size"));
+                return;
+            }
             // g followed by anything but g: a bookmark chain (gh = home…), like yazi.
             if (m_lastG && QDateTime::currentMSecsSinceEpoch() - m_lastG < 600 && !t.isEmpty() &&
                 t != QLatin1String("g") && t.at(0).isPrint()) {
@@ -460,10 +539,40 @@ void FileView::keyPressEvent(QKeyEvent* e)
             if (t == QLatin1String("n")) { emit searchNextRequested(1); return; }
             if (t == QLatin1String("N")) { emit searchNextRequested(-1); return; }
             if (t == QLatin1String(":")) { emit paletteRequested(); return; }
-            if (t == QLatin1String("v")) {
-                if (FileModel* fm = fileModel())
-                    fm->toggleMarked(currentRow());
-                moveCursorBy(1);
+            // v / V: visual mode, moving marks (or unmarks) a range.
+            if (t == QLatin1String("v") || t == QLatin1String("V")) {
+                const int mode = t == QLatin1String("v") ? 1 : -1;
+                setVisual(m_visual == mode ? 0 : mode);
+                return;
+            }
+            // Commands on the selection and around it, yazi's keys.
+            static const QHash<QString, QString> commands = {
+                {QStringLiteral("y"), QStringLiteral("copy-to-clipboard")},
+                {QStringLiteral("x"), QStringLiteral("cut-to-clipboard")},
+                {QStringLiteral("p"), QStringLiteral("paste")},
+                {QStringLiteral("d"), QStringLiteral("move-to-trash")},
+                {QStringLiteral("D"), QStringLiteral("delete-permanently")},
+                {QStringLiteral("r"), QStringLiteral("rename")},
+                {QStringLiteral("a"), QStringLiteral("create")},
+                {QStringLiteral("."), QStringLiteral("show-hidden-files")},
+                {QStringLiteral("f"), QStringLiteral("filter-as-you-type")},
+                {QStringLiteral("s"), QStringLiteral("search-files-names-or-contents")},
+                {QStringLiteral("z"), QStringLiteral("jump-to-folder-search")},
+                {QStringLiteral("t"), QStringLiteral("new-tab")},
+                {QStringLiteral("q"), QStringLiteral("close-tab")},
+                {QStringLiteral("["), QStringLiteral("previous-tab")},
+                {QStringLiteral("]"), QStringLiteral("next-tab")},
+                {QStringLiteral("w"), QStringLiteral("jobs")},
+                {QStringLiteral("K"), QStringLiteral("preview-up")},
+                {QStringLiteral("J"), QStringLiteral("preview-down")},
+                {QStringLiteral("~"), QStringLiteral("keyboard-shortcuts")},
+            };
+            QString id = commands.value(t);
+            if (t.size() == 1 && t.at(0) >= QLatin1Char('1') && t.at(0) <= QLatin1Char('9'))
+                id = QStringLiteral("tab-") + t;  // tab slots
+            if (!id.isEmpty()) {
+                setVisual(0);  // the marks it made stay for the command
+                emit commandIdRequested(id);
                 return;
             }
             if (!t.isEmpty() && t.at(0).isPrint() && t != QLatin1String(" "))
@@ -659,6 +768,8 @@ void FileView::currentChanged(const QModelIndex& current, const QModelIndex& pre
     QTreeView::currentChanged(current, previous);
     if (m_grid && m_grid->isVisible())
         m_grid->ensureVisible(current.row());
+    if (m_visual)
+        applyVisual();
     if (current.row() != previous.row())
         emit cursorMoved();
 }

@@ -210,6 +210,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
                 });
         connect(p, &Panel::contextMenuRequested, this, &MainWindow::showContextMenu);
         connect(p, &Panel::zoomRequested, this, &MainWindow::setZoom);
+        connect(p, &Panel::commandIdRequested, this, &MainWindow::runCommandId);
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
         connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
         connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
@@ -491,12 +492,12 @@ void MainWindow::createMenus()
     // Switches the Settings dialog shows; not in the menu bar, but still
     // commands for the palette and the keys page.
     auto* prefs = new QMenu(tr("Settings"), this);
-    QAction* vim = addCommand(prefs, QT_TR_NOOP("Vim keys (j k h l gg G / n N : v)"), {}, [this] {
+    QAction* vim = addCommand(prefs, QT_TR_NOOP("Modal keys (vim, yazi)"), {}, [this] {
         const bool on = m_actions.value(QStringLiteral("vim"))->isChecked();
         QSettings().setValue(QStringLiteral("input/vimKeys"), on);
         m_left->setVimKeys(on);
         m_right->setVimKeys(on);
-        active()->showMessage(on ? tr("Vim keys on: letters are commands; / searches") : tr("Vim keys off"));
+        active()->showMessage(on ? tr("Modal keys on: letters are commands (F1 lists them)") : tr("Modal keys off"));
     });
     vim->setCheckable(true);
     m_actions[QStringLiteral("vim")] = vim;
@@ -786,7 +787,7 @@ void MainWindow::deleteSelected(bool permanent)
         p->unmarkAll();
 }
 
-void MainWindow::makeFolder()
+void MainWindow::makeFolder(const QString& given)
 {
     Panel* p = active();
     QString why;
@@ -794,10 +795,11 @@ void MainWindow::makeFolder()
         p->showMessage(why, true);
         return;
     }
-    bool ok = false;
-    const QString name = QInputDialog::getText(this, tr("New folder"), tr("Name (use / for nested folders):"),
-                                               QLineEdit::Normal, QString(), &ok)
-                             .trimmed();
+    bool ok = !given.isEmpty();
+    const QString name = ok ? given
+                            : QInputDialog::getText(this, tr("New folder"), tr("Name (use / for nested folders):"),
+                                                    QLineEdit::Normal, QString(), &ok)
+                                  .trimmed();
     if (!ok || name.isEmpty())
         return;
     if (p->inArchive()) {
@@ -2578,7 +2580,42 @@ void MainWindow::openTerminal(const QString& dir)
         active()->showMessage(tr("Could not start %1").arg(program), true);
 }
 
-void MainWindow::makeFile()
+void MainWindow::createNew()
+{
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("Create"), tr("Name (end with / for a folder):"),
+                                               QLineEdit::Normal, QString(), &ok)
+                             .trimmed();
+    if (!ok || name.isEmpty())
+        return;
+    if (name.endsWith(QLatin1Char('/')))
+        makeFolder(name);
+    else
+        makeFile(name);
+}
+
+void MainWindow::runCommandId(const QString& id)
+{
+    if (id == QLatin1String("create")) {
+        createNew();
+    } else if (id == QLatin1String("jobs")) {
+        m_jobsPanel->setExpanded(!m_jobsPanel->isExpanded());
+    } else if (id == QLatin1String("preview-up") || id == QLatin1String("preview-down")) {
+        ViewerWindow* v = active() == m_right && m_quickView2 ? m_quickView2 : m_quickView;
+        if (v)
+            v->scrollPage(id == QLatin1String("preview-down") ? 1 : -1);
+        else
+            active()->showMessage(tr("No preview open (Ctrl+Q)"));
+    } else {
+        for (QAction* a : actions())
+            if (a->property("commandId").toString() == id) {
+                a->trigger();
+                return;
+            }
+    }
+}
+
+void MainWindow::makeFile(const QString& given)
 {
     Panel* p = active();
     QString why;
@@ -2586,9 +2623,10 @@ void MainWindow::makeFile()
         p->showMessage(why, true);
         return;
     }
-    bool ok = false;
+    bool ok = !given.isEmpty();
     const QString name =
-        QInputDialog::getText(this, tr("New file"), tr("File name:"), QLineEdit::Normal, QString(), &ok).trimmed();
+        ok ? given
+           : QInputDialog::getText(this, tr("New file"), tr("File name:"), QLineEdit::Normal, QString(), &ok).trimmed();
     if (!ok || name.isEmpty())
         return;
     if (name.contains(QLatin1Char('/'))) {
