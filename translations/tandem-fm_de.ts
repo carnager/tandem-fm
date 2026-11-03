@@ -4059,6 +4059,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>%1 pt</translation>
     </message>
     <message>
+        <source>Text and icons everywhere. Only the file lists: Ctrl+= and Ctrl+−.</source>
+        <translation>Text und Symbole überall. Nur die Dateilisten: Strg+= und Strg+−.</translation>
+    </message>
+    <message>
         <source>Like the desktop (%1)</source>
         <translation>Wie der Desktop (%1)</translation>
     </message>
@@ -4155,16 +4159,8 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Betrachter, Hex-Ansicht und Umbenennen-Vorlagen. Nur Schriften mit gleich breiten Buchstaben stehen zur Wahl.</translation>
     </message>
     <message>
-        <source>The interface size changes the next time Tandem starts</source>
-        <translation>Die Oberflächengröße ändert sich beim nächsten Start von Tandem</translation>
-    </message>
-    <message>
         <source>Interface size</source>
         <translation>Oberflächengröße</translation>
-    </message>
-    <message>
-        <source>Everything: text, icons, spacing. Takes effect the next time Tandem starts. Only the file lists: Ctrl+= and Ctrl+−.</source>
-        <translation>Alles: Text, Symbole, Abstände. Wirkt beim nächsten Start von Tandem. Nur die Dateilisten: Strg+= und Strg+−.</translation>
     </message>
     <message>
         <source>Keyboard</source>

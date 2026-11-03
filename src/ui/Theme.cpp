@@ -37,9 +37,18 @@ static Theme g_theme;
 
 const Theme& theme() { return g_theme; }
 
+
 namespace {
 QFont g_monoFont;
 bool g_monoSet = false;
+double g_uiScale = 1.0;
+
+QFont scaledFont(QFont f)
+{
+    if (g_uiScale != 1.0 && f.pointSizeF() > 0)
+        f.setPointSizeF(f.pointSizeF() * g_uiScale);
+    return f;
+}
 
 // A font from the settings: family and point size, each empty/0 for `base`'s.
 QFont chosenFont(const QFont& base, const char* family, const char* size)
@@ -54,6 +63,11 @@ QFont chosenFont(const QFont& base, const char* family, const char* size)
     return f;
 }
 }  // namespace
+
+double interfaceScale()
+{
+    return g_uiScale;
+}
 
 QFont monoFont()
 {
@@ -100,8 +114,13 @@ public:
     {
         if (m == PM_IndicatorWidth || m == PM_IndicatorHeight || m == PM_ExclusiveIndicatorWidth ||
             m == PM_ExclusiveIndicatorHeight)
-            return 16;
-        return QProxyStyle::pixelMetric(m, o, w);
+            return qRound(16 * g_uiScale);
+        // Interface size: icons grow with the text.
+        const int v = QProxyStyle::pixelMetric(m, o, w);
+        if (m == PM_SmallIconSize || m == PM_ButtonIconSize || m == PM_ToolBarIconSize || m == PM_ListViewIconSize ||
+            m == PM_TabBarIconSize || m == PM_IconViewIconSize || m == PM_LargeIconSize)
+            return qRound(v * g_uiScale);
+        return v;
     }
 
     void drawPrimitive(PrimitiveElement pe, const QStyleOption* o, QPainter* p, const QWidget* w) const override
@@ -647,14 +666,23 @@ void applyTheme(QApplication& app)
     }
 
     // Fonts (Settings › Appearance): the interface, the file lists, fixed width.
+    // Interface size scales them all, and icons through the style: inside
+    // Tandem, so popups stay where they belong (Qt's own scale factor puts
+    // submenus in the wrong place on Wayland).
+    const double scale = qBound(0.5, QSettings().value(QStringLiteral("view/interfaceScale"), 100).toInt() / 100.0, 3.0);
+    const bool rescaled = scale != g_uiScale;
+    g_uiScale = scale;
     static const QFont desktopFont = app.font();  // as the desktop set it, before ours
-    const QFont ui = chosenFont(desktopFont, "view/fontFamily", "view/fontSize");
+    const QFont uiBase = chosenFont(desktopFont, "view/fontFamily", "view/fontSize");
+    const QFont ui = scaledFont(uiBase);
     if (ui != app.font())
         app.setFont(ui);  // reaches every widget that doesn't set its own
-    t.listFont = chosenFont(ui, "view/listFontFamily", "view/listFontSize");
+    t.listFont = scaledFont(chosenFont(uiBase, "view/listFontFamily", "view/listFontSize"));
     g_monoSet = false;
-    g_monoFont = chosenFont(monoFont(), "view/monoFontFamily", "view/monoFontSize");
+    g_monoFont = scaledFont(chosenFont(monoFont(), "view/monoFontFamily", "view/monoFontSize"));
     g_monoSet = true;
+    if (rescaled && !first)  // widgets measure icons again
+        app.setStyle(new TandemStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
     t.numberFont = t.listFont;
     t.numberFont.setFeature(QFont::Tag("tnum"), 1);
 

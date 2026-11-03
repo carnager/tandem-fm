@@ -27,7 +27,7 @@ FileDelegate::FileDelegate(QTreeView* view) : QStyledItemDelegate(view), m_view(
 QSize FileDelegate::sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const
 {
     const int h = qMax(QFontMetrics(FileView::zoomed(theme().listFont)).height() + 8,
-                       22 * FileView::listZoom() / 100);
+                       qRound(22 * FileView::listZoom() / 100.0 * interfaceScale()));
     return {40, h};
 }
 
@@ -60,7 +60,7 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
 
     QRect r = opt.rect.adjusted(6, 0, -6, 0);
     if (col == FileModel::ColName) {
-        const int iconSize = 16 * FileView::listZoom() / 100;
+        const int iconSize = qRound(16 * FileView::listZoom() / 100.0 * interfaceScale());
         const QIcon ic = idx.data(Qt::DecorationRole).value<QIcon>();
         const QRect iconRect(r.left(), r.top() + (r.height() - iconSize) / 2, iconSize, iconSize);
         ic.paint(p, iconRect);
@@ -150,7 +150,7 @@ QFont FileView::zoomed(QFont f)
 
 void FileView::zoomChanged()
 {
-    const int iconSize = 16 * g_listZoom / 100;
+    const int iconSize = qRound(16 * g_listZoom / 100.0 * interfaceScale());
     setIconSize(QSize(iconSize, iconSize));
     // Columns grow and shrink along, keeping widths the user chose.
     if (model() && m_zoomOfColumns != g_listZoom) {
@@ -277,7 +277,7 @@ FileView::FileView(QWidget* parent) : QTreeView(parent)
 {
     setItemDelegate(new FileDelegate(this));
     connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, [this] {
-        scheduleDelayedItemsLayout();  // a new font: rows of another height
+        zoomChanged();  // a new font or interface size: rows of another height
     });
     setRootIsDecorated(false);
     setItemsExpandable(false);

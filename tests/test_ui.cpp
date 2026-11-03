@@ -44,6 +44,7 @@
 #include <sys/stat.h>
 #include <QFontDatabase>
 #include <QScrollBar>
+#include <QStyle>
 #include <QSignalSpy>
 
 #include <QApplication>
@@ -498,6 +499,26 @@ private slots:
         QCOMPARE(theme().listFont.pointSizeF(), 13.0);  // the size comes from the interface font
         QCOMPARE(monoFont().pointSizeF(), 15.0);
         QVERIFY(QFontInfo(monoFont()).fixedPitch());
+    }
+
+    // Interface size: fonts and icons, applied at once, inside Tandem.
+    void interfaceSize()
+    {
+        auto restore = qScopeGuard([] {
+            QSettings().remove("view/interfaceScale");
+            applyTheme(*qApp);
+        });
+        const double font = QApplication::font().pointSizeF();
+        const int icon = QApplication::style()->pixelMetric(QStyle::PM_SmallIconSize);
+        QSettings().setValue("view/interfaceScale", 150);
+        applyTheme(*qApp);
+        QCOMPARE(interfaceScale(), 1.5);
+        QCOMPARE(QApplication::font().pointSizeF(), font * 1.5);
+        QCOMPARE(QApplication::style()->pixelMetric(QStyle::PM_SmallIconSize), qRound(icon * 1.5));
+        QSettings().setValue("view/interfaceScale", 100);
+        applyTheme(*qApp);
+        QCOMPARE(QApplication::font().pointSizeF(), font);
+        QVERIFY(qEnvironmentVariableIsEmpty("QT_SCALE_FACTOR"));
     }
 
     void quickSearch()

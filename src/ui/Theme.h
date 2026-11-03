@@ -33,6 +33,8 @@ struct Theme {
 const Theme& theme();
 // The configured fixed-width font, guaranteed to really be monospaced.
 QFont monoFont();
+// Interface size (Settings › Appearance), 1.0 = 100 %: fonts and icons.
+double interfaceScale();
 
 // Themes are JSON files: built in (:/themes) and the user's own in
 // themesFolder(). A file names the colours it changes; the rest come from

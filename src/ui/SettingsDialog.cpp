@@ -414,12 +414,11 @@ QWidget* SettingsDialog::appearancePage()
     scale->setCurrentIndex(qMax(0, scale->findData(s.value(QStringLiteral("view/interfaceScale"), 100).toInt())));
     connect(scale, &QComboBox::currentIndexChanged, this, [this, scale] {
         QSettings().setValue(QStringLiteral("view/interfaceScale"), scale->currentData());
-        m_window->active()->showMessage(tr("The interface size changes the next time Tandem starts"));
+        applyTheme(*qApp);
     });
     scale->setMaximumWidth(320);
     page.add(tr("Interface size"), scale,
-             tr("Everything: text, icons, spacing. Takes effect the next time Tandem starts. Only the file lists: "
-                "Ctrl+= and Ctrl+−."));
+             tr("Text and icons everywhere. Only the file lists: Ctrl+= and Ctrl+−."));
 
     auto* icons = new QComboBox(this);
     icons->addItem(tr("Like the desktop (%1)").arg(IconCache::systemTheme()), QString());
