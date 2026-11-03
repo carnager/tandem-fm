@@ -2777,6 +2777,7 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     m_left->setVimKeys(vimKeys);
     m_right->setVimKeys(vimKeys);
     FileView::setInactiveDim(s.value(QStringLiteral("view/inactiveDim"), 0).toInt() / 100.0);
+    FileModel::setRelativeDates(s.value(QStringLiteral("view/relativeDates"), true).toBool());
     ThumbGrid::setDefaultSize(s.value(QStringLiteral("view/gridSize"), ThumbGrid::kDefaultSize).toInt());
     FileView::setListZoom(s.value(QStringLiteral("view/listZoom"), 100).toInt());
     for (Panel* p : {m_left, m_right}) {
@@ -2797,6 +2798,7 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         const char* key;
         int argIndex;
     } panels[] = {{m_left, "left", 0}, {m_right, "right", 1}};
+    const bool rows2 = s.value(QStringLiteral("view/rows2"), false).toBool();
     for (const auto& p : panels) {
         s.beginGroup(QLatin1String(p.key));
         SortSpec spec;
@@ -2804,7 +2806,8 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         spec.descending = s.value(QStringLiteral("sortDescending"), false).toBool();
         p.panel->setSortSpec(spec);
         p.panel->setShowHidden(hidden);
-        p.panel->restoreHeaderState(s.value(QStringLiteral("header")).toByteArray());
+        if (rows2)  // layouts saved before the new columns start over once
+            p.panel->restoreHeaderState(s.value(QStringLiteral("header")).toByteArray());
         QStringList tabs = s.value(QStringLiteral("tabs")).toStringList();
         int current = s.value(QStringLiteral("currentTab"), 0).toInt();
         QList<int> numbers;  // ("slots" is a Qt macro)
@@ -2846,6 +2849,7 @@ void MainWindow::saveSettings()
     s.setValue(QStringLiteral("window/active"), m_active == m_right ? "right" : "left");
     s.setValue(QStringLiteral("view/showHidden"), m_hiddenAction->isChecked());
     s.remove(QStringLiteral("view/thumbnailFolders"));  // older versions: thumbnails per folder
+    s.setValue(QStringLiteral("view/rows2"), true);      // the saved layout has the new columns
     for (auto [panel, key] : {std::pair{m_left, "left"}, std::pair{m_right, "right"}}) {
         s.beginGroup(QLatin1String(key));
         s.setValue(QStringLiteral("tabs"), panel->tabPaths());

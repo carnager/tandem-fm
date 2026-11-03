@@ -641,8 +641,15 @@ void Panel::applyDefaultColumns()
         h->setSectionResizeMode(c, QHeaderView::Interactive);
     m_view->setColumnWidth(FileModel::ColExt, fm.horizontalAdvance(QStringLiteral("desktop")) + 24);
     m_view->setColumnWidth(FileModel::ColSize, fm.horizontalAdvance(QStringLiteral("999.9 MiB")) + 24);
-    m_view->setColumnWidth(FileModel::ColTime, fm.horizontalAdvance(QStringLiteral("2026-12-31 23:59")) + 24);
+    // Dates: room for the longer of both styles ("Yesterday 23:59", "2026-12-31 23:59").
+    const int dateWidth = qMax(fm.horizontalAdvance(QStringLiteral("2026-12-31 23:59")),
+                               fm.horizontalAdvance(FileModel::relativeDate(0, QDateTime::fromSecsSinceEpoch(86400 + 3600 * 23))));
+    m_view->setColumnWidth(FileModel::ColTime, dateWidth + 24);
     m_view->setColumnWidth(FileModel::ColAttr, fm.horizontalAdvance(QStringLiteral("drwxr-xr-x")) + 24);
+    // Extensions show in the name; attributes in the info view. Both can be
+    // switched back on from the column header's menu.
+    h->setSectionHidden(FileModel::ColExt, true);
+    h->setSectionHidden(FileModel::ColAttr, true);
 }
 
 QByteArray Panel::headerState() const

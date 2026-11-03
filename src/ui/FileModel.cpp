@@ -5,9 +5,14 @@
 #include "ui/Theme.h"
 
 #include <QDateTime>
+#include <QLocale>
+#include <QPointer>
+#include <QTimer>
 #include <QRegularExpression>
 
 #include <algorithm>
+#include <dirent.h>
+#include <memory>
 #include <numeric>
 
 namespace tandem {
@@ -79,12 +84,18 @@ QVariant FileModel::data(const QModelIndex& index, int role) const
         case ColSize:
             if (e->isParent)
                 return QString();
-            if (e->isDir)
-                return e->size >= 0 ? formatSize(e->size) : QStringLiteral("<DIR>");
+            if (e->isDir) {
+                if (e->size >= 0)  // computed (Space)
+                    return formatSize(e->size);
+                const std::optional<int> n = itemCount(*e);
+                return n ? plural(tr("%n item(s)", nullptr, *n), *n) : QString();
+            }
             return formatSize(e->size);
         case ColTime:
             if (e->isParent || e->mtime == 0)
                 return QString();
+            if (relativeDates())
+                return relativeDate(e->mtime, QDateTime::currentDateTime());
             return QDateTime::fromSecsSinceEpoch(e->mtime).toString(QStringLiteral("yyyy-MM-dd HH:mm"));
         case ColAttr:
             return e->isParent ? QString() : modeString(e->mode);
@@ -105,9 +116,116 @@ QVariant FileModel::data(const QModelIndex& index, int role) const
     case Qt::ToolTipRole:
         if (index.column() == ColName && !e->isParent)
             return e->name;
+        if (index.column() == ColTime && !e->isParent && e->mtime)
+            return QLocale().toString(QDateTime::fromSecsSinceEpoch(e->mtime), QLocale::LongFormat);
         break;
     }
     return {};
+}
+
+// ------------------------------------------------------- item counts
+
+void FileModel::setCountable(bool on, bool hidden)
+{
+    if (hidden != m_countHidden)
+        m_counts.clear();
+    m_countable = on;
+    m_countHidden = hidden;
+}
+
+std::optional<int> FileModel::itemCount(const FileEntry& e) const
+{
+    if (!m_countable || !e.isDir || e.isParent)
+        return std::nullopt;
+    const auto it = m_counts.constFind(e.name);
+    if (it != m_counts.cend())
+        return *it < 0 ? std::nullopt : std::optional<int>(*it);
+    m_counts.insert(e.name, -1);  // asked for: counted once
+    m_countQueue.insert(e.name);
+    if (!m_countScheduled) {
+        m_countScheduled = true;
+        QTimer::singleShot(0, const_cast<FileModel*>(this), [this] { runCounts(); });
+    }
+    return std::nullopt;
+}
+
+void FileModel::runCounts() const
+{
+    m_countScheduled = false;
+    if (m_countQueue.isEmpty())
+        return;
+    const QStringList names(m_countQueue.cbegin(), m_countQueue.cend());
+    m_countQueue.clear();
+    QPointer<FileModel> self(const_cast<FileModel*>(this));
+    const QString dir = m_path;
+    const bool hidden = m_countHidden;
+    const quint64 gen = m_countGen;
+    ioPool()->start([self, dir, names, hidden, gen] {
+        auto counts = std::make_shared<QHash<QString, int>>();
+        for (const QString& name : names) {
+            DIR* d = ::opendir(toNative(joinPath(dir, name)).constData());
+            int n = 0;
+            if (d) {
+                while (dirent* de = ::readdir(d)) {
+                    const char* s = de->d_name;
+                    if (s[0] == '.' && (s[1] == 0 || (s[1] == '.' && s[2] == 0) || !hidden))
+                        continue;
+                    if (++n >= 99999)
+                        break;
+                }
+                ::closedir(d);
+            }
+            counts->insert(name, d ? n : -2);  // -2: can't be read, don't ask again
+        }
+        postToUi([self, counts, gen] {
+            if (!self || gen != self->m_countGen)
+                return;  // the folder changed meanwhile
+            for (auto it = counts->cbegin(); it != counts->cend(); ++it) {
+                self->m_counts.insert(it.key(), it.value());
+                const int row = self->rowOf(it.key());
+                if (row >= 0)
+                    emit self->dataChanged(self->index(row, ColSize), self->index(row, ColSize));
+            }
+        });
+    });
+}
+
+// -------------------------------------------------------------- dates
+
+namespace {
+bool g_relativeDates = true;
+}
+
+void FileModel::setRelativeDates(bool on)
+{
+    g_relativeDates = on;
+}
+
+bool FileModel::relativeDates()
+{
+    return g_relativeDates;
+}
+
+QString FileModel::relativeDate(qint64 secs, const QDateTime& now)
+{
+    const QDateTime t = QDateTime::fromSecsSinceEpoch(secs);
+    const qint64 ago = t.secsTo(now);
+    const QLocale loc;
+    if (ago >= 0 && ago < 60)
+        return tr("just now");
+    if (ago >= 0 && ago < 3600)
+        return tr("%n min ago", nullptr, int(ago / 60));
+    const QDate d = t.date(), today = now.date();
+    const QString time = loc.toString(t.time(), QLocale::ShortFormat);
+    if (d == today)
+        return tr("Today %1").arg(time);
+    if (d == today.addDays(-1))
+        return tr("Yesterday %1").arg(time);
+    if (d < today && d > today.addDays(-7))
+        return loc.toString(d, QStringLiteral("ddd")) + QLatin1Char(' ') + time;
+    if (d.year() == today.year())
+        return loc.toString(d, tr("d MMM"));
+    return loc.toString(d, tr("d MMM yyyy"));
 }
 
 QVariant FileModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -239,8 +357,12 @@ void FileModel::setFilter(const QString& text)
 void FileModel::setListing(const QString& path, std::vector<FileEntry>&& entries)
 {
     beginResetModel();
-    if (path != m_path)
+    if (path != m_path) {
         m_git.clear();
+        m_counts.clear();  // another folder: counts from here on belong to it
+        m_countQueue.clear();
+        ++m_countGen;
+    }
     m_path = path;
     partition(entries);
     m_stats = {};

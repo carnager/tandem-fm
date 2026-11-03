@@ -1764,6 +1764,40 @@
 </context>
 <context>
     <name>tandem::FileModel</name>
+    <message numerus="yes">
+        <source>%n item(s)</source>
+        <translation>
+            <numerusform>%n Element</numerusform>
+            <numerusform>%n Elemente</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>just now</source>
+        <translation>gerade eben</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n min ago</source>
+        <translation>
+            <numerusform>vor %n Min.</numerusform>
+            <numerusform>vor %n Min.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Today %1</source>
+        <translation>Heute %1</translation>
+    </message>
+    <message>
+        <source>Yesterday %1</source>
+        <translation>Gestern %1</translation>
+    </message>
+    <message>
+        <source>d MMM</source>
+        <translation>d. MMM</translation>
+    </message>
+    <message>
+        <source>d MMM yyyy</source>
+        <translation>d. MMM yyyy</translation>
+    </message>
     <message>
         <source>Name</source>
         <translation>Name</translation>
@@ -4214,6 +4248,22 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Interface size</source>
         <translation>Oberflächengröße</translation>
+    </message>
+    <message>
+        <source>Dates</source>
+        <translation>Datum</translation>
+    </message>
+    <message>
+        <source>Relative (2 h ago, Yesterday)</source>
+        <translation>Relativ (vor 2 Std., Gestern)</translation>
+    </message>
+    <message>
+        <source>Exact (2026-11-03 21:50)</source>
+        <translation>Genau (2026-11-03 21:50)</translation>
+    </message>
+    <message>
+        <source>The exact time is always in the tooltip.</source>
+        <translation>Die genaue Zeit steht immer im Tooltip.</translation>
     </message>
     <message>
         <source>Keyboard</source>

@@ -313,6 +313,8 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
                 t->m_model->setFilter({});  // a new folder starts unfiltered
             if (result->sortedBy != t->m_model->sortSpec())  // sort changed while loading
                 sortEntries(result->entries, t->m_model->sortSpec());
+            // Item counts of subfolders: only where reading them is cheap.
+            t->m_model->setCountable(!result->remote && !result->inArchive && !networkFs, t->m_showHidden);
             t->m_model->setListing(result->path, std::move(result->entries));
             t->m_model->restoreMarks(restore);
             if (old != result->path)
@@ -439,6 +441,7 @@ void DirTab::startSearch(const SearchSpec& spec)
     setWatch(-1);
     m_search = spec;
     m_inSearch = true;
+    m_model->setCountable(false, false);  // results are paths below the folder
     m_searchRunning = true;
     m_searchFound = 0;
     m_searchError.clear();

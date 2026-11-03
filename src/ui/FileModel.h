@@ -1,5 +1,9 @@
 #pragma once
 
+#include <optional>
+
+#include <QDateTime>
+
 #include "core/DirLister.h"
 #include "core/FileEntry.h"
 #include "core/Sorting.h"
@@ -41,6 +45,16 @@ public:
     // Search results arriving: appended as they come (sorted at the end).
     void appendEntries(std::vector<FileEntry>&& entries);
     void setDirSize(const QString& name, int64_t size);
+
+    // Folders show how many items they hold, counted on a worker for the
+    // rows that are painted; only where that is cheap (local folders).
+    void setCountable(bool on, bool hidden);
+    std::optional<int> itemCount(const FileEntry& e) const;  // asks for it when unknown
+
+    // Dates as "12 min ago", "Yesterday 14:20", "3 Nov"; or exact.
+    static QString relativeDate(qint64 secs, const QDateTime& now);
+    static void setRelativeDates(bool on);
+    static bool relativeDates();
 
     QString path() const { return m_path; }
     const FileEntry* entry(int row) const;
@@ -91,6 +105,8 @@ private:
     bool matchesFilter(const FileEntry& e) const;
     void partition(std::vector<FileEntry>& all);
 
+    void runCounts() const;
+
     QString m_path;
     std::vector<FileEntry> m_entries;  // ".." first when not at "/"
     std::vector<FileEntry> m_hidden;   // filtered out
@@ -99,6 +115,11 @@ private:
     QList<QRegularExpression> m_filterTerms;
     SortSpec m_sort;
     Stats m_stats;
+    bool m_countable = false, m_countHidden = false;
+    quint64 m_countGen = 0;
+    mutable QHash<QString, int> m_counts;
+    mutable QSet<QString> m_countQueue;
+    mutable bool m_countScheduled = false;
 };
 
 }  // namespace tandem

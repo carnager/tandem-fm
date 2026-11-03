@@ -565,6 +565,38 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // Rows: dates people read at a glance, folders with item counts, no Ext/Attributes columns.
+    void rowsAtAGlance()
+    {
+        const QDateTime now(QDate(2026, 11, 4), QTime(15, 0));
+        auto at = [&](int days, int h, int m) { return QDateTime(now.date().addDays(days), QTime(h, m)).toSecsSinceEpoch(); };
+        QCOMPARE(FileModel::relativeDate(now.toSecsSinceEpoch() - 20, now), QString("just now"));
+        QCOMPARE(FileModel::relativeDate(now.toSecsSinceEpoch() - 12 * 60, now), QString("12 min ago"));
+        QVERIFY(FileModel::relativeDate(at(0, 9, 5), now).startsWith("Today "));
+        QVERIFY(FileModel::relativeDate(at(-1, 9, 5), now).startsWith("Yesterday "));
+        QVERIFY(FileModel::relativeDate(at(-3, 9, 5), now).contains(QLocale().toString(QTime(9, 5), QLocale::ShortFormat)));
+        QCOMPARE(FileModel::relativeDate(at(-30, 9, 5), now), QLocale().toString(now.date().addDays(-30), "d MMM"));
+        QCOMPARE(FileModel::relativeDate(QDateTime(QDate(2024, 3, 2), QTime(1, 0)).toSecsSinceEpoch(), now),
+                 QLocale().toString(QDate(2024, 3, 2), "d MMM yyyy"));
+
+        // A local folder: its subfolders say how many items they hold.
+        QVERIFY(QDir().mkpath(L("counted/a")));
+        writeFile(L("counted/x.txt"), "x");
+        writeFile(L("counted/.hidden"), "h");
+        auto cleanup = qScopeGuard([this] { QDir(L("counted")).removeRecursively(); });
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTRY_VERIFY(leftModel()->rowOf("counted") >= 0);  // the watcher reports the new folder
+        const int row = leftModel()->rowOf("counted");
+        leftModel()->data(leftModel()->index(row, FileModel::ColSize), Qt::DisplayRole);  // asks for the count
+        QTRY_COMPARE(leftModel()->data(leftModel()->index(row, FileModel::ColSize), Qt::DisplayRole).toString(),
+                     QString("2 items"));  // hidden files aren't counted while they're hidden
+
+        // The extension lives in the name; the columns can come back from the header menu.
+        QVERIFY(m_left->view()->isColumnHidden(FileModel::ColExt));
+        QVERIFY(m_left->view()->isColumnHidden(FileModel::ColAttr));
+    }
+
     void quickSearch()
     {
         m_left->view()->setCurrentRow(0);

@@ -150,7 +150,7 @@ CopyJob::CopyJob(Mode mode, QStringList sources, QString destination)
 }
 
 CopyJob::CopyJob(QList<QPair<QString, QString>> pairs)
-    : Job(tr("Synchronize %n file(s) → %1", nullptr, int(pairs.size()))
+    : Job(plural(tr("Synchronize %n file(s) → %1", nullptr, int(pairs.size())), pairs.size())
               .arg(pairs.isEmpty() ? QString() : tildePath(parentPath(pairs.first().second)))),
       m_mode(Mode::Copy),
       m_pairs(std::move(pairs))

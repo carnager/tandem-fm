@@ -2,6 +2,7 @@
 
 #include "ui/FileColors.h"
 #include "ui/FontPicker.h"
+#include "ui/FileModel.h"
 #include "ui/FileView.h"
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
@@ -464,6 +465,17 @@ QWidget* SettingsDialog::appearancePage()
         QSettings().setValue(QStringLiteral("window/menuBar"), on);
     });
     page.add(QString(), menu);
+    page.add(tr("Dates"),
+             segments(this, {{QStringLiteral("relative"), tr("Relative (2 h ago, Yesterday)")},
+                             {QStringLiteral("exact"), tr("Exact (2026-11-03 21:50)")}},
+                      FileModel::relativeDates() ? QStringLiteral("relative") : QStringLiteral("exact"),
+                      [this](const QString& code) {
+                          const bool relative = code == QLatin1String("relative");
+                          QSettings().setValue(QStringLiteral("view/relativeDates"), relative);
+                          FileModel::setRelativeDates(relative);
+                          m_window->repaintFileViews();
+                      }),
+             tr("The exact time is always in the tooltip."));
     page.add(tr("Inactive panel"),
              segments(this, {{QStringLiteral("0"), tr("As bright")}, {QStringLiteral("30"), tr("Slightly faded")},
                              {QStringLiteral("55"), tr("Clearly faded")}},

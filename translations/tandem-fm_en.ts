@@ -97,6 +97,23 @@
     </message>
 </context>
 <context>
+    <name>tandem::FileModel</name>
+    <message numerus="yes">
+        <source>%n item(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n min ago</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>tandem::JobRow</name>
     <message numerus="yes">
         <source>Finished with %n problem(s)</source>

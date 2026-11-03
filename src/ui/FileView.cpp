@@ -17,6 +17,7 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QScrollBar>
+#include <QTimer>
 
 namespace tandem {
 
@@ -110,13 +111,49 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
         f.setWeight(QFont::Bold);
     p->setFont(f);
     // Secondary columns are dimmed so names stand out; marks keep their color.
-    const bool secondary = col == FileModel::ColTime || col == FileModel::ColAttr ||
-                           (col == FileModel::ColSize && e->isDir);
+    const bool secondary = col == FileModel::ColTime || col == FileModel::ColAttr || col == FileModel::ColSize;
     if (secondary && !e->marked)
         fg = t.dimText;
     p->setPen(fg);
 
-    const QString text = idx.data(Qt::DisplayRole).toString();
+    QString text = idx.data(Qt::DisplayRole).toString();
+    const QFontMetrics fm(f);
+    const auto faded = [](QColor c) {
+        c.setAlphaF(c.alphaF() * 0.62);
+        return c;
+    };
+    // Without an Ext column the name ends in its extension, a little fainter.
+    if (col == FileModel::ColName && !e->isDir && !e->isParent && m_view->isColumnHidden(FileModel::ColExt)) {
+        const QString ext = FileModel::displayExt(*e);
+        if (!ext.isEmpty()) {
+            if (fm.horizontalAdvance(e->name) <= r.width()) {
+                p->drawText(r, Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, text);
+                QRect rest = r;
+                rest.setLeft(r.left() + fm.horizontalAdvance(text));
+                p->setPen(faded(fg));
+                p->drawText(rest, Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, QLatin1Char('.') + ext);
+                p->restore();
+                return;
+            }
+            text = e->name;  // too long: shortened as a whole
+        }
+    }
+    // Sizes and counts: the unit fainter than the number.
+    if (col == FileModel::ColSize) {
+        const int space = int(text.lastIndexOf(QLatin1Char(' ')));
+        if (space > 0) {
+            const QString unit = text.mid(space);
+            const int uw = fm.horizontalAdvance(unit);
+            QRect nr = r;
+            nr.setRight(r.right() - uw);
+            p->drawText(nr, Qt::AlignRight | Qt::AlignVCenter | Qt::TextSingleLine, text.left(space));
+            p->setPen(faded(fg));
+            p->drawText(QRect(r.right() - uw, r.top(), uw + 1, r.height()), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
+                        unit);
+            p->restore();
+            return;
+        }
+    }
     const Qt::Alignment align = col == FileModel::ColSize ? (Qt::AlignRight | Qt::AlignVCenter)
                                                           : (Qt::AlignLeft | Qt::AlignVCenter);
     // Names elide in the middle (keeps the end visible); short columns at the end.
@@ -279,6 +316,14 @@ FileView::FileView(QWidget* parent) : QTreeView(parent)
     connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, [this] {
         zoomChanged();  // a new font or interface size: rows of another height
     });
+    // "5 min ago" becomes "6 min ago".
+    auto* minute = new QTimer(this);
+    minute->setInterval(60 * 1000);
+    connect(minute, &QTimer::timeout, this, [this] {
+        if (FileModel::relativeDates() && isVisible())
+            viewport()->update();
+    });
+    minute->start();
     setRootIsDecorated(false);
     setItemsExpandable(false);
     setUniformRowHeights(true);  // essential for huge directories
