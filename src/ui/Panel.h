@@ -85,6 +85,7 @@ public:
     void showMountMenu();
     // sftp://…, smb://…, user@host:path, …: mount through GVfs, then open.
     void connectTo(const QString& uri);
+    static QString takePassword(const QString& location);
     void connectDialog();
     void disconnectMount(const QString& path);
     void showMessage(const QString& text, bool error = false);
@@ -166,6 +167,7 @@ private:
     QString m_lastSearch;
     QString m_pathBeforeReset;
     int m_scrollBeforeReset = 0;
+    int m_rowBeforeReset = 0;
 };
 
 }  // namespace tandem

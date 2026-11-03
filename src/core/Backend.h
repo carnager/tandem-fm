@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QHash>
+
 #include "core/DirLister.h"
 
 #include <QString>
@@ -67,6 +69,24 @@ public:
     virtual int readLink(const QString& path, QString& target) { (void)path; (void)target; return ENOTSUP; }
     virtual int symlink(const QString& target, const QString& path) { (void)target; (void)path; return ENOTSUP; }
     virtual int chmod(const QString& path, uint32_t mode) { (void)path; (void)mode; return 0; }
+
+    // Everything under path in one go: folder (relative, "" = path itself)
+    // -> its entries. For backends where this beats listing folder by folder
+    // by far (one request instead of thousands of round trips). false: can't
+    // here, walk instead.
+    using Tree = QHash<QString, std::vector<FileEntry>>;
+    virtual bool listTree(const QString& path, bool hidden, Tree& out, const std::atomic<bool>* cancel)
+    {
+        (void)path, (void)hidden, (void)out, (void)cancel;
+        return false;
+    }
+
+    // A password typed into a location ("smb://bob:secret@nas"): used for
+    // this session's login instead of asking; locations never keep it.
+    virtual void offerPassword(const QString& location, const QString& user, const QString& password)
+    {
+        (void)location, (void)user, (void)password;
+    }
 
     // Where "sftp://host" without a path should open (the login's home).
     virtual QString homeLocation(const QString& path);

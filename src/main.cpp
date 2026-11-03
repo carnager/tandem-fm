@@ -1,6 +1,7 @@
 #include "core/Backend.h"
 #include "core/DirWatcher.h"
 #include "ui/AuthDialogs.h"
+#include "ui/Network.h"
 #include "ui/MainWindow.h"
 #include "ui/Theme.h"
 
@@ -38,6 +39,7 @@ int main(int argc, char** argv)
     tandem::DirWatcher::instance();  // must be created on the UI thread
     tandem::registerBuiltinBackends();
     tandem::installAuthDialogs();
+    tandem::Network::instance().recentServers();  // drops passwords older versions stored
 
     QStringList paths = app.arguments().mid(1);
     tandem::MainWindow w(paths);

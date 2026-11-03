@@ -162,8 +162,11 @@ void DirTab::setShowHidden(bool on)
     refresh();
 }
 
-void DirTab::startListing(const QString& path, const QString& focus, History history, bool keepMarks)
+void DirTab::startListing(const QString& pathIn, const QString& focus, History history, bool keepMarks)
 {
+    // GVfs's FUSE folders are slow for sftp and smb; Tandem talks to those itself.
+    const QString native = nativeLocationFor(pathIn);
+    const QString& path = native.isEmpty() ? pathIn : native;
     if (m_inSearch) {
         cancelSearch();
         m_inSearch = false;

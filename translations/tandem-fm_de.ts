@@ -2421,10 +2421,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Hänge ein…</translation>
     </message>
     <message>
-        <source>Servers</source>
-        <translation>Server</translation>
-    </message>
-    <message>
         <source>Connect to server…	Ctrl+K</source>
         <translation>Mit Server verbinden…	Strg+K</translation>
     </message>
@@ -2529,8 +2525,22 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Tandem wurde ohne GIO gebaut: mit sshfs/rclone einhängen und den Ordner öffnen</translation>
     </message>
     <message>
+        <source>Examples:  sftp://user@host/path  ·  user@host:folder  ·  smb://nas/share  ·  davs://cloud.example.com/remote.php/dav/files/me  ·  ftp://host
+sftp and smb are built in; the others are mounted with GVfs (other apps see those too).</source>
+        <translation>Beispiele:  sftp://user@host/pfad  ·  user@host:ordner  ·  smb://nas/freigabe  ·  davs://cloud.example.com/remote.php/dav/files/ich  ·  ftp://host
+sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Programme sehen diese auch).</translation>
+    </message>
+    <message>
         <source>Connecting to %1 …</source>
         <translation>Verbinde mit %1 …</translation>
+    </message>
+    <message>
+        <source>Recent servers</source>
+        <translation>Zuletzt benutzte Server</translation>
+    </message>
+    <message>
+        <source>Clear recent servers</source>
+        <translation>Liste leeren</translation>
     </message>
     <message>
         <source>%1: %2</source>
@@ -2539,12 +2549,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Connect to server</source>
         <translation>Mit Server verbinden</translation>
-    </message>
-    <message>
-        <source>Examples:  sftp://user@host/path  ·  user@host:folder  ·  smb://nas/share  ·  davs://cloud.example.com/remote.php/dav/files/me  ·  ftp://host
-Mounted with GVfs, so other apps see it too. Passwords can go to the keyring.</source>
-        <translation>Beispiele:  sftp://benutzer@host/pfad  ·  benutzer@host:ordner  ·  smb://nas/freigabe  ·  davs://cloud.example.com/remote.php/dav/files/ich  ·  ftp://host
-Eingehängt über GVfs, andere Programme sehen es also auch. Passwörter können in den Schlüsselbund.</translation>
     </message>
     <message>
         <source>Connect</source>
@@ -2700,10 +2704,6 @@ Eingehängt über GVfs, andere Programme sehen es also auch. Passwörter können
         <translation>Schließen</translation>
     </message>
     <message>
-        <source>Comparing %1 …</source>
-        <translation>Vergleiche %1 …</translation>
-    </message>
-    <message>
         <source>Cannot compare: %1</source>
         <translation>Vergleich nicht möglich: %1</translation>
     </message>
@@ -2766,6 +2766,13 @@ Eingehängt über GVfs, andere Programme sehen es also auch. Passwörter können
     <message>
         <source>Comparing …</source>
         <translation>Vergleiche …</translation>
+    </message>
+    <message numerus="yes">
+        <source>Comparing … %n folder(s)</source>
+        <translation>
+            <numerusform>Vergleiche … %n Ordner</numerusform>
+            <numerusform>Vergleiche … %n Ordner</numerusform>
+        </translation>
     </message>
     <message>
         <source>→ %1 to the right · %2</source>

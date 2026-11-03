@@ -1,5 +1,7 @@
 #include "core/Remote.h"
 
+#include "core/Backend.h"
+
 #include <QHash>
 #include <QRegularExpression>
 #include <QUrl>
@@ -108,6 +110,15 @@ QString normalizeServerUri(const QString& input)
         return QStringLiteral("sftp://%1%2%3").arg(m.captured(1), m.captured(2), p);
     }
     return {};
+}
+
+QString nativeLocationFor(const QString& path)
+{
+    const auto r = remoteRootOf(path);
+    if (!r || (r->scheme != QLatin1String("sftp") && r->scheme != QLatin1String("smb")) || !hasBackend(r->scheme) ||
+        !r->label.contains(QLatin1String("://")))
+        return {};
+    return normalizeLocation(r->label + path.mid(r->root.size()));
 }
 
 }  // namespace tandem

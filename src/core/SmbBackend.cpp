@@ -245,6 +245,26 @@ public:
         return c;
     }
 
+    void offerPassword(const QString& location, const QString& user, const QString& password) override
+    {
+        SmbServer* server = serverFor(location);
+        std::vector<SMBCCTX*> old;
+        {
+            std::lock_guard<std::mutex> lock(server->mutex);
+            const Credentials c = splitUser(user, password);
+            if (server->creds && server->creds->user == c.user && server->creds->domain == c.domain &&
+                server->creds->password == c.password)
+                return;
+            server->creds = c;
+            server->verified = false;
+            server->generation += 1;
+            old.swap(server->idle);
+            server->open -= int(old.size());
+        }
+        for (SMBCCTX* c : old)
+            freeContext(c);
+    }
+
     // Asks for a login (one dialog per server at a time). false: cancelled.
     bool askLogin(const QString& location, int seenGeneration)
     {

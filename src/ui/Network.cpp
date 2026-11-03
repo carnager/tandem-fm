@@ -17,6 +17,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSettings>
+#include <QUrl>
 #include <QVBoxLayout>
 
 namespace tandem {
@@ -36,16 +37,35 @@ bool Network::available()
 #endif
 }
 
+// Locations are kept (settings, tabs, history), so they never carry a password.
+static QString withoutPassword(const QString& uri)
+{
+    QUrl u(uri);
+    if (u.password().isEmpty())
+        return uri;
+    u.setPassword(QString());
+    return u.toString();
+}
+
 QStringList Network::recentServers() const
 {
-    return QSettings().value(QStringLiteral("network/recent")).toStringList();
+    QSettings s;
+    const QStringList stored = s.value(QStringLiteral("network/recent")).toStringList();
+    QStringList clean;
+    for (const QString& uri : stored)
+        if (const QString c = withoutPassword(uri); !clean.contains(c))
+            clean << c;
+    if (clean != stored)  // older versions stored typed passwords: drop them
+        s.setValue(QStringLiteral("network/recent"), clean);
+    return clean;
 }
 
 void Network::rememberServer(const QString& uri)
 {
+    const QString clean = withoutPassword(uri);
     QStringList list = recentServers();
-    list.removeAll(uri);
-    list.prepend(uri);
+    list.removeAll(clean);
+    list.prepend(clean);
     while (list.size() > 12)
         list.removeLast();
     QSettings().setValue(QStringLiteral("network/recent"), list);

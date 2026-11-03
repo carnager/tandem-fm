@@ -13,6 +13,7 @@
 #ifdef TANDEM_HAVE_LIBSSH
 
 #include <QHash>
+#include <QElapsedTimer>
 #include <QUrl>
 
 #include <condition_variable>
@@ -213,6 +214,13 @@ public:
         if (!s)
             s = std::make_unique<Server>();
         return s.get();
+    }
+
+    void offerPassword(const QString& location, const QString&, const QString& password) override
+    {
+        Server* server = serverFor(location);
+        std::lock_guard<std::mutex> lock(server->mutex);
+        server->password = password;
     }
 
     // spare: an extra connection for a big transfer. Never waits and never
@@ -561,6 +569,97 @@ public:
         if (r.error && !errText.isEmpty())
             r.errorText = errText;
         return r;
+    }
+
+    // One "find" on the server instead of a listing per folder: what rsync
+    // does too. Needs a shell login with GNU find; sftp-only accounts and
+    // BusyBox say no (or stay silent), and the caller walks instead.
+    bool listTree(const QString& path, bool hidden, Tree& out, const std::atomic<bool>* cancel) override
+    {
+        if (qEnvironmentVariableIsSet("TANDEM_SFTP_NO_EXEC"))
+            return false;
+        QByteArray data;
+        bool ok = false;
+        withConn(path, [&](Conn* c) {
+            ssh_channel ch = ssh_channel_new(c->ssh);
+            if (!ch)
+                return EIO;
+            if (ssh_channel_open_session(ch) != SSH_OK) {
+                ssh_channel_free(ch);
+                return ENOTSUP;
+            }
+            QByteArray dir = remotePath(path);
+            dir.replace('\'', "'\\''");
+            const QByteArray cmd = "LC_ALL=C find '" + dir + "' -mindepth 1 " +
+                                   (hidden ? QByteArray() : QByteArray("\\( -name '.*' -prune \\) -o ")) +
+                                   "-printf '%y %Y %s %T@ %m %P\\0'";
+            if (ssh_channel_request_exec(ch, cmd.constData()) != SSH_OK) {
+                ssh_channel_close(ch);
+                ssh_channel_free(ch);
+                return ENOTSUP;
+            }
+            char buf[65536];
+            QElapsedTimer silent;  // a forced sftp-server never answers: give up then
+            silent.start();
+            while (!(cancel && cancel->load())) {
+                const int n = ssh_channel_read_timeout(ch, buf, sizeof buf, 0, 500);
+                if (n > 0) {
+                    data.append(buf, n);
+                    silent.restart();
+                } else if (n == SSH_ERROR) {
+                    break;
+                } else if (ssh_channel_is_eof(ch)) {
+                    break;
+                } else if (data.isEmpty() && silent.elapsed() > 8000) {
+                    break;
+                }
+                while (ssh_channel_read_timeout(ch, buf, sizeof buf, 1, 0) > 0) {  // drain stderr
+                }
+            }
+            const bool eof = ssh_channel_is_eof(ch);
+            ssh_channel_send_eof(ch);
+            ssh_channel_close(ch);
+            const int status = eof ? ssh_channel_get_exit_status(ch) : -1;
+            ssh_channel_free(ch);
+            // Unreadable subfolders make find exit 1 but the rest is fine.
+            ok = eof && (status == 0 || (status == 1 && !data.isEmpty()));
+            return 0;
+        });
+        if (!ok || (cancel && cancel->load()))
+            return false;
+        out.clear();
+        out.insert(QString(), {});
+        for (const QByteArray& rec : data.split('\0')) {
+            // "y Y size mtime mode rel", rel last (it may hold spaces)
+            int at = 0;
+            QByteArray f[5];
+            bool good = true;
+            for (int k = 0; k < 5 && good; ++k) {
+                const int sp = int(rec.indexOf(' ', at));
+                good = sp > at;
+                if (good) {
+                    f[k] = rec.mid(at, sp - at);
+                    at = sp + 1;
+                }
+            }
+            const QString rel = QString::fromUtf8(rec.mid(at));
+            if (!good || rel.isEmpty())
+                continue;
+            FileEntry e;
+            const int slash = int(rel.lastIndexOf(QLatin1Char('/')));
+            e.name = rel.mid(slash + 1);
+            const char type = f[0].at(0);
+            e.isLink = type == 'l';
+            e.isDir = type == 'd' || (e.isLink && f[1] == "d");
+            e.brokenLink = e.isLink && (f[1] == "N" || f[1] == "L");
+            e.size = e.isDir ? -1 : f[2].toLongLong();
+            e.mtime = int64_t(f[3].toDouble());
+            e.mode = f[4].toUInt(nullptr, 8) | (type == 'd' ? S_IFDIR : e.isLink ? S_IFLNK : S_IFREG);
+            if (type == 'd')
+                out[rel];  // empty folders too
+            out[slash < 0 ? QString() : rel.left(slash)].push_back(std::move(e));
+        }
+        return true;
     }
 
     static void fill(FileEntry& e, sftp_attributes a)

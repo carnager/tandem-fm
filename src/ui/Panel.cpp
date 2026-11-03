@@ -210,7 +210,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     });
 
     connect(m_pathBar, &PathBar::pathEntered, this, [this](QString text) {
-        text = text.trimmed();
+        text = takePassword(text.trimmed());
         if (isRemoteLocation(text) && hasBackend(text.section(QLatin1Char(':'), 0, 0))) {
             navigate(normalizeLocation(text));  // native: a location like any other
             m_view->setFocus();
@@ -298,10 +298,14 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
         }
         const QStringList recent = Network::instance().recentServers();
         if (!recent.isEmpty()) {
-            menu->addSection(tr("Servers"));
+            menu->addSection(tr("Recent servers"));
             for (const QString& uri : recent)
                 menu->addAction(IconCache::themed("network-server", "folder-remote"), uri, this,
                                 [this, uri] { connectTo(uri); });
+            menu->addAction(tr("Clear recent servers"), this, [] {
+                for (const QString& uri : Network::instance().recentServers())
+                    Network::instance().forgetServer(uri);
+            });
         }
         menu->addSeparator();
         if (Network::available())
@@ -441,6 +445,7 @@ void Panel::bindTab(DirTab* t)
             return;
         m_pathBeforeReset = t->model()->path();
         m_scrollBeforeReset = m_view->verticalScrollBar()->value();
+        m_rowBeforeReset = m_view->currentRow();
     });
 }
 
@@ -615,9 +620,12 @@ void Panel::onListingReady(DirTab* t, const QString& focus)
         return;
     }
     m_filterBar->setVisible(!t->model()->filter().isEmpty());
+    const bool sameFolder = t->model()->path() == m_pathBeforeReset;
     int row = focus.isEmpty() ? 0 : t->model()->rowOf(focus);
-    if (row < 0)
-        row = 0;
+    if (row < 0)  // the focused item is gone (deleted, moved): stay where it was, not at the top
+        row = sameFolder ? qBound(0, m_rowBeforeReset, qMax(0, t->model()->count() - 1)) : 0;
+    if (t->isRemote())  // it answered: offer it again under recent servers
+        Network::instance().rememberServer(locationAuthority(t->model()->path()));
     if (t->model()->path() == m_pathBeforeReset)
         m_view->verticalScrollBar()->setValue(m_scrollBeforeReset);  // refresh: keep the view still
     m_view->setCurrentRow(row);
@@ -1183,10 +1191,29 @@ void Panel::showMountMenu()
     m_mountButton->showMenu();
 }
 
-void Panel::connectTo(const QString& uri)
+// "smb://bob:secret@nas": the backend gets the password for this session,
+// the location (kept in tabs, history, settings) doesn't.
+QString Panel::takePassword(const QString& text)
 {
+    if (!isRemoteLocation(text))
+        return text;
+    QUrl u(text);
+    if (u.password().isEmpty())
+        return text;
+    const QString password = u.password();
+    u.setPassword(QString());
+    const QString clean = u.toString();
+    Backend* b = backendFor(clean);
+    if (!b)
+        return text;  // GVfs takes it from the address (and may keep it in the keyring)
+    b->offerPassword(clean, u.userName(), password);
+    return clean;
+}
+
+void Panel::connectTo(const QString& uriIn)
+{
+    const QString uri = takePassword(uriIn);
     if (hasBackend(uri.section(QLatin1Char(':'), 0, 0))) {  // built in: just go there
-        Network::instance().rememberServer(uri);
         if (!QUrl(uri).path().isEmpty()) {
             navigate(normalizeLocation(uri));
             return;
@@ -1221,7 +1248,10 @@ void Panel::connectTo(const QString& uri)
             self->showMessage(tr("%1: %2").arg(uri, error), true);
             return;
         }
-        Network::instance().rememberServer(uri);
+        QUrl server(uri);  // remembered once it worked; the server, not the folder
+        if (!server.host().isEmpty())
+            server.setPath(QString());
+        Network::instance().rememberServer(server.toString());
         // Off the UI thread (network round trips): right after a reconnect
         // the kernel can briefly still report the folder as missing, so wait
         // a moment for it. A bare sftp://host starts in the home folder.
@@ -1251,7 +1281,7 @@ void Panel::connectDialog()
     edit->setMinimumWidth(460);
     auto* hint = new QLabel(tr("Examples:  sftp://user@host/path  ·  user@host:folder  ·  smb://nas/share  ·  "
                                "davs://cloud.example.com/remote.php/dav/files/me  ·  ftp://host\n"
-                               "Mounted with GVfs, so other apps see it too. Passwords can go to the keyring."),
+                               "sftp and smb are built in; the others are mounted with GVfs (other apps see those too)."),
                             &dlg);
     hint->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
     hint->setWordWrap(true);

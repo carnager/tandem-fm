@@ -25,6 +25,8 @@
 #include <QTreeView>
 #include <QVBoxLayout>
 
+#include <mutex>
+
 #include <sys/stat.h>
 
 namespace tandem {
@@ -524,6 +526,8 @@ void SyncDialog::compare()
     m_comparing = true;
     m_syncButton->setEnabled(false);
     m_status->setText(tr("Comparing …"));
+    for (QToolButton* b : m_show)  // nothing to count yet
+        b->hide();
     CompareOptions opt;
     opt.recursive = m_recursive->isChecked();
     opt.contents = m_contents->isChecked();
@@ -535,13 +539,17 @@ void SyncDialog::compare()
     ioPool()->start([self, gen, cancel, left, right, opt] {
         QElapsedTimer tick;
         tick.start();
-        auto progress = [&](const QString& rel) {
-            if (tick.elapsed() < 120)
+        std::mutex lock;  // folders are listed on several threads
+        int folders = 0;
+        auto progress = [&](const QString&) {
+            std::lock_guard<std::mutex> g(lock);
+            ++folders;
+            if (tick.elapsed() < 150)
                 return;
             tick.restart();
-            postToUi([self, gen, rel] {
+            postToUi([self, gen, n = folders] {
                 if (self && gen == self->m_gen)
-                    self->m_status->setText(tr("Comparing %1 …").arg(rel));
+                    self->m_status->setText(plural(tr("Comparing … %n folder(s)", nullptr, n), n));
             });
         };
         auto result = std::make_shared<CompareResult>(compareFolders(left, right, opt, cancel.get(), progress));
@@ -568,6 +576,8 @@ void SyncDialog::compare()
 
 void SyncDialog::updateFilters()
 {
+    for (QToolButton* b : m_show)
+        b->setVisible(!m_comparing);
     int64_t bytes[SyncModel::GroupCount] = {};
     int count[SyncModel::GroupCount] = {};
     for (size_t i = 0; i < m_model->items().size(); ++i) {
@@ -587,7 +597,7 @@ void SyncDialog::updateFilters()
     m_show[SyncModel::GroupEqual]->setText(tr("= %1 identical").arg(count[3]));
     m_show[SyncModel::GroupDelete]->setText(tr("✕ %1 to the trash").arg(count[4]));
     for (int g : {int(SyncModel::GroupDiffers), int(SyncModel::GroupDelete)})
-        m_show[g]->setVisible(count[g] > 0);
+        m_show[g]->setVisible(count[g] > 0 && !m_comparing);
 }
 
 void SyncDialog::updateSummary()

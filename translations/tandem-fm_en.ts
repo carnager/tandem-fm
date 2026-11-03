@@ -165,6 +165,13 @@
 <context>
     <name>tandem::SyncDialog</name>
     <message numerus="yes">
+        <source>Comparing … %n folder(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>Sync %n item(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>

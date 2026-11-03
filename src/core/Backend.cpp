@@ -349,6 +349,14 @@ int64_t directorySizeAt(const QString& path, const std::atomic<bool>* cancel)
     Backend* b = backendFor(path);
     if (!b)
         return isRemoteLocation(path) ? -1 : directorySize(path, cancel);
+    if (Backend::Tree tree; b->listTree(path, true, tree, cancel)) {  // one request for all of it
+        int64_t total = 0;
+        for (const auto& entries : std::as_const(tree))
+            for (const FileEntry& e : entries)
+                if (!e.isDir && !e.isLink)
+                    total += qMax<int64_t>(0, e.size);
+        return total;
+    }
     ListOptions opt;
     opt.showHidden = true;
     const ListResult l = b->list(path, opt, cancel);

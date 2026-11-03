@@ -1053,6 +1053,14 @@ private slots:
         const QString root = gvfsDirectory() + "/sftp:host=h,user=u";
         QVERIFY(isRemotePath(root + "/srv/x"));
         QVERIFY(!isRemotePath("/home/u"));
+        // GVfs sftp/smb folders open natively (when built in).
+        registerBuiltinBackends();
+        if (hasBackend("sftp"))
+            QCOMPARE(nativeLocationFor(root + "/srv/x"), QString("sftp://u@h/srv/x"));
+        if (hasBackend("smb"))
+            QCOMPARE(nativeLocationFor(gvfsDirectory() + "/smb-share:server=nas,share=media/a b"), QString("smb://nas/media/a b"));
+        QCOMPARE(nativeLocationFor(gvfsDirectory() + "/dav:host=x/y"), QString());
+        QCOMPARE(nativeLocationFor("/home/u"), QString());
         QCOMPARE(remoteRootOf(root + "/srv/x")->root, root);
         QCOMPARE(remoteRootOf(root)->label, QString("sftp://u@h"));
         QVERIFY(!remoteRootOf(gvfsDirectory()));
@@ -1266,6 +1274,39 @@ private slots:
 
         Backend* b = backendFor(S);
         QCOMPARE(b->homeLocation(S), server.location(QDir::homePath()));
+
+        // Whole trees in one request (find over an exec channel), same as walking.
+        QVERIFY(QDir().mkpath(base + "/srv/sub/deep/er"));
+        writeFile(base + "/srv/sub/deep/with space.txt", "12345678");
+        Backend::Tree tree;
+        QVERIFY(b->listTree(S, false, tree, nullptr));
+        auto namesIn = [&](const QString& rel) {
+            QStringList n;
+            for (const FileEntry& e : tree.value(rel))
+                n << e.name + (e.isLink ? "@" : "") + (e.isDir ? "/" : "");
+            n.sort();
+            return n;
+        };
+        QCOMPARE(namesIn(""), QStringList({"a.txt", "dirlink@/", "link@", "sub/"}));  // no .hidden
+        QCOMPARE(namesIn("sub/deep"), QStringList({"er/", "with space.txt"}));
+        QVERIFY(tree.contains("sub/deep/er"));  // empty folders are there too
+        for (const FileEntry& e : tree.value("sub/deep"))
+            if (!e.isDir)
+                QCOMPARE(e.size, int64_t(8));
+        QVERIFY(b->listTree(S, true, tree, nullptr));
+        QVERIFY(namesIn("").contains(".hidden"));
+        QCOMPARE(directorySizeAt(S + "/sub", nullptr), int64_t(8));
+        // A comparison against an identical local copy finds nothing.
+        CompareResult same = compareFolders(base + "/srv/sub", S + "/sub", {});
+        QVERIFY(same.error.isEmpty());
+        for (const CompareItem& it : same.items)
+            QVERIFY2(it.diff == Diff::Equal, qPrintable(it.rel));
+        qputenv("TANDEM_SFTP_NO_EXEC", "1");  // servers without a shell: walked folder by folder
+        QVERIFY(!b->listTree(S, false, tree, nullptr));
+        QCOMPARE(directorySizeAt(S + "/sub", nullptr), int64_t(8));
+        QCOMPARE(compareFolders(base + "/srv/sub", S + "/sub", {}).items.size(), same.items.size());
+        qunsetenv("TANDEM_SFTP_NO_EXEC");
+        QVERIFY(QDir(base + "/srv/sub/deep").removeRecursively());
         FileStat st;
         QCOMPARE(b->stat(S + "/link", st), 0);
         QVERIFY(st.isLink);
