@@ -25,6 +25,7 @@ const Theme& theme();
 // The configured fixed-width font, guaranteed to really be monospaced.
 QFont monoFont();
 void applyTheme(QApplication& app);
+void applyFontScale(QApplication& app);
 void setThemeStyle(QWidget* widget, const QString& templateCss);
 
 }  // namespace tandem

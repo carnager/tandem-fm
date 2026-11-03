@@ -33,6 +33,9 @@ QFont monoFont()
         f.setStyleHint(QFont::Monospace);
         f.setFixedPitch(true);
     }
+    const qreal scale = qBound(75, QSettings().value(QStringLiteral("view/fontScale"), 100).toInt(), 200) / 100.0;
+    if (f.pointSizeF() > 0)
+        f.setPointSizeF(f.pointSizeF() * scale);
     return f;
 }
 
@@ -59,6 +62,47 @@ void setThemeStyle(QWidget* widget, const QString& templateCss)
 {
     widget->setProperty("tandemThemeCss", templateCss);
     widget->setStyleSheet(theme().css(templateCss));
+}
+
+void applyFontScale(QApplication& app)
+{
+    const qreal scale = qBound(75, QSettings().value(QStringLiteral("view/fontScale"), 100).toInt(), 200) / 100.0;
+    const qreal previous = app.property("tandemFontScale").isValid() ? app.property("tandemFontScale").toDouble() : 1.0;
+    if (!app.property("tandemBaseFont").isValid())
+        app.setProperty("tandemBaseFont", app.font());
+    // Snapshot every widget before changing parent fonts. Qt's stylesheet
+    // engine can pin an inherited font, so QApplication::setFont alone leaves
+    // some controls unchanged. New widgets start at the previous scale.
+    const auto widgets = QApplication::allWidgets();
+    for (QWidget* w : widgets) {
+        if (w->property("tandemBaseFont").isValid())
+            continue;
+        QFont base = w->font();
+        if (base.pointSizeF() > 0)
+            base.setPointSizeF(base.pointSizeF() / previous);
+        else if (base.pixelSize() > 0)
+            base.setPixelSize(qRound(base.pixelSize() / previous));
+        w->setProperty("tandemBaseFont", base);
+    }
+    auto scaled = [scale](QFont font) {
+        if (font.pointSizeF() > 0)
+            font.setPointSizeF(font.pointSizeF() * scale);
+        else if (font.pixelSize() > 0)
+            font.setPixelSize(qRound(font.pixelSize() * scale));
+        return font;
+    };
+    app.setProperty("tandemFontScale", scale);
+    app.setFont(scaled(app.property("tandemBaseFont").value<QFont>()));
+    for (QWidget* w : widgets)
+        if (w->property("tandemBaseFont").isValid())
+            w->setFont(scaled(w->property("tandemBaseFont").value<QFont>()));
+    g_theme.listFont = app.font();
+    g_theme.numberFont = app.font();
+    g_theme.numberFont.setFeature(QFont::Tag("tnum"), 1);
+    for (QWidget* w : widgets) {
+        w->updateGeometry();
+        w->update();
+    }
 }
 
 static bool systemPrefersDark(const QApplication& app)
@@ -335,6 +379,7 @@ void applyTheme(QApplication& app)
         }
     }
 
+    applyFontScale(app);
     for (QWidget* widget : QApplication::allWidgets()) {
         const QVariant css = widget->property("tandemThemeCss");
         if (css.isValid())

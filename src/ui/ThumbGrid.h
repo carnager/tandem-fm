@@ -33,6 +33,7 @@ protected:
     bool eventFilter(QObject* obj, QEvent* e) override;
     void paintEvent(QPaintEvent* e) override;
     void resizeEvent(QResizeEvent* e) override;
+    void changeEvent(QEvent* e) override;
     void wheelEvent(QWheelEvent* e) override;
     void mousePressEvent(QMouseEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;

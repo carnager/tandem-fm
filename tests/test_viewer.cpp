@@ -6,6 +6,8 @@
 #include "ui/viewer/ViewerWindow.h"
 
 #include <QApplication>
+#include <QSettings>
+#include <QScopeGuard>
 #include <QLabel>
 #include <QPushButton>
 #include <QDirIterator>
@@ -92,6 +94,41 @@ private slots:
 #else
         QVERIFY(w->textEdit()->document()->firstBlock().layout()->formats().isEmpty());
 #endif
+    }
+
+    void largeTextAndHexScaleLive()
+    {
+        const QVariant previous = QSettings().value("view/fontScale");
+        auto restore = qScopeGuard([&] {
+            if (previous.isValid()) QSettings().setValue("view/fontScale", previous);
+            else QSettings().remove("view/fontScale");
+            applyFontScale(*qApp);
+        });
+        QSettings().setValue("view/fontScale", 100);
+        applyFontScale(*qApp);
+        struct TextProbe : TextScrollView {
+            qreal size() const { return m_font.pointSizeF(); }
+            int lineHeight() const { return m_lineH; }
+        } text;
+        struct HexProbe : HexView {
+            qreal size() const { return m_font.pointSizeF(); }
+        } hex;
+        const qreal original = text.size();
+        const int height = text.lineHeight();
+        QSettings().setValue("view/fontScale", 150);
+        applyFontScale(*qApp);
+        QCOMPARE(text.size(), original * 1.5);
+        QCOMPARE(hex.size(), original * 1.5);
+        QVERIFY(text.lineHeight() > height);
+        text.zoom(2);
+        QSettings().setValue("view/fontScale", 200);
+        applyFontScale(*qApp);
+        QCOMPARE(text.size(), original * 2 + 2);
+        QSettings().setValue("view/fontScale", 100);
+        applyFontScale(*qApp);
+        text.zoom(0);
+        QCOMPARE(text.size(), original);
+        QCOMPARE(hex.size(), original);
     }
 
     void binaryOpensAsHex()

@@ -35,6 +35,17 @@ ByteViewBase::ByteViewBase(QWidget* parent) : QAbstractScrollArea(parent)
     });
 }
 
+void ByteViewBase::changeEvent(QEvent* event)
+{
+    QAbstractScrollArea::changeEvent(event);
+    if (event->type() == QEvent::FontChange) {
+        m_font = monoFont();
+        m_baseSize = m_font.pointSizeF() > 0 ? m_font.pointSizeF() : 10;
+        updateMetrics();
+        relayout();
+    }
+}
+
 void ByteViewBase::setCache(BlockCache* cache)
 {
     if (m_cache)

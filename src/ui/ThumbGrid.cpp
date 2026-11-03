@@ -33,6 +33,16 @@ ThumbGrid::ThumbGrid(FileView* view) : QWidget(view->viewport()), m_view(view)
     view->viewport()->installEventFilter(this);
 }
 
+void ThumbGrid::changeEvent(QEvent* event)
+{
+    QWidget::changeEvent(event);
+    if (event->type() == QEvent::FontChange) {
+        relayout();
+        ensureVisible(m_view->currentRow());
+        update();
+    }
+}
+
 QSize ThumbGrid::cell() const
 {
     const int line = fontMetrics().height();

@@ -32,6 +32,7 @@ protected:
     virtual void cacheChanged() {}
     virtual void relayout() { viewport()->update(); }  // font or size changed
     void resizeEvent(QResizeEvent* e) override;
+    void changeEvent(QEvent* e) override;
     void updateMetrics();
     void setScrollRange(qint64 max, qint64 value, qint64 page);
     int rowsVisible() const { return qMax(1, viewport()->height() / m_lineH); }

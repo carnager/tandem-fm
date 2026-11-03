@@ -54,8 +54,10 @@
 #include <QImageReader>
 #include <QCheckBox>
 #include <QHeaderView>
+#include <QSpinBox>
 #include <QScopeGuard>
 #include <QSignalSpy>
+#include <QLabel>
 #include <QListWidget>
 #include <QKeySequenceEdit>
 #include <QTreeWidget>
@@ -1267,8 +1269,10 @@ private slots:
     void liveAppearanceSettings()
     {
         const QVariant oldTheme = QSettings().value("view/theme");
+        const QVariant oldScale = QSettings().value("view/fontScale");
         auto restore = qScopeGuard([&] {
-            for (const auto& item : {qMakePair(QString("view/theme"), oldTheme)}) {
+            for (const auto& item : {qMakePair(QString("view/theme"), oldTheme),
+                                     qMakePair(QString("view/fontScale"), oldScale)}) {
                 if (item.second.isValid()) QSettings().setValue(item.first, item.second);
                 else QSettings().remove(item.first);
             }
@@ -1277,6 +1281,8 @@ private slots:
         });
         SettingsDialog dlg(m_window.get());
         dlg.show();
+        auto* scale = dlg.findChild<QSpinBox*>("fontScale");
+        QVERIFY(scale);
         auto chooseTheme = [&](const QString& code) {
             for (QToolButton* button : dlg.findChildren<QToolButton*>())
                 if (button->property("segmentValue").toString() == code) {
@@ -1296,6 +1302,39 @@ private slots:
         QCOMPARE(m_left->view()->header()->styleSheet(),
                  theme().css(m_left->view()->header()->property("tandemThemeCss").toString()));
         QCOMPARE(dlg.styleSheet(), theme().css(dlg.property("tandemThemeCss").toString()));
+
+        scale->setValue(100);
+        applyFontScale(*qApp);
+        const qreal base = qApp->font().pointSizeF();
+        const qreal listBase = m_left->view()->font().pointSizeF();
+        auto* popupEdit = m_window->findChild<FuzzyPopup*>()->findChild<QLineEdit*>();
+        QVERIFY(popupEdit);
+        const qreal popupBase = popupEdit->font().pointSizeF();
+        QLabel bold("bold");
+        QFont boldFont = bold.font();
+        boldFont.setBold(true);
+        bold.setFont(boldFont);
+        scale->setValue(150);
+        QCOMPARE(QSettings().value("view/fontScale").toInt(), 150);
+        QCOMPARE(qApp->font().pointSizeF(), base * 1.5);
+        QCOMPARE(m_left->view()->font().pointSizeF(), listBase * 1.5);
+        QCOMPARE(popupEdit->font().pointSizeF(), popupBase * 1.5);
+        QCOMPARE(theme().listFont.pointSizeF(), base * 1.5);
+        QVERIFY(bold.font().bold());
+        QCOMPARE(bold.font().pointSizeF(), base * 1.5);
+        QLabel createdAt150("new bold");
+        QFont newFont = createdAt150.font();
+        newFont.setBold(true);
+        createdAt150.setFont(newFont);
+        QVERIFY(chooseTheme("dark")); // theme changes cannot compound the scale
+        QCOMPARE(qApp->font().pointSizeF(), base * 1.5);
+        scale->setValue(200);
+        QCOMPARE(createdAt150.font().pointSizeF(), base * 2);
+        scale->setValue(100);
+        QCOMPARE(qApp->font().pointSizeF(), base);
+        QCOMPARE(bold.font().pointSizeF(), base);
+        QCOMPARE(createdAt150.font().pointSizeF(), base);
+        QVERIFY(bold.font().bold() && createdAt150.font().bold());
 
     }
 

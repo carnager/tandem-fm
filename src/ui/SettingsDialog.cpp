@@ -267,6 +267,19 @@ QWidget* SettingsDialog::appearancePage()
                       }),
              tr("Changes immediately, including the panels and open dialogs."));
 
+    auto* scale = new QSpinBox(this);
+    scale->setObjectName(QStringLiteral("fontScale"));
+    scale->setRange(75, 200);
+    scale->setSingleStep(25);
+    scale->setSuffix(QStringLiteral("%"));
+    scale->setValue(s.value(QStringLiteral("view/fontScale"), 100).toInt());
+    scale->setMaximumWidth(160);
+    connect(scale, &QSpinBox::valueChanged, this, [](int value) {
+        QSettings().setValue(QStringLiteral("view/fontScale"), value);
+        applyFontScale(*qApp);
+    });
+    page.add(tr("Text size"), scale, tr("Scale fonts throughout Tandem. 100% is the system's normal size. Applies immediately."));
+
     auto* language = new QComboBox(this);
     language->addItem(tr("Like the system"), QString());
     language->addItem(QStringLiteral("English"), QStringLiteral("en"));
