@@ -462,7 +462,7 @@ QWidget* SettingsDialog::appearancePage()
     menu->setChecked(m_window->menuBar()->isVisible());
     connect(menu, &QCheckBox::toggled, this, [this](bool on) {
         m_window->menuBar()->setVisible(on);
-        QSettings().setValue(QStringLiteral("window/menuBar"), on);
+        QSettings().setValue(QStringLiteral("window/menuBar2"), on);
     });
     page.add(QString(), menu);
     page.add(tr("Dates"),

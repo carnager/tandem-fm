@@ -17,6 +17,7 @@
 
 class QAbstractButton;
 class QMenu;
+class QPushButton;
 class QSplitter;
 class QVBoxLayout;
 
@@ -54,6 +55,7 @@ private:
                         const QString& id);
     void createMenus();
     QWidget* createFKeyBar();
+    QWidget* createTopBar(QWidget* parent);
     void scheduleFKeyUpdate();
     void updateFKeys();
     void updateTransfers();
@@ -178,6 +180,7 @@ private:
     QHash<QString, QAbstractButton*> m_fkeys;  // F3 … F8
     bool m_fkeyUpdatePending = false;
     QTimer* m_transferTimer = nullptr;
+    QPushButton* m_searchField = nullptr;
     QList<UndoEntry> m_undo;
 };
 

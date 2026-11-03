@@ -29,6 +29,8 @@ class FileView;
 class Panel : public QFrame {
     Q_OBJECT
 public:
+    static constexpr int kCardInset = 3;      // room for the active panel's glow
+    static constexpr double kCardRadius = 12;
     explicit Panel(QWidget* parent = nullptr);
 
     DirTab* tab() const;
@@ -163,7 +165,8 @@ private:
     QWidget* m_header;
     QToolButton* m_mountButton;
     PathBar* m_pathBar;
-    QLabel* m_freeLabel;
+    QWidget* m_freeLabel;  // free space: a little bar and the amount
+    QLabel* m_placeLabel;  // server and protocol, when on one
     QLabel* m_branchLabel;
     QToolButton* m_searchChip;
     QWidget* m_searchBar;

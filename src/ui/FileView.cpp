@@ -29,8 +29,8 @@ FileDelegate::FileDelegate(QTreeView* view) : QStyledItemDelegate(view), m_view(
 
 QSize FileDelegate::sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const
 {
-    const int h = qMax(QFontMetrics(FileView::zoomed(theme().listFont)).height() + 8,
-                       qRound(22 * FileView::listZoom() / 100.0 * interfaceScale()));
+    const int h = qMax(QFontMetrics(FileView::zoomed(theme().listFont)).height() + 12,
+                       qRound(28 * FileView::listZoom() / 100.0 * interfaceScale()));
     return {40, h};
 }
 
@@ -61,7 +61,10 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
     if (fade > 0)
         p->setOpacity(1.0 - fade);
 
-    QRect r = opt.rect.adjusted(6, 0, -6, 0);
+    // Text and icons sit inside the rounded row bar (see drawRow).
+    const bool lastColumn = opt.rect.right() >= m_view->viewport()->width() - 2;
+    QRect r = opt.rect.adjusted(col == FileModel::ColName ? FileView::kRowInset + 10 : 6, 0,
+                                lastColumn ? -(FileView::kRowInset + 10) : -6, 0);
     if (col == FileModel::ColName) {
         const int iconSize = qRound(16 * FileView::listZoom() / 100.0 * interfaceScale());
         const QIcon ic = idx.data(Qt::DecorationRole).value<QIcon>();
@@ -353,8 +356,13 @@ FileView::FileView(QWidget* parent) : QTreeView(parent)
     connect(h, &QHeaderView::customContextMenuRequested, this, &FileView::showHeaderMenu);
     setThemeStyle(h, QStringLiteral(
         "QHeaderView { background: @base; border: none; border-bottom: 1px solid @border; }"
-        "QHeaderView::section { background: @base; color: @dimText; border: none; padding: 4px 6px; }"
+        "QHeaderView::section { background: @base; color: @dimText; border: none; padding: 5px 6px 6px 6px; }"
+        "QHeaderView::section:first { padding-left: 16px; }"
+        "QHeaderView::section:last { padding-right: 16px; }"
         "QHeaderView::section:hover { color: @text; }"));
+    QFont small = h->font();
+    small.setPointSizeF(small.pointSizeF() * 0.9);
+    h->setFont(small);
 }
 
 FileModel* FileView::fileModel() const
@@ -708,34 +716,43 @@ void FileView::drawRow(QPainter* p, const QStyleOptionViewItem& opt, const QMode
     const Theme& t = theme();
     const FileModel* m = fileModel();
     const FileEntry* e = m ? m->entry(idx.row()) : nullptr;
-    const QRect r(0, opt.rect.top(), viewport()->width(), opt.rect.height());
-
-    if (idx.row() % 2)
-        p->fillRect(r, t.altBase);
-    if (e && e->marked)
-        p->fillRect(r, t.markBg);
-    if (idx.row() == m_dropRow)
-        p->fillRect(r, t.dropTarget);
-
-    if (idx.row() == currentIndex().row()) {
-        p->save();
-        p->setRenderHint(QPainter::Antialiasing);
-        const QRectF cr = QRectF(r).adjusted(2.5, 0.5, -2.5, -0.5);
-        if (m_active && hasFocus()) {
-            p->setPen(Qt::NoPen);
-            p->setBrush(t.cursorActive);
-            p->drawRoundedRect(cr, 5, 5);
-        } else if (m_active) {
-            p->setPen(QPen(t.accent, 1.2));
-            p->setBrush(t.cursorActive.lighter(100));
-            p->drawRoundedRect(cr, 5, 5);
-        } else {
-            p->setPen(QPen(t.cursorInactive, 1.2));
-            p->setBrush(Qt::NoBrush);
-            p->drawRoundedRect(cr, 5, 5);
-        }
-        p->restore();
+    // Rows are rounded bars a little in from the edges: zebra, marks, the
+    // drop target and the cursor alike.
+    const QRectF r = QRectF(kRowInset, opt.rect.top(), viewport()->width() - 2 * kRowInset, opt.rect.height())
+                         .adjusted(0.5, 0.5, -0.5, -0.5);
+    auto withAlpha = [](QColor c, double a) {
+        c.setAlphaF(a);
+        return c;
+    };
+    p->save();
+    p->setRenderHint(QPainter::Antialiasing);
+    p->setPen(Qt::NoPen);
+    if (idx.row() % 2) {
+        p->setBrush(t.altBase);
+        p->drawRoundedRect(r, kRowRadius, kRowRadius);
     }
+    if (e && e->marked) {
+        p->setBrush(t.markBg);
+        p->drawRoundedRect(r, kRowRadius, kRowRadius);
+    }
+    if (idx.row() == m_dropRow) {
+        p->setBrush(t.dropTarget);
+        p->drawRoundedRect(r, kRowRadius, kRowRadius);
+    }
+    if (idx.row() == currentIndex().row()) {
+        if (m_active && hasFocus()) {  // where the keys go: tinted, with a clear edge
+            p->setPen(QPen(withAlpha(t.accent, 0.55), 1));
+            p->setBrush(withAlpha(t.accent, t.dark ? 0.17 : 0.14));
+        } else if (m_active) {
+            p->setPen(QPen(withAlpha(t.accent, 0.4), 1));
+            p->setBrush(withAlpha(t.accent, 0.07));
+        } else {
+            p->setPen(QPen(t.cursorInactive, 1));
+            p->setBrush(Qt::NoBrush);
+        }
+        p->drawRoundedRect(r, kRowRadius, kRowRadius);
+    }
+    p->restore();
 
     QStyleOptionViewItem o = opt;
     o.state &= ~(QStyle::State_Selected | QStyle::State_HasFocus | QStyle::State_MouseOver);

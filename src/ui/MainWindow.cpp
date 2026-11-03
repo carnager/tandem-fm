@@ -248,12 +248,13 @@ MainWindow::MainWindow(const QStringList& startPaths)
 
     auto* central = new QWidget(this);
     auto* layout = new QVBoxLayout(central);
-    layout->setContentsMargins(8, 6, 8, 4);
+    layout->setContentsMargins(10, 4, 10, 4);
     layout->setSpacing(6);
+    layout->addWidget(createTopBar(central));
 
     m_splitter = new QSplitter(Qt::Horizontal, central);
     m_splitter->setChildrenCollapsible(false);
-    m_splitter->setHandleWidth(8);
+    m_splitter->setHandleWidth(6);  // panels draw a little room of their own
     m_left = new Panel(m_splitter);
     m_right = new Panel(m_splitter);
     m_left->setObjectName(QStringLiteral("leftPanel"));
@@ -1480,6 +1481,67 @@ void MainWindow::updatePreviewFor(ViewerWindow* preview, Panel* p)
 
 // ------------------------------------------------- command palette & jump
 
+// The slim bar on top: the menus behind one button, the search field for
+// commands, folders and files, Settings.
+QWidget* MainWindow::createTopBar(QWidget* parent)
+{
+    auto* bar = new QWidget(parent);
+    bar->setObjectName(QStringLiteral("topBar"));
+    setThemeStyle(bar, QStringLiteral(
+        "QToolButton { border: none; border-radius: 8px; padding: 6px; }"
+        "QToolButton:hover { background: @header; }"
+        "QToolButton::menu-indicator { image: none; width: 0; }"
+        "QPushButton#searchField { background: @base; color: @dimText; border: 1px solid @border; border-radius: 9px;"
+        "  padding: 6px 12px; text-align: left; min-height: 0; }"
+        "QPushButton#searchField:hover { border-color: @control; }"
+        "QLabel#appName { font-weight: 600; }"));
+    auto* l = new QHBoxLayout(bar);
+    l->setContentsMargins(0, 0, 0, 0);
+    l->setSpacing(8);
+    auto* menuButton = new QToolButton(bar);
+    menuButton->setIcon(IconCache::themed("open-menu", "application-menu"));
+    menuButton->setToolTip(tr("Menu"));
+    menuButton->setAccessibleName(tr("Menu"));
+    menuButton->setPopupMode(QToolButton::InstantPopup);
+    menuButton->setFocusPolicy(Qt::NoFocus);
+    auto* menu = new QMenu(menuButton);
+    connect(menu, &QMenu::aboutToShow, this, [this, menu] {  // the menu bar's menus, as they are now
+        menu->clear();
+        for (QAction* a : menuBar()->actions())
+            menu->addAction(a);
+    });
+    menuButton->setMenu(menu);
+    l->addWidget(menuButton);
+    auto* logo = new QLabel(bar);
+    logo->setPixmap(windowIcon().isNull() ? QApplication::windowIcon().pixmap(18, 18) : windowIcon().pixmap(18, 18));
+    l->addWidget(logo);
+    auto* name = new QLabel(QStringLiteral("Tandem"), bar);
+    name->setObjectName(QStringLiteral("appName"));
+    l->addWidget(name);
+    l->addStretch(1);
+    m_searchField = new QPushButton(IconCache::themed("edit-find", "system-search"),
+                                    tr("Go to a folder, find a file, run a command"), bar);
+    m_searchField->setObjectName(QStringLiteral("searchField"));
+    m_searchField->setFocusPolicy(Qt::NoFocus);
+    m_searchField->setCursor(Qt::IBeamCursor);
+    m_searchField->setMinimumWidth(420);
+    m_searchField->setMaximumWidth(560);
+    m_searchField->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    connect(m_searchField, &QPushButton::clicked, this, &MainWindow::commandPalette);
+    l->addWidget(m_searchField, 3);
+    l->addStretch(1);
+    auto* settings = new QToolButton(bar);
+    settings->setIcon(IconCache::themed("configure", "preferences-system"));
+    settings->setToolTip(tr("Settings (Ctrl+,)"));
+    settings->setAccessibleName(tr("Settings"));
+    settings->setFocusPolicy(Qt::NoFocus);
+    connect(settings, &QToolButton::clicked, this, [this] { openSettings(); });
+    l->addWidget(settings);
+    return bar;
+}
+
+// One search for everything: commands, the folders you go to, the files
+// in the shown folder. As a drop-down under the field when it's there.
 void MainWindow::commandPalette()
 {
     QList<PopupItem> items;
@@ -1509,8 +1571,40 @@ void MainWindow::commandPalette()
     std::sort(items.begin(), items.end(), [](const PopupItem& a, const PopupItem& b) {
         return QString::compare(a.title, b.title, Qt::CaseInsensitive) < 0;
     });
+    for (PopupItem& it : items)
+        it.section = tr("Commands");
+    for (PopupItem it : folderItems()) {
+        it.section = tr("Folders");
+        items.append(it);
+    }
+    Panel* p = active();
+    if (DirTab* t = p->tab(); t && !t->isSearch()) {
+        const QString dir = p->path();
+        const QString here = tr("Files in %1").arg(dir == QDir::homePath() ? QStringLiteral("~") : baseName(dir));
+        for (int r = 0; r < t->model()->count() && r < 2000; ++r) {
+            const FileEntry* e = t->model()->entry(r);
+            if (!e || e->isParent)
+                continue;
+            PopupItem it;
+            it.title = e->name;
+            it.icon = IconCache::forEntry(*e);
+            it.section = here;
+            const QString name = e->name;
+            QPointer<Panel> panel(p);
+            it.run = [panel, dir, name] {
+                if (panel)
+                    panel->navigate(dir, name);  // the cursor goes to it
+            };
+            items.append(it);
+        }
+    }
     m_popup->keyHandler = nullptr;
-    m_popup->open(tr("Type a command…"), items);
+    const QString placeholder = tr("Go to a folder, find a file, run a command");
+    const QString footer = tr("Enter: run or open   ·   Ctrl+J: folders only");
+    if (m_searchField && m_searchField->isVisible())
+        m_popup->openUnder(m_searchField, placeholder, items, footer);
+    else
+        m_popup->open(placeholder, items, footer);
 }
 
 QList<PopupItem> MainWindow::folderItems() const
@@ -3057,7 +3151,8 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         if (s.value(0) > 0 && s.value(1) > 0)
             m_panelRatio = double(s[0]) / (s[0] + s[1]);
     });
-    menuBar()->setVisible(s.value(QStringLiteral("window/menuBar"), true).toBool());
+    // The menus live behind the top bar's button; the classic bar is optional.
+    menuBar()->setVisible(s.value(QStringLiteral("window/menuBar2"), false).toBool());
     const QString iconTheme = s.value(QStringLiteral("view/iconTheme")).toString();
     if (!iconTheme.isEmpty())
         IconCache::setTheme(iconTheme);
@@ -3137,7 +3232,7 @@ void MainWindow::saveSettings()
         s.setValue(QStringLiteral("view/previewWidth"), m_splitter->sizes().value(2));
     s.setValue(QStringLiteral("window/panelSizes"),
                QVariantList{m_splitter->sizes().value(0), m_splitter->sizes().value(1)});
-    s.setValue(QStringLiteral("window/menuBar"), menuBar()->isVisible());
+    s.setValue(QStringLiteral("window/menuBar2"), menuBar()->isVisible());
     s.setValue(QStringLiteral("window/active"), m_active == m_right ? "right" : "left");
     s.setValue(QStringLiteral("view/showHidden"), m_hiddenAction->isChecked());
     s.remove(QStringLiteral("view/thumbnailFolders"));  // older versions: thumbnails per folder

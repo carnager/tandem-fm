@@ -45,6 +45,8 @@ public:
     static double inactiveDim();
     // Zoom of the file lists, in percent (both panels alike).
     static constexpr int kMinZoom = 80, kMaxZoom = 180, kZoomStep = 10;
+    static constexpr int kRowInset = 6;      // rows are bars this far in from the edges
+    static constexpr double kRowRadius = 7;
     static void setListZoom(int percent);
     static int listZoom();
     static QFont zoomed(QFont f);  // a list font at the current zoom

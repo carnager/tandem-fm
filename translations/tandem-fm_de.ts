@@ -2593,16 +2593,24 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Abrufen nicht möglich: %1</translation>
     </message>
     <message>
+        <source>Menu</source>
+        <translation>Menü</translation>
+    </message>
+    <message>
+        <source>Go to a folder, find a file, run a command</source>
+        <translation>Zu einem Ordner, eine Datei finden, einen Befehl ausführen</translation>
+    </message>
+    <message>
+        <source>Settings (Ctrl+,)</source>
+        <translation>Einstellungen (Strg+,)</translation>
+    </message>
+    <message>
         <source>  (on)</source>
         <translation>  (an)</translation>
     </message>
     <message>
         <source>  (off)</source>
         <translation>  (aus)</translation>
-    </message>
-    <message>
-        <source>Type a command…</source>
-        <translation>Befehl eingeben…</translation>
     </message>
     <message>
         <source>pinned</source>
@@ -2792,6 +2800,22 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>All commands</source>
         <translation>Alle Befehle</translation>
+    </message>
+    <message>
+        <source>Commands</source>
+        <translation>Befehle</translation>
+    </message>
+    <message>
+        <source>Folders</source>
+        <translation>Ordner</translation>
+    </message>
+    <message>
+        <source>Files in %1</source>
+        <translation>Dateien in %1</translation>
+    </message>
+    <message>
+        <source>Enter: run or open   ·   Ctrl+J: folders only</source>
+        <translation>Enter: ausführen oder öffnen   ·   Strg+J: nur Ordner</translation>
     </message>
     <message>
         <source>The folder changed while editing; nothing renamed</source>

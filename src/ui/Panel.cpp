@@ -51,11 +51,55 @@
 
 namespace tandem {
 
+namespace {
+
+// "2.4 TiB free" after a little bar of how full the drive is.
+class SpaceChip : public QWidget {
+public:
+    using QWidget::QWidget;
+    void set(int64_t free, int64_t total)
+    {
+        m_text = total > 0 ? Panel::tr("%1 free").arg(formatSize(free)) : QString();
+        m_used = total > 0 ? 1.0 - double(free) / double(total) : 0;
+        setToolTip(total > 0 ? Panel::tr("%1 free of %2").arg(formatSize(free), formatSize(total)) : QString());
+        setVisible(total > 0);
+        updateGeometry();
+        update();
+    }
+    QSize sizeHint() const override
+    {
+        return {kBar + 8 + fontMetrics().horizontalAdvance(m_text) + 4, fontMetrics().height() + 6};
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        const Theme& t = theme();
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        const QRectF bar(0, (height() - 5) / 2.0, kBar, 5);
+        p.setPen(Qt::NoPen);
+        p.setBrush(t.border);
+        p.drawRoundedRect(bar, 2.5, 2.5);
+        p.setBrush(m_used > 0.9 ? t.mark : t.dimText);  // nearly full: warn
+        p.drawRoundedRect(QRectF(bar.left(), bar.top(), bar.width() * qBound(0.04, m_used, 1.0), bar.height()), 2.5, 2.5);
+        p.setPen(t.dimText);
+        p.drawText(QRect(kBar + 8, 0, width() - kBar - 8, height()), Qt::AlignLeft | Qt::AlignVCenter, m_text);
+    }
+
+private:
+    static constexpr int kBar = 40;
+    QString m_text;
+    double m_used = 0;
+};
+
+}  // namespace
+
 Panel::Panel(QWidget* parent) : QFrame(parent)
 {
-    setContentsMargins(1, 1, 1, 1);
+    setContentsMargins(0, 0, 0, 0);
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setContentsMargins(kCardInset + 1, kCardInset + 4, kCardInset + 1, kCardInset + 1);
     layout->setSpacing(0);
 
     m_tabBar = new QTabBar(this);
@@ -66,10 +110,11 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_tabBar->setElideMode(Qt::ElideMiddle);
     setThemeStyle(m_tabBar, QStringLiteral(
         "QTabBar { background: transparent; }"
-        "QTabBar::tab { background: transparent; color: @dimText; padding: 5px 14px; border: none;"
-        "  border-bottom: 2px solid transparent; max-width: 220px; }"
-        "QTabBar::tab:selected { color: @text; border-bottom: 2px solid @accent; }"
-        "QTabBar::tab:hover { color: @text; }"));
+        "QTabBar::tab { background: transparent; color: @dimText; padding: 4px 12px; margin: 6px 2px 0 2px;"
+        "  border: none; border-radius: 8px; max-width: 220px; }"
+        "QTabBar::tab:first { margin-left: 8px; }"
+        "QTabBar::tab:selected { color: @text; background: @altBase; }"
+        "QTabBar::tab:hover:!selected { color: @text; }"));
     m_tabBar->hide();
     layout->addWidget(m_tabBar);
 
@@ -87,7 +132,10 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_pathBar = new PathBar(m_header);
     if (auto* edit = m_pathBar->findChild<QLineEdit*>())
         edit->installEventFilter(this);
-    m_freeLabel = new QLabel(m_header);
+    m_freeLabel = new SpaceChip(m_header);
+    m_placeLabel = new QLabel(m_header);
+    m_placeLabel->setObjectName(QStringLiteral("place"));
+    m_placeLabel->hide();
     m_branchLabel = new QLabel(m_header);
     m_branchLabel->setObjectName(QStringLiteral("branch"));
     m_branchLabel->hide();
@@ -105,6 +153,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     hl->addWidget(m_mountButton);
     hl->addWidget(m_pathBar, 1);
     hl->addWidget(m_searchChip);
+    hl->addWidget(m_placeLabel);
     hl->addWidget(m_branchLabel);
     hl->addWidget(m_freeLabel);
     layout->addWidget(m_header);
@@ -1140,31 +1189,42 @@ void Panel::setActive(bool active)
 void Panel::updateActiveStyle()
 {
     setThemeStyle(m_header, m_active ? QStringLiteral(
-        "#panelHeader { background: @headerActive; border-top-left-radius: 7px; border-top-right-radius: 7px; }"
+        "#panelHeader { background: transparent; }"
         "QLineEdit { background: transparent; color: @text; font-weight: 600; }"
         "QToolButton#crumb { color: @text; border: none; padding: 1px 4px; border-radius: 4px; }"
         "QToolButton#crumb:hover { background: @border; }"
         "QLabel { color: @dimText; }"
-        "QLabel#branch { color: @accent; padding-right: 8px; }"
+        "QLabel#branch, QLabel#place { color: @text; background: @altBase; border-radius: 10px; padding: 2px 9px; }"
         "QToolButton#searchChip { color: @accentText; background: @accent; border: none; border-radius: 9px; padding: 1px 8px; }")
                                            : QStringLiteral(
-        "#panelHeader { background: @header; border-top-left-radius: 7px; border-top-right-radius: 7px; }"
+        "#panelHeader { background: transparent; }"
         "QLineEdit { background: transparent; color: @dimText; font-weight: 600; }"
         "QToolButton#crumb { color: @dimText; border: none; padding: 1px 4px; border-radius: 4px; }"
         "QToolButton#crumb:hover { background: @border; color: @text; }"
         "QLabel { color: @dimText; }"
-        "QLabel#branch { color: @dimText; padding-right: 8px; }"
+        "QLabel#branch, QLabel#place { color: @dimText; background: @altBase; border-radius: 10px; padding: 2px 9px; }"
         "QToolButton#searchChip { color: @text; background: @border; border: none; border-radius: 9px; padding: 1px 8px; }"));
 }
 
+// A card; the active one has an accent edge and a soft glow around it.
 void Panel::paintEvent(QPaintEvent*)
 {
     const Theme& t = theme();
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    p.setPen(QPen(m_active ? t.accent : t.border, 1));
+    const QRectF card = QRectF(rect()).adjusted(kCardInset + 0.5, kCardInset + 0.5, -kCardInset - 0.5, -kCardInset - 0.5);
+    if (m_active) {
+        QColor glow = t.accent;
+        glow.setAlphaF(0.12);
+        p.setPen(Qt::NoPen);
+        p.setBrush(glow);
+        p.drawRoundedRect(QRectF(rect()), kCardRadius + kCardInset, kCardRadius + kCardInset);
+    }
+    QColor edge = t.accent;
+    edge.setAlphaF(0.6);
+    p.setPen(QPen(m_active ? edge : t.border, 1));
     p.setBrush(t.base);
-    p.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 8, 8);
+    p.drawRoundedRect(card, kCardRadius, kCardRadius);
 }
 
 void Panel::updateHeader()
@@ -1176,18 +1236,20 @@ void Panel::updateHeader()
     updateSearchUi();
     m_branchLabel->setVisible(!t->gitBranch().isEmpty());
     m_branchLabel->setText(QStringLiteral("⎇ %1").arg(t->gitBranch()));
+    // On a server: which one, and how (sftp, smb).
+    const QUrl url(t->path());
+    m_placeLabel->setVisible(t->isRemote() && !url.host().isEmpty());
+    m_placeLabel->setText(QStringLiteral("%1 · %2").arg(url.host(), url.scheme()));
     m_branchLabel->setToolTip(tr("Git branch"));
     m_mountButton->setIcon(t->inArchive()  ? IconCache::themed("package-x-generic", "application-x-archive")
                            : t->isRemote() ? IconCache::themed("network-server", "folder-remote")
                                            : IconCache::themed("drive-harddisk", "folder"));
     m_mountButton->setToolTip(t->inArchive() ? tr("Inside archive %1").arg(t->archivePath())
                                              : tr("Locations (Alt+F1 / Alt+F2)"));
-    if (t->freeBytes() >= 0 && t->totalBytes() > 0) {  // GVfs/FUSE often report 0 of 0
-        m_freeLabel->setText(tr("%1 free").arg(formatSize(t->freeBytes())));
-        m_freeLabel->setToolTip(tr("%1 free of %2").arg(formatSize(t->freeBytes()), formatSize(t->totalBytes())));
-    } else {
-        m_freeLabel->clear();
-    }
+    if (t->freeBytes() >= 0 && t->totalBytes() > 0)  // GVfs/FUSE often report 0 of 0
+        static_cast<SpaceChip*>(m_freeLabel)->set(t->freeBytes(), t->totalBytes());
+    else
+        static_cast<SpaceChip*>(m_freeLabel)->set(0, 0);
     window()->setWindowTitle(QStringLiteral("Tandem — %1").arg(path()));
 }
 
