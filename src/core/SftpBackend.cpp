@@ -619,7 +619,11 @@ public:
             const bool eof = ssh_channel_is_eof(ch);
             ssh_channel_send_eof(ch);
             ssh_channel_close(ch);
-            const int status = eof ? ssh_channel_get_exit_status(ch) : -1;
+            uint32_t code = 0;
+            char* signal = nullptr;
+            int core = 0;
+            const int status = eof && ssh_channel_get_exit_state(ch, &code, &signal, &core) == SSH_OK && !signal ? int(code) : -1;
+            ssh_string_free_char(signal);
             ssh_channel_free(ch);
             // Unreadable subfolders make find exit 1 but the rest is fine.
             ok = eof && (status == 0 || (status == 1 && !data.isEmpty()));

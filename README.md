@@ -31,7 +31,7 @@ cmake --build build
 ./build/tandem-fm [left-path] [right-path]
 ```
 
-Requires Qt ≥ 6.5 (Core, Gui, Widgets, Test) and a C++20 compiler. Optional, picked up when found: GIO (GVfs network places), libssh ≥ 0.11 (SFTP), libsmbclient (SMB).
+Requires Qt ≥ 6.5 (Core, Gui, Widgets, Test) and a C++20 compiler. Optional, picked up when found: GIO (GVfs network places), libssh ≥ 0.11 (SFTP), libsmbclient (SMB), libacl (ACLs in the permissions editor).
 
 ## Tests and benchmarks
 
@@ -157,6 +157,26 @@ filters); the chips under the template insert the common ones. Then an
 optional find → replace (`.*` for regex with `$1`, `Aa` to match case) and a
 case style. Recent templates are one click away; Ctrl+E hands the names to
 your text editor instead.
+
+## Permissions (Alt+A)
+
+Who may read, write and run (open, for folders), as a grid instead of a
+number; the `rwxr-x---` and octal forms update live, and typing an octal
+sets the grid. Owner and group are picked in their rows (with completion).
+The special bits are said plainly ("New items get this group" for setgid on
+a folder). Several items at once work: mixed bits show as such and only what
+you touch changes.
+
+Extra people and groups are POSIX ACLs, which Linux has had for decades but
+graphical tools hardly show: type a name to add a person or group with
+their own read/write/run, and for folders "new items inside get the same"
+(a default ACL). Filesystem flags are offered where the filesystem has them
+(no copy-on-write and compression on btrfs, noatime, nodump; append-only and
+locked for root). "Also change everything inside" keeps folders openable and
+never makes files executable by accident. FAT/exFAT say they have no Linux
+permissions instead of failing; NFS, SMB and sshfs mounts get the mode bits
+(their own ACL formats are not edited yet); on SFTP servers the mode bits
+are changed directly. libacl is optional at build time.
 
 ## Viewer (F3) and preview (Ctrl+Q)
 

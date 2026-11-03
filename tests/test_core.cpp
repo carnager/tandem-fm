@@ -15,6 +15,7 @@
 #include "core/IoScheduler.h"
 #include "core/MultiRename.h"
 #include "core/ExifDate.h"
+#include "core/Permissions.h"
 #include "core/Sorting.h"
 
 #include <QDateTime>
@@ -596,6 +597,82 @@ private slots:
         QCOMPARE(names(with("{nope}")), QStringList({"Unknown field {nope}"}));
         QCOMPARE(names(with("{name")), QStringList({"A { is not closed"}));
         QCOMPARE(names(with("{name|shout}")).first(), QString("Unknown filter |shout (lower, upper, title, trim)"));
+    }
+
+    void permissions()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("tree/sub")));
+        writeFile(tmp.filePath("tree/a.txt"), "a");
+        writeFile(tmp.filePath("tree/sub/run.sh"), "#!/bin/sh");
+        QFile::setPermissions(tmp.filePath("tree/sub/run.sh"), QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+        ::chmod(QFile::encodeName(tmp.filePath("tree/a.txt")).constData(), 0600);
+        ::chmod(QFile::encodeName(tmp.filePath("tree/sub")).constData(), 0700);
+
+        PermInfo i = readPermissions(tmp.filePath("tree/a.txt"));
+        QCOMPARE(i.error, 0);
+        QCOMPARE(i.mode, 0600u);
+        QCOMPARE(symbolicMode(i.mode, false), QString("rw-------"));
+        QCOMPARE(symbolicMode(02755, true), QString("rwxr-sr-x"));
+        QCOMPARE(symbolicMode(01777, true), QString("rwxrwxrwt"));
+        QVERIFY(!i.owner.isEmpty());
+
+        // Bits: only what's mentioned changes.
+        PermChange c;
+        c.setBits = 0040;
+        QCOMPARE(applyPermissions(tmp.filePath("tree/a.txt"), c), 0);
+        QCOMPARE(readPermissions(tmp.filePath("tree/a.txt")).mode, 0640u);
+
+        // A tree: group may read. Folders stay openable, files don't become programs,
+        // the script keeps its own x.
+        PermChange tree;
+        tree.setBits = 0050;  // r-x for the group, like ticking both for the top folder
+        tree.recursive = true;
+        PermissionsJob job({tmp.filePath("tree")}, tree);
+        QVERIFY(runJob(job));
+        QVERIFY2(job.errors().isEmpty(), qPrintable(job.errors().join('\n')));
+        QCOMPARE(readPermissions(tmp.filePath("tree")).mode & 0070, 0050u);
+        QCOMPARE(readPermissions(tmp.filePath("tree/sub")).mode, 0750u);
+        QCOMPARE(readPermissions(tmp.filePath("tree/a.txt")).mode, 0640u);
+        QCOMPARE(readPermissions(tmp.filePath("tree/sub/run.sh")).mode, 0750u);
+
+        // Extra people and groups, where the filesystem has ACLs.
+        if (!i.aclSupported)
+            QSKIP("no ACLs on this filesystem (or built without libacl)");
+        PermChange acl;
+        acl.aclSet << AclEntry{false, 65534, QString(), PermRead | PermWrite};
+        QCOMPARE(applyPermissions(tmp.filePath("tree/a.txt"), acl), 0);
+        i = readPermissions(tmp.filePath("tree/a.txt"));
+        QCOMPARE(i.acl.size(), 1);
+        QCOMPARE(i.acl[0].perms, uint32_t(PermRead | PermWrite));
+        QCOMPARE(i.mode, 0640u);  // the group's own bits, not the mask ls shows
+        // A plain chmod keeps the extra entries.
+        PermChange more;
+        more.setBits = 0004;
+        QCOMPARE(applyPermissions(tmp.filePath("tree/a.txt"), more), 0);
+        i = readPermissions(tmp.filePath("tree/a.txt"));
+        QCOMPARE(i.mode, 0644u);
+        QCOMPARE(i.acl.size(), 1);
+        PermChange drop;
+        drop.aclRemove << AclEntry{false, 65534, QString(), 0};
+        QCOMPARE(applyPermissions(tmp.filePath("tree/a.txt"), drop), 0);
+        QVERIFY(readPermissions(tmp.filePath("tree/a.txt")).acl.isEmpty());
+
+        // Folder defaults: new items inherit the entry, shown with the rights that apply.
+        PermChange def;
+        def.defaultEnabled = true;
+        def.defaultSet << AclEntry{true, ::getegid(), QString(), PermRead | PermWrite};
+        QCOMPARE(applyPermissions(tmp.filePath("tree/sub"), def), 0);
+        QVERIFY(readPermissions(tmp.filePath("tree/sub")).hasDefault);
+        writeFile(tmp.filePath("tree/sub/new.txt"), "n");
+        i = readPermissions(tmp.filePath("tree/sub/new.txt"));
+        QCOMPARE(i.acl.size(), 1);
+        QVERIFY(i.acl[0].isGroup);
+        QVERIFY(i.acl[0].perms & PermRead);
+        PermChange off;
+        off.defaultEnabled = false;
+        QCOMPARE(applyPermissions(tmp.filePath("tree/sub"), off), 0);
+        QVERIFY(!readPermissions(tmp.filePath("tree/sub")).hasDefault);
     }
 
     void exifDate()

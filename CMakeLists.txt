@@ -26,6 +26,7 @@ add_library(tandem_core STATIC
   src/core/Vfs.cpp
   src/core/MultiRename.h src/core/MultiRename.cpp
   src/core/ExifDate.h src/core/ExifDate.cpp
+  src/core/Permissions.h src/core/Permissions.cpp
   src/core/IoScheduler.h src/core/IoScheduler.cpp
   src/core/Fuzzy.h src/core/Fuzzy.cpp
   src/core/FolderHistory.h src/core/FolderHistory.cpp
@@ -63,6 +64,7 @@ add_library(tandem_ui STATIC
   src/ui/KeyChordPopup.h src/ui/KeyChordPopup.cpp
   src/ui/CommandBar.h src/ui/CommandBar.cpp
   src/ui/SyncDialog.h src/ui/SyncDialog.cpp
+  src/ui/PermissionsDialog.h src/ui/PermissionsDialog.cpp
   src/ui/Network.h src/ui/Network.cpp
   src/ui/AuthDialogs.h src/ui/AuthDialogs.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
@@ -97,6 +99,18 @@ if(LIBSSH_FOUND)
   message(STATUS "Native SFTP (libssh ${LIBSSH_VERSION}): enabled")
 else()
   message(STATUS "Native SFTP: disabled (libssh >= 0.11 not found; GVfs is used instead)")
+endif()
+
+# Optional: POSIX ACLs (extra users and groups in the permissions editor).
+if(PkgConfig_FOUND)
+  pkg_check_modules(LIBACL IMPORTED_TARGET libacl)
+endif()
+if(LIBACL_FOUND)
+  target_link_libraries(tandem_core PRIVATE PkgConfig::LIBACL)
+  target_compile_definitions(tandem_core PRIVATE TANDEM_HAVE_ACL)
+  message(STATUS "ACLs (libacl ${LIBACL_VERSION}): enabled")
+else()
+  message(STATUS "ACLs: disabled (libacl not found; permissions editor shows mode bits only)")
 endif()
 
 # Optional: native SMB (Samba's libsmbclient).

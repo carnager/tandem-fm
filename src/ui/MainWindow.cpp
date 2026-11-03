@@ -18,6 +18,7 @@
 #include "ui/KeyChordPopup.h"
 #include "ui/EditNames.h"
 #include "ui/MultiRenameDialog.h"
+#include "ui/PermissionsDialog.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ViewerWindow.h"
@@ -307,6 +308,8 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("copy")] = addCommand(files, tr("Copy…"), {K(Qt::Key_F5)}, [this] { copyOrMove(CopyJob::Mode::Copy); });
     m_actions[QStringLiteral("move")] = addCommand(files, tr("Move…"), {K(Qt::Key_F6)}, [this] { copyOrMove(CopyJob::Mode::Move); });
     m_actions[QStringLiteral("rename")] = addCommand(files, tr("Rename"), {K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
+    m_actions[QStringLiteral("permissions")] =
+        addCommand(files, tr("Permissions…"), {K(Qt::ALT | Qt::Key_A)}, [this] { editPermissions(); });
     m_actions[QStringLiteral("multiRename")] =
         addCommand(files, tr("Multi-rename…"), {K(Qt::CTRL | Qt::Key_M)}, [this] { multiRename(); });
     m_actions[QStringLiteral("editorRename")] =
@@ -1545,6 +1548,77 @@ bool MainWindow::collectRenameItems(Panel* p, QList<RenameItem>& items, QSet<QSt
     return !items.isEmpty();
 }
 
+// Alt+A. Reading permissions (ACLs, flags) can touch slow mounts: off the UI thread.
+void MainWindow::editPermissions()
+{
+    Panel* p = active();
+    const QStringList paths = p->selectedPaths();
+    if (paths.isEmpty() || refuseInArchive(p))
+        return;
+    const bool remote = p->isRemote();
+    QPointer<MainWindow> self(this);
+    QPointer<Panel> panel(p);
+    ioPool()->start([self, panel, paths, remote] {
+        auto infos = std::make_shared<QList<PermInfo>>();
+        for (const QString& path : paths) {
+            if (remote) {
+                PermInfo i;
+                FileStat st;
+                i.error = statAt(path, st);
+                i.isDir = st.isDir;
+                i.mode = st.mode & 07777;
+                i.uid = st.uid;
+                i.gid = st.gid;
+                if (path.startsWith(QLatin1String("smb:"))) {  // Windows shares: no Linux permissions
+                    i.posixPerms = false;
+                    i.fsName = tr("a Windows (SMB) share");
+                }
+                infos->append(i);
+            } else {
+                infos->append(readPermissions(path));
+            }
+        }
+        postToUi([self, panel, paths, remote, infos] {
+            if (!self || !panel)
+                return;
+            for (int k = 0; k < infos->size(); ++k)
+                if (infos->at(k).error) {
+                    panel->showMessage(tr("Cannot read %1: %2").arg(baseName(paths[k]), errnoString(infos->at(k).error)), true);
+                    return;
+                }
+            PermissionsDialog dlg(paths, *infos, remote, self);
+            if (dlg.exec() != QDialog::Accepted)
+                return;
+            const PermChange change = dlg.change();
+            if (change.isEmpty())
+                return;
+            if (!remote) {
+                auto* job = new PermissionsJob(paths, change);
+                job->setStartImmediately(true);
+                self->m_jobs->add(job);
+                return;
+            }
+            // Servers: the mode bits, one item at a time.
+            ioPool()->start([panel, paths, infos, change] {
+                QStringList errors;
+                for (int k = 0; k < paths.size(); ++k) {
+                    Backend* b = backendFor(paths[k]);
+                    const uint32_t mode = ((infos->at(k).mode & ~change.clearBits) | change.setBits) & 07777;
+                    if (const int e = b ? b->chmod(paths[k], mode) : ENOTSUP)
+                        errors << tr("%1: %2").arg(baseName(paths[k]), errnoString(e));
+                }
+                postToUi([panel, errors] {
+                    if (!panel)
+                        return;
+                    if (!errors.isEmpty())
+                        panel->showMessage(errors.first(), true);
+                    panel->refresh();
+                });
+            });
+        });
+    });
+}
+
 void MainWindow::multiRename()
 {
     Panel* p = active();
@@ -2028,6 +2102,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         menu.addAction(act("rename"));
     menu.addAction(act("multiRename"));
     menu.addAction(act("editorRename"));
+    menu.addAction(act("permissions"));
     menu.addAction(act("copyPath"));
     menu.addSeparator();
     if (e && e->isDir)

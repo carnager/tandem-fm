@@ -22,6 +22,7 @@
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
 #include "ui/MultiRenameDialog.h"
+#include "ui/PermissionsDialog.h"
 #include "ui/Panel.h"
 #include "ui/PathBar.h"
 #include "ui/Theme.h"
@@ -29,6 +30,8 @@
 #include "ui/viewer/ViewerWindow.h"
 
 #include <QPlainTextEdit>
+
+#include <sys/stat.h>
 #include <QSignalSpy>
 
 #include <QApplication>
@@ -41,6 +44,7 @@
 #include <QSettings>
 #include <QImage>
 #include <QImageReader>
+#include <QCheckBox>
 #include <QListWidget>
 #include <QTreeWidget>
 #include <QClipboard>
@@ -889,6 +893,49 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L("flt"));
         QVERIFY(leftModel()->rowOf("beta.txt") >= 0);
 
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // Alt+A: the permissions editor, with the octal field and extra people.
+    void permissionsEditor()
+    {
+        QVERIFY(QDir().mkpath(L("pe")));
+        writeFile(L("pe/doc.txt"), "x");
+        ::chmod(QFile::encodeName(L("pe/doc.txt")).constData(), 0600);
+        m_left->navigate(L("pe"));
+        QTRY_COMPARE(leftModel()->path(), L("pe"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "doc.txt");
+        const bool acl = readPermissions(L("pe/doc.txt")).aclSupported;
+        auto checked = std::make_shared<bool>(false);
+        answerNextDialog([acl, checked](QWidget* w) {
+            auto* dlg = qobject_cast<PermissionsDialog*>(w);
+            QVERIFY(dlg);
+            QCOMPARE(dlg->octalEdit()->text(), QString("600"));
+            QVERIFY(!dlg->applyButton()->isEnabled());  // nothing changed yet
+            dlg->bitBox(1, 0)->click();                  // group may read
+            QCOMPARE(dlg->octalEdit()->text(), QString("640"));
+            dlg->octalEdit()->setText("644");            // typed as a number
+            emit dlg->octalEdit()->textEdited("644");
+            QVERIFY(dlg->bitBox(2, 0)->isChecked());
+            if (acl) {
+                dlg->addEdit()->setText("nobody");
+                QTest::keyClick(dlg->addEdit(), Qt::Key_Return);
+            }
+            QVERIFY(dlg->applyButton()->isEnabled());
+            *checked = true;
+            dlg->applyButton()->click();
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_A, Qt::AltModifier);
+        QTRY_VERIFY(*checked);
+        QTRY_COMPARE(readPermissions(L("pe/doc.txt")).mode, 0644u);
+        if (acl) {
+            QTRY_COMPARE(readPermissions(L("pe/doc.txt")).acl.size(), 1);
+            QCOMPARE(readPermissions(L("pe/doc.txt")).acl[0].perms, uint32_t(PermRead));
+        }
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
     }

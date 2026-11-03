@@ -619,6 +619,46 @@
         <source>skip</source>
         <translation>auslassen</translation>
     </message>
+    <message>
+        <source>reading</source>
+        <translation>Lesen</translation>
+    </message>
+    <message>
+        <source>owner</source>
+        <translation>Eigentümer</translation>
+    </message>
+    <message>
+        <source>permissions</source>
+        <translation>Berechtigungen</translation>
+    </message>
+    <message>
+        <source>extra users and groups</source>
+        <translation>zusätzliche Personen und Gruppen</translation>
+    </message>
+    <message>
+        <source>defaults for new items</source>
+        <translation>Vorgaben für neue Elemente</translation>
+    </message>
+    <message>
+        <source>flags</source>
+        <translation>Flags</translation>
+    </message>
+    <message>
+        <source>read</source>
+        <translation>lesen</translation>
+    </message>
+    <message>
+        <source>write</source>
+        <translation>schreiben</translation>
+    </message>
+    <message>
+        <source>run</source>
+        <translation>ausführen</translation>
+    </message>
+    <message>
+        <source>nothing</source>
+        <translation>nichts</translation>
+    </message>
 </context>
 <context>
     <name>tandem::ArchiveUpdateJob</name>
@@ -1432,6 +1472,10 @@
         <translation>Unter jedem Panel</translation>
     </message>
     <message>
+        <source>Permissions…</source>
+        <translation>Berechtigungen…</translation>
+    </message>
+    <message>
         <source>Compare folders (mark differences)</source>
         <translation>Ordner vergleichen (Unterschiede markieren)</translation>
     </message>
@@ -1849,6 +1893,18 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Unpack %1 to (archives with several top-level items get their own folder):</source>
         <translation>%1 entpacken nach (Archive mit mehreren Elementen auf oberster Ebene erhalten einen eigenen Ordner):</translation>
+    </message>
+    <message>
+        <source>a Windows (SMB) share</source>
+        <translation>einer Windows-Freigabe (SMB)</translation>
+    </message>
+    <message>
+        <source>Cannot read %1: %2</source>
+        <translation>%1 kann nicht gelesen werden: %2</translation>
+    </message>
+    <message>
+        <source>%1: %2</source>
+        <translation>%1: %2</translation>
     </message>
     <message>
         <source>The folder changed while editing; nothing renamed</source>
@@ -2597,6 +2653,373 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Could not unmount</source>
         <translation>Aushängen fehlgeschlagen</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::PermissionsDialog</name>
+    <message>
+        <source>Permissions of %1</source>
+        <translation>Berechtigungen von %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>Permissions of %n item(s)</source>
+        <translation>
+            <numerusform>Berechtigungen von %n Element</numerusform>
+            <numerusform>Berechtigungen von %n Elementen</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n item(s)</source>
+        <translation>
+            <numerusform>%n Element</numerusform>
+            <numerusform>%n Elemente</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>in %1</source>
+        <translation>in %1</translation>
+    </message>
+    <message>
+        <source>This is on %1, which has no Linux permissions: who may read and write here is decided by how the drive is mounted, for all files at once.</source>
+        <translation>Das liegt auf %1, das keine Linux-Berechtigungen kennt: wer hier lesen und schreiben darf, legt die Art des Einhängens fest, für alle Dateien zugleich.</translation>
+    </message>
+    <message>
+        <source>Only the owner (%1) or root can change these.</source>
+        <translation>Nur der Eigentümer (%1) oder root kann das ändern.</translation>
+    </message>
+    <message>
+        <source>Who can do what</source>
+        <translation>Wer darf was</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Öffnen</translation>
+    </message>
+    <message>
+        <source>Run / open</source>
+        <translation>Ausführen / öffnen</translation>
+    </message>
+    <message>
+        <source>Run</source>
+        <translation>Ausführen</translation>
+    </message>
+    <message>
+        <source>Read</source>
+        <translation>Lesen</translation>
+    </message>
+    <message>
+        <source>Write</source>
+        <translation>Schreiben</translation>
+    </message>
+    <message>
+        <source>See what&apos;s inside</source>
+        <translation>Sehen, was darin ist</translation>
+    </message>
+    <message>
+        <source>Open and read it</source>
+        <translation>Öffnen und lesen</translation>
+    </message>
+    <message>
+        <source>Add, rename and delete items inside</source>
+        <translation>Darin Elemente anlegen, umbenennen und löschen</translation>
+    </message>
+    <message>
+        <source>Change it</source>
+        <translation>Ändern</translation>
+    </message>
+    <message>
+        <source>Go into it and reach the items inside</source>
+        <translation>Hineingehen und die Elemente darin erreichen</translation>
+    </message>
+    <message>
+        <source>Run it as a program</source>
+        <translation>Als Programm ausführen</translation>
+    </message>
+    <message>
+        <source>(mixed)</source>
+        <translation>(gemischt)</translation>
+    </message>
+    <message>
+        <source>Owner</source>
+        <translation>Eigentümer</translation>
+    </message>
+    <message>
+        <source>Group</source>
+        <translation>Gruppe</translation>
+    </message>
+    <message>
+        <source>Everyone else</source>
+        <translation>Alle anderen</translation>
+    </message>
+    <message>
+        <source>As a number, like chmod: 644, 755, 2775 …</source>
+        <translation>Als Zahl, wie bei chmod: 644, 755, 2775 …</translation>
+    </message>
+    <message>
+        <source>Runs as its owner</source>
+        <translation>Läuft als Eigentümer</translation>
+    </message>
+    <message>
+        <source>setuid: a program runs with its owner&apos;s rights, whoever starts it</source>
+        <translation>setuid: ein Programm läuft mit den Rechten seines Eigentümers, egal wer es startet</translation>
+    </message>
+    <message>
+        <source>New items get this group</source>
+        <translation>Neue Elemente bekommen diese Gruppe</translation>
+    </message>
+    <message>
+        <source>Runs as its group</source>
+        <translation>Läuft als Gruppe</translation>
+    </message>
+    <message>
+        <source>setgid: items created inside belong to the folder&apos;s group (shared folders)</source>
+        <translation>setgid: darin angelegte Elemente gehören der Gruppe des Ordners (gemeinsame Ordner)</translation>
+    </message>
+    <message>
+        <source>setgid: a program runs with its group&apos;s rights</source>
+        <translation>setgid: ein Programm läuft mit den Rechten seiner Gruppe</translation>
+    </message>
+    <message>
+        <source>Only owners can delete</source>
+        <translation>Nur Eigentümer dürfen löschen</translation>
+    </message>
+    <message>
+        <source>sticky: in a shared folder, people can only delete or rename their own items (like /tmp)</source>
+        <translation>sticky: in einem gemeinsamen Ordner kann jeder nur eigene Elemente löschen oder umbenennen (wie /tmp)</translation>
+    </message>
+    <message>
+        <source>Extra people and groups</source>
+        <translation>Zusätzliche Personen und Gruppen</translation>
+    </message>
+    <message>
+        <source>Add a person or group: type a name</source>
+        <translation>Person oder Gruppe hinzufügen: Namen tippen</translation>
+    </message>
+    <message>
+        <source>%1 (person)</source>
+        <translation>%1 (Person)</translation>
+    </message>
+    <message>
+        <source>%1 (group)</source>
+        <translation>%1 (Gruppe)</translation>
+    </message>
+    <message>
+        <source>New items inside get the same extra people and groups</source>
+        <translation>Neue Elemente darin bekommen dieselben zusätzlichen Personen und Gruppen</translation>
+    </message>
+    <message>
+        <source>A default ACL on the folder: files and folders created inside inherit these entries</source>
+        <translation>Eine Standard-ACL am Ordner: darin angelegte Dateien und Ordner erben diese Einträge</translation>
+    </message>
+    <message>
+        <source>Extra people and groups (ACLs) aren&apos;t available here.</source>
+        <translation>Zusätzliche Personen und Gruppen (ACLs) gibt es hier nicht.</translation>
+    </message>
+    <message>
+        <source>Extra people and groups (ACLs) aren&apos;t available on %1.</source>
+        <translation>Zusätzliche Personen und Gruppen (ACLs) gibt es auf %1 nicht.</translation>
+    </message>
+    <message>
+        <source>No copy-on-write</source>
+        <translation>Kein Copy-on-Write</translation>
+    </message>
+    <message>
+        <source>For VM images and databases on btrfs; takes effect for new data</source>
+        <translation>Für VM-Abbilder und Datenbanken auf btrfs; wirkt für neue Daten</translation>
+    </message>
+    <message>
+        <source>Compress</source>
+        <translation>Komprimieren</translation>
+    </message>
+    <message>
+        <source>btrfs compresses what&apos;s written from now on</source>
+        <translation>btrfs komprimiert, was ab jetzt geschrieben wird</translation>
+    </message>
+    <message>
+        <source>Don&apos;t record reads</source>
+        <translation>Lesezugriffe nicht vermerken</translation>
+    </message>
+    <message>
+        <source>noatime: reading doesn&apos;t update the access time</source>
+        <translation>noatime: Lesen ändert die Zugriffszeit nicht</translation>
+    </message>
+    <message>
+        <source>Skip in dump backups</source>
+        <translation>Bei dump-Sicherungen auslassen</translation>
+    </message>
+    <message>
+        <source>nodump: dump(8) and some backup tools leave it out</source>
+        <translation>nodump: dump(8) und manche Sicherungsprogramme lassen es aus</translation>
+    </message>
+    <message>
+        <source>Append only</source>
+        <translation>Nur anhängen</translation>
+    </message>
+    <message>
+        <source>Can only be added to, never changed or shortened (root only)</source>
+        <translation>Kann nur ergänzt, nie geändert oder gekürzt werden (nur root)</translation>
+    </message>
+    <message>
+        <source>Locked</source>
+        <translation>Gesperrt</translation>
+    </message>
+    <message>
+        <source>immutable: nobody can change, rename or delete it, not even root, until unlocked</source>
+        <translation>immutable: niemand kann es ändern, umbenennen oder löschen, auch root nicht, bis es entsperrt ist</translation>
+    </message>
+    <message>
+        <source>Filesystem flags</source>
+        <translation>Dateisystem-Flags</translation>
+    </message>
+    <message>
+        <source>Also change everything inside</source>
+        <translation>Auch alles darin ändern</translation>
+    </message>
+    <message>
+        <source>Folders inside stay openable where they can be read; files keep their run permission as it is unless you set it here</source>
+        <translation>Ordner darin bleiben zu öffnen, wo sie lesbar sind; Dateien behalten ihr Ausführrecht, außer du setzt es hier</translation>
+    </message>
+    <message>
+        <source>On a server only these basic permissions can be changed.</source>
+        <translation>Auf einem Server lassen sich nur diese grundlegenden Berechtigungen ändern.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <source>Apply</source>
+        <translation>Anwenden</translation>
+    </message>
+    <message>
+        <source>Group %1</source>
+        <translation>Gruppe %1</translation>
+    </message>
+    <message>
+        <source>Person %1</source>
+        <translation>Person %1</translation>
+    </message>
+    <message>
+        <source>read</source>
+        <translation>lesen</translation>
+    </message>
+    <message>
+        <source>write</source>
+        <translation>schreiben</translation>
+    </message>
+    <message>
+        <source>run</source>
+        <translation>ausführen</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Entfernen</translation>
+    </message>
+    <message>
+        <source> (group)</source>
+        <translation> (Gruppe)</translation>
+    </message>
+    <message>
+        <source> (person)</source>
+        <translation> (Person)</translation>
+    </message>
+    <message>
+        <source>No person or group called “%1”</source>
+        <translation>Keine Person oder Gruppe namens „%1“</translation>
+    </message>
+    <message>
+        <source>mixed</source>
+        <translation>gemischt</translation>
+    </message>
+    <message>
+        <source>Apply to all inside</source>
+        <translation>Auf alles darin anwenden</translation>
+    </message>
+    <message numerus="yes">
+        <source>Apply to %n item(s)</source>
+        <translation>
+            <numerusform>Auf %n Element anwenden</numerusform>
+            <numerusform>Auf %n Elemente anwenden</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Nothing changes yet.</source>
+        <translation>Noch ändert sich nichts.</translation>
+    </message>
+    <message>
+        <source>%1 → %2</source>
+        <translation>%1 → %2</translation>
+    </message>
+    <message>
+        <source>owner</source>
+        <translation>Eigentümer</translation>
+    </message>
+    <message>
+        <source>group</source>
+        <translation>Gruppe</translation>
+    </message>
+    <message>
+        <source>others</source>
+        <translation>andere</translation>
+    </message>
+    <message>
+        <source>+ %1 %2</source>
+        <translation>+ %1 %2</translation>
+    </message>
+    <message>
+        <source>− %1 %2</source>
+        <translation>− %1 %2</translation>
+    </message>
+    <message>
+        <source>owner → %1</source>
+        <translation>Eigentümer → %1</translation>
+    </message>
+    <message>
+        <source>group → %1</source>
+        <translation>Gruppe → %1</translation>
+    </message>
+    <message>
+        <source>%1 may %2</source>
+        <translation>%1 darf %2</translation>
+    </message>
+    <message>
+        <source>%1 removed</source>
+        <translation>%1 entfernt</translation>
+    </message>
+    <message>
+        <source>new items inside inherit them</source>
+        <translation>neue Elemente darin erben sie</translation>
+    </message>
+    <message>
+        <source>new items no longer inherit</source>
+        <translation>neue Elemente erben nicht mehr</translation>
+    </message>
+    <message>
+        <source>flags changed</source>
+        <translation>Flags geändert</translation>
+    </message>
+    <message>
+        <source>  ·  and everything inside</source>
+        <translation>  ·  und alles darin</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::PermissionsJob</name>
+    <message>
+        <source>Change permissions</source>
+        <translation>Berechtigungen ändern</translation>
+    </message>
+    <message>
+        <source>%1: %2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <source>%1 (%2): %3</source>
+        <translation>%1 (%2): %3</translation>
     </message>
 </context>
 <context>

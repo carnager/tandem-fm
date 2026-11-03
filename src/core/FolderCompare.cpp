@@ -202,7 +202,7 @@ CompareResult compareFolders(const QString& left, const QString& right, const Co
                              const std::atomic<bool>* cancel, const std::function<void(const QString&)>& progress)
 {
     CompareResult out;
-    Walker w{left, right, options, cancel, progress, out};
+    Walker w{left, right, options, cancel, progress, out, {}, {}};
     w.run();
     return out;
 }

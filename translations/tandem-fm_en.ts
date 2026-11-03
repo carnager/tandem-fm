@@ -139,6 +139,30 @@
     </message>
 </context>
 <context>
+    <name>tandem::PermissionsDialog</name>
+    <message numerus="yes">
+        <source>Permissions of %n item(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n item(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Apply to %n item(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>tandem::RenameConfirmDialog</name>
     <message numerus="yes">
         <source>%n name(s) can&apos;t be used. Edit again to fix them.</source>
