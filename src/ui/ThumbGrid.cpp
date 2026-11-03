@@ -1,4 +1,5 @@
 #include "ui/ThumbGrid.h"
+#include "ui/FileColors.h"
 
 #include "core/Backend.h"
 #include "core/Util.h"
@@ -245,7 +246,7 @@ void ThumbGrid::paintEvent(QPaintEvent*)
         // The name, on up to two lines.
         const QString name = e->isParent ? QStringLiteral("..") : e->name;
         const QRect text(r.left() + 6, pic.bottom() + 6, r.width() - 12, 2 * fm.height());
-        p.setPen(e->marked ? t.mark : t.text);
+        p.setPen(FileColors::instance().nameColor(*e, m->gitStatus(e->name)));
         QString first = name, second;
         if (fm.horizontalAdvance(name) > text.width()) {
             int cut = int(name.size());

@@ -23,6 +23,7 @@
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
 #include "ui/SettingsDialog.h"
+#include "ui/FileColors.h"
 #include "ui/ShortcutsDialog.h"
 #include "ui/TrashDialog.h"
 #include "ui/Panel.h"
@@ -2509,6 +2510,8 @@ void MainWindow::reloadConfiguration(const QStringList& keys)
     Settings settings;
     if (keys.contains(QStringLiteral("view/theme")) || keys.contains(QStringLiteral("view/fontScale")))
         applyTheme(*qApp);
+    if (keys.contains(QStringLiteral("view/fileColors")) || keys.contains(QStringLiteral("view/fileColorsEnabled")))
+        FileColors::refreshViews();
     if (keys.contains(QStringLiteral("view/iconTheme")))
         setIconTheme(settings.value(QStringLiteral("view/iconTheme")).toString());
     for (Panel* panel : {m_left, m_right}) panel->applyAppearance();

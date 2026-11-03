@@ -1,6 +1,6 @@
 # Portable configuration and folder sync
 
-Tandem 0.1.2 can keep its preferences and bookmarks/history in a folder you sync with Dropbox or another file-sync service. Tandem saves files and reloads changes visible on the local disk; the sync service transfers them between computers.
+Tandem 0.1.2 and later can keep its preferences and bookmarks/history in a folder you sync with Dropbox or another file-sync service. Tandem saves files and reloads changes visible on the local disk; the sync service transfers them between computers.
 
 ## Set up in the GUI
 
@@ -14,7 +14,7 @@ The location selector is stored only on this computer, allowing different Dropbo
 
 The folder contains:
 
-- `settings.ini`: appearance, font scale, dimming, shortcuts, behaviour, external tools, recent servers, command history, viewer/search/compare choices, and saved window/panel/session state.
+- `settings.ini`: appearance, font scale, dimming, file-name color rules, shortcuts, behaviour, external tools, recent servers, command history, viewer/search/compare choices, and saved window/panel/session state.
 - `folders.tsv`: bookmarks, bookmark keys, and visited-folder history.
 
 You can instead choose a named INI file. For example, `work.ini` uses `work.folders.tsv` in the same folder. Sync both files. Caches, temporary transfers, SSH private keys/known-host files, and saved server passwords remain in their normal local locations. Command history and filesystem/server paths are included in the portable settings; commands and paths are copied as written and may need different values on different computers.
@@ -53,3 +53,7 @@ lynxNavigation=true
 ```
 
 Qt's INI encoding preserves typed values such as shortcut lists and binary window geometry; keep those encodings when editing them manually. On first launch, existing native preferences and the old folder history are copied into the new storage format. The native preferences remain as a backup. Other devices need a Tandem build that includes this portable-configuration support; the unmodified upstream app does not read these profiles.
+
+## File-name colors (0.1.3)
+
+Use **Settings → File colors → Add…**. Choose Extension, File type (MIME), or File kind, then pick light/dark text colors. The ordered rules are stored as JSON in `view/fileColors`; the master switch is `view/fileColorsEnabled`. These are part of the same portable INI profile and incoming changes repaint the panels immediately. No default rules are installed.

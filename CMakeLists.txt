@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(tandem-fm VERSION 0.1.2 LANGUAGES CXX)
+project(tandem-fm VERSION 0.1.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -53,6 +53,8 @@ target_compile_options(tandem_core PRIVATE -Wall -Wextra)
 
 # Widgets UI, as a library so tests can drive the real window.
 add_library(tandem_ui STATIC
+  src/ui/FileColors.h src/ui/FileColors.cpp
+  src/ui/FileColorsPage.h src/ui/FileColorsPage.cpp
   src/ui/Theme.h src/ui/Theme.cpp
   src/ui/IconCache.h src/ui/IconCache.cpp
   src/ui/FileModel.h src/ui/FileModel.cpp
@@ -205,6 +207,10 @@ add_executable(tandem-bench bench/bench_list.cpp)
 target_link_libraries(tandem-bench PRIVATE tandem_core)
 
 enable_testing()
+add_executable(test_filecolors tests/test_filecolors.cpp)
+target_link_libraries(test_filecolors PRIVATE tandem_ui Qt6::Test)
+add_test(NAME test_filecolors COMMAND test_filecolors)
+set_tests_properties(test_filecolors PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_executable(test_config tests/test_config.cpp)
 target_link_libraries(test_config PRIVATE tandem_core Qt6::Test)
 add_test(NAME test_config COMMAND test_config)

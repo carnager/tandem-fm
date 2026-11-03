@@ -21,6 +21,7 @@
 #include "ui/DiskUsageDialog.h"
 #include "ui/DuplicatesDialog.h"
 #include "ui/FileView.h"
+#include "ui/FileColors.h"
 #include "ui/ThumbGrid.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/KeyChordPopup.h"
@@ -66,6 +67,7 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QDialog>
+#include <QDialogButtonBox>
 #include <QLineEdit>
 #include <thread>
 #include <QInputDialog>
@@ -1267,6 +1269,63 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void fileColorRulesCanBeEditedInSettings()
+    {
+        const auto previous = Settings().value("view/fileColors");
+        const auto previousEnabled = Settings().value("view/fileColorsEnabled");
+        auto restore = qScopeGuard([&] {
+            if (previous.isValid()) Settings().setValue("view/fileColors", previous); else Settings().remove("view/fileColors");
+            if (previousEnabled.isValid()) Settings().setValue("view/fileColorsEnabled", previousEnabled); else Settings().remove("view/fileColorsEnabled");
+            FileColors::refreshViews();
+        });
+        FileColors::saveRules({}); FileColors::setEnabled(true);
+        SettingsDialog settings(m_window.get()); settings.show(); settings.showPage(5);
+        auto* table = settings.findChild<QTreeWidget*>("fileColorRules");
+        auto* add = settings.findChild<QPushButton*>("addFileColorRule");
+        QVERIFY(table && add);
+        answerNextDialog([](QWidget* widget) {
+            auto* dialog = qobject_cast<QDialog*>(widget); QVERIFY(dialog);
+            auto* extension = dialog->findChild<QLineEdit*>("fileColorExtensions");
+            auto* buttons = dialog->findChild<QDialogButtonBox*>();
+            QVERIFY(extension && buttons);
+            QVERIFY(!buttons->button(QDialogButtonBox::Save)->isEnabled());
+            extension->setText("pdf; epub");
+            dialog->findChild<QLineEdit*>("fileColorLight")->setText("#123456");
+            dialog->findChild<QLineEdit*>("fileColorDark")->setText("#aabbcc");
+            QVERIFY(buttons->button(QDialogButtonBox::Save)->isEnabled());
+            buttons->button(QDialogButtonBox::Save)->click();
+        });
+        add->click();
+        QCOMPARE(table->topLevelItemCount(), 1);
+        QCOMPARE(FileColors::rules()[0].light, QColor("#123456"));
+        answerNextDialog([](QWidget* widget) {
+            auto* dialog = qobject_cast<QDialog*>(widget); QVERIFY(dialog);
+            auto* match = dialog->findChild<QComboBox*>("fileColorMatch"); QVERIFY(match);
+            match->setCurrentIndex(match->findData("mime"));
+            dialog->findChild<QComboBox*>("fileColorMime")->setCurrentText("image/*");
+            dialog->findChild<QDialogButtonBox*>()->button(QDialogButtonBox::Save)->click();
+        });
+        add->click();
+        QCOMPARE(table->topLevelItemCount(), 2);
+        settings.findChild<QPushButton*>("moveFileColorUp")->click();
+        QCOMPARE(FileColors::rules()[0].match, QString("mime"));
+        table->topLevelItem(0)->setCheckState(0, Qt::Unchecked);
+        QVERIFY(!FileColors::rules()[0].enabled);
+        settings.findChild<QPushButton*>("removeFileColorRule")->click();
+        QCOMPARE(FileColors::rules().size(), 1);
+        answerNextDialog([](QWidget* widget) {
+            auto* dialog = qobject_cast<QDialog*>(widget); QVERIFY(dialog);
+            dialog->findChild<QLineEdit*>("fileColorExtensions")->setText("tar.gz");
+            dialog->findChild<QDialogButtonBox*>()->button(QDialogButtonBox::Save)->click();
+        });
+        settings.findChild<QPushButton*>("editFileColorRule")->click();
+        QCOMPARE(FileColors::rules()[0].value, QString("tar.gz"));
+        settings.findChild<QCheckBox*>("fileColorsEnabled")->setChecked(false);
+        QVERIFY(!Settings().value("view/fileColorsEnabled").toBool());
+        SettingsDialog reopened(m_window.get());
+        QCOMPARE(reopened.findChild<QTreeWidget*>("fileColorRules")->topLevelItemCount(), 1);
+    }
+
     void sharedConfigurationReloadsLive()
     {
         QTemporaryDir shared;
@@ -1309,6 +1368,12 @@ private slots:
         reset.write("[view]\ntheme=dark\nfontScale=100\n"); QVERIFY(reset.commit());
         QTRY_VERIFY_WITH_TIMEOUT(theme().dark, 3000);
         QTRY_COMPARE(copy->shortcut(), QKeySequence(Qt::Key_F5)); // removed override restores default
+        QSettings incomingColors(target, QSettings::IniFormat);
+        incomingColors.setValue("view/fileColors", QStringLiteral(R"([{"match":"extension","value":"pdf","light":"#cc2200","dark":"#00cc44","enabled":true}])"));
+        incomingColors.sync();
+        QTRY_COMPARE_WITH_TIMEOUT(FileColors::rules().size(), 1, 3000);
+        FileEntry pdf; pdf.name = "synced.pdf";
+        QTRY_COMPARE(FileColors::instance().nameColor(pdf), QColor("#00cc44"));
     }
 
     void liveAppearanceSettings()

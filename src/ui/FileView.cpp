@@ -1,4 +1,5 @@
 #include "ui/FileView.h"
+#include "ui/FileColors.h"
 
 #include "ui/ThumbGrid.h"
 
@@ -38,16 +39,13 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
         return;
     const Theme& t = theme();
 
-    QColor fg = t.text;
-    if (e->marked)
-        fg = t.mark;
-    else if (!e->isParent && e->name.startsWith(QLatin1Char('.')))
-        fg = t.dimText;
-    else if (e->brokenLink)
-        fg = t.error;
+    const int col = idx.column();
+    QColor fg = col == FileModel::ColName || col == FileModel::ColExt
+                    ? FileColors::instance().nameColor(*e, model->gitStatus(e->name))
+                    : e->marked ? t.mark : e->brokenLink ? t.error
+                    : !e->isParent && e->name.startsWith(QLatin1Char('.')) ? t.dimText : t.text;
 
     QRect r = opt.rect.adjusted(6, 0, -6, 0);
-    const int col = idx.column();
     if (col == FileModel::ColName) {
         const int iconSize = 16;
         const QIcon ic = idx.data(Qt::DecorationRole).value<QIcon>();

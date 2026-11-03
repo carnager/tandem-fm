@@ -2,6 +2,7 @@
 
 #include "core/FolderHistory.h"
 #include "ui/IconCache.h"
+#include "ui/FileColorsPage.h"
 #include "ui/MainWindow.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
@@ -229,6 +230,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
         {tr("Tools"), QStringLiteral("applications-utilities")},
         {tr("Keys"), QStringLiteral("preferences-desktop-keyboard")},
         {tr("Configuration"), QStringLiteral("folder-sync")},
+        {tr("File colors"), QStringLiteral("preferences-desktop-color")},
     };
     for (const auto& [name, icon] : pages)
         new QListWidgetItem(IconCache::themed(icon.toUtf8().constData(), "preferences-system"), name, m_nav);
@@ -239,6 +241,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
     m_pages->addWidget(toolsPage());
     m_pages->addWidget(keysPage());
     m_pages->addWidget(configurationPage());
+    m_pages->addWidget(new FileColorsPage(this));
     body->addWidget(m_pages, 1);
     outer->addLayout(body, 1);
     connect(m_nav, &QListWidget::currentRowChanged, m_pages, &QStackedWidget::setCurrentIndex);
@@ -372,6 +375,11 @@ QWidget* SettingsDialog::appearancePage()
         m_window->m_right->applyAppearance();
     });
     page.add(tr("Dim inactive panel"), dim, tr("Fade the unfocused panel towards the theme background. Set to 0% to turn off."));
+
+    auto* fileColors = new QPushButton(tr("File name colors…"), this);
+    fileColors->setObjectName(QStringLiteral("openFileColorsPage"));
+    connect(fileColors, &QPushButton::clicked, this, [this] { showPage(5); });
+    page.add(tr("File colors"), fileColors, tr("Choose text colors by extension, MIME type, or file kind."));
 
     auto* language = new QComboBox(this);
     language->addItem(tr("Like the system"), QString());

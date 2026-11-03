@@ -1,6 +1,12 @@
-# Tandem for macOS 0.1.2
+# Tandem for macOS 0.1.3
 
 An experimental macOS port of [carnager/tandem-fm](https://github.com/carnager/tandem-fm), based on upstream commit `f82cc2e955b9a58f066703f746661f29f00a6f36`. The upstream Qt 6 Widgets UI, libarchive, libssh, job queues, viewers, and fd/rg search tools are retained. macOS changes are guarded so the Linux implementations remain available.
+
+## Changes in 0.1.3
+
+Settings → File colors adds ordered file-name color rules, with a color picker or hex value for each light/dark theme. Match extensions (including lists and compound suffixes), MIME types such as `image/*`, or kinds such as folders, links and executables. Rules apply immediately in both detail panels and thumbnail grids and travel with your portable settings. An Appearance-page button also opens this page.
+
+The first enabled match wins. Extension matching ignores case and accepts `pdf`, `.pdf`, or `*.pdf`, with multiple extensions separated by commas, semicolons or spaces. MIME matching uses Qt's filename database (including aliases/parent types); it does not open files or access remote servers. Put specific rules above broad ones. Marked files and broken links retain their mark/error colors; the parent entry and metadata columns retain normal theme styling. Custom rules override ordinary hidden/Git-ignored name dimming, and the inactive-panel dimming option still applies. Turn rules off individually or use the master checkbox to restore normal colors. Choose colors visible against each theme's background; set both theme colors to the same value if desired.
 
 ## Changes in 0.1.2
 
