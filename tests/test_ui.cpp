@@ -17,6 +17,7 @@
 #include "ui/AuthDialogs.h"
 #include "ui/viewer/ImageView.h"
 #include "ui/viewer/ViewerWindow.h"
+#include "ui/ChecksumDialog.h"
 #include "ui/DiskUsageDialog.h"
 #include "ui/DuplicatesDialog.h"
 #include "ui/FileView.h"
@@ -947,6 +948,33 @@ private slots:
         }
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // Alt+Shift+C: compute and save checksums, then check them.
+    void checksumRoundTrip()
+    {
+        QVERIFY(QDir().mkpath(L("ck")));
+        writeFile(L("ck/one.iso"), "first");
+        writeFile(L("ck/two.iso"), "second");
+        writeFile(L("ck/three.iso"), "third");
+        QString saved;
+        {
+            ChecksumDialog make({L("ck/one.iso"), L("ck/two.iso"), L("ck/three.iso")}, m_window.get());
+            make.show();
+            QVERIFY(!make.isVerifying());
+            QTRY_VERIFY(!make.isBusy());
+            QCOMPARE(make.list()->topLevelItem(0)->text(1).size(), 64);  // SHA-256 by default
+            make.saveOne();
+            saved = make.saved();
+        }
+        QCOMPARE(saved, L("ck/ck.sha256"));
+        writeFile(L("ck/two.iso"), "changed!");
+        QFile::remove(L("ck/three.iso"));
+        ChecksumDialog check({saved}, m_window.get());
+        check.show();
+        QVERIFY(check.isVerifying());
+        QTRY_VERIFY(!check.isBusy());
+        QCOMPARE(check.summary(), QObject::tr("%1 OK · %2 different · %3 missing").arg(1).arg(1).arg(1));
     }
 
     // Ctrl+Shift+U: disk usage, browse down and up, delete with sizes updating.

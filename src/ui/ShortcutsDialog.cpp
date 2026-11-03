@@ -60,6 +60,7 @@ const Entry kEntries[] = {
     {QT_TRANSLATE_NOOP("Shortcuts", "Files"), "Ctrl+E", QT_TRANSLATE_NOOP("Shortcuts", "Rename in your text editor")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Files"), "Alt+A", QT_TRANSLATE_NOOP("Shortcuts", "Permissions, extra people and groups (ACLs), flags")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Files"), "Ctrl+Shift+F5", QT_TRANSLATE_NOOP("Shortcuts", "Create a link (symbolic, relative or hard)")},
+    {QT_TRANSLATE_NOOP("Shortcuts", "Files"), "Alt+Shift+C", QT_TRANSLATE_NOOP("Shortcuts", "Checksums: compute and save, or check .sha256/.md5 files")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Files"), "Ctrl+C / X / V", QT_TRANSLATE_NOOP("Shortcuts", "Copy, cut, paste (works with other apps)")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Files"), "Ctrl+Z", QT_TRANSLATE_NOOP("Shortcuts", "Undo the last move, copy, trash, rename or new folder")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Files"), "Alt+F5", QT_TRANSLATE_NOOP("Shortcuts", "Pack into an archive")},

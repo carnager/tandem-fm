@@ -132,6 +132,7 @@ private:
     void showTrash();
     void findDuplicates();
     void showDiskUsage();
+    void showChecksums();
     void closePreview();
     void updatePreviewFor(ViewerWindow* preview, Panel* panel);
     void openCommandBar();

@@ -15,6 +15,7 @@
 #include "core/Fuzzy.h"
 #include "core/IoScheduler.h"
 #include "core/MultiRename.h"
+#include "core/Checksums.h"
 #include "core/DiskUsage.h"
 #include "core/Duplicates.h"
 #include "core/ExifDate.h"
@@ -607,6 +608,32 @@ private slots:
         QCOMPARE(names(with("{nope}")), QStringList({"Unknown field {nope}"}));
         QCOMPARE(names(with("{name")), QStringList({"A { is not closed"}));
         QCOMPARE(names(with("{name|shout}")).first(), QString("Unknown filter |shout (lower, upper, title, trim)"));
+    }
+
+    void checksums()
+    {
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("abc.txt"), "abc");
+        QCOMPARE(fileChecksum(tmp.filePath("abc.txt"), QCryptographicHash::Sha256),
+                 QString("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"));
+        QCOMPARE(fileChecksum(tmp.filePath("abc.txt"), QCryptographicHash::Md5), QString("900150983cd24fb0d6963f7d28e17f72"));
+        QVERIFY(fileChecksum(tmp.filePath("missing"), QCryptographicHash::Md5).isEmpty());
+        writeFile(tmp.filePath("SHA256SUMS"), "# made by hand\n"
+                                              "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  abc.txt\n"
+                                              "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD *dir/with space.bin\n");
+        QString algo;
+        QList<ChecksumLine> lines = readChecksumFile(tmp.filePath("SHA256SUMS"), &algo);
+        QCOMPARE(lines.size(), 2);
+        QCOMPARE(lines[1].name, QString("dir/with space.bin"));
+        QCOMPARE(lines[1].hash, lines[0].hash);  // lower-cased
+        QCOMPARE(algoForFile("SHA256SUMS")->name, QString("SHA-256"));
+        QCOMPARE(algoForFile("x.iso.md5")->name, QString("MD5"));
+        writeFile(tmp.filePath("bsd.txt"), "MD5 (abc.txt) = 900150983cd24fb0d6963f7d28e17f72\n");
+        lines = readChecksumFile(tmp.filePath("bsd.txt"), &algo);
+        QCOMPARE(lines.size(), 1);
+        QCOMPARE(algo, QString("MD5"));
+        QCOMPARE(algoForHexLength(40)->name, QString("SHA-1"));
+        QCOMPARE(checksumLines({{"aa", "b"}}), QString("aa  b\n"));
     }
 
     void diskUsage()

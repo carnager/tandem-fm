@@ -31,6 +31,7 @@ add_library(tandem_core STATIC
   src/core/Keyring.h src/core/Keyring.cpp
   src/core/Duplicates.h src/core/Duplicates.cpp
   src/core/DiskUsage.h src/core/DiskUsage.cpp
+  src/core/Checksums.h src/core/Checksums.cpp
   src/core/IoScheduler.h src/core/IoScheduler.cpp
   src/core/Fuzzy.h src/core/Fuzzy.cpp
   src/core/FolderHistory.h src/core/FolderHistory.cpp
@@ -74,6 +75,7 @@ add_library(tandem_ui STATIC
   src/ui/TrashDialog.h src/ui/TrashDialog.cpp
   src/ui/DuplicatesDialog.h src/ui/DuplicatesDialog.cpp
   src/ui/DiskUsageDialog.h src/ui/DiskUsageDialog.cpp
+  src/ui/ChecksumDialog.h src/ui/ChecksumDialog.cpp
   src/ui/Thumbnails.h src/ui/Thumbnails.cpp
   src/ui/ThumbGrid.h src/ui/ThumbGrid.cpp
   src/ui/Network.h src/ui/Network.cpp

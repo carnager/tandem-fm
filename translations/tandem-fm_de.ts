@@ -854,6 +854,10 @@
         <translation>Verknüpfung erstellen (symbolisch, relativ oder hart)</translation>
     </message>
     <message>
+        <source>Checksums: compute and save, or check .sha256/.md5 files</source>
+        <translation>Prüfsummen: berechnen und speichern oder .sha256/.md5-Dateien prüfen</translation>
+    </message>
+    <message>
         <source>Copy, cut, paste (works with other apps)</source>
         <translation>Kopieren, ausschneiden, einfügen (auch mit anderen Programmen)</translation>
     </message>
@@ -1099,6 +1103,128 @@
     <message>
         <source>Cannot remove %1 (%2)</source>
         <translation>%1 kann nicht entfernt werden (%2)</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::ChecksumDialog</name>
+    <message>
+        <source>Check checksums</source>
+        <translation>Prüfsummen prüfen</translation>
+    </message>
+    <message>
+        <source>Checksums</source>
+        <translation>Prüfsummen</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Datei</translation>
+    </message>
+    <message>
+        <source>Result</source>
+        <translation>Ergebnis</translation>
+    </message>
+    <message>
+        <source>Checksum</source>
+        <translation>Prüfsumme</translation>
+    </message>
+    <message>
+        <source>Copy report</source>
+        <translation>Bericht kopieren</translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation>Kopieren</translation>
+    </message>
+    <message>
+        <source>As &quot;checksum  name&quot; lines, like sha256sum prints them</source>
+        <translation>Als Zeilen "prüfsumme  name", wie sha256sum sie ausgibt</translation>
+    </message>
+    <message>
+        <source>Save next to each file</source>
+        <translation>Neben jeder Datei speichern</translation>
+    </message>
+    <message>
+        <source>name.sha256 beside every file</source>
+        <translation>name.sha256 neben jeder Datei</translation>
+    </message>
+    <message>
+        <source>Save as one file</source>
+        <translation>Als eine Datei speichern</translation>
+    </message>
+    <message>
+        <source>One checksum file in this folder listing them all</source>
+        <translation>Eine Prüfsummendatei in diesem Ordner, die alle auflistet</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <source>Copied</source>
+        <translation>Kopiert</translation>
+    </message>
+    <message>
+        <source>Copied the checksum of %1</source>
+        <translation>Prüfsumme von %1 kopiert</translation>
+    </message>
+    <message>
+        <source>Computing …</source>
+        <translation>Berechne …</translation>
+    </message>
+    <message>
+        <source>Computing %1 of %2 · %3%</source>
+        <translation>Berechne %1 von %2 · %3%</translation>
+    </message>
+    <message>
+        <source>can&apos;t be read</source>
+        <translation>nicht lesbar</translation>
+    </message>
+    <message>
+        <source>%1 of %2 files · double click copies one</source>
+        <translation>%1 von %2 Dateien · Doppelklick kopiert eine</translation>
+    </message>
+    <message>
+        <source>No checksums found in these files</source>
+        <translation>In diesen Dateien sind keine Prüfsummen</translation>
+    </message>
+    <message>
+        <source>Checking …</source>
+        <translation>Prüfe …</translation>
+    </message>
+    <message>
+        <source>missing</source>
+        <translation>fehlt</translation>
+    </message>
+    <message>
+        <source>✓ OK</source>
+        <translation>✓ OK</translation>
+    </message>
+    <message>
+        <source>✗ different</source>
+        <translation>✗ anders</translation>
+    </message>
+    <message>
+        <source>Checking %1 of %2 …</source>
+        <translation>Prüfe %1 von %2 …</translation>
+    </message>
+    <message>
+        <source>%1 OK · %2 different · %3 missing</source>
+        <translation>%1 OK · %2 anders · %3 fehlen</translation>
+    </message>
+    <message numerus="yes">
+        <source>Saved %n checksum file(s)</source>
+        <translation>
+            <numerusform>%n Prüfsummendatei gespeichert</numerusform>
+            <numerusform>%n Prüfsummendateien gespeichert</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Cannot write %1</source>
+        <translation>%1 kann nicht geschrieben werden</translation>
+    </message>
+    <message>
+        <source>Saved %1</source>
+        <translation>%1 gespeichert</translation>
     </message>
 </context>
 <context>
@@ -2025,6 +2151,10 @@
         <translation>Papierkorb…</translation>
     </message>
     <message>
+        <source>Checksums…</source>
+        <translation>Prüfsummen…</translation>
+    </message>
+    <message>
         <source>Permissions…</source>
         <translation>Berechtigungen…</translation>
     </message>
@@ -2087,6 +2217,10 @@
     <message>
         <source>Keyboard shortcuts</source>
         <translation>Tastenkürzel</translation>
+    </message>
+    <message>
+        <source>Checksums</source>
+        <translation>Prüfsummen</translation>
     </message>
     <message>
         <source>Finding duplicates</source>

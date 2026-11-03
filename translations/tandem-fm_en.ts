@@ -33,6 +33,16 @@
     </message>
 </context>
 <context>
+    <name>tandem::ChecksumDialog</name>
+    <message numerus="yes">
+        <source>Saved %n checksum file(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>tandem::DiskUsageDialog</name>
     <message numerus="yes">
         <source>Delete %n item(s) (%1) for good? Servers have no trash.</source>
