@@ -467,6 +467,8 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("pack")] = addCommand(tools, QT_TR_NOOP("Pack…"), {K(Qt::ALT | Qt::Key_F5)}, [this] { pack(); });
     m_actions[QStringLiteral("unpack")] =
         addCommand(tools, QT_TR_NOOP("Unpack to other panel…"), {K(Qt::ALT | Qt::Key_F9)}, [this] { unpack(); });
+    m_actions[QStringLiteral("unpackHere")] =
+        addCommand(tools, QT_TR_NOOP("Unpack here"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_F9)}, [this] { unpack(true); });
     m_actions[QStringLiteral("checksums")] =
         addCommand(tools, QT_TR_NOOP("Checksums…"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_C)}, [this] { showChecksums(); });
     tools->addSeparator();
@@ -1529,10 +1531,10 @@ void MainWindow::pack()
         src->unmarkAll();
 }
 
-void MainWindow::unpack()
+void MainWindow::unpack(bool here)
 {
     Panel* src = active();
-    Panel* dst = other();
+    Panel* dst = here ? src : other();
     if (dst->inArchive()) {
         refuseInArchive(dst);
         return;
@@ -1548,10 +1550,12 @@ void MainWindow::unpack()
         src->showMessage(tr("Select one or more archives to unpack."), true);
         return;
     }
-    const QString dest = askDestination(
-        this, tr("Unpack"),
-        tr("Unpack %1 to (archives with several top-level items get their own folder):").arg(describeItems(archives)),
-        dst->path(), &now);
+    const QString dest = here ? dst->path()
+                              : askDestination(this, tr("Unpack"),
+                                               tr("Unpack %1 to (archives with several top-level items get their own "
+                                                  "folder):")
+                                                   .arg(describeItems(archives)),
+                                               dst->path(), &now);
     if (dest.isEmpty())
         return;
     for (const QString& a : std::as_const(archives)) {
@@ -2189,6 +2193,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         return;
     }
     const bool archiveFile = single && e && !e->isDir && isArchiveName(e->name);
+    const bool allArchives = std::all_of(paths.cbegin(), paths.cend(), [](const QString& p) { return isArchiveName(baseName(p)); });
 
     if (paths.size() > 1) {
         QAction* title = menu.addAction(tr("%n items", nullptr, int(paths.size())));
@@ -2221,6 +2226,9 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         const QString p = paths.first();
         menu.addAction(IconCache::themed("archive-extract", "package-x-generic"), tr("Browse archive"), this,
                        [panel, p] { panel->navigate(p); });
+    }
+    if (allArchives && !paths.isEmpty()) {
+        menu.addAction(act("unpackHere"));
         menu.addAction(act("unpack"));
     }
     menu.addAction(act("pack"));

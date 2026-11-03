@@ -906,8 +906,12 @@
         <translation>In ein Archiv packen</translation>
     </message>
     <message>
-        <source>Unpack</source>
-        <translation>Entpacken</translation>
+        <source>Unpack to other panel</source>
+        <translation>In anderes Panel entpacken</translation>
+    </message>
+    <message>
+        <source>Unpack here (each archive next to itself)</source>
+        <translation>Hier entpacken (jedes Archiv neben sich)</translation>
     </message>
     <message>
         <source>Context menu</source>
@@ -2209,6 +2213,10 @@
     <message>
         <source>T&amp;ools</source>
         <translation>E&amp;xtras</translation>
+    </message>
+    <message>
+        <source>Unpack here</source>
+        <translation>Hier entpacken</translation>
     </message>
     <message>
         <source>Plugins</source>

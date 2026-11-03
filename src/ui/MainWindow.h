@@ -118,7 +118,7 @@ private:
     void updateUndoAction();
     void recordJobUndo(Job* job);
     void notifyFinished(Job* job);
-    void unpack();
+    void unpack(bool here = false);  // here: into the shown folder, without asking
     void commandPalette();
     void jumpToFolder();
     QList<PopupItem> folderItems() const;

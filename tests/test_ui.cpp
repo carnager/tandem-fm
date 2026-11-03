@@ -376,6 +376,41 @@ private slots:
                      })));
     }
 
+    // Several archives at once: each unpacked next to itself, several
+    // top-level items in a folder of their own.
+    void unpackSeveralHere()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("one/a")));
+        writeFile(tmp.filePath("one/a/x.txt"), "x");
+        writeFile(tmp.filePath("y.txt"), "y");
+        writeFile(tmp.filePath("z.txt"), "z");
+        for (auto [sources, archive] : {std::pair{QStringList{tmp.filePath("one/a")}, QString("first.zip")},
+                                        std::pair{QStringList{tmp.filePath("y.txt"), tmp.filePath("z.txt")}, QString("second.tar.gz")}}) {
+            PackJob job(sources, L(archive));
+            QSignalSpy done(&job, &Job::finished);
+            job.start();
+            QVERIFY(done.wait(5000));
+        }
+        auto cleanup = qScopeGuard([this] {
+            for (const char* n : {"first.zip", "second.tar.gz", "a", "second"})
+                QFileInfo(L(n)).isDir() ? (void)QDir(L(n)).removeRecursively() : (void)QFile::remove(L(n));
+        });
+        m_left->navigate(L());
+        QTRY_VERIFY(leftModel()->rowOf("second.tar.gz") >= 0);
+        leftModel()->setMarkedNames({"first.zip", "second.tar.gz"});
+        m_left->view()->setFocus();
+        QAction* here = nullptr;
+        for (QAction* a : m_window->actions())
+            if (a->property("commandId").toString() == "unpack-here")
+                here = a;
+        QVERIFY(here);
+        here->trigger();
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(L("a/x.txt")), 10000);             // one item: as it is
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(L("second/z.txt")), 10000);        // several: own folder
+        QVERIFY(QFile::exists(L("second/y.txt")));
+    }
+
     void quickSearch()
     {
         m_left->view()->setCurrentRow(0);
