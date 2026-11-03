@@ -130,6 +130,7 @@ private:
     void setPreviewPosition(const QString& code);
     void openSettings(int page = 0);
     void showTrash();
+    void findDuplicates();
     void closePreview();
     void updatePreviewFor(ViewerWindow* preview, Panel* panel);
     void openCommandBar();

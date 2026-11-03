@@ -17,6 +17,7 @@
 #include "ui/AuthDialogs.h"
 #include "ui/viewer/ImageView.h"
 #include "ui/viewer/ViewerWindow.h"
+#include "ui/DuplicatesDialog.h"
 #include "ui/FileView.h"
 #include "ui/ThumbGrid.h"
 #include "ui/FuzzyPopup.h"
@@ -943,6 +944,50 @@ private slots:
             QTRY_COMPARE(readPermissions(L("pe/doc.txt")).acl.size(), 1);
             QCOMPARE(readPermissions(L("pe/doc.txt")).acl[0].perms, uint32_t(PermRead));
         }
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // Alt+Shift+F7: duplicates, keep one of each, the rest to the trash.
+    void duplicateFinder()
+    {
+        QVERIFY(QDir().mkpath(L("dup/a")));
+        QVERIFY(QDir().mkpath(L("dup/b")));
+        writeFile(L("dup/a/song.mp3"), QByteArray(200000, 's'));
+        writeFile(L("dup/b/song (1).mp3"), QByteArray(200000, 's'));
+        writeFile(L("dup/b/song (2).mp3"), QByteArray(200000, 's'));
+        writeFile(L("dup/a/unique.txt"), "only one");
+        QFile f(L("dup/a/song.mp3"));  // the oldest copy
+        QVERIFY(f.open(QIODevice::ReadWrite));
+        QVERIFY(f.setFileTime(QDateTime::currentDateTime().addDays(-30), QFileDevice::FileModificationTime));
+        f.close();
+        m_left->navigate(L("dup"));
+        QTRY_COMPARE(leftModel()->path(), L("dup"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        auto checked = std::make_shared<bool>(false);
+        answerNextDialog([checked](QWidget* w) {
+            auto* dlg = qobject_cast<DuplicatesDialog*>(w);
+            QVERIFY(dlg);
+            dlg->search();
+            QTRY_VERIFY(!dlg->isSearching());
+            QCOMPARE(dlg->results()->topLevelItemCount(), 1);
+            QCOMPARE(dlg->results()->topLevelItem(0)->childCount(), 3);
+            dlg->keep(false);  // the oldest stays
+            QCOMPARE(dlg->ticked().size(), 2);
+            QVERIFY(!dlg->ticked().contains(dlg->results()->topLevelItem(0)->child(0)->data(0, Qt::UserRole).toString()));
+            for (auto* b : dlg->findChildren<QPushButton*>())
+                if (b->text().startsWith(QObject::tr("Move")))
+                    b->click();
+            QCOMPARE(dlg->results()->topLevelItemCount(), 0);  // one left: not a duplicate anymore
+            *checked = true;
+            dlg->accept();
+        });
+        QTest::keyClick(m_left->view(), Qt::Key_F7, Qt::AltModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(*checked);
+        QTRY_VERIFY(!QFile::exists(L("dup/b/song (1).mp3")) && !QFile::exists(L("dup/b/song (2).mp3")));
+        QVERIFY(QFile::exists(L("dup/a/song.mp3")));
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
     }

@@ -33,6 +33,16 @@
     </message>
 </context>
 <context>
+    <name>tandem::DuplicatesDialog</name>
+    <message numerus="yes">
+        <source>Move %n to the trash</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>tandem::EditNamesSession</name>
     <message numerus="yes">
         <source>Editing %n name(s) in %1 — save and quit to continue</source>

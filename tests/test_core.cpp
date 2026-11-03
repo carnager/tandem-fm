@@ -15,6 +15,7 @@
 #include "core/Fuzzy.h"
 #include "core/IoScheduler.h"
 #include "core/MultiRename.h"
+#include "core/Duplicates.h"
 #include "core/ExifDate.h"
 #include "core/Keyring.h"
 #include "core/Permissions.h"
@@ -605,6 +606,39 @@ private slots:
         QCOMPARE(names(with("{nope}")), QStringList({"Unknown field {nope}"}));
         QCOMPARE(names(with("{name")), QStringList({"A { is not closed"}));
         QCOMPARE(names(with("{name|shout}")).first(), QString("Unknown filter |shout (lower, upper, title, trim)"));
+    }
+
+    void duplicates()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("a/deep")));
+        QVERIFY(QDir().mkpath(tmp.filePath("b")));
+        QByteArray big(300 * 1024, 'x');
+        writeFile(tmp.filePath("a/photo.jpg"), big);
+        writeFile(tmp.filePath("b/photo copy.jpg"), big);
+        writeFile(tmp.filePath("a/deep/again.jpg"), big);
+        QByteArray almost = big;
+        almost[150 * 1024] = 'y';  // same size, start and end: only the full hash tells
+        writeFile(tmp.filePath("b/almost.jpg"), almost);
+        writeFile(tmp.filePath("a/small.txt"), "same");
+        writeFile(tmp.filePath("b/small.txt"), "same");
+        writeFile(tmp.filePath("a/empty1"), "");
+        writeFile(tmp.filePath("b/empty2"), "");
+        writeFile(tmp.filePath("b/.hidden"), "same");
+        QVERIFY(::link(QFile::encodeName(tmp.filePath("a/photo.jpg")).constData(),
+                       QFile::encodeName(tmp.filePath("a/hardlink.jpg")).constData()) == 0);  // one file, two names
+
+        const QList<DuplicateGroup> g = findDuplicates({tmp.filePath("a"), tmp.filePath("b")}, {});
+        QCOMPARE(g.size(), 2);
+        QCOMPARE(g[0].size, int64_t(big.size()));  // biggest waste first
+        QCOMPARE(g[0].files.size(), 3);            // not almost.jpg, the hard link counted once
+        QCOMPARE(g[1].files.size(), 2);            // small.txt twice; empty files and .hidden left out
+        DuplicateOptions withHidden;
+        withHidden.hidden = true;
+        QCOMPARE(findDuplicates({tmp.path()}, withHidden).at(1).files.size(), 3);
+        DuplicateOptions bigOnly;
+        bigOnly.minSize = 1024;
+        QCOMPARE(findDuplicates({tmp.path(), tmp.filePath("a")}, bigOnly).size(), 1);  // a root inside another: once
     }
 
     void trash()

@@ -934,6 +934,10 @@
         <translation>Namen oder Inhalte hier und darunter suchen; die Treffer sind ein Ordner</translation>
     </message>
     <message>
+        <source>Find duplicate files and keep one of each</source>
+        <translation>Doppelte Dateien finden und je eine behalten</translation>
+    </message>
+    <message>
         <source>Filter this folder</source>
         <translation>Diesen Ordner filtern</translation>
     </message>
@@ -1224,6 +1228,116 @@
     <message>
         <source>Cannot delete</source>
         <translation>Löschen nicht möglich</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::DuplicatesDialog</name>
+    <message>
+        <source>Duplicate files</source>
+        <translation>Doppelte Dateien</translation>
+    </message>
+    <message>
+        <source>In %1</source>
+        <translation>In %1</translation>
+    </message>
+    <message>
+        <source>and %1</source>
+        <translation>und %1</translation>
+    </message>
+    <message>
+        <source>Any size</source>
+        <translation>Jede Größe</translation>
+    </message>
+    <message>
+        <source>From 1 MB</source>
+        <translation>Ab 1 MB</translation>
+    </message>
+    <message>
+        <source>From 100 MB</source>
+        <translation>Ab 100 MB</translation>
+    </message>
+    <message>
+        <source>Hidden files too</source>
+        <translation>Auch versteckte Dateien</translation>
+    </message>
+    <message>
+        <source>Find duplicates</source>
+        <translation>Doppelte finden</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Datei</translation>
+    </message>
+    <message>
+        <source>Folder</source>
+        <translation>Ordner</translation>
+    </message>
+    <message>
+        <source>Modified</source>
+        <translation>Geändert</translation>
+    </message>
+    <message>
+        <source>Keep the newest</source>
+        <translation>Neueste behalten</translation>
+    </message>
+    <message>
+        <source>Tick every copy but the newest in each group</source>
+        <translation>In jeder Gruppe alle außer der neuesten ankreuzen</translation>
+    </message>
+    <message>
+        <source>Keep the oldest</source>
+        <translation>Älteste behalten</translation>
+    </message>
+    <message>
+        <source>Tick every copy but the oldest (the original, usually)</source>
+        <translation>In jeder Gruppe alle außer der ältesten ankreuzen (meist das Original)</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <source>Move to trash</source>
+        <translation>In den Papierkorb</translation>
+    </message>
+    <message>
+        <source>Same contents, found by size, then a quick look, then a full comparison.</source>
+        <translation>Gleicher Inhalt, gefunden über die Größe, dann einen schnellen Blick, dann einen vollständigen Vergleich.</translation>
+    </message>
+    <message>
+        <source>Looking …</source>
+        <translation>Suche …</translation>
+    </message>
+    <message>
+        <source>Looking … %1 files, %2 compared</source>
+        <translation>Suche … %1 Dateien, %2 verglichen</translation>
+    </message>
+    <message>
+        <source>%1 copies · %2 each</source>
+        <translation>%1 Kopien · je %2</translation>
+    </message>
+    <message>
+        <source>No duplicates.</source>
+        <translation>Keine Doppelten.</translation>
+    </message>
+    <message>
+        <source>%1 groups · %2 could be freed</source>
+        <translation>%1 Gruppen · %2 könnten frei werden</translation>
+    </message>
+    <message>
+        <source>  ·  %1 ticked (%2)</source>
+        <translation>  ·  %1 angekreuzt (%2)</translation>
+    </message>
+    <message>
+        <source>  ·  careful: every copy of something is ticked</source>
+        <translation>  ·  Vorsicht: von etwas sind alle Kopien angekreuzt</translation>
+    </message>
+    <message numerus="yes">
+        <source>Move %n to the trash</source>
+        <translation>
+            <numerusform>%n in den Papierkorb</numerusform>
+            <numerusform>%n in den Papierkorb</numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -1854,6 +1968,10 @@
         <translation>Dateien suchen (Namen oder Inhalt)…</translation>
     </message>
     <message>
+        <source>Find duplicate files…</source>
+        <translation>Doppelte Dateien finden…</translation>
+    </message>
+    <message>
         <source>Connect to server…</source>
         <translation>Mit Server verbinden…</translation>
     </message>
@@ -1888,6 +2006,10 @@
     <message>
         <source>Keyboard shortcuts</source>
         <translation>Tastenkürzel</translation>
+    </message>
+    <message>
+        <source>Finding duplicates</source>
+        <translation>Doppelte finden</translation>
     </message>
     <message>
         <source>Copy</source>
