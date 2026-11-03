@@ -19,6 +19,7 @@
 #include "ui/EditNames.h"
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
+#include "ui/SettingsDialog.h"
 #include "ui/ShortcutsDialog.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
@@ -27,6 +28,7 @@
 #include <QAbstractButton>
 #include <QActionGroup>
 #include <QApplication>
+#include <QRegularExpression>
 #include <QDateTime>
 #include <QStandardPaths>
 #include <QCryptographicHash>
@@ -284,11 +286,24 @@ void MainWindow::setActive(Panel* p)
 
 // ------------------------------------------------------------------ menus
 
-QAction* MainWindow::addCommand(QMenu* menu, const QString& text, const QList<QKeySequence>& keys,
+// Commands get a stable id from their English name, so changed keys
+// survive a language switch.
+QAction* MainWindow::addCommand(QMenu* menu, const char* source, const QList<QKeySequence>& keys,
                                 std::function<void()> fn)
+{
+    QString id = QString::fromUtf8(source).toLower();
+    id.replace(QRegularExpression(QStringLiteral("[^a-z0-9]+")), QStringLiteral("-"));
+    id.remove(QRegularExpression(QStringLiteral("^-+|-+$")));
+    return addCommand(menu, tr(source), keys, std::move(fn), id);
+}
+
+QAction* MainWindow::addCommand(QMenu* menu, const QString& text, const QList<QKeySequence>& keys,
+                                std::function<void()> fn, const QString& id)
 {
     QAction* a = menu->addAction(text);
     a->setShortcuts(keys);
+    a->setProperty("commandId", id);
+    a->setProperty("defaultKeys", QVariant::fromValue(keys));
     a->setProperty("category", menu->title().remove(QLatin1Char('&')));
     a->setShortcutContext(Qt::WindowShortcut);
     connect(a, &QAction::triggered, this, [fn = std::move(fn)] { fn(); });
@@ -302,115 +317,116 @@ void MainWindow::createMenus()
     QMenuBar* bar = menuBar();
 
     QMenu* files = bar->addMenu(tr("&Files"));
-    m_actions[QStringLiteral("open")] = addCommand(files, tr("Open"), {}, [this] { active()->openCurrent(); });
-    addCommand(files, tr("View"), {K(Qt::Key_F3)}, [this] { viewCurrent(); });
-    m_actions[QStringLiteral("edit")] = addCommand(files, tr("Edit"), {K(Qt::Key_F4)}, [this] { editCurrent(); });
+    m_actions[QStringLiteral("open")] = addCommand(files, QT_TR_NOOP("Open"), {}, [this] { active()->openCurrent(); });
+    addCommand(files, QT_TR_NOOP("View"), {K(Qt::Key_F3)}, [this] { viewCurrent(); });
+    m_actions[QStringLiteral("edit")] = addCommand(files, QT_TR_NOOP("Edit"), {K(Qt::Key_F4)}, [this] { editCurrent(); });
     files->addSeparator();
-    m_actions[QStringLiteral("copy")] = addCommand(files, tr("Copy…"), {K(Qt::Key_F5)}, [this] { copyOrMove(CopyJob::Mode::Copy); });
-    m_actions[QStringLiteral("move")] = addCommand(files, tr("Move…"), {K(Qt::Key_F6)}, [this] { copyOrMove(CopyJob::Mode::Move); });
-    m_actions[QStringLiteral("rename")] = addCommand(files, tr("Rename"), {K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
+    m_actions[QStringLiteral("copy")] = addCommand(files, QT_TR_NOOP("Copy…"), {K(Qt::Key_F5)}, [this] { copyOrMove(CopyJob::Mode::Copy); });
+    m_actions[QStringLiteral("move")] = addCommand(files, QT_TR_NOOP("Move…"), {K(Qt::Key_F6)}, [this] { copyOrMove(CopyJob::Mode::Move); });
+    m_actions[QStringLiteral("rename")] = addCommand(files, QT_TR_NOOP("Rename"), {K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
     m_actions[QStringLiteral("permissions")] =
-        addCommand(files, tr("Permissions…"), {K(Qt::ALT | Qt::Key_A)}, [this] { editPermissions(); });
+        addCommand(files, QT_TR_NOOP("Permissions…"), {K(Qt::ALT | Qt::Key_A)}, [this] { editPermissions(); });
     m_actions[QStringLiteral("multiRename")] =
-        addCommand(files, tr("Multi-rename…"), {K(Qt::CTRL | Qt::Key_M)}, [this] { multiRename(); });
+        addCommand(files, QT_TR_NOOP("Multi-rename…"), {K(Qt::CTRL | Qt::Key_M)}, [this] { multiRename(); });
     m_actions[QStringLiteral("editorRename")] =
-        addCommand(files, tr("Rename in text editor…"), {K(Qt::CTRL | Qt::Key_E)}, [this] { renameInEditor(); });
-    m_actions[QStringLiteral("undo")] = addCommand(files, tr("Undo"), {K(Qt::CTRL | Qt::Key_Z)}, [this] { undo(); });
+        addCommand(files, QT_TR_NOOP("Rename in text editor…"), {K(Qt::CTRL | Qt::Key_E)}, [this] { renameInEditor(); });
+    m_actions[QStringLiteral("undo")] = addCommand(files, QT_TR_NOOP("Undo"), {K(Qt::CTRL | Qt::Key_Z)}, [this] { undo(); });
     m_actions[QStringLiteral("undo")]->setEnabled(false);
     m_actions[QStringLiteral("mkfile")] =
-        addCommand(files, tr("New file…"), {K(Qt::SHIFT | Qt::Key_F4)}, [this] { makeFile(); });
-    m_actions[QStringLiteral("mkdir")] = addCommand(files, tr("New folder…"), {K(Qt::Key_F7)}, [this] { makeFolder(); });
-    m_actions[QStringLiteral("trash")] = addCommand(files, tr("Move to trash"), {K(Qt::Key_F8), K(Qt::Key_Delete)}, [this] { deleteSelected(false); });
-    m_actions[QStringLiteral("delete")] = addCommand(files, tr("Delete permanently"), {K(Qt::SHIFT | Qt::Key_F8), K(Qt::SHIFT | Qt::Key_Delete)},
+        addCommand(files, QT_TR_NOOP("New file…"), {K(Qt::SHIFT | Qt::Key_F4)}, [this] { makeFile(); });
+    m_actions[QStringLiteral("mkdir")] = addCommand(files, QT_TR_NOOP("New folder…"), {K(Qt::Key_F7)}, [this] { makeFolder(); });
+    m_actions[QStringLiteral("trash")] = addCommand(files, QT_TR_NOOP("Move to trash"), {K(Qt::Key_F8), K(Qt::Key_Delete)}, [this] { deleteSelected(false); });
+    m_actions[QStringLiteral("delete")] = addCommand(files, QT_TR_NOOP("Delete permanently"), {K(Qt::SHIFT | Qt::Key_F8), K(Qt::SHIFT | Qt::Key_Delete)},
                [this] { deleteSelected(true); });
     files->addSeparator();
-    m_actions[QStringLiteral("clipCopy")] = addCommand(files, tr("Copy to clipboard"), {K(Qt::CTRL | Qt::Key_C)}, [this] { copyToClipboard(false); });
-    m_actions[QStringLiteral("clipCut")] = addCommand(files, tr("Cut to clipboard"), {K(Qt::CTRL | Qt::Key_X)}, [this] { copyToClipboard(true); });
-    m_actions[QStringLiteral("paste")] = addCommand(files, tr("Paste"), {K(Qt::CTRL | Qt::Key_V)}, [this] { paste(); });
-    m_actions[QStringLiteral("copyPath")] = addCommand(files, tr("Copy full paths as text"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_C)},
+    m_actions[QStringLiteral("clipCopy")] = addCommand(files, QT_TR_NOOP("Copy to clipboard"), {K(Qt::CTRL | Qt::Key_C)}, [this] { copyToClipboard(false); });
+    m_actions[QStringLiteral("clipCut")] = addCommand(files, QT_TR_NOOP("Cut to clipboard"), {K(Qt::CTRL | Qt::Key_X)}, [this] { copyToClipboard(true); });
+    m_actions[QStringLiteral("paste")] = addCommand(files, QT_TR_NOOP("Paste"), {K(Qt::CTRL | Qt::Key_V)}, [this] { paste(); });
+    m_actions[QStringLiteral("copyPath")] = addCommand(files, QT_TR_NOOP("Copy full paths as text"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_C)},
                [this] { copyPathsAsText(); });
     files->addSeparator();
-    m_actions[QStringLiteral("pack")] = addCommand(files, tr("Pack…"), {K(Qt::ALT | Qt::Key_F5)}, [this] { pack(); });
+    m_actions[QStringLiteral("pack")] = addCommand(files, QT_TR_NOOP("Pack…"), {K(Qt::ALT | Qt::Key_F5)}, [this] { pack(); });
     m_actions[QStringLiteral("unpack")] =
-        addCommand(files, tr("Unpack to other panel…"), {K(Qt::ALT | Qt::Key_F9)}, [this] { unpack(); });
+        addCommand(files, QT_TR_NOOP("Unpack to other panel…"), {K(Qt::ALT | Qt::Key_F9)}, [this] { unpack(); });
     files->addSeparator();
     m_actions[QStringLiteral("compare")] =
-        addCommand(files, tr("Compare folders (mark differences)"), {K(Qt::SHIFT | Qt::Key_F2)}, [this] { compareFolders(); });
+        addCommand(files, QT_TR_NOOP("Compare folders (mark differences)"), {K(Qt::SHIFT | Qt::Key_F2)}, [this] { compareFolders(); });
     m_actions[QStringLiteral("sync")] =
-        addCommand(files, tr("Synchronize folders…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_S)}, [this] { synchronizeFolders(); });
+        addCommand(files, QT_TR_NOOP("Synchronize folders…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_S)}, [this] { synchronizeFolders(); });
     m_actions[QStringLiteral("command")] =
-        addCommand(files, tr("Run command…"), {K(Qt::CTRL | Qt::Key_Semicolon)}, [this] { openCommandBar(); });
+        addCommand(files, QT_TR_NOOP("Run command…"), {K(Qt::CTRL | Qt::Key_Semicolon)}, [this] { openCommandBar(); });
     m_actions[QStringLiteral("terminal")] =
-        addCommand(files, tr("Open terminal here"), {K(Qt::CTRL | Qt::ALT | Qt::Key_T)}, [this] { openTerminal(); });
+        addCommand(files, QT_TR_NOOP("Open terminal here"), {K(Qt::CTRL | Qt::ALT | Qt::Key_T)}, [this] { openTerminal(); });
     files->addSeparator();
-    addCommand(files, tr("Quit"), {K(Qt::ALT | Qt::Key_F4)}, [this] { close(); });
+    addCommand(files, QT_TR_NOOP("Quit"), {K(Qt::ALT | Qt::Key_F4)}, [this] { close(); });
 
     QMenu* mark = bar->addMenu(tr("&Mark"));
-    addCommand(mark, tr("Filter as you type…"), {K(Qt::CTRL | Qt::Key_F)}, [this] { active()->startFilter(); });
-    addCommand(mark, tr("Search files (names or contents)…"), {K(Qt::ALT | Qt::Key_F7), K(Qt::CTRL | Qt::SHIFT | Qt::Key_F)},
+    addCommand(mark, QT_TR_NOOP("Filter as you type…"), {K(Qt::CTRL | Qt::Key_F)}, [this] { active()->startFilter(); });
+    addCommand(mark, QT_TR_NOOP("Search files (names or contents)…"), {K(Qt::ALT | Qt::Key_F7), K(Qt::CTRL | Qt::SHIFT | Qt::Key_F)},
                [this] { active()->startSearchBar(); });
     mark->addSeparator();
-    addCommand(mark, tr("Mark group…\tNum +"), {}, [this] { active()->markGroup(1); });
-    addCommand(mark, tr("Unmark group…\tNum -"), {}, [this] { active()->markGroup(-1); });
-    addCommand(mark, tr("Invert marks\tNum *"), {}, [this] { active()->markGroup(0); });
-    m_actions[QStringLiteral("markAll")] = addCommand(mark, tr("Mark all"), {K(Qt::CTRL | Qt::Key_A)}, [this] { active()->markAll(true); });
-    m_actions[QStringLiteral("unmarkAll")] = addCommand(mark, tr("Unmark all"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_A)}, [this] { active()->markAll(false); });
+    addCommand(mark, QT_TR_NOOP("Mark group…\tNum +"), {}, [this] { active()->markGroup(1); });
+    addCommand(mark, QT_TR_NOOP("Unmark group…\tNum -"), {}, [this] { active()->markGroup(-1); });
+    addCommand(mark, QT_TR_NOOP("Invert marks\tNum *"), {}, [this] { active()->markGroup(0); });
+    m_actions[QStringLiteral("markAll")] = addCommand(mark, QT_TR_NOOP("Mark all"), {K(Qt::CTRL | Qt::Key_A)}, [this] { active()->markAll(true); });
+    m_actions[QStringLiteral("unmarkAll")] = addCommand(mark, QT_TR_NOOP("Unmark all"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_A)}, [this] { active()->markAll(false); });
     mark->addSeparator();
-    addCommand(mark, tr("Calculate all folder sizes"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_Return)},
+    addCommand(mark, QT_TR_NOOP("Calculate all folder sizes"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_Return)},
                [this] { active()->computeAllSizes(); });
 
     QMenu* go = bar->addMenu(tr("&Go"));
-    addCommand(go, tr("Back"), {K(Qt::ALT | Qt::Key_Left)}, [this] { active()->back(); });
-    addCommand(go, tr("Forward"), {K(Qt::ALT | Qt::Key_Right)}, [this] { active()->forward(); });
-    addCommand(go, tr("Parent folder"), {K(Qt::CTRL | Qt::Key_PageUp)}, [this] { active()->goUp(); });
-    addCommand(go, tr("Enter folder or archive"), {K(Qt::CTRL | Qt::Key_PageDown)}, [this] { active()->enterCurrent(); });
-    addCommand(go, tr("Root"), {K(Qt::CTRL | Qt::Key_Backslash)}, [this] { active()->navigate(QStringLiteral("/")); });
-    addCommand(go, tr("Home"), {K(Qt::CTRL | Qt::Key_QuoteLeft)}, [this] { active()->navigate(QDir::homePath()); });
-    addCommand(go, tr("Go to path…"), {K(Qt::CTRL | Qt::Key_L)}, [this] { active()->focusPathEdit(); });
-    addCommand(go, tr("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { m_chords->openJump(); });
-    addCommand(go, tr("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
+    addCommand(go, QT_TR_NOOP("Back"), {K(Qt::ALT | Qt::Key_Left)}, [this] { active()->back(); });
+    addCommand(go, QT_TR_NOOP("Forward"), {K(Qt::ALT | Qt::Key_Right)}, [this] { active()->forward(); });
+    addCommand(go, QT_TR_NOOP("Parent folder"), {K(Qt::CTRL | Qt::Key_PageUp)}, [this] { active()->goUp(); });
+    addCommand(go, QT_TR_NOOP("Enter folder or archive"), {K(Qt::CTRL | Qt::Key_PageDown)}, [this] { active()->enterCurrent(); });
+    addCommand(go, QT_TR_NOOP("Root"), {K(Qt::CTRL | Qt::Key_Backslash)}, [this] { active()->navigate(QStringLiteral("/")); });
+    addCommand(go, QT_TR_NOOP("Home"), {K(Qt::CTRL | Qt::Key_QuoteLeft)}, [this] { active()->navigate(QDir::homePath()); });
+    addCommand(go, QT_TR_NOOP("Go to path…"), {K(Qt::CTRL | Qt::Key_L)}, [this] { active()->focusPathEdit(); });
+    addCommand(go, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { m_chords->openJump(); });
+    addCommand(go, QT_TR_NOOP("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
                [this] { m_chords->openAssign(active()->path()); });
-    addCommand(go, tr("Jump to folder (search)…"), {K(Qt::CTRL | Qt::Key_J)}, [this] { jumpToFolder(); });
+    addCommand(go, QT_TR_NOOP("Jump to folder (search)…"), {K(Qt::CTRL | Qt::Key_J)}, [this] { jumpToFolder(); });
     go->addSeparator();
-    addCommand(go, tr("Connect to server…"), {K(Qt::CTRL | Qt::Key_K)}, [this] { active()->connectDialog(); });
-    addCommand(go, tr("Locations (left)"), {K(Qt::ALT | Qt::Key_F1)}, [this] { m_left->showMountMenu(); });
-    addCommand(go, tr("Locations (right)"), {K(Qt::ALT | Qt::Key_F2)}, [this] { m_right->showMountMenu(); });
-    addCommand(go, tr("Show in left panel"), {K(Qt::CTRL | Qt::Key_Left)}, [this] { openInPanel(m_left); });
-    addCommand(go, tr("Show in right panel"), {K(Qt::CTRL | Qt::Key_Right)}, [this] { openInPanel(m_right); });
-    addCommand(go, tr("Swap panels"), {K(Qt::CTRL | Qt::Key_U)}, [this] { swapPanels(); });
-    addCommand(go, tr("Same folder in other panel"), {K(Qt::ALT | Qt::Key_Equal)},
+    addCommand(go, QT_TR_NOOP("Connect to server…"), {K(Qt::CTRL | Qt::Key_K)}, [this] { active()->connectDialog(); });
+    addCommand(go, QT_TR_NOOP("Locations (left)"), {K(Qt::ALT | Qt::Key_F1)}, [this] { m_left->showMountMenu(); });
+    addCommand(go, QT_TR_NOOP("Locations (right)"), {K(Qt::ALT | Qt::Key_F2)}, [this] { m_right->showMountMenu(); });
+    addCommand(go, QT_TR_NOOP("Show in left panel"), {K(Qt::CTRL | Qt::Key_Left)}, [this] { openInPanel(m_left); });
+    addCommand(go, QT_TR_NOOP("Show in right panel"), {K(Qt::CTRL | Qt::Key_Right)}, [this] { openInPanel(m_right); });
+    addCommand(go, QT_TR_NOOP("Swap panels"), {K(Qt::CTRL | Qt::Key_U)}, [this] { swapPanels(); });
+    addCommand(go, QT_TR_NOOP("Same folder in other panel"), {K(Qt::ALT | Qt::Key_Equal)},
                [this] { other()->navigate(active()->path()); });
     go->addSeparator();
-    m_actions[QStringLiteral("refresh")] = addCommand(go, tr("Refresh"), {K(Qt::CTRL | Qt::Key_R)}, [this] { active()->refresh(); });
+    m_actions[QStringLiteral("refresh")] = addCommand(go, QT_TR_NOOP("Refresh"), {K(Qt::CTRL | Qt::Key_R)}, [this] { active()->refresh(); });
 
     QMenu* tabs = bar->addMenu(tr("&Tabs"));
-    addCommand(tabs, tr("New tab"), {K(Qt::CTRL | Qt::Key_T)}, [this] {
+    addCommand(tabs, QT_TR_NOOP("New tab"), {K(Qt::CTRL | Qt::Key_T)}, [this] {
         const QString p = active()->currentEntry() && active()->currentEntry()->isDir &&
                                   !active()->currentEntry()->isParent
                               ? active()->currentPath()
                               : active()->path();
         active()->addTab(p);
     });
-    addCommand(tabs, tr("Close tab"), {K(Qt::CTRL | Qt::Key_W)}, [this] { active()->closeCurrentTab(); });
+    addCommand(tabs, QT_TR_NOOP("Close tab"), {K(Qt::CTRL | Qt::Key_W)}, [this] { active()->closeCurrentTab(); });
     for (int i = 1; i <= 9; ++i)
-        addCommand(tabs, tr("Tab %1").arg(i), {K(Qt::ALT | (Qt::Key_0 + i))}, [this, i] { active()->selectSlot(i); });
-    addCommand(tabs, tr("Next tab"), {K(Qt::CTRL | Qt::Key_Tab)}, [this] { active()->cycleTab(1); });
-    addCommand(tabs, tr("Previous tab"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab), K(Qt::CTRL | Qt::Key_Backtab)},
+        addCommand(tabs, tr("Tab %1").arg(i), {K(Qt::ALT | (Qt::Key_0 + i))}, [this, i] { active()->selectSlot(i); },
+                   QStringLiteral("tab-%1").arg(i));
+    addCommand(tabs, QT_TR_NOOP("Next tab"), {K(Qt::CTRL | Qt::Key_Tab)}, [this] { active()->cycleTab(1); });
+    addCommand(tabs, QT_TR_NOOP("Previous tab"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab), K(Qt::CTRL | Qt::Key_Backtab)},
                [this] { active()->cycleTab(-1); });
 
     QMenu* view = bar->addMenu(tr("&View"));
-    m_actions[QStringLiteral("sortName")] = addCommand(view, tr("Sort by name"), {K(Qt::CTRL | Qt::Key_F3)}, [this] { active()->sortBy(SortColumn::Name); });
-    m_actions[QStringLiteral("sortExt")] = addCommand(view, tr("Sort by extension"), {K(Qt::CTRL | Qt::Key_F4)}, [this] { active()->sortBy(SortColumn::Ext); });
-    m_actions[QStringLiteral("sortDate")] = addCommand(view, tr("Sort by date"), {K(Qt::CTRL | Qt::Key_F5)}, [this] { active()->sortBy(SortColumn::Time); });
-    m_actions[QStringLiteral("sortSize")] = addCommand(view, tr("Sort by size"), {K(Qt::CTRL | Qt::Key_F6)}, [this] { active()->sortBy(SortColumn::Size); });
+    m_actions[QStringLiteral("sortName")] = addCommand(view, QT_TR_NOOP("Sort by name"), {K(Qt::CTRL | Qt::Key_F3)}, [this] { active()->sortBy(SortColumn::Name); });
+    m_actions[QStringLiteral("sortExt")] = addCommand(view, QT_TR_NOOP("Sort by extension"), {K(Qt::CTRL | Qt::Key_F4)}, [this] { active()->sortBy(SortColumn::Ext); });
+    m_actions[QStringLiteral("sortDate")] = addCommand(view, QT_TR_NOOP("Sort by date"), {K(Qt::CTRL | Qt::Key_F5)}, [this] { active()->sortBy(SortColumn::Time); });
+    m_actions[QStringLiteral("sortSize")] = addCommand(view, QT_TR_NOOP("Sort by size"), {K(Qt::CTRL | Qt::Key_F6)}, [this] { active()->sortBy(SortColumn::Size); });
     view->addSeparator();
-    m_hiddenAction = addCommand(view, tr("Show hidden files"), {K(Qt::CTRL | Qt::Key_H)}, [this] {
+    m_hiddenAction = addCommand(view, QT_TR_NOOP("Show hidden files"), {K(Qt::CTRL | Qt::Key_H)}, [this] {
         m_left->setShowHidden(m_hiddenAction->isChecked());
         m_right->setShowHidden(m_hiddenAction->isChecked());
     });
     m_hiddenAction->setCheckable(true);
     view->addSeparator();
-    QAction* vim = addCommand(view, tr("Vim keys (j k h l gg G / n N : v)"), {}, [this] {
+    QAction* vim = addCommand(view, QT_TR_NOOP("Vim keys (j k h l gg G / n N : v)"), {}, [this] {
         const bool on = m_actions.value(QStringLiteral("vim"))->isChecked();
         QSettings().setValue(QStringLiteral("input/vimKeys"), on);
         m_left->setVimKeys(on);
@@ -419,7 +435,7 @@ void MainWindow::createMenus()
     });
     vim->setCheckable(true);
     m_actions[QStringLiteral("vim")] = vim;
-    QAction* git = addCommand(view, tr("Show Git status"), {}, [this] {
+    QAction* git = addCommand(view, QT_TR_NOOP("Show Git status"), {}, [this] {
         const bool on = m_actions.value(QStringLiteral("git"))->isChecked();
         QSettings().setValue(QStringLiteral("view/gitStatus"), on);
         DirTab::setGitEnabled(on);
@@ -429,7 +445,7 @@ void MainWindow::createMenus()
     });
     git->setCheckable(true);
     m_actions[QStringLiteral("git")] = git;
-    QAction* notes = addCommand(view, tr("Notify when long operations finish"), {}, [this] {
+    QAction* notes = addCommand(view, QT_TR_NOOP("Notify when long operations finish"), {}, [this] {
         QSettings().setValue(QStringLiteral("view/notifications"),
                              m_actions.value(QStringLiteral("notifications"))->isChecked());
     });
@@ -454,8 +470,8 @@ void MainWindow::createMenus()
     }
     QMenu* icons = view->addMenu(tr("Icon theme"));
     connect(icons, &QMenu::aboutToShow, this, [this, icons] { populateIconThemeMenu(icons); });
-    addCommand(view, tr("Preview"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
-    addCommand(view, tr("Preview: details instead of content"), {K(Qt::CTRL | Qt::Key_I)}, [this] {
+    addCommand(view, QT_TR_NOOP("Preview"), {K(Qt::CTRL | Qt::Key_Q)}, [this] { toggleQuickView(); });
+    addCommand(view, QT_TR_NOOP("Preview: details instead of content"), {K(Qt::CTRL | Qt::Key_I)}, [this] {
         const bool on = !QSettings().value(QStringLiteral("preview/info"), false).toBool();
         if (!m_quickView)
             toggleQuickView();
@@ -474,21 +490,34 @@ void MainWindow::createMenus()
             a->setCheckable(true);
             a->setChecked(code == previewMode());
             group->addAction(a);
-            connect(a, &QAction::triggered, this, [this, code] {
-                QSettings().setValue(QStringLiteral("view/previewPosition"), code);
-                if (m_quickView) {  // move it right away
-                    closePreview();
-                    toggleQuickView();
-                }
-            });
+            connect(a, &QAction::triggered, this, [this, code] { setPreviewPosition(code); });
         }
     }
-    addCommand(view, tr("Toggle menu bar"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_M)},
+    addCommand(view, QT_TR_NOOP("Toggle menu bar"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_M)},
                [this] { menuBar()->setVisible(!menuBar()->isVisible()); });
+    view->addSeparator();
+    addCommand(view, QT_TR_NOOP("Settings…"), {K(Qt::CTRL | Qt::Key_Comma)}, [this] { openSettings(); });
 
     QMenu* help = bar->addMenu(tr("&Help"));
-    addCommand(help, tr("Command palette…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_P)}, [this] { commandPalette(); });
-    addCommand(help, tr("Keyboard shortcuts"), {K(Qt::Key_F1)}, [this] { showShortcuts(); });
+    addCommand(help, QT_TR_NOOP("Command palette…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_P)}, [this] { commandPalette(); });
+    addCommand(help, QT_TR_NOOP("Keyboard shortcuts"), {K(Qt::Key_F1)}, [this] { showShortcuts(); });
+    applyKeyBindings(actions());  // keys changed in the settings
+}
+
+void MainWindow::setPreviewPosition(const QString& code)
+{
+    QSettings().setValue(QStringLiteral("view/previewPosition"), code);
+    if (m_quickView) {  // move it right away
+        closePreview();
+        toggleQuickView();
+    }
+}
+
+void MainWindow::openSettings(int page)
+{
+    SettingsDialog dlg(this);
+    dlg.showPage(page);
+    dlg.exec();
 }
 
 QWidget* MainWindow::createFKeyBar()

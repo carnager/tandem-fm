@@ -30,6 +30,7 @@ class Panel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
+    friend class SettingsDialog;
 public:
     explicit MainWindow(const QStringList& startPaths);
 
@@ -42,8 +43,9 @@ private:
     Panel* other() const;
     void setActive(Panel* p);
 
-    QAction* addCommand(QMenu* menu, const QString& text, const QList<QKeySequence>& keys,
-                        std::function<void()> fn);
+    QAction* addCommand(QMenu* menu, const char* source, const QList<QKeySequence>& keys, std::function<void()> fn);
+    QAction* addCommand(QMenu* menu, const QString& text, const QList<QKeySequence>& keys, std::function<void()> fn,
+                        const QString& id);
     void createMenus();
     QWidget* createFKeyBar();
 
@@ -124,6 +126,8 @@ private:
     QSplitter* m_leftCol;        // left panel / its own preview
     QSplitter* m_rightCol;       // right panel / its own preview
     QString previewMode() const;  // "each" (default), "bottom", "right"
+    void setPreviewPosition(const QString& code);
+    void openSettings(int page = 0);
     void closePreview();
     void updatePreviewFor(ViewerWindow* preview, Panel* panel);
     void openCommandBar();

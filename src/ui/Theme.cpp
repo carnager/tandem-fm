@@ -11,6 +11,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
+#include <QSettings>
 #include <QProxyStyle>
 #include <QStyleOption>
 #include <QStyleFactory>
@@ -54,7 +55,9 @@ QString Theme::css(const QString& tmpl) const
 
 static bool systemPrefersDark(const QApplication& app)
 {
-    const QByteArray forced = qgetenv("TANDEM_THEME");
+    QByteArray forced = qgetenv("TANDEM_THEME");
+    if (forced.isEmpty())  // the setting (Settings › Appearance)
+        forced = QSettings().value(QStringLiteral("view/theme")).toString().toUtf8();
     if (forced == "light")
         return false;
     if (forced == "dark")

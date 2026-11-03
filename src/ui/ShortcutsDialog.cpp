@@ -190,6 +190,9 @@ ShortcutsDialog::ShortcutsDialog(QWidget* parent) : QDialog(parent)
     m_page = new QWidget(scroll);
     scroll->setWidget(m_page);
     layout->addWidget(scroll, 1);
+    auto* note = new QLabel(tr("These are the default keys. Change them in Settings › Keys (Ctrl+,)."), this);
+    note->setStyleSheet(theme().css(QStringLiteral("color: @dimText;")));
+    layout->addWidget(note);
     connect(m_filter, &QLineEdit::textChanged, this, &ShortcutsDialog::rebuild);
     rebuild();
 }

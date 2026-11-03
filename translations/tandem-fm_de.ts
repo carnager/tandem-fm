@@ -1811,6 +1811,10 @@
         <translation>Menüleiste ein-/ausblenden</translation>
     </message>
     <message>
+        <source>Settings…</source>
+        <translation>Einstellungen…</translation>
+    </message>
+    <message>
         <source>&amp;Help</source>
         <translation>&amp;Hilfe</translation>
     </message>
@@ -3308,6 +3312,237 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     </message>
 </context>
 <context>
+    <name>tandem::SettingsDialog</name>
+    <message>
+        <source>Settings</source>
+        <translation>Einstellungen</translation>
+    </message>
+    <message>
+        <source>Appearance</source>
+        <translation>Aussehen</translation>
+    </message>
+    <message>
+        <source>Behaviour</source>
+        <translation>Verhalten</translation>
+    </message>
+    <message>
+        <source>Tools</source>
+        <translation>Werkzeuge</translation>
+    </message>
+    <message>
+        <source>Keys</source>
+        <translation>Tasten</translation>
+    </message>
+    <message>
+        <source>Changes apply right away.</source>
+        <translation>Änderungen gelten sofort.</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <source>Theme</source>
+        <translation>Farbschema</translation>
+    </message>
+    <message>
+        <source>Like the desktop</source>
+        <translation>Wie der Desktop</translation>
+    </message>
+    <message>
+        <source>Dark</source>
+        <translation>Dunkel</translation>
+    </message>
+    <message>
+        <source>Light</source>
+        <translation>Hell</translation>
+    </message>
+    <message>
+        <source>The theme changes the next time Tandem starts</source>
+        <translation>Das Farbschema ändert sich beim nächsten Start von Tandem</translation>
+    </message>
+    <message>
+        <source>Takes effect the next time Tandem starts.</source>
+        <translation>Wirkt beim nächsten Start von Tandem.</translation>
+    </message>
+    <message>
+        <source>Like the system</source>
+        <translation>Wie das System</translation>
+    </message>
+    <message>
+        <source>Language</source>
+        <translation>Sprache</translation>
+    </message>
+    <message>
+        <source>Like the desktop (%1)</source>
+        <translation>Wie der Desktop (%1)</translation>
+    </message>
+    <message>
+        <source>Icons</source>
+        <translation>Symbole</translation>
+    </message>
+    <message>
+        <source>Preview (Ctrl+Q)</source>
+        <translation>Vorschau (Strg+Q)</translation>
+    </message>
+    <message>
+        <source>Below each panel</source>
+        <translation>Unter jeder Seite</translation>
+    </message>
+    <message>
+        <source>Below both</source>
+        <translation>Unter beiden</translation>
+    </message>
+    <message>
+        <source>On the right</source>
+        <translation>Rechts</translation>
+    </message>
+    <message>
+        <source>In the file lists</source>
+        <translation>In den Dateilisten</translation>
+    </message>
+    <message>
+        <source>Show hidden files (Ctrl+H)</source>
+        <translation>Versteckte Dateien zeigen (Strg+H)</translation>
+    </message>
+    <message>
+        <source>Show Git status (changed, new, ignored files)</source>
+        <translation>Git-Status zeigen (geänderte, neue, ignorierte Dateien)</translation>
+    </message>
+    <message>
+        <source>Show the menu bar (Ctrl+Shift+M)</source>
+        <translation>Menüleiste zeigen (Strg+Umschalt+M)</translation>
+    </message>
+    <message>
+        <source>Keyboard</source>
+        <translation>Tastatur</translation>
+    </message>
+    <message>
+        <source>Vim keys</source>
+        <translation>Vim-Tasten</translation>
+    </message>
+    <message>
+        <source>j k move, h l out of and into folders, gg G, / to search, v to mark, : for the palette. Typing letters no longer starts the quick search.</source>
+        <translation>j k bewegen, h l aus und in Ordner, gg G, / sucht, v markiert, : öffnet die Palette. Buchstaben starten dann keine Schnellsuche mehr.</translation>
+    </message>
+    <message>
+        <source>Notifications</source>
+        <translation>Benachrichtigungen</translation>
+    </message>
+    <message>
+        <source>Notify when long operations finish</source>
+        <translation>Benachrichtigen, wenn lange Vorgänge fertig sind</translation>
+    </message>
+    <message>
+        <source>A desktop notification when a copy or move that took a while is done and Tandem isn&apos;t in front.</source>
+        <translation>Eine Desktop-Benachrichtigung, wenn ein längeres Kopieren oder Verschieben fertig ist und Tandem nicht im Vordergrund liegt.</translation>
+    </message>
+    <message>
+        <source>Editor (F4)</source>
+        <translation>Editor (F4)</translation>
+    </message>
+    <message>
+        <source>The default app for the file type</source>
+        <translation>Das Standardprogramm für den Dateityp</translation>
+    </message>
+    <message>
+        <source>A command; the file is added at the end. Terminal editors (vim, nano) need a terminal: e.g. &quot;kitty nvim&quot;.</source>
+        <translation>Ein Befehl; die Datei kommt ans Ende. Terminal-Editoren (vim, nano) brauchen ein Terminal: z. B. "kitty nvim".</translation>
+    </message>
+    <message>
+        <source>Terminal (Ctrl+Alt+T)</source>
+        <translation>Terminal (Strg+Alt+T)</translation>
+    </message>
+    <message>
+        <source>Found automatically</source>
+        <translation>Automatisch gefunden</translation>
+    </message>
+    <message>
+        <source>Also used for commands run with Ctrl+Enter and for $EDITOR.</source>
+        <translation>Auch für Befehle mit Strg+Enter und für $EDITOR.</translation>
+    </message>
+    <message>
+        <source>Comparing two files</source>
+        <translation>Zwei Dateien vergleichen</translation>
+    </message>
+    <message>
+        <source>Found automatically (else diff -u)</source>
+        <translation>Automatisch gefunden (sonst diff -u)</translation>
+    </message>
+    <message>
+        <source>Used by the sync dialog&apos;s Enter.</source>
+        <translation>Für Enter im Abgleich-Dialog.</translation>
+    </message>
+    <message>
+        <source>$EDITOR in your terminal</source>
+        <translation>$EDITOR in deinem Terminal</translation>
+    </message>
+    <message>
+        <source>Renaming in an editor (Ctrl+E)</source>
+        <translation>Umbenennen im Editor (Strg+E)</translation>
+    </message>
+    <message>
+        <source>A command that waits until you close the file; %f is the file with the names. Empty: $EDITOR in your terminal.</source>
+        <translation>Ein Befehl, der wartet, bis du die Datei schließt; %f ist die Datei mit den Namen. Leer: $EDITOR in deinem Terminal.</translation>
+    </message>
+    <message>
+        <source>Find a command or a key</source>
+        <translation>Befehl oder Taste finden</translation>
+    </message>
+    <message>
+        <source>Command</source>
+        <translation>Befehl</translation>
+    </message>
+    <message>
+        <source>Press the new keys:</source>
+        <translation>Neue Tasten drücken:</translation>
+    </message>
+    <message>
+        <source>No key</source>
+        <translation>Keine Taste</translation>
+    </message>
+    <message>
+        <source>Default</source>
+        <translation>Standard</translation>
+    </message>
+    <message>
+        <source>Pick a command, then press its new keys.</source>
+        <translation>Befehl wählen, dann die neuen Tasten drücken.</translation>
+    </message>
+    <message>
+        <source>Reset all keys</source>
+        <translation>Alle Tasten zurücksetzen</translation>
+    </message>
+    <message>
+        <source>All keys are back to their defaults.</source>
+        <translation>Alle Tasten sind wieder wie anfangs.</translation>
+    </message>
+    <message>
+        <source>Default: %1</source>
+        <translation>Standard: %1</translation>
+    </message>
+    <message>
+        <source>none</source>
+        <translation>keine</translation>
+    </message>
+    <message>
+        <source>%1 was used by “%2”, which now has %3.</source>
+        <translation>%1 gehörte zu „%2“, das jetzt %3 hat.</translation>
+    </message>
+    <message>
+        <source>no key</source>
+        <translation>keine Taste</translation>
+    </message>
+    <message>
+        <source>“%1” has no key now.</source>
+        <translation>„%1“ hat jetzt keine Taste.</translation>
+    </message>
+    <message>
+        <source>“%1” is now %2.</source>
+        <translation>„%1“ ist jetzt %2.</translation>
+    </message>
+</context>
+<context>
     <name>tandem::ShortcutsDialog</name>
     <message>
         <source>Keyboard shortcuts</source>
@@ -3316,6 +3551,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Find a shortcut: type what you want to do, or a key</source>
         <translation>Tastenkürzel finden: tippen, was du tun willst, oder eine Taste</translation>
+    </message>
+    <message>
+        <source>These are the default keys. Change them in Settings › Keys (Ctrl+,).</source>
+        <translation>Das sind die Standardtasten. Ändern unter Einstellungen › Tasten (Strg+,).</translation>
     </message>
     <message>
         <source>No shortcut matches “%1”</source>

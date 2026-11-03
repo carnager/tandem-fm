@@ -23,6 +23,7 @@
 #include "ui/MainWindow.h"
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
+#include "ui/SettingsDialog.h"
 #include "ui/ShortcutsDialog.h"
 #include "ui/Panel.h"
 #include "ui/PathBar.h"
@@ -47,6 +48,7 @@
 #include <QImageReader>
 #include <QCheckBox>
 #include <QListWidget>
+#include <QKeySequenceEdit>
 #include <QTreeWidget>
 #include <QClipboard>
 #include <QContextMenuEvent>
@@ -939,6 +941,47 @@ private slots:
         }
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // Ctrl+,: settings; keys can be changed, conflicts resolved, defaults restored.
+    void settingsAndKeys()
+    {
+        SettingsDialog dlg(m_window.get());
+        dlg.show();
+        dlg.showPage(3);
+        auto find = [&](const QString& text) -> QTreeWidgetItem* {
+            for (int i = 0; i < dlg.keyList()->topLevelItemCount(); ++i)
+                if (dlg.keyList()->topLevelItem(i)->text(0).endsWith(text))
+                    return dlg.keyList()->topLevelItem(i);
+            return nullptr;
+        };
+        QAction* copy = nullptr;
+        QAction* move = nullptr;
+        for (QAction* a : m_window->actions()) {
+            if (a->property("commandId").toString() == "copy")
+                copy = a;
+            if (a->property("commandId").toString() == "move")
+                move = a;
+        }
+        QVERIFY(copy && move);
+        QCOMPARE(move->shortcut(), QKeySequence(Qt::Key_F6));
+        dlg.keyList()->setCurrentItem(find("Copy…"));
+        dlg.keyEdit()->setKeySequence(QKeySequence(Qt::Key_F6));  // Move's key
+        QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F6));
+        QVERIFY(move->shortcuts().isEmpty());  // gave it up
+        QVERIFY(dlg.keyNote()->text().contains("Move"));
+        QCOMPARE(QSettings().value("keys/copy").toStringList(), QStringList({"F6"}));
+        QCOMPARE(QSettings().value("keys/move").toStringList(), QStringList({"none"}));
+        // A restart applies them: simulate with the saved values.
+        copy->setShortcut(QKeySequence(Qt::Key_F5));
+        applyKeyBindings(m_window->actions());
+        QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F6));
+        for (auto* b : dlg.findChildren<QPushButton*>())
+            if (b->text() == QObject::tr("Reset all keys"))
+                b->click();
+        QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F5));
+        QCOMPARE(move->shortcut(), QKeySequence(Qt::Key_F6));
+        QVERIFY(!QSettings().contains("keys/copy") && !QSettings().contains("keys/move"));
     }
 
     // F1: grouped shortcuts in columns, with a filter.
