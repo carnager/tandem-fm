@@ -33,6 +33,9 @@ cmake --build build
 
 Requires Qt ≥ 6.5 (Core, Gui, Widgets, Test) and a C++20 compiler. Optional, picked up when found: GIO (GVfs network places), libssh ≥ 0.11 (SFTP), libsmbclient (SMB), libacl (ACLs in the permissions editor), libsecret (server passwords in the desktop keyring).
 
+Arch Linux: `cd packaging/arch && makepkg -si` builds and installs a package
+from this checkout (with the app icon and desktop entry).
+
 ## Tests and benchmarks
 
 ```sh

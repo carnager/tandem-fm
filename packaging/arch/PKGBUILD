@@ -1,0 +1,45 @@
+# Builds Tandem from this checkout: `cd packaging/arch && makepkg -si`.
+# For the AUR, point source at the published repository instead.
+pkgname=tandem-fm-git
+pkgver=r55.780b8a5
+pkgrel=1
+pkgdesc="Fast two-panel file manager in the spirit of Total Commander (Qt 6)"
+arch=('x86_64' 'aarch64')
+# url=: the published repository, once there is one
+# license: not chosen yet; set it here (and add a LICENSE file) before publishing
+license=('LicenseRef-unset')
+depends=('qt6-base' 'qt6-svg' 'qt6-webengine' 'libarchive' 'hicolor-icon-theme')
+makedepends=('cmake' 'ninja' 'git' 'qt6-tools' 'libssh' 'smbclient' 'libsecret' 'acl' 'glib2' 'syntax-highlighting')
+optdepends=('libssh: built-in SFTP (needed if it was there at build time)'
+            'smbclient: built-in SMB'
+            'libsecret: server passwords in the desktop keyring'
+            'acl: extra people and groups in the permissions editor'
+            'glib2: GVfs network places (WebDAV, ftp, phones)'
+            'gvfs: GVfs network places'
+            'syntax-highlighting: syntax colours in the viewer'
+            'ffmpeg: video and audio previews, video thumbnails'
+            'ripgrep: searching file contents'
+            'fd: fast name search'
+            'meld: comparing two files from the sync dialog')
+provides=('tandem-fm')
+conflicts=('tandem-fm')
+
+_src="$startdir/../.."
+
+pkgver() {
+  cd "$_src"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cmake -S "$_src" -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
+}
+
+check() {
+  QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure -R "core|viewer"
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

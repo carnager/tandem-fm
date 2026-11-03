@@ -35,7 +35,7 @@ int main(int argc, char** argv)
         QApplication::installTranslator(&appTranslator);
 
     tandem::applyTheme(app);
-    QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("system-file-manager")));
+    QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("tandem-fm"), QIcon(QStringLiteral(":/icons/tandem-fm.svg"))));
     tandem::DirWatcher::instance();  // must be created on the UI thread
     tandem::registerBuiltinBackends();
     tandem::installAuthDialogs();

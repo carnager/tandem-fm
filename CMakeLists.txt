@@ -163,6 +163,8 @@ target_compile_options(tandem_ui PRIVATE -Wall -Wextra)
 
 add_executable(tandem-fm src/main.cpp)
 target_link_libraries(tandem-fm PRIVATE tandem_ui)
+# The app icon, inside the binary too (for running from the build folder).
+qt_add_resources(tandem-fm "icons" PREFIX "/icons" BASE data FILES data/tandem-fm.svg)
 
 # Translations (needs qt6-tools): `cmake --build build --target update_translations`
 # refreshes translations/*.ts from the sources; the .qm files are compiled into
@@ -198,3 +200,4 @@ set_tests_properties(test_viewer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscre
 
 install(TARGETS tandem-fm RUNTIME DESTINATION bin)
 install(FILES tandem-fm.desktop DESTINATION share/applications)
+install(FILES data/tandem-fm.svg DESTINATION share/icons/hicolor/scalable/apps)
