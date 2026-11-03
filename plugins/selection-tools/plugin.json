@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "name": "Selection tools",
+  "description": "Copy selected paths or file names, or inspect a selection. Does not modify files.",
+  "actions": [
+    {"id": "copy-paths", "label": "Copy selected paths", "run": ["tandem-plugin-tools"], "result": "copy", "locations": ["local", "remote", "archive"]},
+    {"id": "copy-names", "label": "Copy selected file names", "run": ["tandem-plugin-tools"], "result": "copy", "locations": ["local", "remote", "archive"]},
+    {"id": "inspect", "label": "Selection report", "run": ["tandem-plugin-tools"], "result": "list", "locations": ["local", "remote", "archive"]}
+  ],
+  "settings": [
+    {"key": "separator", "label": "Copy separator", "kind": "choice", "choices": ["Lines", "Tabs"], "default": "Lines"},
+    {"key": "show-dates", "label": "Include modified dates in reports", "kind": "toggle", "default": true}
+  ]
+}

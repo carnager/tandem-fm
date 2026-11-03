@@ -29,6 +29,7 @@
 #include "ui/Panel.h"
 #include "ui/Theme.h"
 #include "ui/ThemeManager.h"
+#include "ui/PluginManager.h"
 #include "ui/viewer/ViewerWindow.h"
 
 #include <QAbstractButton>
@@ -252,6 +253,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
                 p->refresh();
     });
 
+    m_plugins = new PluginController(this);
     createMenus();
     loadSettings(startPaths);
     connect(&Config::instance(), &Config::changed, this, &MainWindow::reloadConfiguration);
@@ -431,6 +433,9 @@ void MainWindow::createMenus()
     themes->setObjectName(QStringLiteral("themeMenu"));
     populateThemeMenu(themes, this);
     connect(themes, &QMenu::aboutToShow, this, [this, themes] { populateThemeMenu(themes, this); });
+    auto* plugins = bar->addMenu(tr("&Plugins"));
+    plugins->setObjectName(QStringLiteral("pluginsMenu"));
+    connect(plugins, &QMenu::aboutToShow, this, [this, plugins] { m_plugins->populateMenu(plugins, active(), other()); });
     QMenu* sort = view->addMenu(tr("Sort by"));
     m_actions[QStringLiteral("sortName")] = addCommand(sort, QT_TR_NOOP("Sort by name"), {K(Qt::CTRL | Qt::Key_F3)}, [this] { active()->sortBy(SortColumn::Name); });
     m_actions[QStringLiteral("sortExt")] = addCommand(sort, QT_TR_NOOP("Sort by extension"), {K(Qt::CTRL | Qt::Key_F4)}, [this] { active()->sortBy(SortColumn::Ext); });
@@ -2149,6 +2154,12 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     QMenu menu(this);
     auto act = [this](const char* id) { return m_actions.value(QLatin1String(id)); };
     const bool canPaste = QApplication::clipboard()->mimeData() && QApplication::clipboard()->mimeData()->hasUrls();
+    auto addPlugins = [&] {
+        auto* sub = new QMenu(tr("Plugins"), &menu);
+        m_plugins->populateMenu(sub, panel, other(), false);
+        if (!sub->isEmpty()) { menu.addSeparator(); menu.addMenu(sub); }
+        else delete sub;
+    };
 
     if (!onItem && panel->inArchive()) {
         menu.addAction(act("refresh"));
@@ -2156,6 +2167,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         for (const char* id : {"sortName", "sortExt", "sortDate", "sortSize"})
             sort->addAction(act(id));
         menu.addAction(m_hiddenAction);
+        addPlugins();
         menu.exec(pos);
         return;
     }
@@ -2176,6 +2188,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         menu.addSeparator();
         menu.addAction(act("markAll"));
         menu.addAction(act("unmarkAll"));
+        addPlugins();
         menu.exec(pos);
         act("paste")->setEnabled(true);
         return;
@@ -2198,6 +2211,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         act("copy")->setText(tr("Extract to other panel…"));
         menu.addAction(act("copy"));
         menu.addAction(act("copyPath"));
+        addPlugins();
         menu.exec(pos);
         act("copy")->setText(tr("Copy…"));
         return;
@@ -2261,6 +2275,8 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     menu.addSeparator();
     menu.addAction(act("trash"));
     menu.addAction(act("delete"));
+
+    addPlugins();
     menu.exec(pos);
     act("copy")->setText(tr("Copy…"));
     act("move")->setText(tr("Move…"));
@@ -2601,6 +2617,7 @@ void MainWindow::closeEvent(QCloseEvent* e)
     saveSettings();
     if (FolderHistory::instance().isLoaded())
         FolderHistory::instance().saveNow();
+    m_plugins->cancelAll();
     m_jobs->cancelAll();
     // Give jobs a moment to stop. A job stuck in the kernel on a dead network
     // mount can't be interrupted; don't let it hold the app hostage.

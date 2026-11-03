@@ -18,12 +18,14 @@ package_dir="dist/macos-$(date +%Y%m%d-%H%M%S)"
 mkdir "$package_dir"
 cp -R build/tandem-fm.app "$package_dir/Tandem.app"
 "$qt_prefix/bin/macdeployqt" "$package_dir/Tandem.app" -always-overwrite -no-codesign \
+  -executable="$package_dir/Tandem.app/Contents/MacOS/tandem-plugin-tools" \
   -libpath="$qt_prefix/lib" -libpath="$(brew --prefix)/lib" > "$package_dir/deployment.log" 2>&1
 python3 packaging/macos/finish_bundle.py "$package_dir/Tandem.app" "$qt_prefix" "$(brew --prefix)"
 python3 packaging/macos/verify_bundle.py "$package_dir/Tandem.app"
 cp LICENSE "$package_dir/LICENSE"
 cp packaging/macos/README.md packaging/macos/VALIDATION.md packaging/macos/CONFIGURATION.md packaging/macos/THEMES.md "$package_dir/"
+cp docs/plugins.md "$package_dir/PLUGINS.md"
 codesign --force --deep --sign - "$package_dir/Tandem.app"
 codesign --verify --deep --strict "$package_dir/Tandem.app"
-ditto -c -k --sequesterRsrc --keepParent "$package_dir/Tandem.app" "$package_dir/Tandem-macOS-0.1.6-$(uname -m).zip"
+ditto -c -k --sequesterRsrc --keepParent "$package_dir/Tandem.app" "$package_dir/Tandem-macOS-0.1.7-$(uname -m).zip"
 printf 'App: %s/Tandem.app\n' "$PWD/$package_dir"

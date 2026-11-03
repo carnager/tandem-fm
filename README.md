@@ -9,6 +9,7 @@ A first macOS port is available in this checkout. See [build instructions, suppo
 
 ## Features
 
+- [Action plugins](docs/plugins.md): external programs, file/panel JSON context, settings and menu actions
 - Tabs, quick search, filter as you type, bookmarks on letter keys, fuzzy jump to any visited folder
 - Copy, move and delete in the background, queued per drive, with undo (Ctrl+Z)
 - Built-in SFTP and SMB, other protocols through GVfs; logins can go in the desktop keyring

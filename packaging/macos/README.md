@@ -1,6 +1,12 @@
-# Tandem for macOS 0.1.6
+# Tandem for macOS 0.1.7
 
 An experimental macOS port of [carnager/tandem-fm](https://github.com/carnager/tandem-fm), based on upstream commit `f82cc2e955b9a58f066703f746661f29f00a6f36`. The upstream Qt 6 Widgets UI, libarchive, libssh, job queues, viewers, and fd/rg search tools are retained. macOS changes are guarded so the Linux implementations remain available.
+
+## Changes in 0.1.7
+
+**Plugins → Manage plugins…** and **Settings → Plugins** add Melody-style external action plugins. Plugins declare menu actions and settings in `plugin.json`, receive selection and both-panel context on stdin as JSON, and return text/clipboard output or native result lists. Programs run asynchronously with output/input limits, timeout, cancellation and Unix child-process-group cleanup. New plugins are off by default. File changes performed by external programs are outside Tandem's file jobs/undo; the host does not execute file-mutation instructions returned by a plugin.
+
+Enable the bundled **Selection tools** example to copy selected paths/names or show a read-only selection report. It uses the included Qt helper, with no Python install needed. **Install folder…** stages third-party folders and never overwrites an existing user plugin. Nonsecret plugin preferences and enabled IDs use the current configuration profile; secrets remain in a separate local owner-only file. User plugins live in `~/Library/Application Support/tandem/plugins`. See the included **PLUGINS.md** (or source `docs/plugins.md`) for the schema, examples and first-version scope. Music-specific Melody plugins need a Tandem adapter; dock panels and automatic triggers are not implemented in this action API.
 
 ## Changes in 0.1.6
 

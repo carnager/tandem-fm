@@ -24,6 +24,7 @@ class QTimer;
 namespace tandem {
 
 class JobManager;
+class PluginController;
 class ViewerWindow;
 class JobsPanel;
 class Panel;
@@ -141,6 +142,7 @@ private:
     void synchronizeFolders();
     void runCommand(const QString& command, bool inTerminal);
     class CommandBar* m_commandBar = nullptr;
+    PluginController* m_plugins;
     JobManager* m_jobs;
     JobsPanel* m_jobsPanel;
     QAction* m_hiddenAction = nullptr;

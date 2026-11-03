@@ -1,11 +1,12 @@
-# macOS 0.1.6 validation
+# macOS 0.1.7 validation
 
 Validated on November 3, 2026, on Apple Silicon (arm64), macOS 27.0, AppleClang 21, Qt 6.11.2, Homebrew libarchive 3.8.8, and libssh 0.12.1.
 
-`./packaging/macos/build.sh` builds and runs CTest before bundling. The final CTest run passed all eight executables (179 QtTest passes, 5 explicit skips, zero failures):
+`./packaging/macos/build.sh` builds and runs CTest before bundling. The final CTest run passed all nine executables (192 QtTest passes, 5 explicit skips, zero failures):
 
 | Executable | Passes | Skips | Main coverage |
 | --- | ---: | ---: | --- |
+| test_plugins | 13 | 0 | Strict manifests/settings, discovery precedence and disabled defaults, private secret persistence, actual subprocess JSON/cwd/literal arguments, failure/output/timeout/input limits, cancellation and child/owner cleanup, exclusive staged install and unsafe-package rejection, result validation, settings save/cancel, real panel context/bundled actions, remote credential stripping |
 | test_themes | 8 | 0 | Built-in Nord/system/light/dark switching, custom profile round-trip and independent edits, invalid imports and protected built-ins, rendered row/mark backgrounds and selection/extension text precedence, actual manager/editor save and cancel, live synced palette reload without navigation |
 | test_filecolors | 9 | 0 | Extension lists/case/compound suffixes/Unicode, filename-only MIME matching, kinds, executable-link distinction, priority and disabling, theme changes, marked/error/parent precedence, invalid rules, portable serialization, actual detail-delegate name/extension/metadata colors |
 | test_config | 14 | 0 | Native preference migration in a fresh process, INI types and Unicode paths, existing-profile preservation, repeated atomic replacement, removed keys, independent key writes, cloud lock copies, temporary unavailability and queued writes, malformed input, stale settings scopes, local selector/environment precedence, bookmark retry and merge |
@@ -21,7 +22,7 @@ Skips: freedesktop Trash browsing (core and UI), Linux libacl editing, the upstr
 
 Not covered: another physical Mac, Intel, Linux execution, Developer ID/notarization, physical external drives/exFAT, fresh native SMB authentication or SMB write/disconnect recovery, power loss, adversarial path replacement races, every macOS privacy restriction, complete ACL/flags semantics, or all application-launch/association combinations. The source retains the upstream Linux paths; this log does not claim they were executed here.
 
-The final bundle contains 74 Mach-O binaries. A recursive dependency audit found no missing libraries or external non-system library references. The bundle passed `codesign --verify --deep --strict` with a local ad-hoc signature, and launched with the native Cocoa backend, rendered a window, and exited successfully with Qt/DYLD override variables removed. This local smoke test does not replace validation on a clean second Mac.
+The final bundle contains 75 Mach-O binaries. A recursive dependency audit found no missing libraries or external non-system library references. The bundle passed `codesign --verify --deep --strict` with a local ad-hoc signature, and launched with the native Cocoa backend, rendered a window, and exited successfully with Qt/DYLD override variables removed. This local smoke test does not replace validation on a clean second Mac.
 
 For 0.1.1 the Lynx navigation and live appearance settings were also tested with the native Cocoa backend. Theme/scale tests cover existing controls and dialogs, explicitly bold fonts, widgets created while scaled, resetting to 100%, and switching themes without cumulative font growth. Inactive-panel tests verify focus switching, persistence, overlay bounds and transparent mouse handling. Native bundle smoke tests rendered both light and dark windows with Qt/DYLD overrides removed.
 
@@ -36,3 +37,7 @@ For 0.1.5, temporary-file tests compare creation dates to filesystem birth metad
 For 0.1.6 all eight CTest executables passed in one run (about 54 seconds). The complete theme suite also passed with native Cocoa: built-in palette selection, custom JSON serialization and validation, profile isolation, row background pixel checks, extension/rule/selection/mark/error precedence, actual manager/editor save and cancel, and an external configuration edit repainting the current theme without navigation. Theme tests use a disposable configuration folder. Import/export file chooser interaction and Dropbox transport are not asserted; JSON import/export logic and configuration reload are exercised directly. Custom themes are color data, and no user file operations are involved in changing a theme.
 
 The 0.1.6 packaged app also launched and rendered with the native Cocoa backend using both built-in Nord and a custom palette in disposable profiles, with Qt/DYLD overrides removed. The dependency audit and strict ad-hoc signature verification passed.
+
+For 0.1.7 all nine CTest executables passed in one run (about 60 seconds). The full 13-pass plugin suite also passed using native Cocoa. Tests execute actual subprocesses, check timeout/cancellation and Unix descendant cleanup, preserve literal Unicode/quoted/trailing-space file paths, reject oversized/malformed requests and results, validate installer cleanup/no-overwrite behavior including symbolic-link and FIFO rejection, verify mode-0600 secrets stay out of portable settings, and automate settings save/cancel and the bundled clipboard/list actions. These tests use disposable configuration and file fixtures. No third-party plugin or user-requested file mutation was executed. Deliberately daemonized external services, power-loss during plugin install and Linux execution are not covered.
+
+The signed 0.1.7 package passed the dependency audit (75 Mach-O files), strict ad-hoc signature verification, and a native Cocoa launch/render with a disposable Nord profile. Its packaged external helper was executed with a system-only PATH and Qt/DYLD overrides removed; exact path output (including quotes, Unicode and a trailing filename space) and structured report JSON both passed.

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(tandem-fm VERSION 0.1.6 LANGUAGES CXX)
+project(tandem-fm VERSION 0.1.7 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,6 +14,7 @@ qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES de)
 # Core engine: filesystem access, jobs, watching. QtCore only, no UI.
 add_library(tandem_core STATIC
   src/core/Config.h src/core/Config.cpp
+  src/core/Plugins.h src/core/Plugins.cpp
   src/core/FileEntry.h
   src/core/Util.h src/core/Util.cpp
   src/core/Sorting.h src/core/Sorting.cpp
@@ -58,6 +59,7 @@ add_library(tandem_ui STATIC
   src/ui/Theme.h src/ui/Theme.cpp
   src/ui/ThemeProfiles.h src/ui/ThemeProfiles.cpp
   src/ui/ThemeManager.h src/ui/ThemeManager.cpp
+  src/ui/PluginManager.h src/ui/PluginManager.cpp
   src/ui/IconCache.h src/ui/IconCache.cpp
   src/ui/FileModel.h src/ui/FileModel.cpp
   src/ui/FileView.h src/ui/FileView.cpp
@@ -180,7 +182,20 @@ target_compile_options(tandem_ui PRIVATE -Wall -Wextra)
 if(APPLE)
   set(CMAKE_MACOSX_RPATH ON)
 endif()
+add_executable(tandem-plugin-tools src/plugin_tools.cpp)
+target_link_libraries(tandem-plugin-tools PRIVATE Qt6::Core)
 add_executable(tandem-fm src/main.cpp)
+add_dependencies(tandem-fm tandem-plugin-tools)
+file(GLOB_RECURSE TANDEM_PLUGIN_ASSETS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/plugins/*")
+set_property(TARGET tandem-fm APPEND PROPERTY LINK_DEPENDS "$<TARGET_FILE:tandem-plugin-tools>" ${TANDEM_PLUGIN_ASSETS})
+if(APPLE)
+  add_custom_command(TARGET tandem-fm POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:tandem-plugin-tools>" "$<TARGET_FILE_DIR:tandem-fm>/tandem-plugin-tools"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/plugins" "$<TARGET_BUNDLE_CONTENT_DIR:tandem-fm>/Resources/plugins")
+else()
+  add_custom_command(TARGET tandem-fm POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/plugins" "$<TARGET_FILE_DIR:tandem-fm>/plugins")
+endif()
 if(APPLE)
   target_sources(tandem-fm PRIVATE packaging/macos/tandem-fm.icns)
   set_source_files_properties(packaging/macos/tandem-fm.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
@@ -216,6 +231,12 @@ add_executable(tandem-bench bench/bench_list.cpp)
 target_link_libraries(tandem-bench PRIVATE tandem_core)
 
 enable_testing()
+add_executable(test_plugins tests/test_plugins.cpp)
+target_link_libraries(test_plugins PRIVATE tandem_ui Qt6::Test)
+target_compile_definitions(test_plugins PRIVATE TANDEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+add_dependencies(test_plugins tandem-plugin-tools)
+add_test(NAME test_plugins COMMAND test_plugins)
+set_tests_properties(test_plugins PROPERTIES TIMEOUT 90 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_executable(test_themes tests/test_themes.cpp)
 target_link_libraries(test_themes PRIVATE tandem_ui Qt6::Test)
 add_test(NAME test_themes COMMAND test_themes)
@@ -258,7 +279,8 @@ set_tests_properties(test_core test_ui test_viewer PROPERTIES TIMEOUT 300)
 if(APPLE)
   install(TARGETS tandem-fm BUNDLE DESTINATION .)
 else()
-install(TARGETS tandem-fm RUNTIME DESTINATION bin)
+install(TARGETS tandem-fm tandem-plugin-tools RUNTIME DESTINATION bin)
+install(DIRECTORY plugins/ DESTINATION share/tandem/plugins)
 install(FILES tandem-fm.desktop DESTINATION share/applications)
 install(FILES data/tandem-fm.svg DESTINATION share/icons/hicolor/scalable/apps)
 foreach(size 32 48 256)

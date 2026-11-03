@@ -5,6 +5,7 @@
 #include "ui/FileColorsPage.h"
 #include "ui/ThemeProfiles.h"
 #include "ui/ThemeManager.h"
+#include "ui/PluginManager.h"
 #include "ui/MainWindow.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
@@ -233,6 +234,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
         {tr("Keys"), QStringLiteral("preferences-desktop-keyboard")},
         {tr("Configuration"), QStringLiteral("folder-sync")},
         {tr("File colors"), QStringLiteral("preferences-desktop-color")},
+        {tr("Plugins"), QStringLiteral("application-x-addon")},
     };
     for (const auto& [name, icon] : pages)
         new QListWidgetItem(IconCache::themed(icon.toUtf8().constData(), "preferences-system"), name, m_nav);
@@ -244,6 +246,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
     m_pages->addWidget(keysPage());
     m_pages->addWidget(configurationPage());
     m_pages->addWidget(new FileColorsPage(this));
+    m_pages->addWidget(new PluginManagerPage(this));
     body->addWidget(m_pages, 1);
     outer->addLayout(body, 1);
     connect(m_nav, &QListWidget::currentRowChanged, m_pages, &QStackedWidget::setCurrentIndex);
