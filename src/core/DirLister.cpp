@@ -17,6 +17,34 @@ namespace tandem {
 
 namespace {
 
+#ifdef __APPLE__
+bool fillEntry(int dirfd, const char* name, FileEntry& e)
+{
+    struct stat st;
+    if (::fstatat(dirfd, name, &st, AT_SYMLINK_NOFOLLOW) != 0)
+        return false;
+    e.mode = st.st_mode;
+    e.size = st.st_size;
+    e.mtime = st.st_mtime;
+    e.uid = st.st_uid;
+    e.gid = st.st_gid;
+    e.isLink = S_ISLNK(st.st_mode);
+    if (e.isLink) {
+        struct stat target;
+        if (::fstatat(dirfd, name, &target, 0) == 0) {
+            e.isDir = S_ISDIR(target.st_mode);
+            e.size = target.st_size;
+        } else {
+            e.brokenLink = true;
+        }
+    } else {
+        e.isDir = S_ISDIR(st.st_mode);
+    }
+    if (e.isDir)
+        e.size = -1;
+    return true;
+}
+#else
 constexpr unsigned kStatMask = STATX_TYPE | STATX_MODE | STATX_SIZE | STATX_MTIME | STATX_UID | STATX_GID;
 
 // AT_STATX_DONT_SYNC: on network filesystems use cached attributes instead of
@@ -47,6 +75,8 @@ bool fillEntry(int dirfd, const char* name, FileEntry& e)
         e.size = -1;
     return true;
 }
+
+#endif
 
 inline bool isDotOrDotDot(const char* n)
 {

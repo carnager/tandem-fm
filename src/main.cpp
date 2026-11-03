@@ -7,6 +7,7 @@
 
 #include <QApplication>
 #include <QIcon>
+#include <QDir>
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QSettings>
@@ -15,6 +16,13 @@
 
 int main(int argc, char** argv)
 {
+#ifdef Q_OS_MACOS
+    QByteArray path = qgetenv("PATH");
+    for (const QByteArray& dir : {QByteArray("/opt/homebrew/bin"), QByteArray("/usr/local/bin")})
+        if (!path.split(':').contains(dir))
+            path += ':' + dir;
+    qputenv("PATH", path);
+#endif
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("tandem-fm"));
     QApplication::setOrganizationName(QStringLiteral("tandem-fm"));

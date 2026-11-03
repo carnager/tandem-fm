@@ -70,6 +70,16 @@ public:
     {
         // Each connection is a child process that outlives the listener: end those too.
         const qint64 master = m_proc.processId();
+#ifdef Q_OS_MACOS
+        QProcess ps;
+        ps.start(QStringLiteral("/bin/ps"), {QStringLiteral("-axo"), QStringLiteral("pid=,ppid=")});
+        if (ps.waitForFinished(3000))
+            for (const QByteArray& line : ps.readAllStandardOutput().split('\n')) {
+                const auto fields = line.simplified().split(' ');
+                if (fields.size() == 2 && fields[1].toLongLong() == master)
+                    ::kill(fields[0].toInt(), SIGTERM);
+            }
+#else
         for (const QString& pid : QDir("/proc").entryList(QDir::Dirs)) {
             QFile stat("/proc/" + pid + "/stat");
             if (!stat.open(QIODevice::ReadOnly))
@@ -78,6 +88,7 @@ public:
             if (f.size() > 1 && f[1].toLongLong() == master)
                 ::kill(pid.toInt(), SIGTERM);
         }
+        #endif
         m_proc.terminate();
         m_proc.waitForFinished(3000);
         for (int i = 0; i < 50 && accepting(); ++i)

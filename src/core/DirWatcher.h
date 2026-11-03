@@ -12,8 +12,8 @@ class QSocketNotifier;
 
 namespace tandem {
 
-// inotify-based directory watcher. Unlike QFileSystemWatcher it reports which
-// names changed, so panels update only the affected rows instead of re-listing.
+// Directory watcher: inotify reports changed names on Linux; kqueue reports
+// changed directories on macOS. Empty names request a full directory listing.
 // Events are coalesced for a short interval so a copy of 10k files into a
 // watched directory costs a handful of updates, not 10k.
 class DirWatcher : public QObject {
@@ -23,7 +23,7 @@ public:
     static DirWatcher* instance();
 
     // Thread-safe. May block (path resolution), so call from a worker.
-    // Returns a watch id, or -1. Watches are ref-counted per directory.
+    // Returns a watch id, or -1. Linux watches are ref-counted per directory.
     int addWatch(const QByteArray& nativePath);
     // Thread-safe and non-blocking.
     void removeWatch(int wd);

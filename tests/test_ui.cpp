@@ -40,7 +40,6 @@
 #include <QPlainTextEdit>
 
 #include <sys/stat.h>
-#include <QSignalSpy>
 
 #include <QApplication>
 #include <QLabel>
@@ -53,6 +52,8 @@
 #include <QImage>
 #include <QImageReader>
 #include <QCheckBox>
+#include <QScopeGuard>
+#include <QSignalSpy>
 #include <QListWidget>
 #include <QKeySequenceEdit>
 #include <QTreeWidget>
@@ -662,7 +663,7 @@ private slots:
         QTest::keyClick(m_left->view(), Qt::Key_M, Qt::ControlModifier);
         QTRY_VERIFY(QFile::exists(L("mr/img_1.txt")));
         QCOMPARE(readName(L("mr/img_1.txt")), QByteArray("a.txt"));  // listing order: a, b, c
-        QCOMPARE(readName(L("mr/img_3.txt")), QByteArray("c.txt"));
+        QTRY_COMPARE(readName(L("mr/img_3.txt")), QByteArray("c.txt"));
         QVERIFY(QFile::exists(L("mr/keep.md")));
         QTRY_VERIFY(leftModel()->rowOf("img_2.txt") >= 0);
 
@@ -707,7 +708,7 @@ private slots:
         auto useEditor = [](const QString& cmd) { QSettings().setValue("tools/nameEditor", cmd); };
 
         // The "editor" swaps .txt for .md on every line.
-        useEditor("sed -i s/\\.txt$/.md/ %f");
+        useEditor("sed -i.bak s/\\.txt$/.md/ %f");
         leftModel()->markByPattern("*", true);
         answerNextDialog([](QWidget* w) {
             auto* dlg = qobject_cast<RenameConfirmDialog*>(w);
@@ -725,7 +726,7 @@ private slots:
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_left->view()->setFocus();
-        useEditor("sed -i 1d %f");
+        useEditor("sed -i.bak 1d %f");
         leftModel()->markByPattern("*", true);
         answerNextDialog([](QWidget* w) {
             auto* box = qobject_cast<QMessageBox*>(w);
@@ -1101,6 +1102,31 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void backgroundRefreshKeepsLatestCursorAndMarks()
+    {
+        QTemporaryDir serverDir;
+        writeFile(serverDir.filePath("a.txt"), "a");
+        writeFile(serverDir.filePath("b.txt"), "b");
+        auto backend = std::make_shared<TestBackend>(serverDir.path());
+        registerBackend("test", backend);
+        auto unregister = qScopeGuard([] { registerBackend("test", nullptr); });
+        m_right->navigate("test://srv/");
+        QTRY_COMPARE(rightModel()->path(), QString("test://srv/"));
+        moveCursorTo(m_right, "a.txt");
+        backend->latencyMs = 250;
+        m_right->refresh();
+        QVERIFY(m_right->tab()->isLoading());
+        moveCursorTo(m_right, "b.txt");
+        rightModel()->setMarked(rightModel()->rowOf("b.txt"), true);
+        QTRY_VERIFY(!m_right->tab()->isLoading());
+        QCOMPARE(m_right->currentName(), QString("b.txt"));
+        QVERIFY(rightModel()->markedNames().contains("b.txt"));
+        backend->latencyMs = 0;
+        m_right->navigate(R());
+        QTRY_COMPARE(rightModel()->path(), R());
+        QVERIFY(ioPool()->waitForDone(5000));
+    }
+
     // Server folders notice changes made elsewhere (polled while shown).
     void serverFolderRefreshes()
     {
@@ -1125,16 +1151,25 @@ private slots:
         m_right->tab()->poll();
         QTRY_VERIFY(rightModel()->rowOf("new-from-elsewhere.txt") >= 0);
         QCOMPARE(m_right->currentName(), QString("b.txt"));  // the cursor stays
-        QVERIFY(!m_left->tab()->needsPolling());              // local folders have inotify
+#ifdef Q_OS_MACOS
+        QVERIFY(m_left->tab()->needsPolling()); // catches file content/metadata changes beside kqueue
+#else
+        QVERIFY(!m_left->tab()->needsPolling()); // local folders have inotify
+#endif
 
         m_right->navigate(R());
         QTRY_COMPARE(rightModel()->path(), R());
+        // A poll can still be reading the mock server after navigation completes.
+        QVERIFY(ioPool()->waitForDone(5000));
         registerBackend("test", nullptr);
     }
 
     // The trash window: lists what's there, restores, deletes for good.
     void trashWindow()
     {
+#ifdef Q_OS_MACOS
+        QSKIP("macOS Trash browsing is delegated to Finder; native trash/undo is tested separately");
+#endif
         QVERIFY(QDir().mkpath(L("tw")));
         writeFile(L("tw/old-report.pdf"), "pdf");
         writeFile(L("tw/gone.txt"), "bye");
@@ -1979,6 +2014,8 @@ private slots:
 
         m_right->navigate(R());
         QTRY_COMPARE(rightModel()->path(), R());
+        // A poll can still be reading the mock server after navigation completes.
+        QVERIFY(ioPool()->waitForDone(5000));
         registerBackend("test", nullptr);
     }
 
@@ -2109,6 +2146,8 @@ private slots:
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickViewRight") == nullptr);
         QSettings().setValue("view/preview", false);
 
+#ifndef Q_OS_MACOS
+        // This block requires GNU stat/getfacl on the local test server.
         // Alt+A on the server: its own permissions tools, its users.
         ::chmod(QFile::encodeName(L("remote/readme.txt")).constData(), 0600);
         m_window->activateWindow();
@@ -2131,6 +2170,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(*permsChecked, 10000);
         QTRY_COMPARE_WITH_TIMEOUT(readPermissions(L("remote/readme.txt")).mode, 0620u, 10000);
 
+        #endif
         // A bare address opens the login's home folder.
         m_right->connectTo(server.location().chopped(1));
         QTRY_COMPARE_WITH_TIMEOUT(rightModel()->path(), server.location(QDir::homePath()), 10000);

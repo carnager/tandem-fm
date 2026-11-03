@@ -254,7 +254,11 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     // Servers and network mounts: inotify doesn't see other machines' changes,
     // so the shown folder is looked at again every few seconds.
     auto* poll = new QTimer(this);
+#ifdef Q_OS_MACOS
+    poll->setInterval(1000);
+#else
     poll->setInterval(5000);
+#endif
     connect(poll, &QTimer::timeout, this, [this] {
         DirTab* t = tab();
         QWidget* w = window();

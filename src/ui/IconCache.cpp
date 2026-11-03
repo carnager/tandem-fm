@@ -69,8 +69,11 @@ void IconCache::clear()
 
 QString IconCache::systemTheme()
 {
-    if (systemThemeName().isEmpty())
+    static bool remembered = false;
+    if (!remembered) {
         systemThemeName() = QIcon::themeName();
+        remembered = true; // an empty native macOS theme is a valid original
+    }
     return systemThemeName();
 }
 

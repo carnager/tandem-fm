@@ -3,6 +3,10 @@
 A two-panel file manager for Linux, built for the keyboard. Total Commander
 keys, modern tools, Qt 6.
 
+## macOS development preview
+
+A first macOS port is available in this checkout. See [build instructions, supported features, and limitations](packaging/macos/README.md). The original Linux build remains supported by the source.
+
 ## Features
 
 - Tabs, quick search, filter as you type, bookmarks on letter keys, fuzzy jump to any visited folder

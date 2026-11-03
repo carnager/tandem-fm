@@ -6,11 +6,18 @@
 
 #include <QDir>
 #include <QCoreApplication>
+#include <QScopeGuard>
+#include <QFileInfo>
 
 #include <cerrno>
 #include <dirent.h>
 #include <fcntl.h>
+#ifdef __linux__
 #include <linux/fs.h>
+#else
+#include <copyfile.h>
+#include <stdio.h>
+#endif
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -19,7 +26,9 @@ namespace tandem {
 
 namespace {
 
+#ifdef __linux__
 constexpr size_t kChunk = 4 * 1024 * 1024;   // copy_file_range step: keeps cancel/pause responsive
+#endif
 constexpr size_t kBufSize = 1024 * 1024;     // read/write fallback buffer
 
 bool isDotOrDotDot(const char* n) { return n[0] == '.' && (n[1] == 0 || (n[1] == '.' && n[2] == 0)); }
@@ -42,6 +51,10 @@ int readNames(const QByteArray& dir, std::vector<QByteArray>& out)
 // that do not support RENAME_NOREPLACE.
 int moveNoReplace(const QByteArray& src, const QByteArray& dst)
 {
+#ifdef __APPLE__
+    // RENAME_EXCL is atomic: never fall back to a check followed by rename.
+    return ::renamex_np(src.constData(), dst.constData(), RENAME_EXCL) == 0 ? 0 : errno;
+#else
     if (renameat2(AT_FDCWD, src.constData(), AT_FDCWD, dst.constData(), RENAME_NOREPLACE) == 0)
         return 0;
     const int e = errno;
@@ -53,6 +66,7 @@ int moveNoReplace(const QByteArray& src, const QByteArray& dst)
     if (::rename(src.constData(), dst.constData()) == 0)
         return 0;
     return errno;
+#endif
 }
 
 bool isInside(const QByteArray& child, const QByteArray& parent)
@@ -62,7 +76,13 @@ bool isInside(const QByteArray& child, const QByteArray& parent)
 
 void setTimes(const QByteArray& path, const struct stat& st, int flags = 0)
 {
-    const struct timespec ts[2] = {st.st_atim, st.st_mtim};
+    const struct timespec ts[2] = {
+#ifdef __APPLE__
+            st.st_atimespec, st.st_mtimespec
+#else
+            st.st_atim, st.st_mtim
+#endif
+        };
     utimensat(AT_FDCWD, path.constData(), ts, flags);
 }
 
@@ -161,6 +181,27 @@ void CopyJob::run()
         }
         items.emplace_back(src, dst);
     }
+
+    std::erase_if(items, [&](const auto& item) {
+        struct stat st;
+        if (::lstat(item.first.constData(), &st) != 0 || !S_ISDIR(st.st_mode))
+            return false;
+        const QString source = QFileInfo(fromNative(item.first)).canonicalFilePath();
+        QString target = QDir::cleanPath(fromNative(item.second));
+        QStringList missing;
+        while (!QFileInfo(target).exists() && target != QLatin1String("/")) {
+            missing.prepend(baseName(target));
+            target = parentPath(target);
+        }
+        target = QFileInfo(target).canonicalFilePath();
+        for (const QString& name : missing)
+            target = joinPath(target, name);
+        if (!source.isEmpty() && !target.isEmpty() && isInside(toNative(target), toNative(source))) {
+            addError(tr("Cannot copy a folder into itself: %1").arg(fromNative(item.first)));
+            return true;
+        }
+        return false;
+    });
 
     if (m_mode == Mode::Move) {
         // Same filesystem: a rename per top-level item, no scanning needed.
@@ -416,6 +457,12 @@ bool CopyJob::copyDirectory(const QByteArray& src, QByteArray dst, const struct 
         if (isCancelled())
             return false;
     }
+#ifdef __APPLE__
+    if (ok && ::copyfile(src.constData(), dst.constData(), nullptr, COPYFILE_METADATA | COPYFILE_NOFOLLOW) != 0) {
+        askError(tr("Cannot copy folder metadata"), fromNative(src), errno);
+        ok = false;
+    }
+#endif
     ::chmod(dst.constData(), st.st_mode & 07777);
     setTimes(dst, st);
     m_filesDone += 1;
@@ -457,6 +504,13 @@ bool CopyJob::copySymlink(const QByteArray& src, QByteArray dst, const struct st
         if (askError(tr("Cannot create link"), fromNative(dst), e) != Answer::Retry)
             return false;
     }
+#ifdef __APPLE__
+    if (::copyfile(src.constData(), dst.constData(), nullptr, COPYFILE_METADATA | COPYFILE_NOFOLLOW) != 0) {
+        askError(tr("Cannot copy link metadata"), fromNative(src), errno);
+        ::unlink(dst.constData());
+        return false;
+    }
+#endif
     setTimes(dst, st, AT_SYMLINK_NOFOLLOW);
     m_filesDone += 1;
     if (m_mode == Mode::Move && ::unlink(src.constData()) != 0) {
@@ -474,40 +528,48 @@ bool CopyJob::copyRegular(const QByteArray& src, QByteArray dst, const struct st
             return false;
     }
 
-    int out;
+    // Resolve conflicts before copying, but leave the existing destination
+    // untouched until all data and metadata have been written successfully.
+    bool replace = false;
+    struct stat approved{};
     for (;;) {
-        out = ::open(dst.constData(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
-        if (out >= 0)
-            break;
-        const int e = errno;
         struct stat dstSt;
-        if (e == EEXIST && lstat(dst.constData(), &dstSt) == 0) {
-            const auto r = resolveConflict(src, st, dst, dstSt);
-            if (!r || *r == Resolution::Skip) {
-                ::close(in);
-                m_filesDone += 1;
-                m_bytesDone += st.st_size;
-                return false;
-            }
-            if (*r == Resolution::Overwrite) {
-                if (S_ISDIR(dstSt.st_mode)) {
-                    addError(tr("Cannot replace a folder with a file: %1").arg(fromNative(dst)));
-                    ::close(in);
-                    return false;
-                }
-                if (::unlink(dst.constData()) != 0) {
-                    askError(tr("Cannot replace"), fromNative(dst), errno);
-                    ::close(in);
-                    return false;
-                }
-            }
-            continue;  // Rename already changed dst
+        if (::lstat(dst.constData(), &dstSt) != 0) {
+            if (errno == ENOENT)
+                break;
+            const int err = errno;
+            ::close(in);
+            askError(tr("Cannot inspect destination"), fromNative(dst), err);
+            return false;
         }
-        if (askError(tr("Cannot create"), fromNative(dst), e) != Answer::Retry) {
+        const auto r = resolveConflict(src, st, dst, dstSt);
+        if (!r || *r == Resolution::Skip) {
+            ::close(in);
+            m_filesDone += 1;
+            m_bytesDone += st.st_size;
+            return false;
+        }
+        if (*r == Resolution::Rename)
+            continue;
+        if (S_ISDIR(dstSt.st_mode)) {
+            addError(tr("Cannot replace a folder with a file: %1").arg(fromNative(dst)));
             ::close(in);
             return false;
         }
+        replace = true;
+        approved = dstSt;
+        break;
     }
+    QByteArray staging = toNative(parentPath(fromNative(dst))) + "/.tandem-copy-XXXXXX";
+    const int out = ::mkstemp(staging.data());
+    if (out < 0) {
+        const int err = errno;
+        ::close(in);
+        askError(tr("Cannot create"), fromNative(dst), err);
+        return false;
+    }
+    ::fcntl(out, F_SETFD, FD_CLOEXEC);
+    auto removeStaging = qScopeGuard([&] { ::unlink(staging.constData()); });
 
     const int64_t before = m_bytesDone.load();
     int err;
@@ -527,14 +589,30 @@ bool CopyJob::copyRegular(const QByteArray& src, QByteArray dst, const struct st
         }
     }
 
-    bool ok = err == 0;
+    bool ok = err == 0 && !isCancelled();
+#ifdef __APPLE__
+    if (ok && ::fcopyfile(in, out, nullptr, COPYFILE_METADATA) != 0) {
+        askError(tr("Cannot copy metadata"), fromNative(src), errno);
+        ok = false;
+    }
+#endif
     if (ok) {
         ::fchmod(out, st.st_mode & 07777);
         if (::fchown(out, st.st_uid, st.st_gid) != 0) {
             // Expected when not root: the copy belongs to us.
         }
-        const struct timespec ts[2] = {st.st_atim, st.st_mtim};
+        const struct timespec ts[2] = {
+#ifdef __APPLE__
+            st.st_atimespec, st.st_mtimespec
+#else
+            st.st_atim, st.st_mtim
+#endif
+        };
         ::futimens(out, ts);
+    }
+    if (ok && ::fsync(out) != 0) {
+        askError(tr("Error while writing"), fromNative(dst), errno);
+        ok = false;
     }
     // Network filesystems may only report write errors on close.
     if (::close(out) != 0 && ok) {
@@ -543,8 +621,22 @@ bool CopyJob::copyRegular(const QByteArray& src, QByteArray dst, const struct st
     }
     ::close(in);
 
-    if (!ok) {
-        ::unlink(dst.constData());
+    if (!ok || isCancelled())
+        return false;
+    int installError = 0;
+    if (replace) {
+        struct stat now;
+        if (::lstat(dst.constData(), &now) != 0 || now.st_dev != approved.st_dev || now.st_ino != approved.st_ino ||
+            now.st_size != approved.st_size || now.st_mtime != approved.st_mtime) {
+            addError(tr("Destination changed during copying; kept both originals: %1").arg(fromNative(dst)));
+            return false;
+        }
+        installError = ::rename(staging.constData(), dst.constData()) == 0 ? 0 : errno;
+    } else {
+        installError = moveNoReplace(staging, dst);
+    }
+    if (installError) {
+        askError(tr("Cannot install copied file"), fromNative(dst), installError);
         return false;
     }
     m_filesDone += 1;
@@ -557,6 +649,7 @@ bool CopyJob::copyRegular(const QByteArray& src, QByteArray dst, const struct st
 
 int CopyJob::copyData(int in, int out, int64_t size)
 {
+    #ifdef __linux__
     ::posix_fadvise(in, 0, 0, POSIX_FADV_SEQUENTIAL);
 
     // Reflink (btrfs, xfs, bcachefs): instant copy-on-write clone.
@@ -566,11 +659,17 @@ int CopyJob::copyData(int in, int out, int64_t size)
     }
 
     bool useCfr = true;
+#else
+    (void)size;
+#endif
+#ifdef __linux__
     int64_t copied = 0;
+#endif
     for (;;) {
         if (checkpoint())
             return -1;
         ssize_t n;
+#ifdef __linux__
         if (useCfr) {
             // In-kernel copy; server-side copy on NFS 4.2 / SMB3.
             n = ::copy_file_range(in, nullptr, out, nullptr, kChunk, 0);
@@ -580,7 +679,9 @@ int CopyJob::copyData(int in, int out, int64_t size)
                 useCfr = false;
                 continue;
             }
-        } else {
+        } else
+#endif
+        {
             if (m_buffer.empty())
                 m_buffer.resize(kBufSize);
             n = ::read(in, m_buffer.data(), m_buffer.size());
@@ -593,6 +694,8 @@ int CopyJob::copyData(int in, int out, int64_t size)
                             continue;
                         return errno;
                     }
+                    if (w == 0)
+                        return EIO;
                     off += w;
                 }
             }
@@ -604,7 +707,9 @@ int CopyJob::copyData(int in, int out, int64_t size)
                 continue;
             return errno;
         }
+#ifdef __linux__
         copied += n;
+#endif
         m_bytesDone += n;
     }
 }

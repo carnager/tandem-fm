@@ -22,13 +22,15 @@ QStringList restoreFromTrash(const QList<QPair<QString, QString>>& pairs)
             continue;
         }
         makeDirectories(parentPath(original));
-        if (::rename(toNative(inTrash).constData(), toNative(original).constData()) != 0) {
-            errors << QObject::tr("%1: %2").arg(original, errnoString(errno));
+        if (const int err = renameNoReplace(inTrash, original)) {
+            errors << QObject::tr("%1: %2").arg(original, errnoString(err));
             continue;
         }
+        #ifndef __APPLE__
         // .../Trash/files/<name>  ->  .../Trash/info/<name>.trashinfo
         const QString trashRoot = parentPath(parentPath(inTrash));
         QFile::remove(trashRoot + QStringLiteral("/info/") + baseName(inTrash) + QStringLiteral(".trashinfo"));
+        #endif
     }
     return errors;
 }

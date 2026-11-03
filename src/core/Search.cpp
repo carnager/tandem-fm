@@ -3,6 +3,7 @@
 #include "core/Util.h"
 
 #include <QDirIterator>
+#include <algorithm>
 #include <QElapsedTimer>
 #include <QProcess>
 #include <QRegularExpression>
@@ -110,6 +111,13 @@ QString builtinNameSearch(const SearchSpec& spec, const std::atomic<bool>* cance
         if (cancel && cancel->load())
             return {};
         const QString path = it.next();
+        const QString relative = path.mid(spec.root.size() + (spec.root.endsWith(QLatin1Char('/')) ? 0 : 1));
+        // Qt on macOS can treat dot directories differently from POSIX tools.
+        if (!spec.all) {
+            const auto parts = relative.split(QLatin1Char('/'));
+            if (std::any_of(parts.begin(), parts.end(), [](const QString& part) { return part.startsWith(QLatin1Char('.')); }))
+                continue;
+        }
         if (!rx.match(it.fileName()).hasMatch())
             continue;
         batch.append(path.mid(spec.root.size() + (spec.root.endsWith(QLatin1Char('/')) ? 0 : 1)));
