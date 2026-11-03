@@ -264,6 +264,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
     m_quickTimer->setInterval(120);  // holding an arrow key doesn't decode every file
     connect(m_quickTimer, &QTimer::timeout, this, &MainWindow::updateQuickView);
     ioPool()->start([] { pruneExtractCache(); });
+    loadPlugins();
     QPointer<MainWindow> self(this);
     ioPool()->start([self] {
         auto themes = std::make_shared<QList<IconTheme>>(scanIconThemes());
@@ -473,6 +474,8 @@ void MainWindow::createMenus()
         addCommand(tools, QT_TR_NOOP("Run command…"), {K(Qt::CTRL | Qt::Key_Semicolon)}, [this] { openCommandBar(); });
     m_actions[QStringLiteral("terminal")] =
         addCommand(tools, QT_TR_NOOP("Open terminal here"), {K(Qt::CTRL | Qt::ALT | Qt::Key_T)}, [this] { openTerminal(); });
+    m_pluginMenu = tools->addMenu(tr("Plugins"));
+    m_pluginMenu->menuAction()->setVisible(false);  // until one is switched on
     tools->addSeparator();
     addCommand(tools, QT_TR_NOOP("Settings…"), {K(Qt::CTRL | Qt::Key_Comma)}, [this] { openSettings(); });
 
@@ -2158,6 +2161,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         menu.addSeparator();
         menu.addAction(act("markAll"));
         menu.addAction(act("unmarkAll"));
+        addPluginItems(&menu, panel, false);
         menu.exec(pos);
         act("paste")->setEnabled(true);
         return;
@@ -2233,6 +2237,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     menu.addAction(act("link"));
     menu.addAction(act("checksums"));
     menu.addAction(act("copyPath"));
+    addPluginItems(&menu, panel, true);
     menu.addSeparator();
     if (e && e->isDir)
         menu.addAction(IconCache::themed("view-statistics"), tr("Calculate size"), this,
@@ -2247,6 +2252,169 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     menu.exec(pos);
     act("copy")->setText(tr("Copy…"));
     act("move")->setText(tr("Move…"));
+}
+
+// ------------------------------------------------------------- plugins
+
+void MainWindow::loadPlugins(std::function<void()> then)
+{
+    QPointer<MainWindow> self(this);
+    ioPool()->start([self, then] {
+        auto found = std::make_shared<QList<Plugin>>(discoverPlugins());
+        postToUi([self, found, then] {
+            if (!self)
+                return;
+            self->m_plugins = *found;
+            self->installPluginCommands();
+            if (then)
+                then();
+        });
+    });
+}
+
+void MainWindow::installPluginCommands()
+{
+    qDeleteAll(m_pluginActions);
+    m_pluginActions.clear();
+    m_pluginMenu->clear();
+    for (const Plugin& plugin : std::as_const(m_plugins)) {
+        if (!plugin.error.isEmpty() || pluginTrust(plugin) != PluginTrust::On)
+            continue;
+        if (!m_pluginMenu->isEmpty())
+            m_pluginMenu->addSeparator();
+        for (const PluginAction& action : plugin.actions) {
+            QList<QKeySequence> keys;
+            for (const QString& k : action.keys)
+                keys << QKeySequence::fromString(k, QKeySequence::PortableText);
+            QAction* a = addCommand(
+                m_pluginMenu, action.title, keys,
+                [this, plugin, action] {
+                    Panel* p = active();
+                    if (action.choices.isEmpty()) {
+                        runPluginAction(plugin, action, p);
+                        return;
+                    }
+                    // Entries to pick from, at the cursor.
+                    auto* menu = new QMenu(this);
+                    menu->setAttribute(Qt::WA_DeleteOnClose);
+                    fillPluginChoices(menu, plugin, action, p);
+                    const QRect r = p->view()->visualRect(p->view()->currentIndex());
+                    menu->popup(p->view()->viewport()->mapToGlobal(r.isValid() ? r.bottomLeft() + QPoint(40, 0)
+                                                                               : QPoint(40, 40)));
+                },
+                QStringLiteral("plugin-%1-%2").arg(plugin.id, action.id));
+            a->setProperty("category", plugin.name);
+            m_pluginActions.append(a);
+        }
+    }
+    m_pluginMenu->menuAction()->setVisible(!m_pluginActions.isEmpty());
+    applyKeyBindings(m_pluginActions);
+}
+
+PluginContext MainWindow::pluginContext(Panel* p) const
+{
+    PluginContext ctx;
+    ctx.selection = p->selectedPaths();
+    ctx.current = p->currentPath();
+    ctx.dir = p->path();
+    ctx.otherDir = (p == m_left ? m_right : m_left)->path();
+    ctx.local = !p->isRemote() && !p->inArchive();
+    return ctx;
+}
+
+void MainWindow::runPluginAction(const Plugin& plugin, const PluginAction& action, Panel* p, const QString& choice)
+{
+    const PluginContext ctx = pluginContext(p);
+    if (!pluginApplies(action, ctx)) {
+        p->showMessage(action.localOnly && !ctx.local ? tr("%1 works on local files only").arg(action.title)
+                                                      : tr("%1 doesn't apply to these files").arg(action.title),
+                       true);
+        return;
+    }
+    auto* run = new PluginRun(plugin, action, ctx, choice, this);
+    QPointer<Panel> panel(p);
+    const QString title = action.title;
+    connect(run, &PluginRun::request, this, [panel](const PluginRequest& r) {
+        if (!panel)
+            return;
+        if (!r.error.isEmpty())
+            panel->showMessage(r.error, true);
+        else if (!r.message.isEmpty())
+            panel->showMessage(r.message);
+        if (!r.cd.isEmpty())
+            panel->navigate(r.cd);
+        else if (r.refresh)
+            panel->refresh();
+        if (!r.select.isEmpty())
+            panel->markNames(r.select);
+    });
+    connect(run, &PluginRun::finished, this, [panel, title](bool ok, const QString& text) {
+        if (!panel)
+            return;
+        if (!text.isEmpty())
+            panel->showMessage(text, !ok);
+        else if (!ok)
+            panel->showMessage(tr("%1 failed").arg(title), true);
+    });
+    p->showMessage(tr("%1 …").arg(choice.isEmpty() ? title : QStringLiteral("%1: %2").arg(title, choice)));
+    run->start();
+}
+
+void MainWindow::fillPluginChoices(QMenu* menu, const Plugin& plugin, const PluginAction& action, Panel* p)
+{
+    QAction* loading = menu->addAction(tr("Loading…"));
+    loading->setEnabled(false);
+    QPointer<QMenu> target(menu);
+    QPointer<Panel> panel(p);
+    listPluginChoices(plugin, action, pluginContext(p), menu,
+                      [this, target, panel, plugin, action](const QList<QPair<QString, QString>>& entries,
+                                                            const QString& error) {
+                          if (!target || !panel)
+                              return;
+                          target->clear();
+                          if (!error.isEmpty() || entries.isEmpty()) {
+                              target->addAction(error.isEmpty() ? tr("Nothing to choose") : error)->setEnabled(false);
+                              return;
+                          }
+                          for (const auto& [label, value] : entries) {
+                              const QString v = value;
+                              target->addAction(label, this, [this, panel, plugin, action, v] {
+                                  if (panel)
+                                      runPluginAction(plugin, action, panel, v);
+                              });
+                          }
+                      });
+}
+
+// The plugin actions that fit what was right-clicked: the selection, or
+// the folder when clicking beside the files.
+void MainWindow::addPluginItems(QMenu* menu, Panel* p, bool onItem)
+{
+    const PluginContext ctx = pluginContext(p);
+    bool first = true;
+    for (const Plugin& plugin : std::as_const(m_plugins)) {
+        if (!plugin.error.isEmpty() || pluginTrust(plugin) != PluginTrust::On)
+            continue;
+        for (const PluginAction& action : plugin.actions) {
+            if (action.forFolder == onItem || !pluginApplies(action, ctx))
+                continue;
+            if (first)
+                menu->addSeparator();
+            first = false;
+            if (action.choices.isEmpty()) {
+                menu->addAction(action.title, this, [this, plugin, action, p] { runPluginAction(plugin, action, p); });
+                continue;
+            }
+            QMenu* sub = menu->addMenu(action.title);
+            sub->addAction(tr("Loading…"))->setEnabled(false);  // empty menus don't open
+            connect(sub, &QMenu::aboutToShow, this, [this, sub, plugin, action, p] {
+                if (sub->property("filled").toBool())
+                    return;
+                sub->setProperty("filled", true);
+                fillPluginChoices(sub, plugin, action, p);
+            });
+        }
+    }
 }
 
 void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)

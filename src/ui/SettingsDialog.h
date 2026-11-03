@@ -22,7 +22,7 @@ class SettingsDialog : public QDialog {
 public:
     explicit SettingsDialog(MainWindow* window);
 
-    void showPage(int index);  // 0 appearance, 1 behaviour, 2 tools, 3 keys
+    void showPage(int index);  // 0 appearance, 1 behaviour, 2 tools, 3 keys, 4 plugins
     // For tests.
     QTreeWidget* keyList() const { return m_keys; }
     QKeySequenceEdit* keyEdit() const { return m_keyEdit; }
@@ -34,6 +34,8 @@ private:
     QWidget* behaviourPage();
     QWidget* toolsPage();
     QWidget* keysPage();
+    QWidget* pluginsPage();
+    void fillPlugins();
     void fillKeys();
     void keySelected();
     void assignKeys(const QKeySequence& seq);
@@ -48,6 +50,7 @@ private:
     QPushButton* m_keyClear = nullptr;
     QPushButton* m_keyReset = nullptr;
     bool m_loadingKey = false;
+    QWidget* m_pluginList = nullptr;
 };
 
 // Keys the user changed, stored per command id ("keys/<id>"); applied at start.

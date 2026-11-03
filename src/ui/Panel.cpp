@@ -830,6 +830,17 @@ void Panel::markAll(bool on)
         t->model()->markAll(on);
 }
 
+void Panel::markNames(const QStringList& names)
+{
+    DirTab* t = tab();
+    if (!t)
+        return;
+    QSet<QString> set;
+    for (const QString& n : names)
+        set.insert(n.startsWith(QLatin1Char('/')) ? baseName(n) : n);
+    t->model()->setMarkedNames(set);
+}
+
 void Panel::computeCurrentSize()
 {
     const FileEntry* e = currentEntry();

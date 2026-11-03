@@ -4,6 +4,7 @@
 
 #include "core/FileOps.h"
 #include "core/MultiRename.h"
+#include "core/Plugins.h"
 #include "core/Undo.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/IconCache.h"
@@ -66,6 +67,14 @@ private:
     void showShortcuts();
     void showContextMenu(Panel* panel, const QPoint& pos, bool onItem);
     void addOpenWithMenu(QMenu* menu, const QStringList& paths);
+    // Plugins: read on a worker, then their actions become commands.
+    void loadPlugins(std::function<void()> then = {});
+    void installPluginCommands();
+    PluginContext pluginContext(Panel* p) const;
+    void runPluginAction(const Plugin& plugin, const PluginAction& action, Panel* panel, const QString& choice = {});
+    // Fills `menu` with the action's entries once they are known.
+    void fillPluginChoices(QMenu* menu, const Plugin& plugin, const PluginAction& action, Panel* panel);
+    void addPluginItems(QMenu* menu, Panel* panel, bool onItem);
     void makeFile();
     void openTerminal(const QString& dir = {});
     void pasteInto(const QString& dir);
@@ -152,6 +161,9 @@ private:
     double m_panelRatio = 0.5;  // left panel's share of the two panels
     QList<IconTheme> m_iconThemes;
     bool m_iconThemesLoaded = false;
+    QList<Plugin> m_plugins;
+    QList<QAction*> m_pluginActions;
+    QMenu* m_pluginMenu = nullptr;
     QList<UndoEntry> m_undo;
 };
 

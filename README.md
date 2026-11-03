@@ -16,6 +16,7 @@ keys, modern tools, Qt 6.
 - Find duplicates, disk usage, checksums, links, trash, thumbnails
 - Command palette (Ctrl+Shift+P), every key changeable, optional Vim keys, Git status
 - Themes: Nord, Dracula, Gruvbox, Catppuccin, Solarized, Tokyo Night and more, or your own; can follow the desktop's light and dark mode
+- Plugins: any program becomes a command on the selection, with menus to pick from ([docs/plugins.md](docs/plugins.md))
 
 F1 lists all keys.
 

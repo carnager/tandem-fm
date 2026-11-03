@@ -33,6 +33,7 @@
 #include "ui/TrashDialog.h"
 #include "ui/Panel.h"
 #include "ui/PathBar.h"
+#include "core/Plugins.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ImageView.h"
 #include "ui/viewer/ViewerWindow.h"
@@ -317,6 +318,62 @@ private slots:
         writeFile(own, "{\"name\": \"My Nord\", \"dark\": true, \"colors\": {\"accent\": \"#00ff00\"}}");
         QTRY_COMPARE(theme().name, QString("My Nord"));  // picked up by watching the folder
         QVERIFY(label.styleSheet().contains("rgba(0,255,0"));
+    }
+
+    // A plugin: switched on in Settings, it becomes a command; its answer marks a file.
+    void pluginCommand()
+    {
+        const QString dir = pluginsFolder() + "/marker";
+        QVERIFY(QDir().mkpath(dir));
+        auto cleanup = qScopeGuard([dir] { QDir(dir).removeRecursively(); });
+        writeFile(dir + "/plugin.json",
+                  "{\"name\": \"Marker\", \"actions\": [{\"title\": \"Mark the second\", "
+                  "\"run\": [\"sh\", \"-c\", \"echo '{\\\"select\\\": [\\\"file2.txt\\\"], "
+                  "\\\"message\\\": \\\"marked\\\"}'\"]}]}");
+
+        SettingsDialog settings(m_window.get());
+        settings.showPage(4);
+        auto* reload = [&] {
+            for (auto* b : settings.findChildren<QPushButton*>())
+                if (b->text() == tr("Reload"))
+                    return b;
+            return static_cast<QPushButton*>(nullptr);
+        }();
+        QVERIFY(reload);
+        reload->click();
+        QCheckBox* box = nullptr;
+        QTRY_VERIFY((box = [&] {
+            for (auto* c : settings.findChildren<QCheckBox*>())
+                if (c->text() == "Marker" && !c->isHidden())
+                    return c;
+            return static_cast<QCheckBox*>(nullptr);
+        }()));
+        QVERIFY(!box->isChecked());  // off until switched on
+        box->setChecked(true);
+        settings.close();
+
+        QAction* command = nullptr;
+        for (QAction* a : m_window->actions())
+            if (a->property("commandId").toString() == "plugin-marker-mark-the-second")
+                command = a;
+        QVERIFY(command);
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        moveCursorTo(m_left, "file1.txt");  // something to run on
+        command->trigger();
+        QTRY_VERIFY(leftModel()->markedNames().contains("file2.txt"));
+        leftModel()->markAll(false);
+
+        // Changing the plugin switches it off again.
+        writeFile(dir + "/plugin.json", "{\"actions\": [{\"title\": \"Other\", \"run\": \"true\"}]}");
+        bool reloaded = false;
+        SettingsDialog again(m_window.get());
+        for (auto* b : again.findChildren<QPushButton*>())
+            if (b->text() == tr("Reload"))
+                b->click();
+        QTRY_VERIFY((reloaded = std::none_of(m_window->actions().cbegin(), m_window->actions().cend(), [](QAction* a) {
+                         return a->property("commandId").toString().startsWith("plugin-marker");
+                     })));
     }
 
     void quickSearch()

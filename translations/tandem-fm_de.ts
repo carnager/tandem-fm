@@ -399,8 +399,28 @@
         <translation>Kamera</translation>
     </message>
     <message>
+        <source>plugin.json: %1</source>
+        <translation>plugin.json: %1</translation>
+    </message>
+    <message>
+        <source>needs a newer Tandem</source>
+        <translation>braucht ein neueres Tandem</translation>
+    </message>
+    <message>
+        <source>no usable actions</source>
+        <translation>keine nutzbaren Aktionen</translation>
+    </message>
+    <message>
+        <source>no answer</source>
+        <translation>keine Antwort</translation>
+    </message>
+    <message>
         <source>Could not start %1</source>
         <translation>%1 konnte nicht gestartet werden</translation>
+    </message>
+    <message>
+        <source>failed (exit %1)</source>
+        <translation>fehlgeschlagen (Exit %1)</translation>
     </message>
     <message>
         <source>Search failed</source>
@@ -2183,6 +2203,10 @@
         <translation>E&amp;xtras</translation>
     </message>
     <message>
+        <source>Plugins</source>
+        <translation>Plugins</translation>
+    </message>
+    <message>
         <source>Settings…</source>
         <translation>Einstellungen…</translation>
     </message>
@@ -2731,6 +2755,30 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Calculate size</source>
         <translation>Größe berechnen</translation>
+    </message>
+    <message>
+        <source>%1 works on local files only</source>
+        <translation>%1 geht nur mit lokalen Dateien</translation>
+    </message>
+    <message>
+        <source>%1 doesn&apos;t apply to these files</source>
+        <translation>%1 passt nicht zu diesen Dateien</translation>
+    </message>
+    <message>
+        <source>%1 failed</source>
+        <translation>%1 fehlgeschlagen</translation>
+    </message>
+    <message>
+        <source>%1 …</source>
+        <translation>%1 …</translation>
+    </message>
+    <message>
+        <source>Loading…</source>
+        <translation>Wird geladen…</translation>
+    </message>
+    <message>
+        <source>Nothing to choose</source>
+        <translation>Nichts zur Auswahl</translation>
     </message>
     <message>
         <source>Open with</source>
@@ -3655,6 +3703,17 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     </message>
 </context>
 <context>
+    <name>tandem::PluginRun</name>
+    <message>
+        <source>Could not start %1</source>
+        <translation>%1 konnte nicht gestartet werden</translation>
+    </message>
+    <message>
+        <source>%1 failed (exit %2)</source>
+        <translation>%1 fehlgeschlagen (Exit %2)</translation>
+    </message>
+</context>
+<context>
     <name>tandem::PromptDialog</name>
     <message>
         <source>Source</source>
@@ -3819,6 +3878,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Wie das System</translation>
     </message>
     <message>
+        <source>Plugins</source>
+        <translation>Plugins</translation>
+    </message>
+    <message>
         <source>Light:</source>
         <translation>Hell:</translation>
     </message>
@@ -3921,6 +3984,34 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>A desktop notification when a copy or move that took a while is done and Tandem isn&apos;t in front.</source>
         <translation>Eine Desktop-Benachrichtigung, wenn ein längeres Kopieren oder Verschieben fertig ist und Tandem nicht im Vordergrund liegt.</translation>
+    </message>
+    <message>
+        <source>Plugins are programs that run with your rights: switch on only those you trust. One that changes is switched off until you switch it on again. Their commands appear in the context menu, under Tools › Plugins, in the command palette and on the Keys page.</source>
+        <translation>Plugins sind Programme, die mit deinen Rechten laufen: schalte nur die ein, denen du vertraust. Ändert sich eins, ist es aus, bis du es wieder einschaltest. Ihre Befehle stehen im Kontextmenü, unter Extras › Plugins, in der Befehlspalette und auf der Seite Tasten.</translation>
+    </message>
+    <message>
+        <source>Open plugins folder</source>
+        <translation>Plugin-Ordner öffnen</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Neu laden</translation>
+    </message>
+    <message>
+        <source>Own plugins go in %1, each in a folder with a plugin.json.</source>
+        <translation>Eigene Plugins gehören nach %1, jedes in einen Ordner mit einer plugin.json.</translation>
+    </message>
+    <message>
+        <source>No plugins installed.</source>
+        <translation>Keine Plugins installiert.</translation>
+    </message>
+    <message>
+        <source>Can&apos;t be used: %1</source>
+        <translation>Nicht nutzbar: %1</translation>
+    </message>
+    <message>
+        <source>Changed since you switched it on: check it, then switch it on again.</source>
+        <translation>Geändert, seit du es eingeschaltet hast: prüfe es und schalte es wieder ein.</translation>
     </message>
     <message>
         <source>Editor (F4)</source>

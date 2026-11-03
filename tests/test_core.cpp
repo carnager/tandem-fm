@@ -13,6 +13,7 @@
 #include "core/Trash.h"
 #include "core/Undo.h"
 #include "core/FolderHistory.h"
+#include "core/Plugins.h"
 #include "core/Fuzzy.h"
 #include "core/IoScheduler.h"
 #include "core/MultiRename.h"
@@ -350,6 +351,14 @@ private slots:
                   "[Desktop Entry]\nType=Application\nName=Gone\nExec=gone\nMimeType=text/plain;\n");
         writeFile(tmp.filePath("config/mimeapps.list"),
                   "[Default Applications]\ntext/plain=zzz.desktop;\n[Removed Associations]\ntext/plain=gone.desktop;\n");
+        // Later tests need the real ones (the MIME database lives in XDG_DATA_DIRS).
+        QHash<const char*, QByteArray> saved;
+        for (const char* var : {"XDG_DATA_HOME", "XDG_DATA_DIRS", "XDG_CONFIG_HOME", "XDG_CONFIG_DIRS"})
+            saved.insert(var, qgetenv(var));
+        auto restoreEnv = qScopeGuard([saved] {
+            for (auto it = saved.cbegin(); it != saved.cend(); ++it)
+                it.value().isEmpty() ? qunsetenv(it.key()) : qputenv(it.key(), it.value());
+        });
         qputenv("XDG_DATA_HOME", QFile::encodeName(tmp.filePath("data")));
         qputenv("XDG_DATA_DIRS", QFile::encodeName(tmp.filePath("none")));
         qputenv("XDG_CONFIG_HOME", QFile::encodeName(tmp.filePath("config")));
@@ -1756,6 +1765,147 @@ private slots:
         setupConfigDir(args);
         QVERIFY(args.isEmpty());
         QCOMPARE(tandem::configDir(), tmp.filePath("other"));
+    }
+
+    void pluginManifest()
+    {
+        Plugin p;
+        p.id = "demo";
+        p.dir = "/opt/demo";
+        QVERIFY(parsePluginManifest("{ "
+            "            \"tandem\": 1, \"name\": \"Demo\", \"description\": \"Does things\", \"someday\": {\"x\": 1}, "
+            "            \"actions\": [ "
+            "                {\"title\": \"Send to phone\", \"run\": [\"./send\", \"--to\", \"%c\", \"%s\"], \"choices\": \"pocketlink devices\", "
+            "                 \"types\": [\"image/*\", \"*.pdf\"], \"keys\": [\"Ctrl+Alt+P\"], \"glitter\": true}, "
+            "                {\"id\": \"here\", \"title\": \"Here\", \"run\": \"echo %d\", \"on\": \"folder\", \"local\": false}, "
+            "                {\"title\": \"No command\"} "
+            "            ]}", p));
+        QCOMPARE(p.name, QString("Demo"));
+        QCOMPARE(p.actions.size(), 2);  // the incomplete one is left out
+        const PluginAction& send = p.actions[0];
+        QCOMPARE(send.id, QString("send-to-phone"));
+        QCOMPARE(send.choices, QStringList({"pocketlink", "devices"}));
+        QCOMPARE(send.keys, QStringList({"Ctrl+Alt+P"}));
+        QVERIFY(send.localOnly && !send.forFolder);
+        QVERIFY(p.actions[1].forFolder && !p.actions[1].localOnly);
+
+        Plugin newer;
+        QVERIFY(!parsePluginManifest("{\"tandem\": 99, \"actions\": [{\"title\": \"x\", \"run\": \"x\"}]}", newer));
+        QVERIFY(!newer.error.isEmpty());
+        QVERIFY(!parsePluginManifest("{ broken", newer));
+
+        // Placeholders, no shell: %s gives one argument per path.
+        PluginContext ctx;
+        ctx.selection = {"/data/a b.jpg", "/data/c.pdf"};
+        ctx.current = "/data/a b.jpg";
+        ctx.dir = "/data";
+        ctx.otherDir = "/other";
+        QCOMPARE(expandPluginArgs(p, send.run, ctx, "Pixel 10"),
+                 QStringList({"/opt/demo/send", "--to", "Pixel 10", "/data/a b.jpg", "/data/c.pdf"}));
+        QCOMPARE(expandPluginArgs(p, {"x", "%n|%f|%d|%D|100%%|%q"}, ctx),
+                 QStringList({"x", "a b.jpg|/data/a b.jpg|/data|/other|100%|%q"}));
+
+        // Which actions fit: types by name, local only, folder actions.
+        QVERIFY(pluginApplies(send, ctx));
+        ctx.selection << "/data/notes.txt";
+        QVERIFY(!pluginApplies(send, ctx));  // every item must match
+        ctx.selection = {"/data/IMG.JPEG"};
+        QVERIFY(pluginApplies(send, ctx));
+        ctx.local = false;
+        QVERIFY(!pluginApplies(send, ctx));
+        QVERIFY(pluginApplies(p.actions[1], ctx));
+        ctx.selection.clear();
+        ctx.local = true;
+        QVERIFY(!pluginApplies(send, ctx));
+
+        // Trust: on, changed, off (kept in the settings: a throwaway folder here).
+        QTemporaryDir cfg;
+        useConfigDir(cfg.path());
+        auto restore = qScopeGuard([] { useConfigDir(QString()); });
+        p.hash = "aaa";
+        setPluginEnabled(p, true);
+        QCOMPARE(pluginTrust(p), PluginTrust::On);
+        p.hash = "bbb";
+        QCOMPARE(pluginTrust(p), PluginTrust::Changed);
+        setPluginEnabled(p, false);
+        QCOMPARE(pluginTrust(p), PluginTrust::Off);
+
+        PluginRequest r;
+        QVERIFY(parsePluginRequest("{\"message\": \"Sent\", \"select\": [\"a\", \"b\"], \"refresh\": true}", r));
+        QCOMPARE(r.message, QString("Sent"));
+        QCOMPARE(r.select, QStringList({"a", "b"}));
+        QVERIFY(r.refresh);
+        QVERIFY(!parsePluginRequest("just text", r));
+    }
+
+    void pluginRuns()
+    {
+        QTemporaryDir tmp;
+        auto restore = qScopeGuard([] { useConfigDir(QString()); });
+        useConfigDir(tmp.filePath("cfg"));
+        const QString dir = pluginsFolder() + "/demo";
+        QVERIFY(QDir().mkpath(dir));
+        writeFile(dir + "/plugin.json", "{\"name\": \"Demo\", \"actions\": [ "
+            "            {\"title\": \"Report\", \"run\": [\"./report.sh\", \"%s\"], \"choices\": [\"./devices.sh\"]}, "
+            "            {\"title\": \"Fail\", \"run\": [\"sh\", \"-c\", \"echo broken >&2; exit 3\"]}]}");
+        writeFile(dir + "/report.sh",
+                  "#!/bin/sh\necho \"working on $# files\"\necho '{\"select\": [\"a.txt\"], \"refresh\": true}'\n"
+                  "echo \"plugin dir: $TANDEM_PLUGIN_DIR\"\n");
+        writeFile(dir + "/devices.sh", "#!/bin/sh\nprintf 'Pixel 10\\tpixel\\nTablet\\n'\n");
+        QFile::setPermissions(dir + "/report.sh", QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+        QFile::setPermissions(dir + "/devices.sh", QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+
+        const QList<Plugin> found = discoverPlugins();
+        const auto it = std::find_if(found.begin(), found.end(), [](const Plugin& p) { return p.id == "demo"; });
+        QVERIFY(it != found.end());
+        const Plugin& p = *it;
+        QVERIFY2(p.error.isEmpty(), qPrintable(p.error));
+        QVERIFY(!p.system && !p.hash.isEmpty());
+
+        PluginContext ctx;
+        ctx.selection = {tmp.filePath("a.txt"), tmp.filePath("b.txt")};
+        ctx.dir = tmp.path();
+        QList<PluginRequest> requests;
+        bool ok = false, done = false;
+        QString text;
+        auto* run = new PluginRun(p, p.actions[0], ctx, QString(), nullptr);
+        connect(run, &PluginRun::request, this, [&](const PluginRequest& r) { requests << r; });
+        connect(run, &PluginRun::finished, this, [&](bool success, const QString& t) {
+            ok = success;
+            text = t;
+            done = true;
+        });
+        run->start();
+        QTRY_VERIFY(done);
+        QVERIFY(ok);
+        QCOMPARE(requests.size(), 1);
+        QCOMPARE(requests[0].select, QStringList({"a.txt"}));
+        QCOMPARE(text, "plugin dir: " + dir);  // the last plain line
+
+        done = false;
+        auto* fail = new PluginRun(p, p.actions[1], ctx, QString(), nullptr);
+        connect(fail, &PluginRun::finished, this, [&](bool success, const QString& t) {
+            ok = success;
+            text = t;
+            done = true;
+        });
+        fail->start();
+        QTRY_VERIFY(done);
+        QVERIFY(!ok);
+        QCOMPARE(text, QString("broken"));
+
+        QList<QPair<QString, QString>> entries;
+        done = false;
+        QObject context;
+        listPluginChoices(p, p.actions[0], ctx, &context, [&](const QList<QPair<QString, QString>>& e, const QString& error) {
+            QVERIFY(error.isEmpty());
+            entries = e;
+            done = true;
+        });
+        QTRY_VERIFY(done);
+        QCOMPARE(entries.size(), 2);
+        QCOMPARE(entries[0], qMakePair(QString("Pixel 10"), QString("pixel")));
+        QCOMPARE(entries[1], qMakePair(QString("Tablet"), QString("Tablet")));
     }
 
     void helpers()

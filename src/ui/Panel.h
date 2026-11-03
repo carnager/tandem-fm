@@ -75,6 +75,7 @@ public:
     bool showHidden() const { return m_showHidden; }
     void markGroup(int mode);
     void markAll(bool on);
+    void markNames(const QStringList& names);  // names or paths in the shown folder
     void unmarkAll() { markAll(false); }
     void computeCurrentSize();
     void computeAllSizes();

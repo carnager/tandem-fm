@@ -221,6 +221,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
         {tr("Behaviour"), QStringLiteral("preferences-system")},
         {tr("Tools"), QStringLiteral("applications-utilities")},
         {tr("Keys"), QStringLiteral("preferences-desktop-keyboard")},
+        {tr("Plugins"), QStringLiteral("preferences-plugin")},
     };
     for (const auto& [name, icon] : pages)
         new QListWidgetItem(IconCache::themed(icon.toUtf8().constData(), "preferences-system"), name, m_nav);
@@ -230,6 +231,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
     m_pages->addWidget(behaviourPage());
     m_pages->addWidget(toolsPage());
     m_pages->addWidget(keysPage());
+    m_pages->addWidget(pluginsPage());
     body->addWidget(m_pages, 1);
     outer->addLayout(body, 1);
     connect(m_nav, &QListWidget::currentRowChanged, m_pages, &QStackedWidget::setCurrentIndex);
@@ -422,6 +424,81 @@ QWidget* SettingsDialog::behaviourPage()
              toggle(tr("Notify when long operations finish"), m_window->m_actions.value(QStringLiteral("notifications"))),
              tr("A desktop notification when a copy or move that took a while is done and Tandem isn't in front."));
     return page.finish();
+}
+
+// Plugins run with the user's rights: each one is switched on by hand, and
+// again after its plugin.json changed.
+QWidget* SettingsDialog::pluginsPage()
+{
+    Page page(this);
+    m_pluginList = new QWidget(this);
+    auto* v = new QVBoxLayout(m_pluginList);
+    v->setContentsMargins(0, 0, 0, 0);
+    v->setSpacing(4);
+    fillPlugins();
+    page.add(tr("Plugins"), m_pluginList,
+             tr("Plugins are programs that run with your rights: switch on only those you trust. One that changes "
+                "is switched off until you switch it on again. Their commands appear in the context menu, under "
+                "Tools › Plugins, in the command palette and on the Keys page."));
+
+    auto* tools = new QWidget(this);
+    auto* th = new QHBoxLayout(tools);
+    th->setContentsMargins(0, 0, 0, 0);
+    auto* folder = new QPushButton(tr("Open plugins folder"), tools);
+    auto* reload = new QPushButton(tr("Reload"), tools);
+    th->addWidget(folder);
+    th->addWidget(reload);
+    th->addStretch(1);
+    connect(folder, &QPushButton::clicked, this, [] {
+        QDir().mkpath(pluginsFolder());
+        QDesktopServices::openUrl(QUrl::fromLocalFile(pluginsFolder()));
+    });
+    connect(reload, &QPushButton::clicked, this, [this] {
+        QPointer<SettingsDialog> self(this);
+        m_window->loadPlugins([self] {
+            if (self)
+                self->fillPlugins();
+        });
+    });
+    page.add(QString(), tools, tr("Own plugins go in %1, each in a folder with a plugin.json.").arg(pluginsFolder()));
+    return page.finish();
+}
+
+void SettingsDialog::fillPlugins()
+{
+    auto* v = static_cast<QVBoxLayout*>(m_pluginList->layout());
+    while (QLayoutItem* item = v->takeAt(0)) {
+        if (QWidget* w = item->widget()) {  // later: one of them may be the box just clicked
+            w->hide();
+            w->deleteLater();
+        }
+        delete item;
+    }
+    if (m_window->m_plugins.isEmpty())
+        v->addWidget(hint(tr("No plugins installed."), m_pluginList));
+    for (const Plugin& plugin : std::as_const(m_window->m_plugins)) {
+        const PluginTrust trust = pluginTrust(plugin);
+        auto* box = new QCheckBox(plugin.name, m_pluginList);
+        box->setChecked(trust == PluginTrust::On);
+        box->setEnabled(plugin.error.isEmpty());
+        QStringList about;
+        if (!plugin.error.isEmpty())
+            about << tr("Can't be used: %1").arg(plugin.error);
+        else if (trust == PluginTrust::Changed)
+            about << tr("Changed since you switched it on: check it, then switch it on again.");
+        if (!plugin.description.isEmpty())
+            about << plugin.description;
+        about << plugin.dir;
+        v->addWidget(box);
+        QLabel* note = hint(about.join(QLatin1Char('\n')), m_pluginList);
+        note->setContentsMargins(26, 0, 0, 6);
+        v->addWidget(note);
+        connect(box, &QCheckBox::toggled, this, [this, plugin](bool on) {
+            setPluginEnabled(plugin, on);
+            m_window->installPluginCommands();
+            fillPlugins();
+        });
+    }
 }
 
 QWidget* SettingsDialog::toolsPage()
