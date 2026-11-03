@@ -21,14 +21,13 @@ struct Place {
     bool network = false;
 };
 
-// Mounting through GIO/GVfs: sftp, smb, dav(s), ftp, nfs, mtp, … Password and
-// host-key questions are shown as dialogs over `parent`; passwords can be
-// kept in the keyring. All calls are asynchronous (GLib main loop = Qt's).
+// GIO/GVfs handles Linux mounts. macOS uses NetFS for SMB, with the system
+// authentication/share chooser and normal /Volumes mounts. Calls are asynchronous.
 class Network : public QObject {
     Q_OBJECT
 public:
     static Network& instance();
-    static bool available();  // built with GIO
+    static bool available();  // GIO or native macOS mounting
 
     using Done = std::function<void(const QString& path, const QString& error)>;
     void mount(const QString& uri, QWidget* parent, Done done);

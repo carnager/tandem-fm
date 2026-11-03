@@ -5,6 +5,9 @@
 #endif
 
 #include "ui/Network.h"
+#ifdef Q_OS_MACOS
+#include "ui/MacSmb.h"
+#endif
 
 #include "core/Remote.h"
 
@@ -16,7 +19,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QSettings>
+#include "core/Config.h"
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -30,7 +33,7 @@ Network& Network::instance()
 
 bool Network::available()
 {
-#ifdef TANDEM_HAVE_GIO
+#if defined(TANDEM_HAVE_GIO) || defined(Q_OS_MACOS)
     return true;
 #else
     return false;
@@ -49,7 +52,7 @@ static QString withoutPassword(const QString& uri)
 
 QStringList Network::recentServers() const
 {
-    QSettings s;
+    Settings s;
     const QStringList stored = s.value(QStringLiteral("network/recent")).toStringList();
     QStringList clean;
     for (const QString& uri : stored)
@@ -68,14 +71,14 @@ void Network::rememberServer(const QString& uri)
     list.prepend(clean);
     while (list.size() > 12)
         list.removeLast();
-    QSettings().setValue(QStringLiteral("network/recent"), list);
+    Settings().setValue(QStringLiteral("network/recent"), list);
 }
 
 void Network::forgetServer(const QString& uri)
 {
     QStringList list = recentServers();
     list.removeAll(uri);
-    QSettings().setValue(QStringLiteral("network/recent"), list);
+    Settings().setValue(QStringLiteral("network/recent"), list);
 }
 
 #ifdef TANDEM_HAVE_GIO
@@ -450,6 +453,31 @@ QList<Place> Network::places() const
     g_object_unref(monitor);
     return out;
 }
+
+#elif defined(Q_OS_MACOS)
+
+Network::Network() = default;
+void Network::mount(const QString& uri, QWidget* parent, Done done)
+{
+    if (QUrl(uri).scheme().compare(QLatin1String("smb"), Qt::CaseInsensitive) != 0) {
+        done({}, tr("On macOS, use smb://server/share for native mounting, or SFTP through Tandem's built-in connection."));
+        return;
+    }
+    MacSmb::mount(uri, parent, [this, done = std::move(done)](const QString& path, const QString& error) {
+        if (error.isEmpty()) emit placesChanged();
+        done(path, error);
+    });
+}
+void Network::mountVolume(const QString&, QWidget*, Done done) { done({}, tr("Mount this drive in Finder, then open it from Locations.")); }
+void Network::unmount(const QString& path, QWidget*, std::function<void(const QString&)> done)
+{
+    MacSmb::unmount(path, [this, done = std::move(done)](const QString& error) {
+        if (error.isEmpty()) emit placesChanged();
+        done(error);
+    });
+}
+bool Network::canUnmount(const QString& path) const { return !MacSmb::mountRoot(path).isEmpty(); }
+QList<Place> Network::places() const { return {}; } // mounted volumes already come from listMounts()
 
 #else  // no GIO: network places come only from kernel/FUSE mounts
 

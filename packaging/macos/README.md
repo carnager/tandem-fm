@@ -1,6 +1,14 @@
-# Tandem for macOS 0.1.3
+# Tandem for macOS 0.1.4
 
 An experimental macOS port of [carnager/tandem-fm](https://github.com/carnager/tandem-fm), based on upstream commit `f82cc2e955b9a58f066703f746661f29f00a6f36`. The upstream Qt 6 Widgets UI, libarchive, libssh, job queues, viewers, and fd/rg search tools are retained. macOS changes are guarded so the Linux implementations remain available.
+
+## Changes in 0.1.4
+
+SMB connections on macOS now use Apple's NetFS service and native SMB filesystem. In **Go → Connect to server…**, enter `smb://server/share` (optionally followed by a subfolder), or `smb://server` to use the system share chooser. macOS handles login and share selection. Mounted folders open in Tandem and remain available to Finder and other apps. If several shares are selected, the first opens in the panel; the rest are available in Locations.
+
+Existing shares are identified by their actual remount URL (server, share, port and requested account), avoiding guesses from `/Volumes` names. The read-only local probe successfully reused the existing media mount. Credentials are passed directly to NetFS and stripped from saved recent addresses and status text. Native mounts run asynchronously, with cancellation/error/timeout handling. Navigating away prevents a late connection result from taking over the panel. SMB disconnect uses normal macOS `diskutil unmount`, without force; an in-use volume can be refused by the OS.
+
+The Linux GIO/libsmbclient and cross-platform libssh paths are retained. A fresh NAS login and live SMB write/disconnect tests have not been performed against the user's share; native login outcomes still depend on the server, permissions and macOS authentication.
 
 ## Changes in 0.1.3
 
@@ -44,16 +52,17 @@ Open `Tandem.app` from its output folder or copy it into Applications. This prev
 - Copying a directory into itself through a symlink is rejected. Symlinks are copied as links by the existing engine.
 - Qt's native move-to-Trash and session undo. Trash browsing opens Finder; its private restore metadata is never parsed or rewritten.
 - Mounted volumes under `/Volumes`, including network mounts. Default file opening uses Qt/macOS associations. “Open terminal here” opens Terminal when no custom terminal is set.
+- Native macOS SMB through NetFS, including reuse of existing mounts and subfolder navigation.
 - Native SFTP with the original libssh backend. Basic transfers and fallback traversal are tested against a temporary local sshd.
 
 ## Preview limits and follow-up
 
 This is a development preview, not a guarantee of loss-free operation in every filesystem or failure scenario. Keep backups and first try it with disposable folders. Automated tests cover the cases recorded in VALIDATION.md; they do not establish power-loss recovery or resistance to concurrent malicious filesystem changes.
 
-- No macOS Keychain integration yet: server passwords last for the session, using the existing fallback.
+- SFTP passwords use the existing session fallback. SMB authentication and its credential UI are managed by macOS.
 - The permissions editor exposes POSIX mode/owner/group only. Darwin ACL editing and BSD flags are not offered. Linux ACLs and flags remain available on Linux.
 - GVfs, freedesktop notifications, and Linux desktop application discovery are unavailable on macOS. Custom commands still work; a native “Open with” application picker/default-association editor is pending.
-- SMB via libsmbclient is optional and was not built or tested here. Finder-mounted SMB volumes can be browsed as local paths. Other GVfs protocols require an alternative integration.
+- SMB on macOS uses NetFS and mounted filesystem paths. Other GVfs protocols require an alternative integration. SMB-specific write/metadata and disconnect recovery need further live-server coverage.
 - SFTP's GNU `find -printf` acceleration falls back to protocol traversal on BSD servers. Remote permissions/account editing still expects Linux server tools; it is not supported against macOS servers.
 - Terminal commands that need an interactive terminal require configuring a compatible terminal command; the native default currently covers opening a folder in Terminal.
 - Special APFS features (clones, snapshots), hard-link topology, sparse allocation, cross-volume metadata behavior, read-only volumes, low-disk-space errors, and network disconnect scenarios need more coverage. Directory extended attributes are tested; symlink metadata needs broader validation. External helpers and archives have their upstream preservation/security limits.

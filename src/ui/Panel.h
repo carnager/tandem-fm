@@ -142,6 +142,7 @@ private:
     std::vector<DirTab*> m_tabs;
     int m_current = -1;
     QWidget* m_inactiveShade = nullptr;
+    quint64 m_connectionGeneration = 0;
     bool m_active = false;
     bool m_showHidden = false;
     SortSpec m_sort;
