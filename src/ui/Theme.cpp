@@ -1,6 +1,7 @@
 #include "ui/Theme.h"
 
 #include "core/ConfigDir.h"
+#include "ui/FileColors.h"
 #include "ui/IconCache.h"
 
 #include <QApplication>
@@ -382,6 +383,10 @@ bool loadThemeFile(const QString& path, Theme& out, QString* error)
     derive("cursorActive", withAlpha(t.accent, dark ? 72 : 50));
     derive("dropTarget", withAlpha(t.accent, dark ? 110 : 90));
     derive("headerActive", mix(t.header, t.accent, dark ? 0.16 : 0.12));
+    const QJsonObject files = o.value(QLatin1String("files")).toObject();
+    for (auto it = files.begin(); it != files.end(); ++it)
+        if (const auto c = parseColor(it.value().toString()))
+            t.files.append({it.key(), *c});
     out = t;
     return true;
 }
@@ -396,10 +401,14 @@ QByteArray themeJson(const Theme& t)
             v += QStringLiteral("%1").arg(c.alpha(), 2, 16, QLatin1Char('0'));
         colors.insert(QLatin1String(r.key), v);
     }
+    QJsonObject files;
+    for (const auto& [key, c] : t.files.isEmpty() ? defaultFileColors(t) : t.files)
+        files.insert(key, c.name(QColor::HexRgb));
     QJsonObject o;
     o.insert(QStringLiteral("name"), t.name);
     o.insert(QStringLiteral("dark"), t.dark);
     o.insert(QStringLiteral("colors"), colors);
+    o.insert(QStringLiteral("files"), files);
     return QJsonDocument(o).toJson(QJsonDocument::Indented);
 }
 
@@ -510,8 +519,10 @@ void applyTheme(QApplication& app)
     static bool first = true;
     bool followsDesktop = false;
     const QFont listFont = g_theme.listFont;
+    static quint64 serial = 0;
     g_theme = chosenTheme(app, &followsDesktop);
     Theme& t = g_theme;
+    t.serial = ++serial;
 
     if (first) {
         // Fusion + our palette: consistent, fast to paint, no theme engine quirks.

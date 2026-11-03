@@ -125,6 +125,7 @@ private:
     void toggleQuickView();
     void updateQuickView();
     void setIconTheme(const QString& id);
+    void repaintFileViews();  // after a change in how files are drawn
 
     void loadSettings(const QStringList& startPaths);
     void saveSettings();

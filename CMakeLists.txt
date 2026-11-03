@@ -56,6 +56,7 @@ target_compile_options(tandem_core PRIVATE -Wall -Wextra)
 add_library(tandem_ui STATIC
   src/ui/Theme.h src/ui/Theme.cpp
   src/ui/IconCache.h src/ui/IconCache.cpp
+  src/ui/FileColors.h src/ui/FileColors.cpp
   src/ui/FileModel.h src/ui/FileModel.cpp
   src/ui/FileView.h src/ui/FileView.cpp
   src/ui/DirTab.h src/ui/DirTab.cpp

@@ -3,6 +3,7 @@
 #include "ui/ThumbGrid.h"
 
 #include "core/Sorting.h"
+#include "ui/FileColors.h"
 #include "ui/FileModel.h"
 #include "ui/Theme.h"
 
@@ -36,6 +37,7 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
     if (!e)
         return;
     const Theme& t = theme();
+    const int col = idx.column();
 
     QColor fg = t.text;
     if (e->marked)
@@ -44,9 +46,18 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
         fg = t.dimText;
     else if (e->brokenLink)
         fg = t.error;
+    else if (col == FileModel::ColName || col == FileModel::ColExt)
+        if (const auto c = fileColor(*e))
+            fg = *c;
+
+    // The panel that isn't active fades into its background, if wished.
+    const auto* view = qobject_cast<const FileView*>(opt.widget);
+    const double fade = view ? view->fade() : 0.0;
+    p->save();
+    if (fade > 0)
+        p->setOpacity(1.0 - fade);
 
     QRect r = opt.rect.adjusted(6, 0, -6, 0);
-    const int col = idx.column();
     if (col == FileModel::ColName) {
         const int iconSize = 16;
         const QIcon ic = idx.data(Qt::DecorationRole).value<QIcon>();
@@ -111,6 +122,21 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
     const Qt::TextElideMode elide = col == FileModel::ColName ? Qt::ElideMiddle : Qt::ElideRight;
     const QString shown = QFontMetrics(f).elidedText(text, elide, r.width());
     p->drawText(r, int(align) | Qt::TextSingleLine, shown);
+    p->restore();
+}
+
+namespace {
+double g_inactiveDim = 0.0;
+}
+
+void FileView::setInactiveDim(double amount)
+{
+    g_inactiveDim = qBound(0.0, amount, 0.8);
+}
+
+double FileView::inactiveDim()
+{
+    return g_inactiveDim;
 }
 
 QWidget* FileDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem&, const QModelIndex&) const

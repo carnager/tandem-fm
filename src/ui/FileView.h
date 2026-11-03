@@ -33,6 +33,10 @@ public:
     bool isActive() const { return m_active; }
     int currentRow() const { return currentIndex().row(); }
     void setVimKeys(bool on) { m_vim = on; }
+    // How much the panel that isn't active fades: 0 (not at all) to 1.
+    static void setInactiveDim(double amount);
+    static double inactiveDim();
+    double fade() const { return m_active ? 0.0 : inactiveDim(); }
     void setArrowFolders(bool on) { m_arrowFolders = on; }  // Left/Right leave and enter folders
     // Header state as the user configured it (ignores columns hidden for width).
     QByteArray userHeaderState();

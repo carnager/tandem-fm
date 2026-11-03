@@ -1,5 +1,7 @@
 #include "ui/SettingsDialog.h"
 
+#include "ui/FileColors.h"
+#include "ui/FileView.h"
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
 #include "ui/Panel.h"
@@ -391,6 +393,17 @@ QWidget* SettingsDialog::appearancePage()
     };
     page.add(tr("In the file lists"), toggle(tr("Show hidden files (Ctrl+H)"), m_window->m_hiddenAction));
     page.add(QString(), toggle(tr("Show Git status (changed, new, ignored files)"), m_window->m_actions.value(QStringLiteral("git"))));
+    auto* colors = new QCheckBox(tr("Color file names by type"), this);
+    colors->setObjectName(QStringLiteral("fileColors"));
+    colors->setChecked(fileColorsEnabled());
+    connect(colors, &QCheckBox::toggled, this, [this](bool on) {
+        QSettings().setValue(QStringLiteral("view/fileColors"), on);
+        setFileColorsEnabled(on);
+        m_window->repaintFileViews();
+    });
+    page.add(QString(), colors,
+             tr("Programs, pictures, videos, music, archives and documents, in colours that suit the theme. Own "
+                "rules go in a theme's \"files\" section."));
     auto* menu = new QCheckBox(tr("Show the menu bar (Ctrl+Shift+M)"), this);
     menu->setChecked(m_window->menuBar()->isVisible());
     connect(menu, &QCheckBox::toggled, this, [this](bool on) {
@@ -398,6 +411,16 @@ QWidget* SettingsDialog::appearancePage()
         QSettings().setValue(QStringLiteral("window/menuBar"), on);
     });
     page.add(QString(), menu);
+    page.add(tr("Inactive panel"),
+             segments(this, {{QStringLiteral("0"), tr("As bright")}, {QStringLiteral("30"), tr("Slightly faded")},
+                             {QStringLiteral("55"), tr("Clearly faded")}},
+                      QString::number(qRound(FileView::inactiveDim() * 100)),
+                      [this](const QString& code) {
+                          QSettings().setValue(QStringLiteral("view/inactiveDim"), code.toInt());
+                          FileView::setInactiveDim(code.toInt() / 100.0);
+                          m_window->repaintFileViews();
+                      }),
+             tr("Makes it easier to see which panel the keys go to."));
     return page.finish();
 }
 

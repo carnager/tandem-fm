@@ -34,6 +34,7 @@
 #include "ui/Panel.h"
 #include "ui/PathBar.h"
 #include "core/Plugins.h"
+#include "ui/FileColors.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ImageView.h"
 #include "ui/viewer/ViewerWindow.h"
@@ -409,6 +410,53 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(L("a/x.txt")), 10000);             // one item: as it is
         QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(L("second/z.txt")), 10000);        // several: own folder
         QVERIFY(QFile::exists(L("second/y.txt")));
+    }
+
+    void fileColorsAndFading()
+    {
+        auto restore = qScopeGuard([] {
+            setFileColorsEnabled(false);
+            FileView::setInactiveDim(0);
+            QSettings().remove("view/theme");
+            applyTheme(*qApp);
+        });
+        QSettings().setValue("view/theme", "nord");
+        applyTheme(*qApp);
+        auto entry = [](const QString& name, uint32_t mode = S_IFREG | 0644, bool dir = false) {
+            FileEntry e;
+            e.name = name;
+            e.mode = mode;
+            e.isDir = dir;
+            return e;
+        };
+        QVERIFY(!fileColor(entry("a.jpg")));  // off unless switched on
+        setFileColorsEnabled(true);
+        QCOMPARE(*fileColor(entry("a.JPG")), QColor("#b48ead"));
+        QCOMPARE(*fileColor(entry("b.tar.gz")), QColor("#bf616a"));
+        QCOMPARE(*fileColor(entry("run", S_IFREG | 0755)), QColor("#a3be8c"));
+        QCOMPARE(*fileColor(entry("song.flac", S_IFREG | 0755)), QColor("#8fbcbb"));  // the name wins over the x bit
+        QVERIFY(!fileColor(entry("notes.txt")));
+        QVERIFY(!fileColor(entry("Pictures", S_IFDIR | 0755, true)));
+
+        // A theme's own rules come first; kinds it leaves out are simply not coloured.
+        QTemporaryDir tmp;
+        QDir().mkpath(themesFolder());
+        const QString own = themesFolder() + "/rules.json";
+        auto removeOwn = qScopeGuard([own] { QFile::remove(own); });
+        writeFile(own, "{\"colors\": {\"base\": \"#000000\"}, \"files\": {\"*.txt\": \"#123456\", "
+                       "\"image\": \"#654321\"}}");
+        QSettings().setValue("view/theme", "rules");
+        applyTheme(*qApp);
+        QCOMPARE(*fileColor(entry("notes.txt")), QColor("#123456"));
+        QCOMPARE(*fileColor(entry("a.png")), QColor("#654321"));
+        QVERIFY(!fileColor(entry("b.zip")));
+
+        // Only the panel that isn't active fades.
+        FileView::setInactiveDim(0.3);
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+        QCOMPARE(m_left->view()->fade(), 0.0);
+        QCOMPARE(m_right->view()->fade(), 0.3);
     }
 
     void quickSearch()

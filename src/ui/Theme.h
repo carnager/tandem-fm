@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QFont>
 #include <QList>
+#include <QPair>
 #include <QObject>
 #include <QString>
 
@@ -20,6 +21,9 @@ struct Theme {
     QColor border, header, headerActive, error, success;
     QColor gitModified, gitAdded, gitUntracked;
     QColor control;     // borders of inputs, buttons and checkboxes: visible, unlike @border
+    // File name colours by type ("files" in the file; see FileColors.h).
+    QList<QPair<QString, QColor>> files;
+    quint64 serial = 0;  // counts up with every applyTheme()
     QFont listFont;     // file list
     QFont numberFont;   // tabular digits for sizes and dates
 

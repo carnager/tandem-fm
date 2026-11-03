@@ -1,5 +1,7 @@
 #include "ui/ThumbGrid.h"
 
+#include "ui/FileColors.h"
+
 #include "core/Backend.h"
 #include "core/Util.h"
 #include "ui/FileModel.h"
@@ -187,6 +189,7 @@ void ThumbGrid::paintEvent(QPaintEvent*)
         if (!e)
             continue;
         const QRect r = cellRect(row);
+        p.setOpacity(1.0);
         if (row == current) {
             QColor c = active ? t.cursorActive : t.cursorInactive;
             p.setPen(active ? QPen(t.accent, 1.2) : Qt::NoPen);
@@ -197,6 +200,7 @@ void ThumbGrid::paintEvent(QPaintEvent*)
             p.setBrush(t.markBg);
             p.drawRoundedRect(QRectF(r), 8, 8);
         }
+        p.setOpacity(1.0 - m_view->fade());  // the cursor stays clear, the rest fades
         // The picture: a thumbnail when there is one, else the file's icon.
         const QRect pic(r.left() + 8, r.top() + 8, m_thumb, m_thumb);
         QPixmap px;
@@ -235,7 +239,8 @@ void ThumbGrid::paintEvent(QPaintEvent*)
         // The name, on up to two lines.
         const QString name = e->isParent ? QStringLiteral("..") : e->name;
         const QRect text(r.left() + 6, pic.bottom() + 6, r.width() - 12, 2 * fm.height());
-        p.setPen(e->marked ? t.mark : t.text);
+        const auto typeColor = e->marked ? std::nullopt : fileColor(*e);
+        p.setPen(e->marked ? t.mark : typeColor.value_or(t.text));
         QString first = name, second;
         if (fm.horizontalAdvance(name) > text.width()) {
             int cut = int(name.size());

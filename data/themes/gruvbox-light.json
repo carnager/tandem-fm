@@ -17,5 +17,13 @@
     "gitModified": "#b57614",
     "gitAdded": "#79740e",
     "gitUntracked": "#427b58"
+  },
+  "files": {
+    "image": "#8f3f71",
+    "video": "#076678",
+    "audio": "#427b58",
+    "archive": "#9d0006",
+    "executable": "#79740e",
+    "document": "#b57614"
   }
 }

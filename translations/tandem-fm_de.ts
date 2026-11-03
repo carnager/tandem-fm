@@ -3966,6 +3966,34 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Git-Status zeigen (geänderte, neue, ignorierte Dateien)</translation>
     </message>
     <message>
+        <source>Color file names by type</source>
+        <translation>Dateinamen nach Typ einfärben</translation>
+    </message>
+    <message>
+        <source>Programs, pictures, videos, music, archives and documents, in colours that suit the theme. Own rules go in a theme&apos;s &quot;files&quot; section.</source>
+        <translation>Programme, Bilder, Videos, Musik, Archive und Dokumente, in Farben, die zum Farbschema passen. Eigene Regeln gehören in den Abschnitt &quot;files&quot; eines Farbschemas.</translation>
+    </message>
+    <message>
+        <source>Inactive panel</source>
+        <translation>Inaktives Panel</translation>
+    </message>
+    <message>
+        <source>As bright</source>
+        <translation>Gleich hell</translation>
+    </message>
+    <message>
+        <source>Slightly faded</source>
+        <translation>Etwas blasser</translation>
+    </message>
+    <message>
+        <source>Clearly faded</source>
+        <translation>Deutlich blasser</translation>
+    </message>
+    <message>
+        <source>Makes it easier to see which panel the keys go to.</source>
+        <translation>So sieht man leichter, in welches Panel die Tasten gehen.</translation>
+    </message>
+    <message>
         <source>Show the menu bar (Ctrl+Shift+M)</source>
         <translation>Menüleiste zeigen (Strg+Umschalt+M)</translation>
     </message>

@@ -15,7 +15,7 @@ keys, modern tools, Qt 6.
 - Permissions editor with ACLs and filesystem flags, locally and over SFTP
 - Find duplicates, disk usage, checksums, links, trash, thumbnails
 - Command palette (Ctrl+Shift+P), every key changeable, optional Vim keys, Git status
-- Themes: Nord, Dracula, Gruvbox, Catppuccin, Solarized, Tokyo Night and more, or your own; can follow the desktop's light and dark mode
+- Themes: Nord, Dracula, Gruvbox, Catppuccin, Solarized, Tokyo Night and more, or your own; can follow the desktop's light and dark mode; optional colours by file type
 - Plugins: any program becomes a command on the selection, with menus to pick from ([docs/plugins.md](docs/plugins.md))
 
 F1 lists all keys.
@@ -66,6 +66,17 @@ saved. Only the colours you want to change are needed:
 
 "Copy to edit" in Settings writes the current theme with every colour as a
 starting point. A file named like a shipped theme (`nord.json`) replaces it.
+
+With *Color file names by type* switched on (Settings → Appearance), the
+`files` section colours names: kinds (`executable`, `image`, `video`,
+`audio`, `archive`, `document`, `folder`), name patterns and MIME types,
+which come first:
+
+```json
+"files": { "image": "#c4a7e7", "archive": "#eb6f92", "*.rs": "#f5a97f", "text/x-python": "#8aadf4" }
+```
+
+A theme without a `files` section gets colours made from its own.
 
 ## Settings in another folder
 

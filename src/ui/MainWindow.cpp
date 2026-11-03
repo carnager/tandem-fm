@@ -9,7 +9,9 @@
 #include "ui/DirTab.h"
 #include "ui/Dialogs.h"
 #include "ui/FileModel.h"
+#include "ui/FileColors.h"
 #include "ui/FileView.h"
+#include "ui/ThumbGrid.h"
 #include "ui/IconCache.h"
 #include "ui/JobManager.h"
 #include "ui/CommandBar.h"
@@ -1243,6 +1245,15 @@ void MainWindow::jumpToFolder()
 }
 
 // ------------------------------------------------------------ icon themes
+
+void MainWindow::repaintFileViews()
+{
+    for (Panel* p : {m_left, m_right}) {
+        p->view()->viewport()->update();
+        if (p->view()->thumbGrid())
+            p->view()->thumbGrid()->update();
+    }
+}
 
 void MainWindow::setIconTheme(const QString& id)
 {
@@ -2623,6 +2634,8 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     m_actions.value(QStringLiteral("vim"))->setChecked(vimKeys);
     m_left->setVimKeys(vimKeys);
     m_right->setVimKeys(vimKeys);
+    FileView::setInactiveDim(s.value(QStringLiteral("view/inactiveDim"), 0).toInt() / 100.0);
+    setFileColorsEnabled(s.value(QStringLiteral("view/fileColors"), false).toBool());
     const bool arrowFolders = s.value(QStringLiteral("input/arrowFolders"), true).toBool();
     m_actions.value(QStringLiteral("arrowFolders"))->setChecked(arrowFolders);
     m_left->setArrowFolders(arrowFolders);
