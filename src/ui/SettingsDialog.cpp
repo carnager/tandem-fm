@@ -315,7 +315,11 @@ QWidget* SettingsDialog::behaviourPage()
         });
         return box;
     };
-    page.add(tr("Keyboard"), toggle(tr("Vim keys"), m_window->m_actions.value(QStringLiteral("vim"))),
+    page.add(tr("Keyboard"),
+             toggle(tr("Arrow keys walk folders"), m_window->m_actions.value(QStringLiteral("arrowFolders"))),
+             tr("→ enters the folder or archive under the cursor, ← goes up, like lynx or mc. → never opens a "
+                "file."));
+    page.add(QString(), toggle(tr("Vim keys"), m_window->m_actions.value(QStringLiteral("vim"))),
              tr("j k move, h l out of and into folders, gg G, / to search, v to mark, : for the palette. Typing "
                 "letters no longer starts the quick search."));
     page.add(tr("Notifications"),

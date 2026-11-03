@@ -44,6 +44,7 @@ public:
     void navigate(const QString& path, const QString& focus = {});
     void refresh();
     void openCurrent();
+    void stepInto();  // like openCurrent, but files are left alone
     void enterCurrent();  // Ctrl+PgDn: also browses into files of any type as archives
 
     // Archive locations (read-only for now).
@@ -97,6 +98,7 @@ public:
     void showMessage(const QString& text, bool error = false);
 
     void setVimKeys(bool on);
+    void setArrowFolders(bool on);
     QByteArray headerState() const;
     void restoreHeaderState(const QByteArray& state);
 

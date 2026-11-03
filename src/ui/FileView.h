@@ -33,6 +33,7 @@ public:
     bool isActive() const { return m_active; }
     int currentRow() const { return currentIndex().row(); }
     void setVimKeys(bool on) { m_vim = on; }
+    void setArrowFolders(bool on) { m_arrowFolders = on; }  // Left/Right leave and enter folders
     // Header state as the user configured it (ignores columns hidden for width).
     QByteArray userHeaderState();
     void fitColumns();
@@ -45,6 +46,7 @@ public:
 signals:
     void openRequested();               // Enter, double click
     void parentRequested();             // Backspace
+    void intoRequested();               // Right: enter a folder, never launch a file
     void switchPanelRequested();        // Tab
     void escapePressed();
     void quickSearchRequested(const QString& firstText);
@@ -92,6 +94,7 @@ private:
     QPoint m_pressPos;
     bool m_maybeDrag = false;
     bool m_vim = false;
+    bool m_arrowFolders = true;
     QList<int> m_autoHidden;  // columns hidden because the panel is narrow
     qint64 m_lastG = 0;  // for "gg"
     ThumbGrid* m_grid = nullptr;

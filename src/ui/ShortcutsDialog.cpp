@@ -27,6 +27,7 @@ const Entry kEntries[] = {
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Tab", QT_TRANSLATE_NOOP("Shortcuts", "Switch panel")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Enter", QT_TRANSLATE_NOOP("Shortcuts", "Open")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Backspace", QT_TRANSLATE_NOOP("Shortcuts", "Parent folder")},
+    {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "← / →", QT_TRANSLATE_NOOP("Shortcuts", "Parent folder / into folder or archive (can be turned off)")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "a…z", QT_TRANSLATE_NOOP("Shortcuts", "Quick search: type letters (↑ ↓ next match)")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Alt+←", QT_TRANSLATE_NOOP("Shortcuts", "Back")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Alt+→", QT_TRANSLATE_NOOP("Shortcuts", "Forward")},

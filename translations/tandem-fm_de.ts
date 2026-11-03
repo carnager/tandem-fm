@@ -718,6 +718,10 @@
         <translation>Übergeordneter Ordner</translation>
     </message>
     <message>
+        <source>Parent folder / into folder or archive (can be turned off)</source>
+        <translation>Übergeordneter Ordner / in Ordner oder Archiv (abschaltbar)</translation>
+    </message>
+    <message>
         <source>Quick search: type letters (↑ ↓ next match)</source>
         <translation>Schnellsuche: Buchstaben tippen (↑ ↓ nächster Treffer)</translation>
     </message>
@@ -2181,6 +2185,10 @@
     <message>
         <source>Settings</source>
         <translation>Einstellungen</translation>
+    </message>
+    <message>
+        <source>Arrow keys walk folders (← up, → into)</source>
+        <translation>Pfeiltasten wechseln Ordner (← hoch, → hinein)</translation>
     </message>
     <message>
         <source>&amp;Help</source>
@@ -3861,6 +3869,14 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Keyboard</source>
         <translation>Tastatur</translation>
+    </message>
+    <message>
+        <source>Arrow keys walk folders</source>
+        <translation>Pfeiltasten wechseln Ordner</translation>
+    </message>
+    <message>
+        <source>→ enters the folder or archive under the cursor, ← goes up, like lynx or mc. → never opens a file.</source>
+        <translation>→ öffnet den Ordner oder das Archiv unter dem Cursor, ← geht eine Ebene hoch, wie in lynx oder mc. → startet nie eine Datei.</translation>
     </message>
     <message>
         <source>Vim keys</source>

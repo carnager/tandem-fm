@@ -488,6 +488,14 @@ void MainWindow::createMenus()
     });
     vim->setCheckable(true);
     m_actions[QStringLiteral("vim")] = vim;
+    QAction* arrows = addCommand(prefs, QT_TR_NOOP("Arrow keys walk folders (← up, → into)"), {}, [this] {
+        const bool on = m_actions.value(QStringLiteral("arrowFolders"))->isChecked();
+        QSettings().setValue(QStringLiteral("input/arrowFolders"), on);
+        m_left->setArrowFolders(on);
+        m_right->setArrowFolders(on);
+    });
+    arrows->setCheckable(true);
+    m_actions[QStringLiteral("arrowFolders")] = arrows;
     QAction* git = addCommand(prefs, QT_TR_NOOP("Show Git status"), {}, [this] {
         const bool on = m_actions.value(QStringLiteral("git"))->isChecked();
         QSettings().setValue(QStringLiteral("view/gitStatus"), on);
@@ -2437,6 +2445,10 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     m_actions.value(QStringLiteral("vim"))->setChecked(vimKeys);
     m_left->setVimKeys(vimKeys);
     m_right->setVimKeys(vimKeys);
+    const bool arrowFolders = s.value(QStringLiteral("input/arrowFolders"), true).toBool();
+    m_actions.value(QStringLiteral("arrowFolders"))->setChecked(arrowFolders);
+    m_left->setArrowFolders(arrowFolders);
+    m_right->setArrowFolders(arrowFolders);
     m_actions.value(QStringLiteral("notifications"))->setChecked(s.value(QStringLiteral("view/notifications"), true).toBool());
     const bool hidden = s.value(QStringLiteral("view/showHidden"), false).toBool();
     m_hiddenAction->setChecked(hidden);

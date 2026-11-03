@@ -336,8 +336,16 @@ void FileView::keyPressEvent(QKeyEvent* e)
         break;
     case Qt::Key_Left:
     case Qt::Key_Right:
-        if (mods == Qt::NoModifier)
-            return;  // no tree to expand; don't scroll sideways either
+        if (mods == Qt::NoModifier) {
+            // No tree to expand and no sideways scrolling: walk folders instead.
+            if (m_arrowFolders) {
+                if (e->key() == Qt::Key_Left)
+                    emit parentRequested();
+                else
+                    emit intoRequested();
+            }
+            return;
+        }
         break;
     default:
         break;

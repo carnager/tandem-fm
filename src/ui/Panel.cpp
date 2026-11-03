@@ -277,6 +277,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     });
     connect(m_view, &FileView::openRequested, this, &Panel::openCurrent);
     connect(m_view, &FileView::parentRequested, this, &Panel::goUp);
+    connect(m_view, &FileView::intoRequested, this, &Panel::stepInto);
     connect(m_view, &FileView::switchPanelRequested, this, &Panel::switchRequested);
     // Esc in the list closes one thing at a time, innermost first.
     connect(m_view, &FileView::escapePressed, this, [this] {
@@ -685,6 +686,13 @@ void Panel::openCurrent()
         emit openFileRequested(joinPath(path(), e->name));
 }
 
+void Panel::stepInto()
+{
+    const FileEntry* e = currentEntry();
+    if (e && (e->isParent || e->isDir || (!inArchive() && !isRemote() && isArchiveName(e->name))))
+        openCurrent();
+}
+
 void Panel::enterCurrent()
 {
     const FileEntry* e = currentEntry();
@@ -895,6 +903,11 @@ void Panel::doRename(const QString& from, const QString& to)
 void Panel::setVimKeys(bool on)
 {
     m_view->setVimKeys(on);
+}
+
+void Panel::setArrowFolders(bool on)
+{
+    m_view->setArrowFolders(on);
 }
 
 void Panel::startQuickSearch(const QString& text)

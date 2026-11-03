@@ -239,6 +239,32 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void arrowKeysWalkFolders()
+    {
+        moveCursorTo(m_left, "sub");
+        QTest::keyClick(m_left->view(), Qt::Key_Right);
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+        QTest::keyClick(m_left->view(), Qt::Key_Left);
+        QTRY_COMPARE(leftModel()->path(), L());
+        QCOMPARE(m_left->currentName(), QString("sub"));
+
+        // → on a file does nothing: no app is started.
+        QSignalSpy launched(m_left, &Panel::openFileRequested);
+        moveCursorTo(m_left, "file1.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_Right);
+        QTest::qWait(50);
+        QCOMPARE(launched.size(), 0);
+        QCOMPARE(leftModel()->path(), L());
+
+        // Switched off, the arrows are inert again.
+        m_left->setArrowFolders(false);
+        moveCursorTo(m_left, "sub");
+        QTest::keyClick(m_left->view(), Qt::Key_Right);
+        QTest::qWait(50);
+        QCOMPARE(leftModel()->path(), L());
+        m_left->setArrowFolders(true);
+    }
+
     void quickSearch()
     {
         m_left->view()->setCurrentRow(0);
