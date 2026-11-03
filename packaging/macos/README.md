@@ -1,6 +1,11 @@
-# Tandem for macOS 0.1
+# Tandem for macOS 0.1.1
 
 An experimental macOS port of [carnager/tandem-fm](https://github.com/carnager/tandem-fm), based on upstream commit `f82cc2e955b9a58f066703f746661f29f00a6f36`. The upstream Qt 6 Widgets UI, libarchive, libssh, job queues, viewers, and fd/rg search tools are retained. macOS changes are guarded so the Linux implementations remain available.
+
+## Changes in 0.1.1
+
+- Left/Right navigation is enabled by default in the details view: Left opens the parent and Right enters a folder. Right never launches regular files. Toggle it in Settings → Behaviour; thumbnail grids retain normal arrow movement.
+- Directory notifications refresh only affected macOS panels; background refreshes preserve cursor/marks changed while listing was in progress.
 
 ## Build and package
 

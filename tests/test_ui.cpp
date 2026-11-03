@@ -40,6 +40,7 @@
 #include <QPlainTextEdit>
 
 #include <sys/stat.h>
+#include <QSignalSpy>
 
 #include <QApplication>
 #include <QLabel>
@@ -238,6 +239,37 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L("sub"));
         QTest::keyClick(m_left->view(), Qt::Key_Backspace);
         QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    void lynxFolderNavigation()
+    {
+        const QVariant previous = QSettings().value("keys/lynxNavigation");
+        auto restore = qScopeGuard([&] {
+            if (previous.isValid()) QSettings().setValue("keys/lynxNavigation", previous);
+            else QSettings().remove("keys/lynxNavigation");
+        });
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        moveCursorTo(m_left, "sub");
+        QTest::keyClick(m_left->view(), Qt::Key_Right);
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+        QTest::keyClick(m_left->view(), Qt::Key_Left);
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTRY_COMPARE(m_left->currentName(), QString("sub"));
+        moveCursorTo(m_left, "file1.txt");
+        QSignalSpy opened(m_left->view(), &FileView::openRequested);
+        QTest::keyClick(m_left->view(), Qt::Key_Right);
+        QCOMPARE(opened.size(), 0); // never launch the default application
+        QCOMPARE(leftModel()->path(), L());
+        SettingsDialog settings(m_window.get());
+        auto* lynx = settings.findChild<QCheckBox*>("lynxNavigation");
+        QVERIFY(lynx);
+        lynx->setChecked(false);
+        moveCursorTo(m_left, "sub");
+        QTest::keyClick(m_left->view(), Qt::Key_Right);
+        QCOMPARE(leftModel()->path(), L());
+        QCOMPARE(opened.size(), 0);
+        lynx->setChecked(true);
     }
 
     void quickSearch()

@@ -315,7 +315,14 @@ QWidget* SettingsDialog::behaviourPage()
         });
         return box;
     };
-    page.add(tr("Keyboard"), toggle(tr("Vim keys"), m_window->m_actions.value(QStringLiteral("vim"))),
+    auto* lynx = new QCheckBox(tr("Lynx-style Left/Right navigation"), this);
+    lynx->setObjectName(QStringLiteral("lynxNavigation"));
+    lynx->setChecked(QSettings().value(QStringLiteral("keys/lynxNavigation"), true).toBool());
+    connect(lynx, &QCheckBox::toggled, this, [](bool on) {
+        QSettings().setValue(QStringLiteral("keys/lynxNavigation"), on);
+    });
+    page.add(tr("Keyboard"), lynx, tr("In the details view, Right enters the selected folder and Left opens its parent. Right never launches files. Thumbnail grids keep their arrow navigation."));
+    page.add(QString(), toggle(tr("Vim keys"), m_window->m_actions.value(QStringLiteral("vim"))),
              tr("j k move, h l out of and into folders, gg G, / to search, v to mark, : for the palette. Typing "
                 "letters no longer starts the quick search."));
     page.add(tr("Notifications"),

@@ -16,6 +16,7 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QScrollBar>
+#include <QSettings>
 
 namespace tandem {
 
@@ -67,9 +68,7 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
         r.setLeft(iconRect.right() + 7);
         // Git badge at the right end of the name.
         const char git = model->gitStatus(e->name);
-        if (git == '!' && !e->marked) {
-            fg = t.dimText;
-        } else if (git) {
+        if (git && git != '!') {
             QColor c = git == 'U' ? t.error : git == 'M' ? t.gitModified : git == 'A' ? t.gitAdded : t.gitUntracked;
             const int s = opt.fontMetrics.height() - 2;
             const QRect badge(r.right() - s, r.top() + (r.height() - s) / 2, s, s);
@@ -336,8 +335,17 @@ void FileView::keyPressEvent(QKeyEvent* e)
         break;
     case Qt::Key_Left:
     case Qt::Key_Right:
-        if (mods == Qt::NoModifier)
-            return;  // no tree to expand; don't scroll sideways either
+        if (mods == Qt::NoModifier) {
+            if (QSettings().value(QStringLiteral("keys/lynxNavigation"), true).toBool()) {
+                if (e->key() == Qt::Key_Left) {
+                    emit parentRequested();
+                } else if (const FileEntry* entry = m ? m->entry(currentRow()) : nullptr;
+                           entry && (entry->isDir || entry->isParent)) {
+                    emit openRequested();
+                }
+            }
+            return;
+        }
         break;
     default:
         break;

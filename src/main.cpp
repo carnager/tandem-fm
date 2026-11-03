@@ -27,7 +27,7 @@ int main(int argc, char** argv)
     QApplication::setApplicationName(QStringLiteral("tandem-fm"));
     QApplication::setOrganizationName(QStringLiteral("tandem-fm"));
     QApplication::setApplicationDisplayName(QStringLiteral("Tandem"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QApplication::setApplicationVersion(QStringLiteral("0.1.1"));
     QGuiApplication::setDesktopFileName(QStringLiteral("tandem-fm"));
 
     // UI language: TANDEM_LANG=de, else View > Language, else the system's.
