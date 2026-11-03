@@ -1943,10 +1943,6 @@
         <translation>Beenden</translation>
     </message>
     <message>
-        <source>&amp;Mark</source>
-        <translation>&amp;Markieren</translation>
-    </message>
-    <message>
         <source>Filter as you type…</source>
         <translation>Filtern beim Tippen…</translation>
     </message>
@@ -2115,36 +2111,8 @@
         <translation>Benachrichtigen, wenn lange Vorgänge abgeschlossen sind</translation>
     </message>
     <message>
-        <source>Language</source>
-        <translation>Sprache</translation>
-    </message>
-    <message>
-        <source>System default</source>
-        <translation>Systemstandard</translation>
-    </message>
-    <message>
-        <source>The language changes the next time Tandem starts</source>
-        <translation>Die Sprache wechselt beim nächsten Start von Tandem</translation>
-    </message>
-    <message>
-        <source>Icon theme</source>
-        <translation>Symbolthema</translation>
-    </message>
-    <message>
         <source>Preview</source>
         <translation>Vorschau</translation>
-    </message>
-    <message>
-        <source>Preview position</source>
-        <translation>Position der Vorschau</translation>
-    </message>
-    <message>
-        <source>Right of the panels</source>
-        <translation>Rechts neben den Panels</translation>
-    </message>
-    <message>
-        <source>Below each panel</source>
-        <translation>Unter jedem Panel</translation>
     </message>
     <message>
         <source>Trash…</source>
@@ -2195,16 +2163,20 @@
         <translation>Vorschau: Details statt Inhalt</translation>
     </message>
     <message>
-        <source>Below both panels</source>
-        <translation>Unter beiden Panels</translation>
-    </message>
-    <message>
         <source>Toggle menu bar</source>
         <translation>Menüleiste ein-/ausblenden</translation>
     </message>
     <message>
+        <source>T&amp;ools</source>
+        <translation>E&amp;xtras</translation>
+    </message>
+    <message>
         <source>Settings…</source>
         <translation>Einstellungen…</translation>
+    </message>
+    <message>
+        <source>Settings</source>
+        <translation>Einstellungen</translation>
     </message>
     <message>
         <source>&amp;Help</source>
@@ -2386,14 +2358,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Enter: öffnen   ·   Ctrl+P: anheften / lösen   ·   Shift+Del: vergessen   ·   Ctrl+D: Lesezeichen-Tasten</translation>
     </message>
     <message>
-        <source>System default (%1)</source>
-        <translation>Systemstandard (%1)</translation>
-    </message>
-    <message>
-        <source>Loading…</source>
-        <translation>Wird geladen…</translation>
-    </message>
-    <message>
         <source>Extracting %1 …</source>
         <translation>%1 wird entpackt …</translation>
     </message>
@@ -2541,6 +2505,10 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>%1: %2</source>
         <translation>%1: %2</translation>
+    </message>
+    <message>
+        <source>&amp;Edit</source>
+        <translation>&amp;Bearbeiten</translation>
     </message>
     <message>
         <source>The folder changed while editing; nothing renamed</source>

@@ -1390,12 +1390,7 @@ private slots:
         m_right->navigate(R());
 
         // One shared preview below both: follows the active panel.
-        auto pick = [this](const QString& label) {
-            for (QAction* a : m_window->findChildren<QAction*>())
-                if (a->text() == label)
-                    a->trigger();
-        };
-        pick(QObject::tr("Below both panels"));
+        m_window->setPreviewPosition("bottom");
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickViewRight") == nullptr);
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") != nullptr);
         auto* shared = m_window->findChild<ViewerWindow*>("quickView");
@@ -1403,7 +1398,7 @@ private slots:
         QVERIFY(shared->parentWidget() != m_left->parentWidget());
 
         // On the right: a third column.
-        pick(QObject::tr("Right of the panels"));
+        m_window->setPreviewPosition("right");
         QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView") &&
                     qobject_cast<QSplitter*>(m_window->findChild<ViewerWindow*>("quickView")->parentWidget())
                             ->orientation() == Qt::Horizontal);

@@ -33,6 +33,8 @@ class MainWindow : public QMainWindow {
     friend class SettingsDialog;
 public:
     explicit MainWindow(const QStringList& startPaths);
+    // "each" (below each panel), "bottom" (below both) or "right".
+    void setPreviewPosition(const QString& code);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* e) override;
@@ -108,7 +110,6 @@ private:
     void recordJobUndo(Job* job);
     void notifyFinished(Job* job);
     void unpack();
-    void populateIconThemeMenu(QMenu* menu);
     void commandPalette();
     void jumpToFolder();
     QList<PopupItem> folderItems() const;
@@ -127,7 +128,6 @@ private:
     QSplitter* m_leftCol;        // left panel / its own preview
     QSplitter* m_rightCol;       // right panel / its own preview
     QString previewMode() const;  // "each" (default), "bottom", "right"
-    void setPreviewPosition(const QString& code);
     void openSettings(int page = 0);
     void showTrash();
     void findDuplicates();
