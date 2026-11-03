@@ -427,7 +427,7 @@ QList<uint32_t> ownGroups()
 // ---------------------------------------------------------- PermissionsJob
 
 PermissionsJob::PermissionsJob(QStringList paths, PermChange change)
-    : Job(tr("Change permissions")), m_paths(std::move(paths)), m_change(std::move(change))
+    : Job(tr("Permissions of %1").arg(itemsSummary(paths))), m_paths(std::move(paths)), m_change(std::move(change))
 {
 }
 

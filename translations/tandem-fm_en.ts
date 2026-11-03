@@ -31,11 +31,28 @@
             <numerusform></numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%1 and %n more</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>tandem::ChecksumDialog</name>
     <message numerus="yes">
         <source>Saved %n checksum file(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>tandem::CopyJob</name>
+    <message numerus="yes">
+        <source>Synchronize %n file(s) → %1</source>
         <translation type="unfinished">
             <numerusform></numerusform>
             <numerusform></numerusform>
@@ -82,7 +99,7 @@
 <context>
     <name>tandem::JobRow</name>
     <message numerus="yes">
-        <source>finished with %n problem(s)</source>
+        <source>Finished with %n problem(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
             <numerusform></numerusform>

@@ -98,7 +98,8 @@ QByteArray uniqueName(const QByteArray& path)
 // ---------------------------------------------------------------- CopyJob
 
 CopyJob::CopyJob(Mode mode, QStringList sources, QString destination)
-    : Job(mode == Mode::Copy ? tr("Copy") : tr("Move")),
+    : Job((mode == Mode::Copy ? tr("Copy %1 → %2") : tr("Move %1 → %2"))
+              .arg(itemsSummary(sources), tildePath(destination))),
       m_mode(mode),
       m_sources(std::move(sources)),
       m_destination(std::move(destination))
@@ -106,7 +107,10 @@ CopyJob::CopyJob(Mode mode, QStringList sources, QString destination)
 }
 
 CopyJob::CopyJob(QList<QPair<QString, QString>> pairs)
-    : Job(tr("Synchronize")), m_mode(Mode::Copy), m_pairs(std::move(pairs))
+    : Job(tr("Synchronize %n file(s) → %1", nullptr, int(pairs.size()))
+              .arg(pairs.isEmpty() ? QString() : tildePath(parentPath(pairs.first().second)))),
+      m_mode(Mode::Copy),
+      m_pairs(std::move(pairs))
 {
 }
 
@@ -636,7 +640,9 @@ int CopyJob::copyData(int in, int out, int64_t size)
 // -------------------------------------------------------------- DeleteJob
 
 DeleteJob::DeleteJob(QStringList paths, bool toTrash)
-    : Job(toTrash ? tr("Move to trash") : tr("Delete")), m_paths(std::move(paths)), m_toTrash(toTrash)
+    : Job((toTrash ? tr("Trash %1") : tr("Delete %1")).arg(itemsSummary(paths))),
+      m_paths(std::move(paths)),
+      m_toTrash(toTrash)
 {
 }
 

@@ -30,6 +30,8 @@ JobRow::JobRow(Job* job, JobManager* manager, QWidget* parent) : QWidget(parent)
     auto* text = new QVBoxLayout;
     text->setSpacing(2);
     m_title = new QLabel(this);
+    m_title->setMinimumWidth(100);
+    m_title->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);  // long paths are shortened, not widening
     QFont bold = m_title->font();
     bold.setWeight(QFont::DemiBold);
     m_title->setFont(bold);
@@ -39,7 +41,7 @@ JobRow::JobRow(Job* job, JobManager* manager, QWidget* parent) : QWidget(parent)
     m_detail->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     text->addWidget(m_title);
     text->addWidget(m_detail);
-    layout->addLayout(text, 3);
+    layout->addLayout(text, 1);
 
     m_bar = new QProgressBar(this);
     m_bar->setTextVisible(false);
@@ -48,7 +50,8 @@ JobRow::JobRow(Job* job, JobManager* manager, QWidget* parent) : QWidget(parent)
     setThemeStyle(m_bar, QStringLiteral(
         "QProgressBar { background: @border; border: none; border-radius: 3px; }"
         "QProgressBar::chunk { background: @accent; border-radius: 3px; }"));
-    layout->addWidget(m_bar, 2);
+    m_bar->setFixedWidth(120);  // the text needs the room
+    layout->addWidget(m_bar);
 
     m_pause = new QToolButton(this);
     m_pause->setAutoRaise(true);
@@ -97,6 +100,18 @@ JobRow::JobRow(Job* job, JobManager* manager, QWidget* parent) : QWidget(parent)
     m_clock.start();
 }
 
+void JobRow::showTexts()
+{
+    m_title->setText(m_title->fontMetrics().elidedText(m_titleText, Qt::ElideMiddle, qMax(40, m_title->width())));
+    m_detail->setText(m_detail->fontMetrics().elidedText(m_detailText, Qt::ElideMiddle, qMax(40, m_detail->width())));
+}
+
+void JobRow::resizeEvent(QResizeEvent* e)
+{
+    QWidget::resizeEvent(e);
+    showTexts();
+}
+
 double JobRow::speed() const
 {
     return m_job->isFinished() ? 0 : m_speed;
@@ -113,55 +128,55 @@ void JobRow::refresh()
         m_lastMs = now;
     }
 
-    QString state;
+    // Line 1: what and where to (the job's title). Line 2: how it's going,
+    // and which file it is on.
+    QString detail;
+    const QString current = s.current.isEmpty() ? QString() : baseName(s.current);
+    const QString files = s.filesTotal > 0 ? tr("%1 of %2 files").arg(s.filesDone).arg(s.filesTotal) : QString();
     switch (s.state) {
     case Job::State::Queued:
-        state = tr("queued: waits for its drive");
+        detail = tr("Queued: waits until its drive is free");
         break;
     case Job::State::Pending:
     case Job::State::Scanning:
-        state = tr("scanning…");
+        detail = s.filesTotal > 0 ? tr("Counting… %1 files so far").arg(s.filesTotal) : tr("Counting files…");
         break;
     case Job::State::Waiting:
-        state = tr("waiting for your answer");
+        detail = tr("Waiting for your answer");
         break;
-    case Job::State::Running:
-        state = s.paused ? tr("paused") : QString();
+    case Job::State::Running: {
+        QStringList parts;
+        if (s.paused)
+            parts << tr("Paused");
+        if (!files.isEmpty())
+            parts << files;
+        if (s.bytesTotal > 0) {
+            parts << QStringLiteral("%1 / %2").arg(formatSize(s.bytesDone), formatSize(s.bytesTotal));
+            if (!s.paused && m_speed > 1)
+                parts << formatSpeed(m_speed)
+                      << tr("%1 left").arg(formatDuration(int64_t(double(s.bytesTotal - s.bytesDone) / m_speed)));
+        }
+        if (!current.isEmpty())
+            parts << current;
+        detail = parts.join(QStringLiteral("  ·  "));
         break;
+    }
     case Job::State::Done:
-        state = s.errorCount ? plural(tr("finished with %n problem(s)", nullptr, s.errorCount), s.errorCount) : tr("done");
+        detail = s.errorCount ? plural(tr("Finished with %n problem(s)", nullptr, s.errorCount), s.errorCount) +
+                                    QStringLiteral(": ") + m_job->errors().constFirst()
+                              : tr("Done") + (files.isEmpty() ? QString() : QStringLiteral("  ·  ") + files);
         break;
     case Job::State::Failed:
-        state = tr("failed");
+        detail = tr("Failed") + (s.errorCount ? QStringLiteral(": ") + m_job->errors().constFirst() : QString());
         break;
     case Job::State::Cancelled:
-        state = tr("cancelled");
+        detail = tr("Cancelled");
         break;
     }
-
-    QString title = m_job->title();
-    if (s.filesTotal > 0)
-        title += QStringLiteral("  %1 / %2").arg(s.filesDone).arg(s.filesTotal);
-    if (!state.isEmpty())
-        title += QStringLiteral("  ·  ") + state;
-    m_title->setText(title);
-
-    QString detail;
-    if (!m_job->isFinished()) {
-        detail = s.current;
-        if (s.bytesTotal > 0) {
-            detail = QStringLiteral("%1 / %2   %3")
-                         .arg(formatSize(s.bytesDone), formatSize(s.bytesTotal),
-                              s.paused ? QString() : formatSpeed(m_speed));
-            if (m_speed > 1 && !s.paused)
-                detail += QStringLiteral("   ") +
-                          tr("%1 left").arg(formatDuration(int64_t(double(s.bytesTotal - s.bytesDone) / m_speed)));
-            detail += QStringLiteral("   ·   ") + s.current;
-        }
-    } else if (s.errorCount) {
-        detail = m_job->errors().constFirst();
-    }
-    m_detail->setText(detail);
+    m_titleText = m_job->title();
+    m_detailText = detail;
+    showTexts();
+    m_title->setToolTip(m_job->title());
     m_detail->setToolTip(s.errorCount ? m_job->errors().join(QLatin1Char('\n')) : s.current);
 
     int permille = 0;

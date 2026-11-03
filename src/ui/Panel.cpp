@@ -1270,12 +1270,6 @@ static bool isSystemMount(const MountPoint& m)
     return home == m.path || home.startsWith(m.path + QLatin1Char('/'));  // "Home" covers it
 }
 
-static QString tildePath(const QString& p)
-{
-    const QString home = QDir::homePath();
-    return p == home || p.startsWith(home + QLatin1Char('/')) ? QLatin1Char('~') + p.mid(home.size()) : p;
-}
-
 QList<PopupItem> Panel::locationItems()
 {
     QList<PopupItem> items;

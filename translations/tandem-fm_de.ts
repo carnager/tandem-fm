@@ -730,6 +730,13 @@
         <source>no &quot;colors&quot;</source>
         <translation>kein &quot;colors&quot;</translation>
     </message>
+    <message numerus="yes">
+        <source>%1 and %n more</source>
+        <translation>
+            <numerusform>%1 und %n weitere</numerusform>
+            <numerusform>%1 und %n weitere</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>Shortcuts</name>
@@ -1345,16 +1352,19 @@
 <context>
     <name>tandem::CopyJob</name>
     <message>
-        <source>Copy</source>
-        <translation>Kopieren</translation>
+        <source>Copy %1 → %2</source>
+        <translation>%1 kopieren → %2</translation>
     </message>
     <message>
-        <source>Move</source>
-        <translation>Verschieben</translation>
+        <source>Move %1 → %2</source>
+        <translation>%1 verschieben → %2</translation>
     </message>
-    <message>
-        <source>Synchronize</source>
-        <translation>Synchronisieren</translation>
+    <message numerus="yes">
+        <source>Synchronize %n file(s) → %1</source>
+        <translation>
+            <numerusform>%n Datei synchronisieren → %1</numerusform>
+            <numerusform>%n Dateien synchronisieren → %1</numerusform>
+        </translation>
     </message>
     <message>
         <source>Cannot create folder</source>
@@ -1440,12 +1450,12 @@
 <context>
     <name>tandem::DeleteJob</name>
     <message>
-        <source>Move to trash</source>
-        <translation>In den Papierkorb verschieben</translation>
+        <source>Trash %1</source>
+        <translation>%1 in den Papierkorb</translation>
     </message>
     <message>
-        <source>Delete</source>
-        <translation>Löschen</translation>
+        <source>Delete %1</source>
+        <translation>%1 löschen</translation>
     </message>
     <message>
         <source>Cannot move to trash. Delete permanently?</source>
@@ -1700,8 +1710,12 @@
 <context>
     <name>tandem::ExtractJob</name>
     <message>
-        <source>Extract</source>
-        <translation>Entpacken</translation>
+        <source>Extract %1 → %2</source>
+        <translation>%1 entpacken → %2</translation>
+    </message>
+    <message>
+        <source>Extract %1 from %2 → %3</source>
+        <translation>%1 aus %2 entpacken → %3</translation>
     </message>
     <message>
         <source>Cannot read archive</source>
@@ -1823,43 +1837,51 @@
         <translation>Fortsetzen</translation>
     </message>
     <message>
-        <source>queued: waits for its drive</source>
-        <translation>in Warteschlange: wartet auf sein Laufwerk</translation>
+        <source>%1 of %2 files</source>
+        <translation>%1 von %2 Dateien</translation>
     </message>
     <message>
-        <source>scanning…</source>
-        <translation>wird eingelesen…</translation>
+        <source>Queued: waits until its drive is free</source>
+        <translation>In der Warteschlange: wartet, bis das Laufwerk frei ist</translation>
     </message>
     <message>
-        <source>waiting for your answer</source>
-        <translation>wartet auf Antwort</translation>
+        <source>Counting… %1 files so far</source>
+        <translation>Zählen … bisher %1 Dateien</translation>
     </message>
     <message>
-        <source>paused</source>
-        <translation>pausiert</translation>
-    </message>
-    <message numerus="yes">
-        <source>finished with %n problem(s)</source>
-        <translation>
-            <numerusform>mit %n Problem beendet</numerusform>
-            <numerusform>mit %n Problemen beendet</numerusform>
-        </translation>
+        <source>Counting files…</source>
+        <translation>Dateien werden gezählt …</translation>
     </message>
     <message>
-        <source>done</source>
-        <translation>fertig</translation>
+        <source>Waiting for your answer</source>
+        <translation>Wartet auf deine Antwort</translation>
     </message>
     <message>
-        <source>failed</source>
-        <translation>fehlgeschlagen</translation>
-    </message>
-    <message>
-        <source>cancelled</source>
-        <translation>abgebrochen</translation>
+        <source>Paused</source>
+        <translation>Pausiert</translation>
     </message>
     <message>
         <source>%1 left</source>
         <translation>noch %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>Finished with %n problem(s)</source>
+        <translation>
+            <numerusform>Fertig mit %n Problem</numerusform>
+            <numerusform>Fertig mit %n Problemen</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation>Fertig</translation>
+    </message>
+    <message>
+        <source>Failed</source>
+        <translation>Fehlgeschlagen</translation>
+    </message>
+    <message>
+        <source>Cancelled</source>
+        <translation>Abgebrochen</translation>
     </message>
     <message>
         <source>Dismiss</source>
@@ -3153,8 +3175,8 @@ F3 lädt es herunter und öffnet es</translation>
 <context>
     <name>tandem::PackJob</name>
     <message>
-        <source>Pack</source>
-        <translation>Packen</translation>
+        <source>Pack %1 into %2</source>
+        <translation>%1 in %2 packen</translation>
     </message>
     <message>
         <source>Cannot read: %1 (%2)</source>
@@ -3809,8 +3831,8 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
 <context>
     <name>tandem::PermissionsJob</name>
     <message>
-        <source>Change permissions</source>
-        <translation>Berechtigungen ändern</translation>
+        <source>Permissions of %1</source>
+        <translation>Rechte von %1</translation>
     </message>
     <message>
         <source>%1: %2</source>

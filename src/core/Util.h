@@ -43,5 +43,8 @@ QByteArray joinPath(const QByteArray& dir, const QByteArray& name);
 QString parentPath(const QString& path);
 QString baseName(const QString& path);
 QString expandUserPath(const QString& path);  // ~ expansion + cleanPath
+QString tildePath(const QString& path);       // the reverse, for showing: /home/me/x -> ~/x
+// "a.jpg", "a.jpg, b.jpg" or "a.jpg and 11 more": what a job works on.
+QString itemsSummary(const QStringList& paths);
 
 }  // namespace tandem

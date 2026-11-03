@@ -24,7 +24,12 @@ public:
     Job* job() const { return m_job; }
     double speed() const;  // bytes/s, 0 once finished
 
+protected:
+    void resizeEvent(QResizeEvent* e) override;
+
 private:
+    void showTexts();  // the two lines, shortened in the middle to fit
+
     Job* m_job;
     JobManager* m_manager;
     QLabel* m_title;
@@ -37,6 +42,7 @@ private:
     int64_t m_lastBytes = 0;
     qint64 m_lastMs = 0;
     double m_speed = 0;
+    QString m_titleText, m_detailText;
 };
 
 // Collapsed: a pill in the bottom-right corner with overall progress.

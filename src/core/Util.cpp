@@ -147,4 +147,25 @@ QString expandUserPath(const QString& in)
     return QDir::cleanPath(p);
 }
 
+QString tildePath(const QString& path)
+{
+    const QString home = QDir::homePath();
+    if (path == home)
+        return QStringLiteral("~");
+    if (path.startsWith(home + QLatin1Char('/')))
+        return QLatin1Char('~') + path.mid(home.size());
+    return path;
+}
+
+QString itemsSummary(const QStringList& paths)
+{
+    if (paths.isEmpty())
+        return {};
+    if (paths.size() == 1)
+        return baseName(paths.first());
+    if (paths.size() == 2)
+        return QStringLiteral("%1, %2").arg(baseName(paths[0]), baseName(paths[1]));
+    return QObject::tr("%1 and %n more", nullptr, int(paths.size() - 1)).arg(baseName(paths.first()));
+}
+
 }  // namespace tandem
