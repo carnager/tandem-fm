@@ -2087,20 +2087,16 @@ void MainWindow::pack()
     }
     if (refuseOnServer(src, tr("Packing")) || refuseOnServer(other(), tr("Packing")))
         return;
-    bool now = false;
     const QString base = paths.size() == 1 ? baseName(paths.first()) : baseName(src->path());
     const QString dir = other()->inArchive() ? src->path() : other()->path();
-    const QString text = askDestination(
-        this, tr("Pack"),
-        tr("Pack %1 into (the extension picks the format: .zip .7z .tar.gz .tar.xz .tar.zst .tar):")
-            .arg(describeItems(paths)),
-        joinPath(dir, base + QStringLiteral(".zip")), &now);
-    if (text.isEmpty())
+    const auto choice = askPack(this, describeItems(paths), joinPath(dir, base));
+    if (!choice)
         return;
+    const QString& text = choice->target;
     QString target = text.startsWith(QLatin1Char('/')) || text.startsWith(QLatin1Char('~')) ? text
                                                                                              : joinPath(src->path(), text);
-    auto* packJob = new PackJob(paths, expandUserPath(target));
-    packJob->setStartImmediately(now);
+    auto* packJob = new PackJob(paths, expandUserPath(target), choice->password);
+    packJob->setStartImmediately(choice->startNow);
     m_jobs->add(packJob);
     if (!src->hasSelectionOverride())
         src->unmarkAll();

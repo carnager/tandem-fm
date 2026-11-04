@@ -43,7 +43,10 @@ QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut, QLineEdit** user
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     dlg->setObjectName(QStringLiteral("authDialog"));
     const bool hostKey = q.kind == AuthQuestion::Kind::HostKey;
-    dlg->setWindowTitle(hostKey ? QObject::tr("Unknown server") : QObject::tr("Log in"));
+    const bool archive = q.location.startsWith(QLatin1Char('/'));  // an encrypted archive, not a server
+    dlg->setWindowTitle(hostKey ? QObject::tr("Unknown server")
+                        : archive ? QObject::tr("Encrypted archive")
+                                  : QObject::tr("Log in"));
     dlg->setMinimumWidth(420);
     auto* layout = new QVBoxLayout(dlg);
     auto* where = new QLabel(q.location, dlg);
@@ -95,7 +98,9 @@ QDialog* makeDialog(const AuthQuestion& q, QLineEdit** editOut, QLineEdit** user
         layout->addWidget(remember);
     }
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, dlg);
-    buttons->button(QDialogButtonBox::Ok)->setText(hostKey ? QObject::tr("Trust and connect") : QObject::tr("Log in"));
+    buttons->button(QDialogButtonBox::Ok)->setText(hostKey   ? QObject::tr("Trust and connect")
+                                                   : archive ? QObject::tr("Open")
+                                                             : QObject::tr("Log in"));
     layout->addWidget(buttons);
     QObject::connect(buttons, &QDialogButtonBox::accepted, dlg, &QDialog::accept);
     QObject::connect(buttons, &QDialogButtonBox::rejected, dlg, &QDialog::reject);

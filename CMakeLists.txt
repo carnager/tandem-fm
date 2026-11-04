@@ -26,6 +26,7 @@ add_library(tandem_core STATIC
   src/core/FileOps.h src/core/FileOps.cpp
   src/core/DesktopApps.h src/core/DesktopApps.cpp
   src/core/Archive.h src/core/Archive.cpp
+  src/core/SevenZip.h src/core/SevenZip.cpp
   src/core/Vfs.cpp
   src/core/MultiRename.h src/core/MultiRename.cpp
   src/core/ExifDate.h src/core/ExifDate.cpp

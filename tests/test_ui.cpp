@@ -84,6 +84,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
+#include <QDialogButtonBox>
 
 using namespace tandem;
 
@@ -1963,6 +1964,47 @@ private slots:
     }
 
     // Ctrl+Shift+F5: a link in the other panel; Ctrl+Z takes it away again.
+    // Alt+F5: the format picks the extension (and typing one picks the
+    // format); only ZIP and 7-Zip take a password, typed twice.
+    void packDialog()
+    {
+        QSettings().remove("pack/format");
+        auto restore = qScopeGuard([] { QSettings().remove("pack/format"); });
+        bool checked = false;
+        answerNextDialog([&checked](QWidget* w) {
+            auto* target = w->findChild<QLineEdit*>("target");
+            auto* format = w->findChild<QComboBox*>("format");
+            auto* password = w->findChild<QLineEdit*>("password");
+            auto* repeat = w->findChild<QLineEdit*>("repeat");
+            auto* buttons = w->findChild<QDialogButtonBox*>();
+            QPushButton* ok = buttons->button(QDialogButtonBox::Ok);
+            QCOMPARE(target->text(), QString("/data/photos.zip"));
+            QCOMPARE(target->selectedText(), QString("photos"));
+            format->setCurrentIndex(format->findText("tar.zst", Qt::MatchContains));
+            QCOMPARE(target->text(), QString("/data/photos.tar.zst"));
+            QVERIFY(!password->isEnabled());
+            target->setFocus();
+            target->selectAll();
+            QTest::keyClicks(target, "/data/pics.zip");
+            QVERIFY(format->currentText().contains(".zip"));
+            QVERIFY(password->isEnabled());
+            password->setText("secret");
+            QVERIFY(!ok->isEnabled());  // not repeated yet
+            repeat->setText("secreT");
+            QVERIFY(!ok->isEnabled());
+            repeat->setText("secret");
+            QVERIFY(ok->isEnabled());
+            checked = true;
+            ok->click();
+        });
+        const auto choice = askPack(m_window.get(), "2 items", "/data/photos");
+        QVERIFY(checked);
+        QVERIFY(choice);
+        QCOMPARE(choice->target, QString("/data/pics.zip"));
+        QCOMPARE(choice->password, QString("secret"));
+        QCOMPARE(QSettings().value("pack/format").toString(), QString(".zip"));
+    }
+
     // Enter in a conflict overwrites only when that loses nothing newer.
     void conflictDefault()
     {

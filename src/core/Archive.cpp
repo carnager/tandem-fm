@@ -1,12 +1,15 @@
 #include "core/Archive.h"
 
+#include "core/Backend.h"
 #include "core/FileOps.h"
+#include "core/SevenZip.h"
 #include "core/Util.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QDirIterator>
+#include <QHash>
 #include <QMutex>
 #include <QSet>
 #include <QStandardPaths>
@@ -67,12 +70,143 @@ int setWriterFormat(archive* writer, const QByteArray& name)
     return archive_write_set_format_filter_by_ext(writer, name.constData());
 }
 
+// Passwords of encrypted archives, kept for the session.
+QMutex g_passwordMutex;
+QHash<QString, QByteArray> g_passwords;
+QSet<QString> g_checked;  // 7-Zip opened these with the kept password
+
+// Asked by libarchive when a member is encrypted and no password it has
+// fits (again after a wrong one). One reader per thread at a time.
+struct PasswordState {
+    QString path;
+    QByteArray answer;  // must stay valid while libarchive uses it
+    int asked = 0;
+    bool gaveUp = false;
+};
+thread_local PasswordState t_password;
+
+std::optional<QByteArray> knownPassword(const QString& path)
+{
+    QMutexLocker lock(&g_passwordMutex);
+    if (const auto it = g_passwords.constFind(path); it != g_passwords.cend())
+        return *it;
+    return std::nullopt;
+}
+
+// nullopt: cancelled. Kept for the session once given.
+std::optional<QByteArray> askPassword(const QString& path, bool wrong)
+{
+    AuthQuestion q;
+    q.kind = AuthQuestion::Kind::Password;
+    q.location = path;
+    q.message = wrong ? QObject::tr("Wrong password. Try again:") : QObject::tr("This archive is encrypted. Password:");
+    const auto answer = askAuth(q);
+    if (!answer)
+        return std::nullopt;
+    const QByteArray pw = answer->toUtf8();
+    QMutexLocker lock(&g_passwordMutex);
+    g_passwords.insert(path, pw);
+    return pw;
+}
+
+void forgetPassword(const QString& path)
+{
+    QMutexLocker lock(&g_passwordMutex);
+    g_passwords.remove(path);
+    g_checked.remove(path);
+}
+
+const char* passwordCallback(archive*, void*)
+{
+    PasswordState& st = t_password;
+    if (st.gaveUp)
+        return nullptr;  // cancelled once: don't ask for every member
+    const auto answer = askPassword(st.path, st.asked > 0);
+    st.asked += 1;
+    if (!answer) {
+        st.gaveUp = true;
+        return nullptr;
+    }
+    st.answer = *answer;
+    return st.answer.constData();
+}
+
+// Through 7-Zip: asks until a password opens the archive, tried on one
+// encrypted member (empty: by listing, for hidden names). false: cancelled
+// or failed, with *error.
+bool sevenZipPassword(const QString& path, const QString& member, QByteArray* password, QString* error)
+{
+    std::optional<QByteArray> pw = knownPassword(path);
+    {
+        QMutexLocker lock(&g_passwordMutex);
+        if (pw && g_checked.contains(path)) {
+            *password = *pw;
+            return true;
+        }
+    }
+    if (!pw && !(pw = askPassword(path, false))) {
+        *error = QObject::tr("Cancelled");
+        return false;
+    }
+    for (;;) {
+        QString why;
+        QList<SevenZipItem> items;
+        const SevenZipStatus s = member.isEmpty() ? sevenZipList(path, *pw, &items, &why)
+                                                  : sevenZipTest(path, member, *pw, &why);
+        if (s == SevenZipStatus::Ok) {
+            *password = *pw;
+            QMutexLocker lock(&g_passwordMutex);
+            g_passwords.insert(path, *pw);
+            g_checked.insert(path);
+            return true;
+        }
+        if (s == SevenZipStatus::Failed) {
+            *error = why;
+            return false;
+        }
+        forgetPassword(path);
+        if (!(pw = askPassword(path, true))) {
+            *error = QObject::tr("Cancelled");
+            return false;
+        }
+    }
+}
+
+// One member at a time, its data read after it: libarchive or 7-Zip.
+struct Member {
+    QString path;  // normalized; empty: unsafe, skip it
+    int type = AE_IFREG;
+    int64_t size = 0;
+    int64_t mtime = 0;
+    mode_t perm = 0;
+    QByteArray symlink;
+    QByteArray hardlink;
+    bool encrypted = false;
+};
+
+class MemberReader {
+public:
+    virtual ~MemberReader() = default;
+    virtual bool next(Member* m) = 0;  // false at the end or on errors (error set)
+    virtual la_ssize_t read(char* buf, size_t n) = 0;  // 0: end of this member; < 0: error set
+    QString error;
+};
+
 // Configured reader, or nullptr with *error set.
 archive* openReader(const QString& path, QString* error)
 {
     archive* a = archive_read_new();
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
+    t_password = PasswordState{path, {}, 0, false};
+    {
+        QMutexLocker lock(&g_passwordMutex);
+        if (const auto known = g_passwords.find(path); known != g_passwords.end()) {
+            archive_read_add_passphrase(a, known->constData());
+            t_password.asked = 1;  // it didn't fit if the callback runs
+        }
+    }
+    archive_read_set_passphrase_callback(a, nullptr, passwordCallback);
     if (isSingleCompressed(baseName(path)))
         archive_read_support_format_raw(a);
     if (archive_read_open_filename(a, toNative(path).constData(), 64 * 1024) != ARCHIVE_OK) {
@@ -92,6 +226,118 @@ QString memberPath(archive_entry* e, const QString& archivePath)
         p = archiveStem(baseName(archivePath));  // raw format names its member "data"
     return normalizeArchivePath(p);
 }
+
+class LibarchiveMembers : public MemberReader {
+public:
+    LibarchiveMembers(archive* a, QString path) : m_a(a), m_path(std::move(path)) {}
+    ~LibarchiveMembers() override { archive_read_free(m_a); }
+    bool next(Member* m) override
+    {
+        archive_entry* e = nullptr;
+        const int r = archive_read_next_header(m_a, &e);
+        if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
+            if (r != ARCHIVE_EOF)
+                error = archiveErrorText(m_a, QObject::tr("Damaged archive"));
+            return false;
+        }
+        m->path = memberPath(e, m_path);
+        m->type = int(archive_entry_filetype(e));
+        m->size = archive_entry_size(e);
+        m->mtime = archive_entry_mtime(e);
+        m->perm = archive_entry_perm(e) & 07777;
+        const char* link = archive_entry_symlink(e);
+        m->symlink = link ? QByteArray(link) : QByteArray();
+        const char* hard = archive_entry_hardlink(e);
+        m->hardlink = hard ? QByteArray(hard) : QByteArray();
+        m->encrypted = archive_entry_is_encrypted(e);
+        m_encrypted = m->encrypted;
+        return true;
+    }
+    la_ssize_t read(char* buf, size_t n) override
+    {
+        const la_ssize_t got = archive_read_data(m_a, buf, n);
+        if (got < 0)
+            error = m_encrypted ? QObject::tr("wrong or no password") : archiveErrorText(m_a, QObject::tr("damaged data"));
+        return got;
+    }
+
+private:
+    archive* m_a;
+    QString m_path;
+    bool m_encrypted = false;
+};
+
+// 7-Zip writes every file's data in archive order: split it by the sizes
+// the listing gave.
+class SevenZipMembers : public MemberReader {
+public:
+    explicit SevenZipMembers(std::shared_ptr<const ArchiveIndex> idx) : m_idx(std::move(idx)) {}
+    bool start(const QByteArray& password) { return m_stream.start(m_idx->archivePath, password, &error); }
+    bool next(Member* m) override
+    {
+        if (!skipRest())
+            return false;
+        if (m_next >= int(m_idx->members.size()))
+            return false;
+        const ArchiveEntry& e = m_idx->members[size_t(m_next++)];
+        m->path = e.path;
+        m->type = e.isDir ? AE_IFDIR : e.isLink ? AE_IFLNK : AE_IFREG;
+        m->size = e.isDir ? 0 : e.size;
+        m->mtime = e.mtime;
+        m->perm = e.mode & 07777;
+        m->hardlink.clear();
+        m->symlink.clear();
+        m->encrypted = e.encrypted;
+        m_left = m->size;
+        if (e.isLink) {  // stored as its target
+            m->symlink.resize(qsizetype(m_left));
+            if (m_left > 0 && readExact(m->symlink.data(), m_left) < 0)
+                return false;
+        }
+        return true;
+    }
+    la_ssize_t read(char* buf, size_t n) override
+    {
+        if (m_left <= 0)
+            return 0;
+        const qint64 got = m_stream.read(buf, qMin<qint64>(qint64(n), m_left));
+        if (got < 0) {
+            error = m_stream.error();
+            return -1;
+        }
+        if (got == 0) {
+            error = QObject::tr("damaged data");
+            return -1;
+        }
+        m_left -= got;
+        return got;
+    }
+
+private:
+    la_ssize_t readExact(char* buf, int64_t n)
+    {
+        while (n > 0) {
+            const la_ssize_t got = read(buf, size_t(n));
+            if (got <= 0)
+                return -1;
+            buf += got;
+            n -= got;
+        }
+        return 0;
+    }
+    bool skipRest()
+    {
+        char buf[64 * 1024];
+        while (m_left > 0)
+            if (read(buf, sizeof buf) < 0)
+                return false;
+        return true;
+    }
+    std::shared_ptr<const ArchiveIndex> m_idx;
+    SevenZipStream m_stream;
+    int m_next = 0;
+    int64_t m_left = 0;
+};
 
 struct CachedIndex {
     QString path;
@@ -182,9 +428,6 @@ std::shared_ptr<const ArchiveIndex> loadArchiveIndex(const QString& archivePath,
         }
     }
 
-    archive* a = openReader(archivePath, error);
-    if (!a)
-        return nullptr;
     auto idx = std::make_shared<ArchiveIndex>();
     idx->archivePath = archivePath;
     idx->archiveSize = st.st_size;
@@ -203,9 +446,18 @@ std::shared_ptr<const ArchiveIndex> loadArchiveIndex(const QString& archivePath,
         idx->entries.push_back(std::move(e));
     };
 
+    // libarchive reads most; encrypted 7z and RAR it can list at best, so
+    // those go through 7-Zip.
+    bool sevenZip = false;
+    archive* a = openReader(archivePath, error);
+    if (!a) {
+        if (!error->contains(QLatin1String("encrypt"), Qt::CaseInsensitive))
+            return nullptr;
+        sevenZip = true;
+    }
     archive_entry* entry = nullptr;
-    int r;
-    while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK || r == ARCHIVE_WARN) {
+    int r = ARCHIVE_EOF;
+    while (a && ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK || r == ARCHIVE_WARN)) {
         if (cancel && cancel->load()) {
             archive_read_free(a);
             *error = QObject::tr("Cancelled");
@@ -226,14 +478,59 @@ std::shared_ptr<const ArchiveIndex> loadArchiveIndex(const QString& archivePath,
         if ((e.mode & S_IFMT) == 0)
             e.mode |= e.isDir ? S_IFDIR : S_IFREG;
         e.encrypted = archive_entry_is_encrypted(entry);
+        if (e.encrypted) {
+            const int format = archive_format(a) & ARCHIVE_FORMAT_BASE_MASK;
+            sevenZip = sevenZip || format == ARCHIVE_FORMAT_7ZIP || format == ARCHIVE_FORMAT_RAR ||
+                       format == ARCHIVE_FORMAT_RAR_V5;
+        }
         add(std::move(e));
     }
-    if (r == ARCHIVE_FATAL || r == ARCHIVE_FAILED) {
+    if (a && (r == ARCHIVE_FATAL || r == ARCHIVE_FAILED)) {
         *error = archiveErrorText(a, QObject::tr("Damaged archive"));
-        archive_read_free(a);
-        return nullptr;
+        sevenZip = error->contains(QLatin1String("encrypt"), Qt::CaseInsensitive);
+        if (!sevenZip) {
+            archive_read_free(a);
+            return nullptr;
+        }
     }
-    archive_read_free(a);
+    if (a)
+        archive_read_free(a);
+    if (sevenZip) {
+        if (sevenZipProgram().isEmpty()) {
+            *error = QObject::tr("Encrypted archive: install 7-Zip (7z or 7zz) to open it");
+            return nullptr;
+        }
+        QList<SevenZipItem> items;
+        QString why;
+        SevenZipStatus s = sevenZipList(archivePath, knownPassword(archivePath).value_or(QByteArray()), &items, &why);
+        if (s == SevenZipStatus::WrongPassword) {  // the names are encrypted too
+            QByteArray pw;
+            if (!sevenZipPassword(archivePath, {}, &pw, error))
+                return nullptr;
+            s = sevenZipList(archivePath, pw, &items, &why);
+        }
+        if (s != SevenZipStatus::Ok) {
+            *error = why.isEmpty() ? QObject::tr("Damaged archive") : why;
+            return nullptr;
+        }
+        idx->entries.clear();
+        idx->byPath.clear();
+        idx->viaSevenZip = true;
+        for (const SevenZipItem& it : std::as_const(items)) {
+            ArchiveEntry e;
+            e.path = normalizeArchivePath(it.path);
+            e.name = e.path.section(QLatin1Char('/'), -1);
+            e.isDir = it.isDir;
+            e.isLink = it.isLink;
+            e.size = it.isDir ? 0 : it.size;
+            e.mtime = it.mtime;
+            e.mode = it.mode;
+            e.encrypted = it.encrypted;
+            idx->members.push_back(e);
+            if (!e.path.isEmpty())
+                add(std::move(e));
+        }
+    }
 
     // Folders that only exist implicitly ("a/b/c.txt" without "a/" and "a/b/").
     const size_t real = idx->entries.size();
@@ -281,6 +578,37 @@ std::shared_ptr<const ArchiveIndex> loadArchiveIndex(const QString& archivePath,
 
 // --------------------------------------------------------- single extract
 
+namespace {
+
+// The archive's members with their data, from whichever reader fits.
+std::unique_ptr<MemberReader> openMembers(const QString& path, QString* error)
+{
+    const auto idx = loadArchiveIndex(path, error);
+    if (!idx)
+        return nullptr;
+    if (!idx->viaSevenZip) {
+        archive* a = openReader(path, error);
+        return a ? std::make_unique<LibarchiveMembers>(a, path) : nullptr;
+    }
+    QString encrypted;
+    for (const ArchiveEntry& e : idx->members)
+        if (e.encrypted && !e.isDir && !e.path.isEmpty()) {
+            encrypted = e.path;
+            break;
+        }
+    QByteArray pw = knownPassword(path).value_or(QByteArray());
+    if (!encrypted.isEmpty() && !sevenZipPassword(path, encrypted, &pw, error))
+        return nullptr;
+    auto reader = std::make_unique<SevenZipMembers>(idx);
+    if (!reader->start(pw)) {
+        *error = reader->error;
+        return nullptr;
+    }
+    return reader;
+}
+
+}  // namespace
+
 QString extractToCache(const QString& archivePath, const QString& innerPath, QString* error,
                        const std::atomic<bool>* cancel)
 {
@@ -300,31 +628,29 @@ QString extractToCache(const QString& archivePath, const QString& innerPath, QSt
         return target;  // already extracted from this exact archive version
     QDir().mkpath(dir);
 
-    archive* a = openReader(archivePath, error);
-    if (!a)
+    auto reader = openMembers(archivePath, error);
+    if (!reader)
         return {};
-    archive_entry* entry = nullptr;
-    int r;
-    while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK || r == ARCHIVE_WARN) {
+    Member m;
+    while (reader->next(&m)) {
         if (cancel && cancel->load())
             break;
-        if (memberPath(entry, archivePath) != inner)
+        if (m.path != inner)
             continue;
         const QString part = target + QStringLiteral(".part");
         const int fd = ::open(toNative(part).constData(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
         if (fd < 0) {
             *error = errnoString(errno);
-            archive_read_free(a);
             return {};
         }
         QByteArray buf(256 * 1024, Qt::Uninitialized);
         bool ok = true;
         for (;;) {
-            const la_ssize_t n = archive_read_data(a, buf.data(), size_t(buf.size()));
+            const la_ssize_t n = reader->read(buf.data(), size_t(buf.size()));
             if (n == 0)
                 break;
             if (n < 0 || (cancel && cancel->load())) {
-                *error = archiveErrorText(a, QObject::tr("Cannot extract"));
+                *error = n < 0 ? reader->error : QObject::tr("Cancelled");
                 ok = false;
                 break;
             }
@@ -335,7 +661,6 @@ QString extractToCache(const QString& archivePath, const QString& innerPath, QSt
             }
         }
         ::close(fd);
-        archive_read_free(a);
         if (!ok) {
             QFile::remove(part);
             return {};
@@ -346,9 +671,7 @@ QString extractToCache(const QString& archivePath, const QString& innerPath, QSt
         return target;
     }
     if (error->isEmpty())
-        *error = (r == ARCHIVE_FATAL) ? archiveErrorText(a, QObject::tr("Damaged archive"))
-                                      : QObject::tr("Not found in the archive");
-    archive_read_free(a);
+        *error = !reader->error.isEmpty() ? reader->error : QObject::tr("Not found in the archive");
     return {};
 }
 
@@ -453,20 +776,19 @@ void ExtractJob::run()
     }
     setState(State::Running);
 
-    archive* a = openReader(m_archive, &error);
-    if (!a) {
+    auto reader = openMembers(m_archive, &error);
+    if (!reader) {
         askErrorText(tr("Cannot read archive"), m_archive, error);
         setState(State::Failed);
         return;
     }
     QByteArray buf(1024 * 1024, Qt::Uninitialized);
     int64_t remaining = files;
-    archive_entry* entry = nullptr;
-    int r;
-    while (remaining > 0 && ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK || r == ARCHIVE_WARN)) {
+    Member m;
+    while (remaining > 0 && reader->next(&m)) {
         if (checkpoint())
             break;
-        const QString member = memberPath(entry, m_archive);
+        const QString& member = m.path;
         const QString rel = member.isEmpty() ? QString() : relativeFor(member);
         if (rel.isEmpty())
             continue;  // not selected; libarchive skips the data
@@ -478,10 +800,10 @@ void ExtractJob::run()
             m_filesDone += 1;
             continue;
         }
-        const auto type = archive_entry_filetype(entry);
-        const int64_t size = archive_entry_size(entry);
-        const int64_t mtime = archive_entry_mtime(entry);
-        const mode_t perm = (archive_entry_perm(entry) & 07777) ?: (type == AE_IFDIR ? 0755 : 0644);
+        const auto type = m.type;
+        const int64_t size = m.size;
+        const int64_t mtime = m.mtime;
+        const mode_t perm = m.perm ?: (type == AE_IFDIR ? 0755 : 0644);
 
         if (type == AE_IFDIR) {
             makeDirectories(fromNative(target));
@@ -513,10 +835,9 @@ void ExtractJob::run()
         };
 
         if (type == AE_IFLNK) {
-            const char* linkTarget = archive_entry_symlink(entry);
             bool done = false;
             while (!done) {
-                if (::symlink(linkTarget ? linkTarget : "", target.constData()) == 0)
+                if (::symlink(m.symlink.constData(), target.constData()) == 0)
                     break;
                 if (errno != EEXIST) {
                     askError(tr("Cannot create link"), fromNative(target), errno);
@@ -531,8 +852,8 @@ void ExtractJob::run()
                 break;
             continue;
         }
-        if (const char* hard = archive_entry_hardlink(entry)) {
-            const QString linkRel = relativeFor(normalizeArchivePath(QString::fromUtf8(hard)));
+        if (!m.hardlink.isEmpty()) {
+            const QString linkRel = relativeFor(normalizeArchivePath(QString::fromUtf8(m.hardlink)));
             if (!linkRel.isEmpty() && ::link(joinPath(nbase, toNative(linkRel)).constData(), target.constData()) == 0) {
                 m_filesDone += 1;
                 continue;
@@ -552,10 +873,8 @@ void ExtractJob::run()
                 break;
             if (errno == EEXIST) {
                 const int h = handleExisting();
-                if (h < 0) {
-                    archive_read_free(a);
+                if (h < 0)
                     return;
-                }
                 if (h == 0) {
                     skip = true;
                     break;
@@ -581,14 +900,11 @@ void ExtractJob::run()
                 ok = false;
                 break;
             }
-            const la_ssize_t n = archive_read_data(a, buf.data(), size_t(buf.size()));
+            const la_ssize_t n = reader->read(buf.data(), size_t(buf.size()));
             if (n == 0)
                 break;
             if (n < 0) {
-                const QString why = archive_entry_is_encrypted(entry)
-                                        ? tr("encrypted archives are not supported yet")
-                                        : archiveErrorText(a, tr("damaged data"));
-                askErrorText(tr("Cannot extract"), member, why);
+                askErrorText(tr("Cannot extract"), member, reader->error);
                 ok = false;
                 break;
             }
@@ -609,7 +925,8 @@ void ExtractJob::run()
         if (isCancelled())
             break;
     }
-    archive_read_free(a);
+    if (remaining > 0 && !isCancelled() && !reader->error.isEmpty())
+        askErrorText(tr("Cannot read archive"), m_archive, reader->error);
     if (!isCancelled()) {
         m_filesDone = m_filesTotal.load();
         m_bytesDone = m_bytesTotal.load();
@@ -618,10 +935,24 @@ void ExtractJob::run()
 
 // ------------------------------------------------------------------ PackJob
 
-PackJob::PackJob(QStringList sources, QString archivePath)
+bool canEncryptArchive(const QString& archivePath)
+{
+    if (archivePath.endsWith(QLatin1String(".7z"), Qt::CaseInsensitive))
+        return !sevenZipProgram().isEmpty();
+    return archivePath.endsWith(QLatin1String(".zip"), Qt::CaseInsensitive);
+}
+
+void forgetArchivePasswords()
+{
+    QMutexLocker lock(&g_passwordMutex);
+    g_passwords.clear();
+}
+
+PackJob::PackJob(QStringList sources, QString archivePath, QString password)
     : Job(tr("Pack %1 into %2").arg(itemsSummary(sources), baseName(archivePath))),
       m_sources(std::move(sources)),
-      m_archive(std::move(archivePath))
+      m_archive(std::move(archivePath)),
+      m_password(std::move(password))
 {
 }
 
@@ -673,6 +1004,42 @@ void PackJob::run()
     }
     const QByteArray part = target + ".part";
 
+    // The new archive is written as .part, then takes the name.
+    auto finish = [&](bool ok) {
+        if (!ok) {
+            ::unlink(part.constData());
+            if (!isCancelled())
+                setState(State::Failed);
+            return;
+        }
+        const bool replaced = ::lstat(target.constData(), &existing) == 0;
+        if (::rename(part.constData(), target.constData()) != 0) {
+            askError(tr("Cannot create archive"), m_archive, errno);
+            ::unlink(part.constData());
+            setState(State::Failed);
+        } else if (!replaced) {
+            recordUndo(fromNative(target));
+        }
+    };
+
+    if (!m_password.isEmpty() && m_archive.endsWith(QLatin1String(".7z"), Qt::CaseInsensitive)) {
+        // libarchive can't encrypt 7z: 7-Zip does (names too).
+        setState(State::Running);
+        QString why;
+        const int64_t total = bytes;
+        const bool ok = sevenZipCreate(fromNative(part), m_sources, m_password.toUtf8(), [this, total](int percent) {
+            if (percent >= 0)
+                m_bytesDone = total * percent / 100;
+            return !checkpoint();
+        }, &why);
+        if (!ok && !isCancelled())
+            askErrorText(tr("Cannot create archive"), m_archive, why);
+        if (ok)
+            m_filesDone = m_filesTotal.load();
+        finish(ok);
+        return;
+    }
+
     archive* a = archive_write_new();
     if (setWriterFormat(a, target) != ARCHIVE_OK) {
         askErrorText(tr("Unknown archive type"), m_archive,
@@ -680,6 +1047,20 @@ void PackJob::run()
         archive_write_free(a);
         setState(State::Failed);
         return;
+    }
+    if (!m_password.isEmpty()) {
+        const QString why = !canEncryptArchive(m_archive) ? tr("only .zip and .7z archives can have a password")
+                            : archive_write_set_options(a, "zip:encryption=aes256") != ARCHIVE_OK
+                                ? archiveErrorText(a, tr("this system's libarchive cannot encrypt"))
+                            : archive_write_set_passphrase(a, m_password.toUtf8().constData()) != ARCHIVE_OK
+                                ? archiveErrorText(a, tr("cannot set the password"))
+                                : QString();
+        if (!why.isEmpty()) {
+            askErrorText(tr("Cannot encrypt"), m_archive, why);
+            archive_write_free(a);
+            setState(State::Failed);
+            return;
+        }
     }
     if (archive_write_open_filename(a, part.constData()) != ARCHIVE_OK) {
         askErrorText(tr("Cannot create archive"), m_archive, archiveErrorText(a, tr("write error")));
@@ -742,20 +1123,7 @@ void PackJob::run()
         ok = false;
     }
     archive_write_free(a);
-    if (!ok) {
-        ::unlink(part.constData());
-        if (!isCancelled())
-            setState(State::Failed);
-        return;
-    }
-    const bool replaced = ::lstat(target.constData(), &existing) == 0;
-    if (::rename(part.constData(), target.constData()) != 0) {
-        askError(tr("Cannot create archive"), m_archive, errno);
-        ::unlink(part.constData());
-        setState(State::Failed);
-    } else if (!replaced) {
-        recordUndo(fromNative(target));
-    }
+    finish(ok);
 }
 
 // ------------------------------------------------------------ archive update

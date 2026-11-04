@@ -511,6 +511,77 @@ private slots:
         QCOMPARE(readFile(cached), QByteArray("hello"));
     }
 
+    void archivePassword_data()
+    {
+        QTest::addColumn<QString>("ext");
+        QTest::newRow("zip") << ".zip";
+        QTest::newRow("7z") << ".7z";
+    }
+
+    // Packing with a password; opening asks for it once (again when wrong,
+    // never again after Cancel), and keeps it for the session.
+    void archivePassword()
+    {
+        QFETCH(QString, ext);
+        if (!canEncryptArchive("x" + ext))
+            QSKIP("7-Zip is not installed");
+        QVERIFY(!canEncryptArchive("x.tar.gz"));
+        forgetArchivePasswords();
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("src/docs")));
+        writeFile(tmp.filePath("src/readme.txt"), "hello");
+        writeFile(tmp.filePath("src/docs/big.bin"), QByteArray(300000, 'b'));
+        writeFile(tmp.filePath("src/empty"), "");
+        QVERIFY(::symlink("readme.txt", QFile::encodeName(tmp.filePath("src/link")).constData()) == 0);
+        const QString arc = tmp.filePath("secret" + ext);
+        PackJob pack({tmp.filePath("src")}, arc, "pässword");
+        QVERIFY(runJob(pack));
+        QVERIFY2(pack.errors().isEmpty(), qPrintable(pack.errors().join('\n')));
+        QVERIFY(!readFile(arc).contains("hello"));
+        QVERIFY(!QFile::exists(arc + ".part"));
+
+        QStringList answers;  // given in turn; nullopt when used up
+        QStringList questions;
+        setAuthHandler([&](const AuthQuestion& q) -> std::optional<QString> {
+            questions << q.message;
+            if (q.location != arc || answers.isEmpty())
+                return std::nullopt;
+            return answers.takeFirst();
+        });
+        auto restore = qScopeGuard([] {
+            setAuthHandler({});
+            forgetArchivePasswords();
+        });
+
+        // Cancelled: an error, not a stream of questions.
+        forgetArchiveIndex(arc);
+        QString err;
+        QVERIFY(extractToCache(arc, "src/readme.txt", &err).isEmpty());
+        QVERIFY(!err.isEmpty());
+        QVERIFY2(questions.size() == 1, qPrintable(questions.join(" | ")));
+
+        // Wrong, then right: asked twice, then never again.
+        questions.clear();
+        forgetArchiveIndex(arc);
+        answers = {"wrong", "pässword"};
+        ListResult root = listLocation(arc + "/src", {.showHidden = true});
+        QCOMPARE(root.error, 0);
+        QCOMPARE(int(root.entries.size()), 4);
+        QVERIFY(QDir().mkdir(tmp.filePath("x")));
+        ExtractJob ex(arc, {""}, tmp.filePath("x"));
+        QVERIFY(runJob(ex));
+        QVERIFY2(ex.errors().isEmpty(), qPrintable(ex.errors().join('\n')));
+        QCOMPARE(readFile(tmp.filePath("x/src/readme.txt")), QByteArray("hello"));
+        QCOMPARE(readFile(tmp.filePath("x/src/docs/big.bin")), QByteArray(300000, 'b'));
+        QCOMPARE(readFile(tmp.filePath("x/src/empty")), QByteArray());
+        QCOMPARE(QFile::symLinkTarget(tmp.filePath("x/src/link")), tmp.filePath("x/src/readme.txt"));
+        const QString cached = extractToCache(arc, "src/docs/big.bin", &err);
+        QVERIFY2(!cached.isEmpty(), qPrintable(err));
+        QCOMPARE(readFile(cached).size(), 300000);
+        QVERIFY2(questions.size() == 2, qPrintable(questions.join(" | ")));
+        QVERIFY(questions[1].contains("Wrong"));
+    }
+
     void archiveUpdate_data()
     {
         QTest::addColumn<QString>("ext");

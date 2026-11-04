@@ -32,6 +32,10 @@ struct ArchiveIndex {
     std::vector<ArchiveEntry> entries;
     QHash<QString, int> byPath;
     QHash<QString, QList<int>> children;  // folder path -> entry indices; "" is the root
+    // Encrypted 7z / RAR: read through 7-Zip. Its members in the order their
+    // data comes out (paths empty where unsafe).
+    bool viaSevenZip = false;
+    std::vector<ArchiveEntry> members;
 
     const ArchiveEntry* find(const QString& path) const;
 };
@@ -106,14 +110,23 @@ private:
     ArchiveChanges m_changes;
 };
 
+// Encrypted members ask for the password (askAuth, from the reading thread)
+// the first time; it is kept for the session. Tests reset it here.
+void forgetArchivePasswords();
+
 // Drops the cached table of contents (after the archive changed).
 void forgetArchiveIndex(const QString& archivePath);
 
+// Whether an archive with this name can have a password: .zip (AES-256,
+// names stay readable) and, with 7-Zip installed, .7z (names hidden too).
+bool canEncryptArchive(const QString& archivePath);
+
 // Alt+F5: creates an archive from local files. The format follows the
 // extension (.zip, .7z, .tar, .tar.gz/.tgz, .tar.xz, .tar.zst, .tar.bz2).
+// A password encrypts the files (see canEncryptArchive).
 class PackJob : public Job {
 public:
-    PackJob(QStringList sources, QString archivePath);
+    PackJob(QStringList sources, QString archivePath, QString password = {});
 
 protected:
     void run() override;
@@ -121,6 +134,7 @@ protected:
 private:
     QStringList m_sources;
     QString m_archive;
+    QString m_password;
 };
 
 }  // namespace tandem

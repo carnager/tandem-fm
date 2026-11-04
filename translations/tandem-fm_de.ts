@@ -54,12 +54,28 @@
         <translation>Abgebrochen</translation>
     </message>
     <message>
+        <source>Wrong password. Try again:</source>
+        <translation>Falsches Passwort. Noch einmal:</translation>
+    </message>
+    <message>
+        <source>This archive is encrypted. Password:</source>
+        <translation>Dieses Archiv ist verschlüsselt. Passwort:</translation>
+    </message>
+    <message>
         <source>Damaged archive</source>
         <translation>Beschädigtes Archiv</translation>
     </message>
     <message>
-        <source>Cannot extract</source>
-        <translation>Entpacken nicht möglich</translation>
+        <source>wrong or no password</source>
+        <translation>falsches oder kein Passwort</translation>
+    </message>
+    <message>
+        <source>damaged data</source>
+        <translation>beschädigte Daten</translation>
+    </message>
+    <message>
+        <source>Encrypted archive: install 7-Zip (7z or 7zz) to open it</source>
+        <translation>Verschlüsseltes Archiv: installiere 7-Zip (7z oder 7zz), um es zu öffnen</translation>
     </message>
     <message>
         <source>Not found in the archive</source>
@@ -144,6 +160,82 @@
     <message>
         <source>Enter: queue behind other operations on the same drive   ·   Shift+Enter: start right away</source>
         <translation>Enter: hinter andere Vorgänge auf demselben Laufwerk einreihen   ·   Shift+Enter: sofort starten</translation>
+    </message>
+    <message>
+        <source>ZIP</source>
+        <translation>ZIP</translation>
+    </message>
+    <message>
+        <source>7-Zip</source>
+        <translation>7-Zip</translation>
+    </message>
+    <message>
+        <source>tar.gz</source>
+        <translation>tar.gz</translation>
+    </message>
+    <message>
+        <source>tar.xz</source>
+        <translation>tar.xz</translation>
+    </message>
+    <message>
+        <source>tar.zst</source>
+        <translation>tar.zst</translation>
+    </message>
+    <message>
+        <source>tar</source>
+        <translation>tar</translation>
+    </message>
+    <message>
+        <source>Pack</source>
+        <translation>Packen</translation>
+    </message>
+    <message>
+        <source>Pack %1 into:</source>
+        <translation>%1 packen in:</translation>
+    </message>
+    <message>
+        <source>none</source>
+        <translation>keins</translation>
+    </message>
+    <message>
+        <source>&amp;Archive</source>
+        <translation>&amp;Archiv</translation>
+    </message>
+    <message>
+        <source>&amp;Format</source>
+        <translation>&amp;Format</translation>
+    </message>
+    <message>
+        <source>&amp;Password</source>
+        <translation>&amp;Passwort</translation>
+    </message>
+    <message>
+        <source>&amp;Repeat</source>
+        <translation>&amp;Wiederholen</translation>
+    </message>
+    <message>
+        <source>A password for 7z needs 7-Zip (7z or 7zz) installed.</source>
+        <translation>Ein Passwort für 7z braucht ein installiertes 7-Zip (7z oder 7zz).</translation>
+    </message>
+    <message>
+        <source>tar archives can&apos;t have a password: pick ZIP or 7-Zip for one.</source>
+        <translation>tar-Archive können kein Passwort haben: wähle dafür ZIP oder 7-Zip.</translation>
+    </message>
+    <message>
+        <source>Type the password again.</source>
+        <translation>Gib das Passwort noch einmal ein.</translation>
+    </message>
+    <message>
+        <source>The passwords don&apos;t match.</source>
+        <translation>Die Passwörter stimmen nicht überein.</translation>
+    </message>
+    <message>
+        <source>ZIP encrypts the files with AES-256; their names stay readable.</source>
+        <translation>ZIP verschlüsselt die Dateien mit AES-256; ihre Namen bleiben lesbar.</translation>
+    </message>
+    <message>
+        <source>7-Zip encrypts the files and their names with AES-256.</source>
+        <translation>7-Zip verschlüsselt die Dateien und ihre Namen mit AES-256.</translation>
     </message>
     <message>
         <source>folder, modified %1</source>
@@ -526,6 +618,10 @@
         <translation>Unbekannter Server</translation>
     </message>
     <message>
+        <source>Encrypted archive</source>
+        <translation>Verschlüsseltes Archiv</translation>
+    </message>
+    <message>
         <source>Log in</source>
         <translation>Anmelden</translation>
     </message>
@@ -544,6 +640,10 @@
     <message>
         <source>Trust and connect</source>
         <translation>Vertrauen und verbinden</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Öffnen</translation>
     </message>
     <message>
         <source>Log in to %1. Write the user as DOMAIN\user if needed; leave both empty for guest.</source>
@@ -751,6 +851,10 @@
     <message>
         <source>line %1: %2</source>
         <translation>Zeile %1: %2</translation>
+    </message>
+    <message>
+        <source>7-Zip is not installed</source>
+        <translation>7-Zip ist nicht installiert</translation>
     </message>
 </context>
 <context>
@@ -1765,14 +1869,6 @@
         <translation>Erstellen nicht möglich</translation>
     </message>
     <message>
-        <source>encrypted archives are not supported yet</source>
-        <translation>verschlüsselte Archive werden noch nicht unterstützt</translation>
-    </message>
-    <message>
-        <source>damaged data</source>
-        <translation>beschädigte Daten</translation>
-    </message>
-    <message>
         <source>Cannot extract</source>
         <translation>Entpacken nicht möglich</translation>
     </message>
@@ -2780,14 +2876,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Packen</translation>
     </message>
     <message>
-        <source>Pack</source>
-        <translation>Packen</translation>
-    </message>
-    <message>
-        <source>Pack %1 into (the extension picks the format: .zip .7z .tar.gz .tar.xz .tar.zst .tar):</source>
-        <translation>%1 packen nach (die Endung bestimmt das Format: .zip .7z .tar.gz .tar.xz .tar.zst .tar):</translation>
-    </message>
-    <message>
         <source>Unpacking</source>
         <translation>Entpacken</translation>
     </message>
@@ -3494,6 +3582,22 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Cannot create archive</source>
         <translation>Archiv kann nicht erstellt werden</translation>
+    </message>
+    <message>
+        <source>only .zip and .7z archives can have a password</source>
+        <translation>nur .zip- und .7z-Archive können ein Passwort haben</translation>
+    </message>
+    <message>
+        <source>this system&apos;s libarchive cannot encrypt</source>
+        <translation>die libarchive dieses Systems kann nicht verschlüsseln</translation>
+    </message>
+    <message>
+        <source>cannot set the password</source>
+        <translation>Passwort kann nicht gesetzt werden</translation>
+    </message>
+    <message>
+        <source>Cannot encrypt</source>
+        <translation>Kann nicht verschlüsseln</translation>
     </message>
     <message>
         <source>write error</source>
