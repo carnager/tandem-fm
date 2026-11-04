@@ -755,9 +755,26 @@ void FileView::drawRow(QPainter* p, const QStyleOptionViewItem& opt, const QMode
     }
     p->restore();
 
+    // The cells, by hand: QTreeView::drawRow would let the desktop style paint
+    // its own focus and hover bars (full width, under the rounded cursor).
     QStyleOptionViewItem o = opt;
     o.state &= ~(QStyle::State_Selected | QStyle::State_HasFocus | QStyle::State_MouseOver);
-    QTreeView::drawRow(p, o, idx);
+    o.showDecorationSelected = false;
+    const QHeaderView* h = header();
+    for (int section = 0; section < h->count(); ++section) {
+        const int col = h->logicalIndex(section);
+        if (h->isSectionHidden(col))
+            continue;
+        const int x = h->sectionViewportPosition(col);
+        const int w = h->sectionSize(col);
+        if (x + w < 0 || x > viewport()->width())
+            continue;
+        const QModelIndex cell = idx.sibling(idx.row(), col);
+        QStyleOptionViewItem c = o;
+        c.rect = QRect(x, opt.rect.top(), w, opt.rect.height());
+        c.index = cell;
+        itemDelegateForIndex(cell)->paint(p, c, cell);
+    }
 }
 
 QString FileView::dropTargetFor(const QPoint& pos, int* row) const

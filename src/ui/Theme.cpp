@@ -26,6 +26,7 @@
 #include <QSettings>
 #include <QProxyStyle>
 #include <QStyleOption>
+#include <QAbstractItemView>
 #include <QStyleFactory>
 #include <QStyleHints>
 
@@ -143,6 +144,13 @@ public:
             return c;
         };
         switch (pe) {
+        case PE_FrameFocusRect:
+            // Lists draw their own cursor; Fusion's frame (after keyboard use)
+            // would add a second, full-width one under it.
+            if (qobject_cast<const QAbstractItemView*>(w)
+                || (w && qobject_cast<const QAbstractItemView*>(w->parentWidget())))
+                return;
+            break;
         case PE_IndicatorCheckBox:
         case PE_IndicatorItemViewItemCheck: {
             if (o->rect.width() < 6)  // hidden on purpose (toggle-style check boxes)
