@@ -119,6 +119,11 @@ ctest --test-dir build --output-on-failure
   `QTemporaryDir`, `useConfigDir()`, `setKeyringHooksForTests`, and restore
   environment variables you change (a test that left `XDG_DATA_DIRS`
   pointing nowhere broke later tests).
+- Tests never start apps on the desktop. Start programs with
+  `launchDetached()` (core/Launch.h) and open files or URLs with
+  `openExternally()` (ui/OpenUrl.h), never `QProcess::startDetached` or
+  `QDesktopServices::openUrl`: the test guard (tests/TestLaunchGuard.h)
+  catches them there.
 - No raw string literals (`R"(…)"`) in test files: moc can't read them.
 - Check how it looks, without opening windows on anyone's desktop:
   `QT_QPA_PLATFORM=offscreen TANDEM_SCREENSHOT=/tmp/shot.png ./build/tandem-fm`

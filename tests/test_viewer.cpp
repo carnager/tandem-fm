@@ -1,5 +1,6 @@
 // F3 viewer: modes, large files, search, navigation (run offscreen).
 
+#include "TestLaunchGuard.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ByteViews.h"
 #include "ui/viewer/ImageView.h"
@@ -61,6 +62,7 @@ private slots:
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);
+        installTestLaunchGuard();  // never real apps
         qputenv("XDG_CONFIG_HOME", QFile::encodeName(m_tmp.filePath("config")));
         applyTheme(*qApp);
 

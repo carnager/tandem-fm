@@ -1,4 +1,6 @@
 #include "ui/MainWindow.h"
+#include "ui/OpenUrl.h"
+#include "core/Launch.h"
 
 #include "core/Archive.h"
 #include "core/Backend.h"
@@ -665,7 +667,7 @@ void MainWindow::showTrash()
 {
 #ifdef Q_OS_MACOS
     // Finder owns the private restore metadata. Never guess original paths.
-    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(QDir::homePath() + QStringLiteral("/.Trash"))))
+    if (!openExternally(QUrl::fromLocalFile(QDir::homePath() + QStringLiteral("/.Trash"))))
         active()->showMessage(tr("Could not open Trash in Finder"), true);
     return;
 #endif
@@ -1283,7 +1285,7 @@ void MainWindow::editCurrent()
         QStringList args = QProcess::splitCommand(editor);
         const QString program = args.takeFirst();
         args.append(path);
-        if (QProcess::startDetached(program, args, active()->path()))
+        if (launchDetached(program, args, active()->path()))
             return;
     }
     openFile(path);
@@ -1313,7 +1315,7 @@ void MainWindow::openFile(const QString& path)
                 return;
         }
     }
-    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
+    if (!openExternally(QUrl::fromLocalFile(path)))
         active()->showMessage(tr("No application to open %1").arg(baseName(path)), true);
 }
 
@@ -1999,7 +2001,7 @@ void MainWindow::editRemote(Panel* p, const QString& path)
         // Already being edited: reopen that copy, don't fetch over changes.
         const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
         QStringList args = QProcess::splitCommand(editor);
-        if (args.isEmpty() || !QProcess::startDetached(args.takeFirst(), args << editCopy, parentPath(editCopy)))
+        if (args.isEmpty() || !launchDetached(args.takeFirst(), args << editCopy, parentPath(editCopy)))
             openFile(editCopy);
         return;
     }
@@ -2034,7 +2036,7 @@ void MainWindow::watchEdit(const QString& local)
         QStringList args = QProcess::splitCommand(editor);
         const QString program = args.takeFirst();
         args.append(local);
-        if (QProcess::startDetached(program, args, parentPath(local)))
+        if (launchDetached(program, args, parentPath(local)))
             return;
     }
     openFile(local);
@@ -2539,7 +2541,7 @@ void MainWindow::runCommand(const QString& command, bool inTerminal)
         const QString wrapped = expanded + QStringLiteral("; printf '\n[exit %s] Enter closes ' \"$?\"; read _");
         QStringList argv = DesktopApps::terminalCommand(terminal, {QStringLiteral("sh"), QStringLiteral("-c"), wrapped});
         const QString program = argv.takeFirst();
-        if (!QProcess::startDetached(program, argv, ctx.dir))
+        if (!launchDetached(program, argv, ctx.dir))
             p->showMessage(tr("Could not start %1").arg(program), true);
         return;
     }
@@ -3251,7 +3253,7 @@ void MainWindow::openTerminal(const QString& dir)
         where = parentPath(active()->archivePath());  // the folder holding the archive
 #ifdef Q_OS_MACOS
     if (QSettings().value(QStringLiteral("tools/terminal")).toString().isEmpty()) {
-        if (!QProcess::startDetached(QStringLiteral("/usr/bin/open"),
+        if (!launchDetached(QStringLiteral("/usr/bin/open"),
                                      {QStringLiteral("-a"), QStringLiteral("Terminal"), where}))
             active()->showMessage(tr("Could not open Terminal"), true);
         return;
@@ -3266,7 +3268,7 @@ void MainWindow::openTerminal(const QString& dir)
     }
     QStringList args = QProcess::splitCommand(terminal);
     const QString program = args.takeFirst();
-    if (!QProcess::startDetached(program, args, where))
+    if (!launchDetached(program, args, where))
         active()->showMessage(tr("Could not start %1").arg(program), true);
 }
 

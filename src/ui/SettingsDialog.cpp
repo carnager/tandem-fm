@@ -1,4 +1,5 @@
 #include "ui/SettingsDialog.h"
+#include "ui/OpenUrl.h"
 
 #include "ui/Keymap.h"
 
@@ -337,7 +338,7 @@ QWidget* SettingsDialog::themeChooser()
     th->addStretch(1);
     connect(folder, &QPushButton::clicked, this, [] {
         QDir().mkpath(themesFolder());
-        QDesktopServices::openUrl(QUrl::fromLocalFile(themesFolder()));
+        openExternally(QUrl::fromLocalFile(themesFolder()));
     });
     connect(copy, &QPushButton::clicked, this, [this, main, fill] {
         Theme t = theme();
@@ -354,7 +355,7 @@ QWidget* SettingsDialog::themeChooser()
         f.close();
         fill();
         main->setCurrentIndex(main->findData(id));  // applies it
-        QDesktopServices::openUrl(QUrl::fromLocalFile(f.fileName()));
+        openExternally(QUrl::fromLocalFile(f.fileName()));
     });
 
     v->addWidget(main);
@@ -551,7 +552,7 @@ QWidget* SettingsDialog::pluginsPage()
     th->addStretch(1);
     connect(folder, &QPushButton::clicked, this, [] {
         QDir().mkpath(pluginsFolder());
-        QDesktopServices::openUrl(QUrl::fromLocalFile(pluginsFolder()));
+        openExternally(QUrl::fromLocalFile(pluginsFolder()));
     });
     connect(reload, &QPushButton::clicked, this, [this] {
         QPointer<SettingsDialog> self(this);

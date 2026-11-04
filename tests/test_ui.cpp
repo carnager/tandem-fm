@@ -1,5 +1,6 @@
 // Drives the real main window with keystrokes (run with QT_QPA_PLATFORM=offscreen).
 
+#include "TestLaunchGuard.h"
 #include "core/Archive.h"
 #include "core/DirWatcher.h"
 #include "core/FolderHistory.h"
@@ -194,6 +195,7 @@ private slots:
     {
         QStandardPaths::setTestModeEnabled(true);
         setKeyringHooksForTests({});  // never the real keyring
+        installTestLaunchGuard();      // never real apps
         qputenv("XDG_CONFIG_HOME", QFile::encodeName(m_tmp.filePath("config")));
         applyTheme(*qApp);
         DirWatcher::instance();
@@ -882,6 +884,26 @@ private slots:
         leftModel()->setData(leftModel()->index(m_left->view()->currentRow(), 0), "renamed.txt", Qt::EditRole);
         QTRY_VERIFY(QFile::exists(L("renamed.txt")));
         QTRY_COMPARE(m_left->currentName(), QString("renamed.txt"));
+    }
+
+    // Enter on a file opens it with the default app, which tests only record.
+    void openingAFileStartsNothingReal()
+    {
+        writeFile(L("open-me.txt"), "x");
+        QTRY_VERIFY(leftModel()->rowOf("open-me.txt") >= 0);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "open-me.txt");
+        {
+            QMutexLocker lock(&launchedMutex());
+            launchedForTests().clear();
+        }
+        QTest::keyClick(m_left->view(), Qt::Key_Return);
+        QTRY_VERIFY([] {
+            QMutexLocker lock(&launchedMutex());
+            return launchedForTests().join('\n').contains("open-me.txt");
+        }());
     }
 
     // F2 renames in place, like Shift+F6, and has a button in the F-key bar.

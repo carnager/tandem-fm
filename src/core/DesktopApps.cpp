@@ -1,4 +1,5 @@
 #include "core/DesktopApps.h"
+#include "core/Launch.h"
 
 #include "core/Util.h"
 
@@ -373,7 +374,7 @@ bool DesktopApps::launch(const DesktopApp& app, const QStringList& paths, const 
         if (app.terminal && !terminal.isEmpty())
             argv = terminalCommand(terminal, argv);
         const QString program = argv.takeFirst();
-        ok = QProcess::startDetached(program, argv, workDir) && ok;
+        ok = launchDetached(program, argv, workDir) && ok;
     }
     return ok;
 }

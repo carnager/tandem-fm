@@ -1,4 +1,5 @@
 #include "ui/SyncDialog.h"
+#include "core/Launch.h"
 
 #include "core/Backend.h"
 #include "core/Job.h"
@@ -707,7 +708,7 @@ void SyncDialog::compareFiles(int row)
                 }
             }
         }
-        if (!tool.isEmpty() && QProcess::startDetached(tool, {local[0], local[1]})) {
+        if (!tool.isEmpty() && launchDetached(tool, {local[0], local[1]})) {
             postToUi([self] {
                 if (self)
                     self->updateSummary();

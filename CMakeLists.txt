@@ -26,6 +26,7 @@ add_library(tandem_core STATIC
   src/core/FileOps.h src/core/FileOps.cpp
   src/core/DesktopApps.h src/core/DesktopApps.cpp
   src/core/Archive.h src/core/Archive.cpp
+  src/core/Launch.h src/core/Launch.cpp
   src/core/SevenZip.h src/core/SevenZip.cpp
   src/core/Vfs.cpp
   src/core/MultiRename.h src/core/MultiRename.cpp
@@ -82,6 +83,7 @@ add_library(tandem_ui STATIC
   src/ui/DirTab.h src/ui/DirTab.cpp
   src/ui/Panel.h src/ui/Panel.cpp
   src/ui/Dialogs.h src/ui/Dialogs.cpp
+  src/ui/OpenUrl.h src/ui/OpenUrl.cpp
   src/ui/DialogKeys.h src/ui/DialogKeys.cpp
   src/ui/JobManager.h src/ui/JobManager.cpp
   src/ui/JobsPanel.h src/ui/JobsPanel.cpp

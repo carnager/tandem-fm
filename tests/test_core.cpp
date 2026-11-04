@@ -1,3 +1,4 @@
+#include "TestLaunchGuard.h"
 #include "core/Archive.h"
 #include "core/Backend.h"
 #include "core/ConfigDir.h"
@@ -92,6 +93,7 @@ private slots:
     void initTestCase()
     {
         setKeyringHooksForTests({});  // never the real keyring
+        installTestLaunchGuard();      // never real apps
     }
 
     void naturalSort()
