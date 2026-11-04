@@ -118,6 +118,19 @@ QStringList localPaths(const QList<QUrl>& urls)
     return out;
 }
 
+// Tandem's own clipboard format: locations as Tandem writes them, server
+// ones included, separated by NUL. Other programs get the usual URL list.
+const QString kLocationsMime = QStringLiteral("application/x-tandem-locations");
+
+QUrl locationUrl(const QString& location)
+{
+    if (!isRemoteLocation(location))
+        return QUrl::fromLocalFile(location);
+    QUrl u(locationRoot(location), QUrl::TolerantMode);
+    u.setPath(locationPath(location));
+    return u;
+}
+
 QString describeItems(const QStringList& paths)
 {
     if (paths.size() == 1)
@@ -1313,11 +1326,12 @@ void MainWindow::copyToClipboard(bool cut)
     QList<QUrl> urls;
     QByteArray gnome = cut ? "cut" : "copy";
     for (const QString& p : paths) {
-        const QUrl u = QUrl::fromLocalFile(p);
+        const QUrl u = locationUrl(p);
         urls.append(u);
         gnome += '\n' + u.toEncoded();
     }
     mime->setUrls(urls);
+    mime->setData(kLocationsMime, paths.join(QChar(0)).toUtf8());
     mime->setData(QStringLiteral("x-special/gnome-copied-files"), gnome);
     mime->setData(QStringLiteral("application/x-kde-cutselection"), cut ? "1" : "0");
     mime->setText(paths.join(QLatin1Char('\n')));
@@ -1342,14 +1356,22 @@ void MainWindow::paste()
 void MainWindow::pasteInto(const QString& dir)
 {
     const QMimeData* mime = QApplication::clipboard()->mimeData();
-    if (!mime || !mime->hasUrls())
+    if (!mime)
         return;
-    const QStringList paths = localPaths(mime->urls());
+    // Our own list first: it keeps server locations, which URLs from other
+    // programs can't be trusted to.
+    const QStringList paths = mime->hasFormat(kLocationsMime)
+                                  ? QString::fromUtf8(mime->data(kLocationsMime)).split(QChar(0), Qt::SkipEmptyParts)
+                                  : localPaths(mime->urls());
     if (paths.isEmpty())
         return;
     const bool cut = mime->data(QStringLiteral("x-special/gnome-copied-files")).startsWith("cut") ||
                      mime->data(QStringLiteral("application/x-kde-cutselection")) == "1";
     if (Panel* ap = archivePanelFor(dir)) {
+        if (std::any_of(paths.begin(), paths.end(), [](const QString& p) { return isRemoteLocation(p); })) {
+            ap->showMessage(tr("Files from a server can't be pasted into an archive yet. Copy them to a local folder first."), true);
+            return;
+        }
         if (addToArchive(ap, paths, ap->innerPath(dir), cut) && cut)
             QApplication::clipboard()->clear();
         return;

@@ -2664,6 +2664,10 @@
         </translation>
     </message>
     <message>
+        <source>Files from a server can&apos;t be pasted into an archive yet. Copy them to a local folder first.</source>
+        <translation>Dateien von einem Server können noch nicht in ein Archiv eingefügt werden. Kopiere sie zuerst in einen lokalen Ordner.</translation>
+    </message>
+    <message>
         <source>Move the cursor onto a file</source>
         <translation>Cursor auf eine Datei setzen</translation>
     </message>

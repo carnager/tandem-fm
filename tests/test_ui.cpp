@@ -1702,6 +1702,45 @@ private slots:
         QVERIFY(ioPool()->waitForDone(5000));
     }
 
+    // Ctrl+C on a server, Ctrl+V in a local folder (and back) copies the files.
+    void clipboardWithServer()
+    {
+        QTemporaryDir serverDir;
+        writeFile(serverDir.filePath("from server.txt"), "s");
+        auto backend = std::make_shared<TestBackend>(serverDir.path());
+        registerBackend("test", backend);
+        auto unregister = qScopeGuard([] { registerBackend("test", nullptr); });
+        QVERIFY(QDir().mkpath(L("clip")));
+        writeFile(L("clip/local.txt"), "l");
+        m_left->navigate(L("clip"));
+        QTRY_COMPARE(leftModel()->path(), L("clip"));
+        m_right->navigate("test://srv/");
+        QTRY_COMPARE(rightModel()->path(), QString("test://srv/"));
+        QTRY_VERIFY(rightModel()->rowOf("from server.txt") >= 0);
+
+        moveCursorTo(m_right, "from server.txt");
+        m_right->view()->setFocus();
+        QTest::keyClick(m_right->view(), Qt::Key_C, Qt::ControlModifier);
+        // Other programs get a real server URL, not a local file.
+        const QList<QUrl> urls = QApplication::clipboard()->mimeData()->urls();
+        QCOMPARE(urls.size(), 1);
+        QCOMPARE(urls.first().scheme(), QString("test"));
+        QCOMPARE(urls.first().path(), QString("/from server.txt"));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_V, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(readFile(L("clip/from server.txt")), QByteArray("s"), 5000);
+
+        moveCursorTo(m_left, "local.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_C, Qt::ControlModifier);
+        m_right->view()->setFocus();
+        QTest::keyClick(m_right->view(), Qt::Key_V, Qt::ControlModifier);
+        QTRY_COMPARE_WITH_TIMEOUT(readFile(serverDir.filePath("local.txt")), QByteArray("l"), 5000);
+
+        m_right->navigate(R());
+        QTRY_COMPARE(rightModel()->path(), R());
+        QVERIFY(ioPool()->waitForDone(5000));
+    }
+
     // Server folders notice changes made elsewhere (polled while shown).
     void serverFolderRefreshes()
     {
