@@ -80,6 +80,7 @@ private:
     void showShortcuts();
     void showContextMenu(Panel* panel, const QPoint& pos, bool onItem);
     void addOpenWithMenu(QMenu* menu, const QStringList& paths);
+    void openWithPicker();
     void fillBookmarksMenu(QMenu* menu);
     void setupKeymap();
     void applyKeymap();

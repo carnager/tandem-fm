@@ -331,6 +331,8 @@ void MainWindow::createMenus()
     files->addSeparator();
     m_actions[QStringLiteral("copy")] = addCommand(files, QT_TR_NOOP("Copy…"), {K(Qt::Key_F5)}, [this] { copyOrMove(CopyJob::Mode::Copy); });
     m_actions[QStringLiteral("move")] = addCommand(files, QT_TR_NOOP("Move…"), {K(Qt::Key_F6)}, [this] { copyOrMove(CopyJob::Mode::Move); });
+    addCommand(files, QT_TR_NOOP("Open with…"), {K(Qt::SHIFT | Qt::Key_Return), K(Qt::SHIFT | Qt::Key_Enter)},
+               [this] { openWithPicker(); });
     m_actions[QStringLiteral("copyTo")] = addCommand(files, QT_TR_NOOP("Copy to an open tab, bookmark or folder…"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_F5)},
                                                      [this] { copyOrMoveTo(CopyJob::Mode::Copy); });
     m_actions[QStringLiteral("moveTo")] = addCommand(files, QT_TR_NOOP("Move to an open tab, bookmark or folder…"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_F6)},
@@ -3015,19 +3017,13 @@ void MainWindow::fillBookmarksMenu(QMenu* menu)
     menu->setToolTipsVisible(true);
 }
 
-void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)
+// Apps that can open every one of paths, best match (the default) first.
+static QList<DesktopApp> appsForAll(const QStringList& paths)
 {
-    QMenu* sub = menu->addMenu(tr("Open with"));
-    DesktopApps& registry = DesktopApps::instance();
-    if (!registry.isLoaded()) {
-        sub->addAction(tr("Loading applications…"))->setEnabled(false);
-        return;
-    }
-    // Apps that can open every selected file, best match first.
     QList<DesktopApp> apps;
     bool first = true;
     for (const QString& p : paths) {
-        const QList<DesktopApp> forThis = registry.appsFor(mimeChainFor(p));
+        const QList<DesktopApp> forThis = DesktopApps::instance().appsFor(mimeChainFor(p));
         if (first) {
             apps = forThis;
             first = false;
@@ -3037,6 +3033,73 @@ void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)
             });
         }
     }
+    return apps;
+}
+
+// Shift+Enter (o with modal keys): pick the app from a list, like yazi.
+// Typing something no app matches runs it as a command with the files.
+void MainWindow::openWithPicker()
+{
+    Panel* p = active();
+    const QStringList paths = p->selectedPaths();
+    if (paths.isEmpty() || p->isRemote() || p->inArchive()) {
+        if (!paths.isEmpty())
+            p->showMessage(tr("Open with works on local files: F3 or Enter opens this one"), true);
+        return;
+    }
+    DesktopApps& registry = DesktopApps::instance();
+    if (!registry.isLoaded()) {
+        p->showMessage(tr("Still loading the applications, a moment…"));
+        return;
+    }
+    const QList<DesktopApp> apps = appsForAll(paths);
+    const QString defaultId = registry.defaultFor(mimeChainFor(paths.first())).id;
+    const QString dir = p->path();
+    const QString terminal = registry.defaultTerminal();
+    QList<PopupItem> items;
+    for (const DesktopApp& app : apps) {
+        PopupItem it;
+        it.title = app.name;
+        it.subtitle = app.id == defaultId ? tr("default") : QString();
+        it.icon = QIcon::fromTheme(app.icon);
+        it.key = app.id;
+        it.run = [this, app, paths, dir, terminal] {
+            if (!DesktopApps::launch(app, paths, dir, terminal))
+                active()->showMessage(tr("Could not start %1").arg(app.name), true);
+        };
+        items.append(it);
+    }
+    m_popup->keyHandler = nullptr;
+    m_popup->queryItem = [this, paths, dir](const QString& q) -> std::optional<PopupItem> {
+        if (q.trimmed().isEmpty())
+            return std::nullopt;
+        PopupItem it;
+        it.title = tr("Run “%1” with the files").arg(q.trimmed());
+        it.bonus = -1;  // after the apps that match
+        it.icon = IconCache::themed("utilities-terminal", "system-run");
+        const QString cmd = q.trimmed();
+        it.run = [this, cmd, paths, dir] {
+            DesktopApp custom;
+            custom.name = cmd;
+            custom.exec = cmd;
+            if (!DesktopApps::launch(custom, paths, dir, {}))
+                active()->showMessage(tr("Could not start %1").arg(cmd), true);
+        };
+        return it;
+    };
+    m_popup->open(tr("Open %1 with…").arg(describeItems(paths)), items,
+                  tr("Enter: open   ·   type a command to run it with the files"));
+}
+
+void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)
+{
+    QMenu* sub = menu->addMenu(tr("Open with"));
+    DesktopApps& registry = DesktopApps::instance();
+    if (!registry.isLoaded()) {
+        sub->addAction(tr("Loading applications…"))->setEnabled(false);
+        return;
+    }
+    const QList<DesktopApp> apps = appsForAll(paths);
     const QString dir = active()->path();
     const QString terminal = registry.defaultTerminal();
 

@@ -71,7 +71,8 @@ public:
 
     // Extra keys (e.g. Ctrl+P to pin). Return true when handled.
     std::function<bool(QKeyEvent*, const PopupItem*)> keyHandler;
-    // An extra first row made from what was typed (e.g. "Go to /some/path").
+    // An extra first row made from what was typed (e.g. "Go to /some/path");
+    // with a negative bonus it comes last, as a fallback.
     std::function<std::optional<PopupItem>(const QString& query)> queryItem;
 
 protected:

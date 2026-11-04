@@ -296,7 +296,9 @@ void FuzzyPopup::refilter()
             sorted.append(rows[i]);
         rows = sorted;
     }
-    if (typed)
+    if (typed && typed->bonus < 0)
+        rows.append({0, {}, {}});  // a fallback: after the matches
+    else if (typed)
         rows.prepend({0, {}, {}});
     if (rows.size() > kMaxRows)
         rows.resize(kMaxRows);

@@ -22,6 +22,7 @@
 #include "ui/DuplicatesDialog.h"
 #include "ui/FileView.h"
 #include "ui/ThumbGrid.h"
+#include "core/DesktopApps.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/Keymap.h"
 #include "ui/KeyChordPopup.h"
@@ -1824,6 +1825,42 @@ private slots:
         QTRY_VERIFY(!km.error().isEmpty());
         QVERIFY2(km.error().contains("line"), qPrintable(km.error()));
         QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F2));
+    }
+
+    // Open with: a list of apps (o in modal mode, Shift+Enter otherwise); what
+    // was typed can run as a command, after the apps that match.
+    void openWithPicker()
+    {
+        DesktopApps::instance().loadAsync();
+        QTRY_VERIFY(DesktopApps::instance().isLoaded());
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTRY_VERIFY(!m_left->tab()->isLoading());
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "file1.txt");
+        auto visiblePopup = [&]() -> FuzzyPopup* {
+            for (auto* p : m_window->findChildren<FuzzyPopup*>())
+                if (p->isVisible())
+                    return p;
+            return nullptr;
+        };
+        QTest::keyClick(m_left->view(), Qt::Key_Return, Qt::ShiftModifier);
+        FuzzyPopup* popup = nullptr;
+        QTRY_VERIFY((popup = visiblePopup()));
+        auto* edit = qobject_cast<QLineEdit*>(QApplication::focusWidget());
+        QVERIFY(edit && edit->placeholderText().contains("file1.txt"));
+        QTest::keyClicks(edit, "zzqx-no-such-app");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->title.startsWith("Run"));
+        QTest::keyClick(edit, Qt::Key_Escape);
+        QTRY_VERIFY(!visiblePopup());
+
+        m_left->setVimKeys(true);
+        auto off = qScopeGuard([this] { m_left->setVimKeys(false); });
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_O);
+        QTRY_VERIFY((popup = visiblePopup()));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+        QTRY_VERIFY(!visiblePopup());
     }
 
     // Ctrl+,: settings; keys can be changed, conflicts resolved, defaults restored.

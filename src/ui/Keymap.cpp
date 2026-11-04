@@ -132,6 +132,7 @@ const QList<std::pair<QString, QString>>& Keymap::modalDefaults()
         {QStringLiteral("move-to-trash"), QStringLiteral("d")},
         {QStringLiteral("delete-permanently"), QStringLiteral("D")},
         {QStringLiteral("rename"), QStringLiteral("r")},
+        {QStringLiteral("open-with"), QStringLiteral("o")},
         {QStringLiteral("create"), QStringLiteral("a")},
         {QStringLiteral("show-hidden-files"), QStringLiteral(".")},
         {QStringLiteral("filter-as-you-type"), QStringLiteral("f")},

@@ -26,6 +26,7 @@ struct Entry {
 const Entry kEntries[] = {
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Tab", QT_TRANSLATE_NOOP("Shortcuts", "Switch panel")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Enter", QT_TRANSLATE_NOOP("Shortcuts", "Open")},
+    {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Shift+Enter", QT_TRANSLATE_NOOP("Shortcuts", "Open with: pick the application")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "Backspace", QT_TRANSLATE_NOOP("Shortcuts", "Parent folder")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "← / →", QT_TRANSLATE_NOOP("Shortcuts", "Parent folder / into folder or archive (can be turned off)")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Moving around"), "a…z", QT_TRANSLATE_NOOP("Shortcuts", "Quick search: type letters (↑ ↓ next match)")},
@@ -104,6 +105,7 @@ const Entry kEntries[] = {
     {QT_TRANSLATE_NOOP("Shortcuts", "Modal keys (defaults; keys.toml changes them)"), "Space", QT_TRANSLATE_NOOP("Shortcuts", "Mark and move down")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Modal keys (defaults; keys.toml changes them)"), "y / x / p", QT_TRANSLATE_NOOP("Shortcuts", "Copy, cut, paste (clipboard)")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Modal keys (defaults; keys.toml changes them)"), "d / D", QT_TRANSLATE_NOOP("Shortcuts", "Move to trash / delete permanently")},
+    {QT_TRANSLATE_NOOP("Shortcuts", "Modal keys (defaults; keys.toml changes them)"), "o", QT_TRANSLATE_NOOP("Shortcuts", "Open with: pick the application")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Modal keys (defaults; keys.toml changes them)"), "r · a", QT_TRANSLATE_NOOP("Shortcuts", "Rename · create (a name ending in / makes a folder)")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Modal keys (defaults; keys.toml changes them)"), ".", QT_TRANSLATE_NOOP("Shortcuts", "Show hidden files")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Modal keys (defaults; keys.toml changes them)"), "f · s · z", QT_TRANSLATE_NOOP("Shortcuts", "Filter · search files · jump to a folder")},

@@ -768,6 +768,10 @@
         <translation>Öffnen</translation>
     </message>
     <message>
+        <source>Open with: pick the application</source>
+        <translation>Öffnen mit: Programm wählen</translation>
+    </message>
+    <message>
         <source>Parent folder</source>
         <translation>Übergeordneter Ordner</translation>
     </message>
@@ -2371,6 +2375,10 @@
         <translation>Mit Server verbinden…</translation>
     </message>
     <message>
+        <source>Open with…</source>
+        <translation>Öffnen mit…</translation>
+    </message>
+    <message>
         <source>Copy to an open tab, bookmark or folder…</source>
         <translation>In offenen Tab, Lesezeichen oder Ordner kopieren…</translation>
     </message>
@@ -3185,6 +3193,30 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>No terminal found. Set tools/terminal in the config.</source>
         <translation>Kein Terminal gefunden. tools/terminal in der Konfiguration setzen.</translation>
+    </message>
+    <message>
+        <source>Open with works on local files: F3 or Enter opens this one</source>
+        <translation>„Öffnen mit“ geht nur mit lokalen Dateien: F3 oder Enter öffnet diese</translation>
+    </message>
+    <message>
+        <source>Still loading the applications, a moment…</source>
+        <translation>Programme werden noch geladen, einen Moment…</translation>
+    </message>
+    <message>
+        <source>default</source>
+        <translation>Standard</translation>
+    </message>
+    <message>
+        <source>Run “%1” with the files</source>
+        <translation>„%1“ mit den Dateien ausführen</translation>
+    </message>
+    <message>
+        <source>Open %1 with…</source>
+        <translation>%1 öffnen mit…</translation>
+    </message>
+    <message>
+        <source>Enter: open   ·   type a command to run it with the files</source>
+        <translation>Enter: öffnen   ·   einen Befehl tippen, um ihn mit den Dateien auszuführen</translation>
     </message>
     <message>
         <source>A terminal on the server: use ssh (Tandem doesn&apos;t open one there yet)</source>
