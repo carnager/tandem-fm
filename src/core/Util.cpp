@@ -151,16 +151,6 @@ QString expandUserPath(const QString& in)
     return QDir::cleanPath(p);
 }
 
-QString tildePath(const QString& path)
-{
-    const QString home = QDir::homePath();
-    if (path == home)
-        return QStringLiteral("~");
-    if (path.startsWith(home + QLatin1Char('/')))
-        return QLatin1Char('~') + path.mid(home.size());
-    return path;
-}
-
 QString itemsSummary(const QStringList& paths)
 {
     if (paths.isEmpty())

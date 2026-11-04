@@ -13,18 +13,6 @@
 
 namespace tandem {
 
-namespace {
-QString pretty(const QString& path)
-{
-    const QString home = QDir::homePath();
-    if (path == home)
-        return QStringLiteral("~");
-    if (path.startsWith(home + QLatin1Char('/')))
-        return QLatin1Char('~') + path.mid(home.size());
-    return path;
-}
-}  // namespace
-
 KeyChordPopup::KeyChordPopup(QWidget* window) : QFrame(window)
 {
     const Theme& t = theme();
@@ -164,8 +152,8 @@ void KeyChordPopup::keyPressEvent(QKeyEvent* e)
     case Qt::Key_Enter:
         if (m_mode == Mode::Assign) {
             FolderHistory::instance().setBookmark(m_assignPath, m_typed);
-            emit message(m_typed.isEmpty() ? tr("Pinned %1").arg(pretty(m_assignPath))
-                                           : tr("Bookmarked %1 as “%2”").arg(pretty(m_assignPath), m_typed),
+            emit message(m_typed.isEmpty() ? tr("Pinned %1").arg(m_assignPath)
+                                           : tr("Bookmarked %1 as “%2”").arg(m_assignPath, m_typed),
                          false);
             close();
         } else if (const QString p = FolderHistory::instance().pathForKey(m_typed); !p.isEmpty()) {
@@ -176,7 +164,7 @@ void KeyChordPopup::keyPressEvent(QKeyEvent* e)
     case Qt::Key_Delete:
         if (m_mode == Mode::Assign) {
             FolderHistory::instance().setPinned(m_assignPath, false);
-            emit message(tr("Removed bookmark for %1").arg(pretty(m_assignPath)), false);
+            emit message(tr("Removed bookmark for %1").arg(m_assignPath), false);
             close();
             return;
         }
@@ -210,10 +198,10 @@ void KeyChordPopup::refresh()
         m_hint->setText(tr("Type a key   ·   Space: search all folders   ·   Ctrl+Shift+D: bookmark this folder   ·   Esc"));
     } else {
         const QString owner = m_typed.isEmpty() ? QString() : FolderHistory::instance().pathForKey(m_typed);
-        m_title->setText(tr("Bookmark key for %1:  %2").arg(pretty(m_assignPath), m_typed.isEmpty() ? QStringLiteral("_")
+        m_title->setText(tr("Bookmark key for %1:  %2").arg(m_assignPath, m_typed.isEmpty() ? QStringLiteral("_")
                                                                                                       : m_typed));
         m_hint->setText(!owner.isEmpty() && owner != m_assignPath
-                            ? tr("“%1” is used by %2 and will move here   ·   Enter: save   ·   Esc").arg(m_typed, pretty(owner))
+                            ? tr("“%1” is used by %2 and will move here   ·   Enter: save   ·   Esc").arg(m_typed, owner)
                             : tr("Type a key or chain (e.g. cp)   ·   Enter: save   ·   Delete: remove   ·   Esc"));
     }
     int row = 0, col = 0;
@@ -232,7 +220,7 @@ void KeyChordPopup::refresh()
             cap->setText(b.key);
         }
         cap->setObjectName(QStringLiteral("cap"));
-        auto* path = new QLabel(pretty(b.path), m_grid);
+        auto* path = new QLabel(b.path, m_grid);
         path->setObjectName(b.path == m_assignPath ? QString() : QStringLiteral("dim"));
         path->setTextFormat(Qt::PlainText);
         cap->show();

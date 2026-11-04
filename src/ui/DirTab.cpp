@@ -63,8 +63,6 @@ QString DirTab::title() const
     if (m_inSearch)
         return QStringLiteral("⌕ %1").arg(m_search.query);
     const QString p = path();
-    if (p == QDir::homePath())
-        return QStringLiteral("~");
     if (const auto r = remoteRootOf(p); r && r->root == p)
         return r->label.section(QStringLiteral("://"), -1);
     return baseName(p);

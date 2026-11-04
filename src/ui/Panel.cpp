@@ -1528,7 +1528,7 @@ QList<PopupItem> Panel::locationItems()
         items << it;
     };
     const QString places = tr("Places"), drives = tr("Drives"), network = tr("Network"), recent = tr("Recent servers");
-    add(places, IconCache::themed("user-home", "folder"), tr("Home"), tildePath(QDir::homePath()), {},
+    add(places, IconCache::themed("user-home", "folder"), tr("Home"), QDir::homePath(), {},
         [this] { navigate(QDir::homePath()); });
     add(places, IconCache::themed("folder-root", "folder"), tr("Computer"), QStringLiteral("/"), {},
         [this] { navigate(QStringLiteral("/")); });
@@ -1540,7 +1540,7 @@ QList<PopupItem> Panel::locationItems()
             continue;
         const char* icon = m.isNetwork ? "network-server" : (m.isRemovable ? "drive-removable-media" : "drive-harddisk");
         add(m.isNetwork ? network : drives, IconCache::themed(icon, "drive-harddisk"), baseName(m.path),
-            tildePath(m.path), QStringLiteral("mount:") + m.path, [this, p = m.path] { navigate(p); },
+            m.path, QStringLiteral("mount:") + m.path, [this, p = m.path] { navigate(p); },
             m.isRemovable ? tr("Del ⏏") : QString(), kindBadge(m.fsType));
     }
     for (const Place& pl : Network::instance().places()) {
@@ -1549,7 +1549,7 @@ QList<PopupItem> Panel::locationItems()
         if (!pl.path.isEmpty()) {
             const auto r = remoteRootOf(pl.path);
             const QString kind = gvfsKind(pl.path);
-            const QString label = r ? r->label.section(QLatin1String("://"), -1) : tildePath(pl.path);
+            const QString label = r ? r->label.section(QLatin1String("://"), -1) : pl.path;
             add(pl.network ? network : drives, icon, pl.name, label,
                 QStringLiteral("mount:") + pl.path, [this, p = pl.path] { navigate(p); }, tr("Del ⏏"),
                 kind.isEmpty() ? QString() : kindBadge(kind));

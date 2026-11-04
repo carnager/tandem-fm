@@ -368,9 +368,9 @@ void ServersDialog::importFromSsh()
     dlg.resize(520, 420);
     auto* layout = new QVBoxLayout(&dlg);
     layout->setContentsMargins(18, 16, 18, 14);
-    auto* intro = new QLabel(hosts.isEmpty() ? tr("No hosts found in %1.").arg(tildePath(sshConfigPath.isEmpty()
-                                                                                     ? QDir::homePath() + QStringLiteral("/.ssh/config")
-                                                                                     : sshConfigPath))
+    auto* intro = new QLabel(hosts.isEmpty() ? tr("No hosts found in %1.").arg(sshConfigPath.isEmpty()
+                                                                         ? QDir::homePath() + QStringLiteral("/.ssh/config")
+                                                                         : sshConfigPath)
                                              : tr("Pick the hosts to copy. Later changes to the SSH config don't change them."),
                              &dlg);
     intro->setWordWrap(true);

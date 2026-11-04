@@ -877,7 +877,7 @@ void ViewerWindow::fillFacts(const FileInfo& info)
                 continue;
             auto* k = new QLabel(key, m_factsBox);
             setThemeStyle(k, QStringLiteral("color: @dimText;"));
-            auto* v = new QLabel(key == QObject::tr("Location") ? tildePath(r.value) : r.value, m_factsBox);
+            auto* v = new QLabel(r.value, m_factsBox);
             v->setTextInteractionFlags(Qt::TextSelectableByMouse);
             v->setWordWrap(true);
             m_factsGrid->addWidget(k, row, 0, Qt::AlignTop);

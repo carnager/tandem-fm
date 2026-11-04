@@ -490,12 +490,7 @@ void SyncDialog::resizeEvent(QResizeEvent* e)
     // Long paths: shorten each to half the width, keeping both ends.
     const QFontMetrics fm(m_paths->font());
     const int half = qMax(80, (m_paths->width() - fm.horizontalAdvance(QStringLiteral("   ⇄   "))) / 2);
-    auto shortPath = [&](QString p) {
-        const QString home = QDir::homePath();
-        if (p == home || p.startsWith(home + QLatin1Char('/')))
-            p = QLatin1Char('~') + p.mid(home.size());
-        return fm.elidedText(p, Qt::ElideMiddle, half);
-    };
+    auto shortPath = [&](const QString& p) { return fm.elidedText(p, Qt::ElideMiddle, half); };
     m_paths->setText(QStringLiteral("%1   ⇄   %2").arg(shortPath(m_left), shortPath(m_right)));
 }
 

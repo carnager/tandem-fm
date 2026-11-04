@@ -142,7 +142,7 @@ QByteArray uniqueName(const QByteArray& path)
 
 CopyJob::CopyJob(Mode mode, QStringList sources, QString destination)
     : Job((mode == Mode::Copy ? tr("Copy %1 → %2") : tr("Move %1 → %2"))
-              .arg(itemsSummary(sources), tildePath(destination))),
+              .arg(itemsSummary(sources), destination)),
       m_mode(mode),
       m_sources(std::move(sources)),
       m_destination(std::move(destination))
@@ -151,7 +151,7 @@ CopyJob::CopyJob(Mode mode, QStringList sources, QString destination)
 
 CopyJob::CopyJob(QList<QPair<QString, QString>> pairs)
     : Job(plural(tr("Synchronize %n file(s) → %1", nullptr, int(pairs.size())), pairs.size())
-              .arg(pairs.isEmpty() ? QString() : tildePath(parentPath(pairs.first().second)))),
+              .arg(pairs.isEmpty() ? QString() : parentPath(pairs.first().second))),
       m_mode(Mode::Copy),
       m_pairs(std::move(pairs))
 {

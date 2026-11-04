@@ -381,7 +381,7 @@ ExtractJob::ExtractJob(QString archivePath, QStringList innerPaths, QString dest
     : Job((innerPaths.size() == 1 && innerPaths.first().isEmpty()
                ? tr("Extract %1 → %2").arg(baseName(archivePath))
                : tr("Extract %1 from %2 → %3").arg(itemsSummary(innerPaths), baseName(archivePath)))
-              .arg(tildePath(destDir))),
+              .arg(destDir)),
       m_archive(std::move(archivePath)),
       m_inner(std::move(innerPaths)),
       m_destDir(std::move(destDir)),

@@ -843,7 +843,7 @@ void FileView::updateDropText(const QMimeData* data, Qt::DropAction action, cons
 {
     int row = -1;
     QString target = dropTargetFor(pos, &row);
-    target = target == QDir::homePath() ? QStringLiteral("~") : baseName(target);
+    target = baseName(target);
     const QList<QUrl> urls = data ? data->urls() : QList<QUrl>{};
     const QString what = urls.size() == 1 ? urls.first().fileName()
                                           : plural(tr("%n item(s)", nullptr, int(urls.size())), urls.size());

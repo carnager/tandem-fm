@@ -751,7 +751,7 @@ void MainWindow::updateTransfers()
                     continue;
                 const QStringList src = c->sources();
                 const QString what = QStringLiteral("<b>%1</b>").arg(itemsSummary(src).toHtmlEscaped());
-                const QString from = src.isEmpty() ? QString() : tildePath(parentPath(src.first())).toHtmlEscaped();
+                const QString from = src.isEmpty() ? QString() : parentPath(src.first()).toHtmlEscaped();
                 text = (c->mode() == CopyJob::Mode::Copy ? tr("Copying %1 here from %2") : tr("Moving %1 here from %2"))
                            .arg(what, from);
                 found = j;
@@ -794,8 +794,6 @@ void MainWindow::updateFKeys()
     QString target = dst->path();
     if (dst->inArchive())
         target = baseName(dst->archivePath());
-    else if (target == QDir::homePath())
-        target = QStringLiteral("~");
     else if (target != QLatin1String("/"))
         target = baseName(target.endsWith(QLatin1Char('/')) ? target.chopped(1) : target);
     const QString to = target.isEmpty() ? QString() : QStringLiteral("→ ") + target;
@@ -1041,10 +1039,6 @@ void MainWindow::copyOrMoveTo(CopyJob::Mode mode, QWidget* anchor)
     if (paths.isEmpty())
         return;
     const bool copy = mode == CopyJob::Mode::Copy;
-    const QString home = QDir::homePath();
-    auto shortPath = [&home](const QString& p) {
-        return p.startsWith(home + QLatin1Char('/')) || p == home ? QLatin1Char('~') + p.mid(home.size()) : p;
-    };
     static const QIcon folder = IconCache::themed("folder");
     static const QIcon pin = IconCache::themed("pin", "emblem-favorite");
     QSet<QString> seen{src->path()};  // where they already are is no target
@@ -1056,7 +1050,7 @@ void MainWindow::copyOrMoveTo(CopyJob::Mode mode, QWidget* anchor)
         PopupItem it;
         it.key = path;
         it.title = path == QLatin1String("/") ? path : baseName(path);
-        it.subtitle = shortPath(path);
+        it.subtitle = path;
         it.matchSubtitle = true;
         it.hint = hint;
         it.icon = icon;
@@ -1713,7 +1707,7 @@ void MainWindow::commandPalette()
     Panel* p = active();
     if (DirTab* t = p->tab(); t && !t->isSearch()) {
         const QString dir = p->path();
-        const QString here = tr("Files in %1").arg(dir == QDir::homePath() ? QStringLiteral("~") : baseName(dir));
+        const QString here = tr("Files in %1").arg(baseName(dir));
         for (int r = 0; r < t->model()->count() && r < 2000; ++r) {
             const FileEntry* e = t->model()->entry(r);
             if (!e || e->isParent)
@@ -1751,7 +1745,7 @@ QList<PopupItem> MainWindow::folderItems() const
         PopupItem it;
         it.key = f.path;
         it.title = f.path == QLatin1String("/") ? f.path : baseName(f.path);
-        it.subtitle = f.path.startsWith(home) ? QLatin1Char('~') + f.path.mid(home.size()) : f.path;
+        it.subtitle = f.path;
         it.matchSubtitle = true;
         it.icon = f.pinned ? pin : folder;
         // Pins on top; otherwise frecency nudges the fuzzy ranking (zoxide-like).
@@ -3070,8 +3064,8 @@ void MainWindow::fillBookmarksMenu(QMenu* menu)
     static const QIcon pin = IconCache::themed("pin", "emblem-favorite");
     auto entry = [&](const QString& path, const QString& key, const QIcon& icon) {
         QAction* a = add(menu->addAction(icon, key.isEmpty() ? label(path) : label(path) + QLatin1Char('\t') + key));
-        a->setToolTip(tildePath(path));
-        a->setStatusTip(tildePath(path));
+        a->setToolTip(path);
+        a->setStatusTip(path);
         connect(a, &QAction::triggered, this, [this, path] { active()->navigate(path); });
     };
     for (const auto& [path, key] : std::as_const(entries))
