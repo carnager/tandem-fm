@@ -181,9 +181,9 @@ QIcon macPathIcon(const QString& path)
         NSImage* image = [[NSWorkspace sharedWorkspace] iconForFile:nativePath];
         if (!image)
             return {};
-        // List rows at 1x and 2x, and the grid up to 96 px at 2x.
+        // List rows at 1x and 2x, and the grid up to 96 px at 2x: about 170 KB.
         QList<QImage> images;
-        for (int side : {32, 64, 128, 256}) {
+        for (int side : {32, 64, 192}) {
             QImage drawn = drawNative(image, QSize(side, side));
             if (!drawn.isNull())
                 images.append(std::move(drawn));

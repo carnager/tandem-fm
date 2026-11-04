@@ -2,6 +2,7 @@
 
 #include "core/FileEntry.h"
 
+#include <QCache>
 #include <QHash>
 #include <QIcon>
 #include <QObject>
@@ -41,7 +42,10 @@ private:
     TypeLoader m_typeLoader;
     PathLoader m_pathLoader;
     QHash<QString, QIcon> m_types;
-    QHash<QString, PathIcon> m_paths;  // one entry per path; a new ctime replaces it
+    // One entry per path; a new ctime replaces it. Each holds ~170 KB of
+    // pixels, so the least recently shown go first: 192 is ~32 MB, still far
+    // more than a list or grid shows at once.
+    QCache<QString, PathIcon> m_paths{192};
     QSet<QString> m_pending;
     std::deque<Request> m_queue;
     quint64 m_generation = 0;

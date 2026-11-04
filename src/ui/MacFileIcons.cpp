@@ -60,8 +60,8 @@ QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
     if (localPath.isEmpty() || (!entry.hasCustomIcon && !entry.isPackage))
         return fallback;
 
-    if (auto it = m_paths.constFind(localPath); it != m_paths.cend() && it->revision == entry.iconRevision)
-        return it->icon.isNull() ? fallback : it->icon;
+    if (const PathIcon* known = m_paths.object(localPath); known && known->revision == entry.iconRevision)
+        return known->icon.isNull() ? fallback : known->icon;
     const QString key = localPath + QChar(0) + QString::number(entry.iconRevision);
     if (!m_pending.contains(key)) {
         m_pending.insert(key);
@@ -91,11 +91,9 @@ void MacFileIcons::pump()
                 }
                 self->m_pending.remove(request.path + QChar(0) + QString::number(request.revision));
                 // Keep failures too, until ctime changes; a late, older lookup must not win.
-                auto it = self->m_paths.find(request.path);
-                if (it == self->m_paths.end())
-                    self->m_paths.insert(request.path, {request.revision, icon});
-                else if (it->revision <= request.revision)
-                    *it = {request.revision, icon};
+                const PathIcon* known = self->m_paths.object(request.path);
+                if (!known || known->revision <= request.revision)
+                    self->m_paths.insert(request.path, new PathIcon{request.revision, icon});
                 emit self->ready(request.path);
                 self->pump();
             });
