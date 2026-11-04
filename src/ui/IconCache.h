@@ -17,6 +17,7 @@ public:
     // Switch icon theme ("" = the system's) and drop cached icons.
     static void setTheme(const QString& name);
     static QString systemTheme();
+    static bool usesSystemTheme();
     static void clear();
 };
 

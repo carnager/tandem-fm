@@ -22,7 +22,7 @@ MacFileIcons::MacFileIcons(QObject* parent, Loader loader) : QObject(parent), m_
 
 QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
 {
-    if (entry.isParent || (!QIcon::themeName().isEmpty() && QIcon::themeName() != IconCache::systemTheme()))
+    if (entry.isParent || !IconCache::usesSystemTheme())
         return IconCache::forEntry(entry);
 
     MacIconRequest request{entry.name, localPath, entry.isDir,

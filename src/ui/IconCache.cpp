@@ -40,6 +40,12 @@ QString& systemThemeName()
     return name;
 }
 
+bool& systemThemeMode()
+{
+    static bool automatic = true;
+    return automatic;
+}
+
 QIcon iconForMime(const QList<QMimeType>& types, const QIcon& generic)
 {
     if (types.isEmpty())
@@ -79,9 +85,15 @@ QString IconCache::systemTheme()
 
 void IconCache::setTheme(const QString& name)
 {
+    systemThemeMode() = name.isEmpty();
     systemTheme();  // remember the original before changing it
     QIcon::setThemeName(name.isEmpty() ? systemThemeName() : name);
     clear();
+}
+
+bool IconCache::usesSystemTheme()
+{
+    return systemThemeMode();
 }
 
 const QIcon& IconCache::forEntry(const FileEntry& e)

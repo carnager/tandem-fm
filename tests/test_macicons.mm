@@ -170,12 +170,33 @@ private slots:
         QCOMPARE(icons.get(folder, "/fixture/folder").pixmap(32).toImage().pixelColor(16, 16), QColor(Qt::blue));
     }
 
+    void systemChoiceWithFallbackTheme()
+    {
+        const QString original = QIcon::themeName();
+        IconCache::setTheme({});
+        auto restore = qScopeGuard([&] { QIcon::setThemeName(original); IconCache::clear(); });
+        QIcon::setThemeName("tandem-test-automatic-fallback");
+        std::atomic<int> calls{0};
+        MacFileIcons icons(nullptr, [&](const MacIconRequest&) {
+            ++calls;
+            QImage image(32, 32, QImage::Format_ARGB32);
+            image.fill(Qt::green);
+            return image;
+        });
+        FileEntry folder;
+        folder.isDir = true;
+        QSignalSpy ready(&icons, &MacFileIcons::ready);
+        icons.get(folder);
+        QTRY_VERIFY_WITH_TIMEOUT(!ready.isEmpty(), 1000);
+        QCOMPARE(calls.load(), 1);
+    }
+
     void explicitTheme()
     {
         const QString original = QIcon::themeName();
         IconCache::systemTheme();
-        auto restore = qScopeGuard([&] { QIcon::setThemeName(original); IconCache::clear(); });
-        QIcon::setThemeName("tandem-test-explicit-theme");
+        auto restore = qScopeGuard([&] { IconCache::setTheme({}); QIcon::setThemeName(original); });
+        IconCache::setTheme("tandem-test-explicit-theme");
         std::atomic<int> calls{0};
         MacFileIcons icons(nullptr, [&](const MacIconRequest&) { ++calls; return QImage(); });
         FileEntry folder;
