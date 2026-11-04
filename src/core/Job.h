@@ -116,6 +116,10 @@ protected:
     };
     std::optional<Resolution> resolveConflict(const ConflictSide& src, QByteArray& dst, const ConflictSide& existing,
                                               bool sameFile = false);
+    // The free name a Rename answer gave this target since forgetRenames(),
+    // or the target itself.
+    QByteArray renamedTarget(const QByteArray& dst) const;
+    void forgetRenames() { m_renames.clear(); }
 
     void setState(State s) { m_state.store(s); }
     void setCurrent(const QString& s);
@@ -143,6 +147,7 @@ private:
     bool m_skipAllErrors = false;
     enum class ConflictPolicy { Ask, OverwriteAll, OverwriteOlder, SkipAll, RenameAll };
     ConflictPolicy m_conflictPolicy = ConflictPolicy::Ask;
+    QList<QPair<QByteArray, QByteArray>> m_renames;  // (asked-for target, free name)
     AsyncPrompt m_promptHandler;
     SyncPrompt m_syncPrompt;
 };

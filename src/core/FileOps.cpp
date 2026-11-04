@@ -271,15 +271,18 @@ void CopyJob::run()
 
     for (const auto& it : items) {
         // Only things that didn't exist before are undoable: undoing a merge
-        // or an overwrite could destroy data that was there first.
+        // or an overwrite could destroy data that was there first. "Keep
+        // both" makes a new name, which is new by definition.
         struct stat st;
         const bool existed = ::lstat(it.second.constData(), &st) == 0;
+        forgetRenames();
         const bool ok = processItem(it.first, it.second);
-        if (!existed && ::lstat(it.second.constData(), &st) == 0) {
+        const QByteArray made = renamedTarget(it.second);
+        if ((made != it.second || !existed) && ::lstat(made.constData(), &st) == 0) {
             if (m_mode == Mode::Copy)
-                recordUndo(fromNative(it.second));
+                recordUndo(fromNative(made));
             else if (ok)
-                recordUndo(fromNative(it.second), fromNative(it.first));
+                recordUndo(fromNative(made), fromNative(it.first));
         }
         if (isCancelled())
             return;
@@ -379,6 +382,14 @@ std::optional<CopyJob::Resolution> CopyJob::resolveConflict(const QByteArray& sr
     return Job::resolveConflict(side(src, srcSt), dst, side(dst, dstSt), same);
 }
 
+QByteArray Job::renamedTarget(const QByteArray& dst) const
+{
+    for (const auto& [wanted, given] : m_renames)
+        if (wanted == dst)
+            return given;
+    return dst;
+}
+
 // Shared by every job that writes files (copy, extract, pack).
 std::optional<Job::Resolution> Job::resolveConflict(const ConflictSide& src, QByteArray& dst,
                                                     const ConflictSide& existing, bool sameFile)
@@ -395,9 +406,12 @@ std::optional<Job::Resolution> Job::resolveConflict(const ConflictSide& src, QBy
         return Resolution::Skip;
     case ConflictPolicy::OverwriteOlder:
         return olderRule();
-    case ConflictPolicy::RenameAll:
+    case ConflictPolicy::RenameAll: {
+        const QByteArray wanted = dst;
         dst = uniqueName(dst);
+        m_renames.append({wanted, dst});
         return Resolution::Rename;
+    }
     case ConflictPolicy::Ask:
         break;
     }
@@ -429,9 +443,12 @@ std::optional<Job::Resolution> Job::resolveConflict(const ConflictSide& src, QBy
     case Answer::RenameAll:
         m_conflictPolicy = ConflictPolicy::RenameAll;
         [[fallthrough]];
-    case Answer::Rename:
+    case Answer::Rename: {
+        const QByteArray wanted = dst;
         dst = uniqueName(dst);
+        m_renames.append({wanted, dst});
         return Resolution::Rename;
+    }
     default:
         cancel();
         return std::nullopt;

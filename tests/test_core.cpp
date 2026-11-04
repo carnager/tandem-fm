@@ -1180,6 +1180,19 @@ private slots:
         QCOMPARE(move.undoRecords(),
                  (QList<QPair<QString, QString>>{{tmp.filePath("moved/f"), tmp.filePath("src/f")}}));
 
+        // "Keep both" makes a new file: that one can be undone.
+        writeFile(tmp.filePath("src/g"), "new");
+        writeFile(tmp.filePath("dst/g"), "old");
+        CopyJob both(CopyJob::Mode::Copy, {tmp.filePath("src/g")}, tmp.filePath("dst"));
+        both.setSyncPromptHandler([](const PromptRequest&) { return Answer::Rename; });
+        QVERIFY(runJob(both));
+        QCOMPARE(both.undoRecords(), (QList<QPair<QString, QString>>{{tmp.filePath("dst/g (2)"), QString()}}));
+        CopyJob moveBoth(CopyJob::Mode::Move, {tmp.filePath("src/g")}, tmp.filePath("dst"));
+        moveBoth.setSyncPromptHandler([](const PromptRequest&) { return Answer::Rename; });
+        QVERIFY(runJob(moveBoth));
+        QCOMPARE(moveBoth.undoRecords(),
+                 (QList<QPair<QString, QString>>{{tmp.filePath("dst/g (3)"), tmp.filePath("src/g")}}));
+
         // Trash and restore, inside a private XDG_DATA_HOME on the same filesystem.
         const QByteArray oldData = qgetenv("XDG_DATA_HOME");
         qputenv("XDG_DATA_HOME", QFile::encodeName(tmp.filePath("data")));

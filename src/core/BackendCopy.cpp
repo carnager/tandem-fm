@@ -109,13 +109,15 @@ void CopyJob::runWithBackends()
         FileStat before;
         const bool localTarget = !isRemoteLocation(it.second);
         const bool existed = localTarget && statAt(it.second, before) == 0;
+        forgetRenames();
         const bool ok = backendItem(it.first, it.second);
+        const QString made = fromNative(renamedTarget(toNative(it.second)));
         FileStat after;
-        if (localTarget && !existed && statAt(it.second, after) == 0) {
+        if (localTarget && (made != it.second || !existed) && statAt(made, after) == 0) {
             if (m_mode == Mode::Copy)
-                recordUndo(it.second);
+                recordUndo(made);
             else if (ok && !isRemoteLocation(it.first))
-                recordUndo(it.second, it.first);
+                recordUndo(made, it.first);
         }
         if (isCancelled())
             return;
