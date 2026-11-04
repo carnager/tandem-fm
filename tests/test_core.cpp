@@ -1887,7 +1887,7 @@ private slots:
         QVERIFY2(text.contains("[tools]\neditor = \"nvim \\\"%f\\\"\""), qPrintable(text));
         QVERIFY2(!text.contains("geometry") && !text.contains("recent"), qPrintable(text));
         QVERIFY(QFile::exists(stateFilePath()));
-        QCOMPARE(stateFilePath(), tmp.filePath("state.toml"));
+        QCOMPARE(stateFilePath(), QFileInfo(file).path() + "/state.toml");  // with the settings
         {
             QSettings s;
             QCOMPARE(s.value("window/geometry").toByteArray(), QByteArray("\x01\x02\xff", 3));
@@ -1918,6 +1918,22 @@ private slots:
         QFile f(file);
         f.open(QIODevice::ReadOnly);
         QCOMPARE(f.readAll(), QByteArray("[view]\ntheme = nord\n"));
+    }
+
+    // A state.toml from r98–r101, straight in the config folder, moves next to the settings.
+    void misplacedStateMoves()
+    {
+        QTemporaryDir tmp;
+        {
+            QFile f(tmp.filePath("state.toml"));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("[window]\nactive = \"right\"\n");
+        }
+        useConfigDir(tmp.path());
+        auto restore = qScopeGuard([] { useConfigDir(QString()); });
+        QVERIFY(!QFile::exists(tmp.filePath("state.toml")));
+        QVERIFY(QFile::exists(stateFilePath()));
+        QCOMPARE(QFileInfo(stateFilePath()).path(), QFileInfo(QSettings().fileName()).path());
     }
 
     // Line edits: a commented-out default is reused; removing can leave it commented.

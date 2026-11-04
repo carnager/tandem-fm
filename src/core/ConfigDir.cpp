@@ -3,6 +3,8 @@
 #include "core/TomlSettings.h"
 
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QSettings>
 #include <QStandardPaths>
 
@@ -45,6 +47,12 @@ void useConfigDir(const QString& dirIn)
     }
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, g_dir);
     QSettings::setPath(tomlFormat(), QSettings::UserScope, g_dir);
+    // r98–r101 put state.toml straight into the folder: next to the settings now.
+    const QString misplaced = g_dir + QStringLiteral("/state.toml");
+    if (QFile::exists(misplaced) && !QFile::exists(stateFilePath())) {
+        QDir().mkpath(QFileInfo(stateFilePath()).path());
+        QFile::rename(misplaced, stateFilePath());
+    }
 }
 
 QString configDir()

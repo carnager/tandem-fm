@@ -221,8 +221,14 @@ QSettings::Format tomlFormat()
 QString stateFilePath()
 {
     const QString dir = configDir();
-    if (!dir.isEmpty())
-        return dir + QStringLiteral("/state.toml");
+    if (!dir.isEmpty()) {
+        // Next to the settings, keys and themes: <dir>/<organization>/. Worked
+        // out here, not with QSettings: this runs inside QSettings' own reading.
+        QString org = QCoreApplication::organizationName();
+        if (org.isEmpty())
+            org = QStringLiteral("Unknown Organization");
+        return dir + QLatin1Char('/') + org + QStringLiteral("/state.toml");
+    }
     QString base = QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation);
     if (base.isEmpty())
         base = QDir::homePath() + QStringLiteral("/.local/state");

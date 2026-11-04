@@ -15,7 +15,7 @@ namespace tandem {
 // Every QSettings() in the program reads and writes through this format.
 QSettings::Format tomlFormat();
 
-// Where window state goes: <configDir>/state.toml with --config-dir,
+// Where window state goes: next to the settings with --config-dir,
 // otherwise $XDG_STATE_HOME/tandem-fm/state.toml.
 QString stateFilePath();
 // keys.toml, next to the settings file.
