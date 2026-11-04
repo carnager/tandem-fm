@@ -70,7 +70,8 @@ QSize PopupDelegate::sizeHint(const QStyleOptionViewItem& opt, const QModelIndex
     const PopupItem* it = model->item(idx.row());
     const int line = opt.fontMetrics.height();
     const int header = model->header(idx.row()).isEmpty() ? 0 : line + 14;
-    return {200, (it && !it->subtitle.isEmpty() ? line * 2 + 4 : line) + 12 + header};
+    (void)it;
+    return {200, line + 14 + header};  // one line each: the subtitle sits beside the title
 }
 
 static void drawHighlighted(QPainter* p, const QRect& r, const QString& text, const QList<int>& positions,
@@ -155,12 +156,15 @@ void PopupDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QM
     if (it->subtitle.isEmpty()) {
         drawHighlighted(p, r, it->title, pos, opt.font, t.text, t.accent);
     } else {
+        // Title, then the subtitle (category or path) dimmed beside it.
         QFont sub = opt.font;
-        sub.setPointSizeF(sub.pointSizeF() * 0.9);
-        const QRect top(r.left(), r.top(), r.width(), line + 2);
-        const QRect bottom(r.left(), r.top() + line + 2, r.width(), line + 2);
-        drawHighlighted(p, top, it->title, it->matchSubtitle ? QList<int>{} : pos, opt.font, t.text, t.accent);
-        drawHighlighted(p, bottom, it->subtitle, it->matchSubtitle ? pos : QList<int>{}, sub, t.dimText, t.accent);
+        sub.setPointSizeF(sub.pointSizeF() * 0.92);
+        const int titleWidth = qMin(opt.fontMetrics.horizontalAdvance(it->title) + 2, r.width() * 4 / 5);
+        const QRect first(r.left(), r.top(), titleWidth, r.height());
+        const QRect second(r.left() + titleWidth + 12, r.top(), qMax(0, r.width() - titleWidth - 12), r.height());
+        drawHighlighted(p, first, it->title, it->matchSubtitle ? QList<int>{} : pos, opt.font, t.text, t.accent);
+        drawHighlighted(p, second, it->subtitle, it->matchSubtitle ? pos : QList<int>{}, sub, t.dimText, t.accent);
+        (void)line;
     }
     p->restore();
 }

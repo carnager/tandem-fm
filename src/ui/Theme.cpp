@@ -643,6 +643,15 @@ void applyTheme(QApplication& app)
         "QPushButton:default:hover { border-color: @text; }"
         "QPushButton:disabled { color: @dimText; border-color: @border; background: @header; }"
         "QToolTip { background: @header; color: @text; border: 1px solid @control; border-radius: 4px; padding: 4px 6px; }"
+        // Scroll bars: a thin rounded handle on nothing, no arrow buttons.
+        "QScrollBar:vertical { background: transparent; width: 12px; margin: 2px 0 2px 0; border: none; }"
+        "QScrollBar:horizontal { background: transparent; height: 12px; margin: 0 2px 0 2px; border: none; }"
+        "QScrollBar::handle:vertical { background: @control; border-radius: 3px; min-height: 36px; margin: 0 3px; }"
+        "QScrollBar::handle:horizontal { background: @control; border-radius: 3px; min-width: 36px; margin: 3px 0; }"
+        "QScrollBar::handle:hover, QScrollBar::handle:pressed { background: @dimText; }"
+        "QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; border: none; background: none; }"
+        "QScrollBar::add-page, QScrollBar::sub-page { background: none; }"
+        "QAbstractScrollArea::corner { background: transparent; }"
         // Menus: an edge, room, and a soft highlight instead of a full bar.
         "QMenu { background: @header; color: @text; border: 1px solid @control; border-radius: 8px; padding: 5px; }"
         "QMenu::item { padding: 5px 24px 5px 10px; border-radius: 5px; background: transparent; }"
