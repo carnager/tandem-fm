@@ -3,6 +3,7 @@
 #include "core/DirWatcher.h"
 #include "core/TomlSettings.h"
 #include "ui/AuthDialogs.h"
+#include "ui/DialogKeys.h"
 #include "ui/Keymap.h"
 #include "ui/Network.h"
 #include "ui/MainWindow.h"
@@ -55,6 +56,9 @@ int main(int argc, char** argv)
         QApplication::installTranslator(&appTranslator);
 
     tandem::applyTheme(app);
+#ifdef Q_OS_MACOS
+    tandem::installDialogKeys(&app);  // underlined letters on buttons
+#endif
     QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("tandem-fm"), QIcon(QStringLiteral(":/icons/tandem-fm.svg"))));
     tandem::DirWatcher::instance();  // must be created on the UI thread
     tandem::registerBuiltinBackends();

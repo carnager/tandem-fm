@@ -4,6 +4,7 @@
 #include "core/DirWatcher.h"
 #include "core/FolderHistory.h"
 #include "ui/DirTab.h"
+#include "ui/DialogKeys.h"
 #include "ui/Dialogs.h"
 #include "ui/FileModel.h"
 #include "ui/CommandBar.h"
@@ -85,6 +86,7 @@
 #include <QTest>
 #include <QTimer>
 #include <QDialogButtonBox>
+#include <QVBoxLayout>
 
 using namespace tandem;
 
@@ -2024,6 +2026,53 @@ private slots:
         QCOMPARE(defaultAnswer(2000, 1000), QObject::tr("&Overwrite"));
         QCOMPARE(defaultAnswer(1000, 1000), QObject::tr("&Overwrite"));
         QCOMPARE(defaultAnswer(1000, 2000), QObject::tr("&Skip"));
+    }
+
+    // macOS: a button's underlined letter presses it (alone, or with Option
+    // in a text field). Installed here by hand; Linux has it built in.
+    void dialogLetterKeys()
+    {
+        std::unique_ptr<QObject> keys(installDialogKeys(qApp));
+        auto answerFor = [](QKeyCombination key) {
+            PromptRequest req;
+            req.kind = PromptRequest::Kind::TrashFailed;
+            req.srcPath = "/Volumes/share/f";
+            PromptDialog dlg(req, nullptr);
+            int result = -1;
+            QObject::connect(&dlg, &QDialog::finished, [&result](int r) { result = r; });
+            dlg.show();
+            dlg.activateWindow();
+            if (!QTest::qWaitForWindowActive(&dlg))
+                return -2;
+            QTest::keyClick(QApplication::focusWidget() ? QApplication::focusWidget() : &dlg, key.key(),
+                            key.keyboardModifiers());
+            QTest::qWaitFor([&] { return result != -1; }, 2000);
+            return result;
+        };
+        QCOMPARE(answerFor(Qt::Key_S), int(Answer::Skip));
+        QCOMPARE(answerFor(Qt::Key_A), int(Answer::DeletePermanentlyAll));
+        QCOMPARE(answerFor(Qt::ALT | Qt::Key_D), int(Answer::DeletePermanently));
+        QCOMPARE(answerFor(Qt::Key_C), int(Answer::Cancel));
+        QCOMPARE(answerFor(Qt::Key_Return), int(Answer::DeletePermanently));
+
+        // Typing in a field stays typing; Option+letter still presses.
+        QDialog dlg;
+        auto* edit = new QLineEdit(&dlg);
+        auto* ok = new QPushButton("&Save", &dlg);
+        int saved = 0;
+        QObject::connect(ok, &QPushButton::clicked, [&saved] { ++saved; });
+        auto* layout = new QVBoxLayout(&dlg);
+        layout->addWidget(edit);
+        layout->addWidget(ok);
+        dlg.show();
+        dlg.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&dlg));
+        edit->setFocus();
+        QTest::keyClicks(edit, "ss");
+        QCOMPARE(edit->text(), QString("ss"));
+        QCOMPARE(saved, 0);
+        QTest::keyClick(edit, Qt::Key_S, Qt::AltModifier);
+        QTRY_COMPARE(saved, 1);
     }
 
     void createLinks()

@@ -77,6 +77,7 @@ add_library(tandem_ui STATIC
   src/ui/DirTab.h src/ui/DirTab.cpp
   src/ui/Panel.h src/ui/Panel.cpp
   src/ui/Dialogs.h src/ui/Dialogs.cpp
+  src/ui/DialogKeys.h src/ui/DialogKeys.cpp
   src/ui/JobManager.h src/ui/JobManager.cpp
   src/ui/JobsPanel.h src/ui/JobsPanel.cpp
   src/ui/MainWindow.h src/ui/MainWindow.cpp
