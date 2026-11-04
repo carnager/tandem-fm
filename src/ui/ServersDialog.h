@@ -13,7 +13,6 @@ class QLabel;
 class QLineEdit;
 class QListWidget;
 class QPushButton;
-class QSpinBox;
 class QWidget;
 
 namespace tandem {
@@ -44,6 +43,7 @@ private:
     void formChanged();
     void updateRow(int row);
     void connectCurrent();
+    void updateHeading();
 
     QList<SavedServer> m_servers;
     QStringList m_passwords;  // per row: typed, stored in the keyring on Save
@@ -55,7 +55,7 @@ private:
     QLineEdit* m_name;
     QButtonGroup* m_type;
     QLineEdit* m_host;
-    QSpinBox* m_port;
+    QLineEdit* m_port;
     QLineEdit* m_user;
     QLineEdit* m_domain;
     QLineEdit* m_keyFile;
@@ -63,6 +63,8 @@ private:
     QLineEdit* m_password;
     QLineEdit* m_folder;
     QLabel* m_address;
+    QLabel* m_heading;
+    QLabel* m_empty;
     QPushButton* m_remove;
     QPushButton* m_connect;
     QPushButton* m_save;

@@ -4470,10 +4470,6 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Host</translation>
     </message>
     <message>
-        <source>default</source>
-        <translation>Standard</translation>
-    </message>
-    <message>
         <source>Port</source>
         <translation>Port</translation>
     </message>
@@ -4518,8 +4514,48 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>leer: der Persönliche Ordner</translation>
     </message>
     <message>
+        <source>No servers yet. Add one, or import hosts from your SSH config.</source>
+        <translation>Noch keine Server. Füge einen hinzu oder übernimm Hosts aus deiner SSH-Konfiguration.</translation>
+    </message>
+    <message>
+        <source>Connection</source>
+        <translation>Verbindung</translation>
+    </message>
+    <message>
+        <source>shown in Locations; empty: the host</source>
+        <translation>so in den Orten angezeigt; leer: der Host</translation>
+    </message>
+    <message>
+        <source>Empty: the usual port</source>
+        <translation>Leer: der übliche Port</translation>
+    </message>
+    <message>
         <source>Start in</source>
         <translation>Starten in</translation>
+    </message>
+    <message>
+        <source>Login</source>
+        <translation>Anmeldung</translation>
+    </message>
+    <message>
+        <source>Choose…</source>
+        <translation>Auswählen…</translation>
+    </message>
+    <message>
+        <source>Passwords are kept in the desktop keyring.</source>
+        <translation>Passwörter werden im Schlüsselbund des Desktops gespeichert.</translation>
+    </message>
+    <message>
+        <source>No keyring here: passwords are asked when connecting.</source>
+        <translation>Kein Schlüsselbund: Passwörter werden beim Verbinden abgefragt.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>&amp;Save</source>
+        <translation>&amp;Speichern</translation>
     </message>
     <message>
         <source>Save and &amp;connect</source>
@@ -4536,6 +4572,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>share/folder; empty: the list of shares</source>
         <translation>Freigabe/Ordner; leer: die Liste der Freigaben</translation>
+    </message>
+    <message>
+        <source>Type a host to see the address</source>
+        <translation>Gib einen Host ein, um die Adresse zu sehen</translation>
     </message>
     <message>
         <source>A server needs a host.</source>

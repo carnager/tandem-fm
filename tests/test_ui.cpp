@@ -1827,6 +1827,13 @@ private slots:
             dlg.findChild<QLineEdit*>("domain")->setText("HOME");
             dlg.findChild<QLineEdit*>("password")->setText("secret");
             dlg.findChild<QLineEdit*>("folder")->setText("media");
+            // The port shows the usual one as a hint; empty keeps it.
+            auto* port = dlg.findChild<QLineEdit*>("port");
+            QCOMPARE(port->placeholderText(), QString("445"));
+            port->setText("1445");
+            QCOMPARE(dlg.servers().last().port, 1445);
+            port->clear();
+            QCOMPARE(dlg.servers().last().port, 0);
             QVERIFY(!dlg.findChild<QLineEdit*>("keyFile")->isVisibleTo(&dlg));  // SSH only
 
             answerNextDialog([](QWidget* w) {
