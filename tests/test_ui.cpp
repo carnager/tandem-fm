@@ -682,6 +682,54 @@ private slots:
         QVERIFY(v->dropText().isEmpty());
     }
 
+    // The preview as an inspector: facts and actions under the content, a two-way switch.
+    void previewInspector()
+    {
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "file1.txt");
+        QSettings().setValue("preview/info", false);
+        QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
+        auto restore = qScopeGuard([this] {
+            QSettings().remove("preview/info");
+            m_left->view()->setFocus();
+            QTest::keyClick(m_left->view(), Qt::Key_Q, Qt::ControlModifier);
+        });
+        ViewerWindow* v = nullptr;  // with a preview below each panel, the left one's
+        QTRY_VERIFY([&] {
+            for (ViewerWindow* w : m_window->findChildren<ViewerWindow*>())
+                if (w->currentPath() == L("file1.txt"))
+                    v = w;
+            return v != nullptr;
+        }());
+        QStringList facts;
+        QTRY_VERIFY([&] {
+            facts.clear();
+            for (auto* l : v->findChildren<QLabel*>())
+                if (l->isVisibleTo(v))
+                    facts << l->text();
+            return facts.contains("Modified") && facts.contains("Location");
+        }());
+        QStringList actions;
+        for (auto* b : v->findChildren<QAbstractButton*>())
+            if (b->isVisibleTo(v))
+                actions << b->accessibleName();
+        QVERIFY2(actions.contains("Open") && actions.contains("Edit"), qPrintable(actions.join(", ")));
+        QToolButton* details = nullptr;
+        for (auto* b : v->findChildren<QToolButton*>())
+            if (b->text() == "Details")
+                details = b;
+        QVERIFY(details);
+        details->click();
+        QTRY_COMPARE(v->mode(), ViewerWindow::Mode::Info);
+        details->click();  // checked again: stays on details
+        for (auto* b : v->findChildren<QToolButton*>())
+            if (b->text() == "Preview")
+                b->click();
+        QTRY_VERIFY(v->mode() != ViewerWindow::Mode::Info);
+    }
+
     void quickSearch()
     {
         m_left->view()->setCurrentRow(0);

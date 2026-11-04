@@ -1,5 +1,7 @@
 #include "ui/viewer/ViewerWindow.h"
 
+#include "ui/KeyButton.h"
+
 #include <QScrollBar>
 
 #include <QAbstractScrollArea>
@@ -31,6 +33,7 @@
 #include <QSettings>
 #include <QShortcut>
 #include <QStackedWidget>
+#include <QTimer>
 #include <QStringDecoder>
 #include <QGridLayout>
 #include <QHeaderView>
@@ -185,9 +188,18 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
         caption->setFont(cf);
         setThemeStyle(caption, QStringLiteral("color: @dimText;"));
         titles->addWidget(caption);
+        QFont big = m_title->font();
+        big.setPointSizeF(big.pointSizeF() * 1.3);
+        m_title->setFont(big);
+        titles->addSpacing(2);
         titles->addWidget(m_title);
+        m_subtitle = new QLabel(top);
+        m_subtitle->setTextFormat(Qt::PlainText);
+        m_subtitle->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+        setThemeStyle(m_subtitle, QStringLiteral("color: @dimText;"));
+        titles->addWidget(m_subtitle);
         tl->addLayout(titles, 1);
-        tl->setContentsMargins(14, 8, 10, 4);
+        tl->setContentsMargins(14, 8, 10, 6);
     } else {
         tl->addWidget(m_title, 1);
     }
@@ -205,6 +217,33 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_hexButton = makeButton(tr("Hex"), tr("Hex (3)"));
     m_imageButton = makeButton(tr("Image"), tr("Image, page, frame, contents… (4)"));
     m_infoButton = makeButton(tr("Info"), tr("Details: type, dates, permissions, owner, checksum… (I)"));
+    if (embedded) {
+        // Two views are enough here: the content, or everything about the file.
+        m_segment = new QWidget(top);
+        m_segment->setObjectName(QStringLiteral("segment"));
+        m_segment->setAttribute(Qt::WA_StyledBackground);
+        setThemeStyle(m_segment, QStringLiteral(
+            "#segment { background: @base; border-radius: 9px; }"
+            "#segment QToolButton { color: @dimText; border: none; border-radius: 7px; padding: 3px 10px; }"
+            "#segment QToolButton:checked { background: @border; color: @text; }"));
+        auto* sg = new QHBoxLayout(m_segment);
+        sg->setContentsMargins(2, 2, 2, 2);
+        sg->setSpacing(0);
+        m_segPreview = new QToolButton(m_segment);
+        m_segPreview->setText(tr("Preview"));
+        m_segDetails = new QToolButton(m_segment);
+        m_segDetails->setText(tr("Details"));
+        m_segDetails->setToolTip(tr("Everything about the file (Ctrl+I)"));
+        for (QToolButton* b : {m_segPreview, m_segDetails}) {
+            b->setCheckable(true);
+            b->setFocusPolicy(Qt::NoFocus);
+            sg->addWidget(b);
+        }
+        connect(m_segPreview, &QToolButton::clicked, this, [this] { setShowInfo(false); });
+        connect(m_segDetails, &QToolButton::clicked, this, [this] { setShowInfo(true); });
+        tl->addWidget(m_segment, 0, Qt::AlignTop);
+        m_segment->hide();
+    }
     // Wrapping is a text option, not a view: a checkbox by the status line.
     m_wrapButton = new QCheckBox(tr("Wrap lines"), this);
     m_wrapButton->setToolTip(tr("Wrap long lines (W)"));
@@ -323,6 +362,31 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
         inset->setContentsMargins(10, 4, 10, 0);
         inset->addWidget(m_sheet);
         layout->addLayout(inset, 1);
+        // Under the content: the main facts, what can be done, the keys.
+        m_extras = new QWidget(this);
+        auto* el = new QVBoxLayout(m_extras);
+        el->setContentsMargins(16, 12, 16, 2);
+        el->setSpacing(12);
+        m_factsBox = new QWidget(m_extras);
+        m_factsGrid = new QGridLayout(m_factsBox);
+        m_factsGrid->setContentsMargins(0, 0, 0, 0);
+        m_factsGrid->setHorizontalSpacing(16);
+        m_factsGrid->setVerticalSpacing(6);
+        m_factsGrid->setColumnStretch(1, 1);
+        el->addWidget(m_factsBox);
+        m_actionsBox = new QWidget(m_extras);
+        auto* al = new QHBoxLayout(m_actionsBox);
+        al->setContentsMargins(0, 0, 0, 0);
+        al->setSpacing(6);
+        el->addWidget(m_actionsBox);
+        auto* hints = new QLabel(tr("Ctrl+Q  hide   ·   Ctrl+I  details"), m_extras);
+        setThemeStyle(hints, QStringLiteral("color: @dimText;"));
+        QFont hf = hints->font();
+        hf.setPointSizeF(hf.pointSizeF() * 0.88);
+        hints->setFont(hf);
+        el->addWidget(hints);
+        m_extras->hide();
+        layout->addWidget(m_extras);
     } else {
         layout->addWidget(m_stack, 1);
     }
@@ -355,6 +419,7 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
         m_status->setWordWrap(true);
     }
     auto* statusRow = new QWidget(this);
+    m_statusRow = statusRow;
     setThemeStyle(statusRow, QStringLiteral("background: @window; color: @dimText;"));
     auto* sr = new QHBoxLayout(statusRow);
     sr->setContentsMargins(0, 0, embedded ? 14 : 10, 0);
@@ -534,6 +599,11 @@ void ViewerWindow::showNote(const QString& text)
     for (QToolButton* b : {m_textButton, m_hexButton, m_imageButton, m_infoButton})
         b->hide();
     m_wrapButton->hide();
+    if (m_embedded) {
+        m_subtitle->clear();
+        m_segment->hide();
+        m_extras->hide();
+    }
     showMessage(text);
     m_noteIcon->show();  // the empty state gets the big icon
 }
@@ -620,6 +690,8 @@ void ViewerWindow::openIndex(int index)
             }
             const bool info = w->m_embedded && QSettings().value(QStringLiteral("preview/info"), false).toBool();
             w->setMode(info ? Mode::Info : w->defaultMode());
+            if (w->m_embedded)
+                w->loadFacts();
         });
     });
 }
@@ -760,6 +832,77 @@ void ViewerWindow::loadText()
             emit w->loaded();
         });
     });
+}
+
+// The few facts that matter most for this kind of file, under its content.
+void ViewerWindow::loadFacts()
+{
+    const quint64 gen = m_gen;
+    const QString path = m_path;
+    const char git = m_gitHint;
+    QPointer<ViewerWindow> self(this);
+    ioPool()->start([self, gen, path, git] {
+        auto info = std::make_shared<FileInfo>(gatherFileInfo(path, git));
+        postToUi([self, gen, info] {
+            if (self && gen == self->m_gen)
+                self->fillFacts(*info);
+        });
+    });
+}
+
+void ViewerWindow::fillFacts(const FileInfo& info)
+{
+    while (QLayoutItem* item = m_factsGrid->takeAt(0)) {
+        if (QWidget* w = item->widget()) {
+            w->hide();
+            w->deleteLater();
+        }
+        delete item;
+    }
+    const QStringList wanted = {QObject::tr("Dimensions"), QCoreApplication::translate("FileInfo", "Taken"),
+                                QCoreApplication::translate("FileInfo", "Camera"), QObject::tr("Contains"),
+                                QObject::tr("Modified"), QObject::tr("Location")};
+    int row = 0;
+    for (const QString& key : wanted) {
+        for (const FileInfoRow& r : info.rows) {
+            if (r.key != key || r.value.isEmpty())
+                continue;
+            auto* k = new QLabel(key, m_factsBox);
+            setThemeStyle(k, QStringLiteral("color: @dimText;"));
+            auto* v = new QLabel(key == QObject::tr("Location") ? tildePath(r.value) : r.value, m_factsBox);
+            v->setTextInteractionFlags(Qt::TextSelectableByMouse);
+            v->setWordWrap(true);
+            m_factsGrid->addWidget(k, row, 0, Qt::AlignTop);
+            m_factsGrid->addWidget(v, row, 1);
+            ++row;
+            break;
+        }
+    }
+    m_factsBox->setVisible(row > 0 && m_mode != Mode::Info);
+    m_extras->show();
+}
+
+void ViewerWindow::setActions(const QList<ViewerAction>& actions)
+{
+    if (!m_actionsBox)
+        return;
+    auto* l = static_cast<QHBoxLayout*>(m_actionsBox->layout());
+    while (QLayoutItem* item = l->takeAt(0)) {
+        if (QWidget* w = item->widget()) {
+            w->hide();
+            w->deleteLater();
+        }
+        delete item;
+    }
+    for (const ViewerAction& a : actions) {
+        auto* b = new KeyButton(a.keys, a.label, m_actionsBox);
+        b->setBoxed(true, a.primary);
+        const auto run = a.run;
+        connect(b, &QAbstractButton::clicked, this, [b, run] { run(b); });
+        l->addWidget(b);
+    }
+    l->addStretch(1);
+    m_actionsBox->setVisible(!actions.isEmpty());
 }
 
 void ViewerWindow::loadInfo()
@@ -1027,6 +1170,18 @@ void ViewerWindow::updateModeButtons()
     m_textButton->setVisible(m_cache != nullptr);
     m_hexButton->setVisible(m_cache != nullptr);
     m_wrapButton->setVisible(m_mode == Mode::Text);
+    if (m_embedded) {  // the inspector has its own two-way switch
+        for (QToolButton* b : {m_textButton, m_hexButton, m_imageButton, m_infoButton})
+            b->hide();
+        m_segment->setVisible(!m_path.isEmpty());
+        m_segPreview->setChecked(m_mode != Mode::Info);
+        m_segDetails->setChecked(m_mode == Mode::Info);
+        m_factsBox->setVisible(m_mode != Mode::Info);
+        // The status line repeats the facts; it stays for text and hex (encoding, position).
+        m_statusRow->setVisible(m_mode == Mode::Text || m_mode == Mode::Hex);
+        // The switch takes room from the name: shorten it again once laid out.
+        QTimer::singleShot(0, this, [this] { setTitle(m_titleText, QIcon()); });
+    }
 }
 
 void ViewerWindow::updateStatus()
@@ -1035,6 +1190,10 @@ void ViewerWindow::updateStatus()
         m_status->clear();
         return;
     }
+    if (m_embedded)  // under the name: what it is, how big
+        m_subtitle->setText(m_kind == PreviewKind::Folder || m_mimeComment.isEmpty()
+                                ? m_mimeComment
+                                : QStringLiteral("%1 · %2").arg(m_mimeComment, formatSize(m_size)));
     QStringList parts;
     if (m_kind != PreviewKind::Folder)
         parts << formatSize(m_size);

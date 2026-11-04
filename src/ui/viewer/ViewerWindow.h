@@ -6,6 +6,7 @@
 #include <QWidget>
 
 #include <atomic>
+#include <functional>
 #include <memory>
 
 class QFrame;
@@ -27,6 +28,15 @@ namespace tandem {
 
 class BlockCache;
 class HexView;
+
+// What can be done with the previewed file, offered under it.
+struct ViewerAction {
+    QString keys;   // "Enter", "F4" (shown as key caps), may be empty
+    QString label;
+    std::function<void(QWidget* button)> run;
+    bool primary = false;
+};
+
 class ImageView;
 class TextScrollView;
 
@@ -63,6 +73,8 @@ public:
     void setShowInfo(bool on);
     // Git state of the next file shown (the viewer doesn't know the panel).
     void setGitHint(char status) { m_gitHint = status; }
+    // Preview column: buttons under the file (Open, Edit, plugins).
+    void setActions(const QList<ViewerAction>& actions);
     QWidget* infoPage() const { return m_infoPage; }
 
     QPlainTextEdit* textEdit() const { return m_text; }
@@ -90,6 +102,8 @@ private:
     QSize richMaxSize() const;
     void loadInfo();
     void fillInfo(const struct FileInfo& info);
+    void loadFacts();
+    void fillFacts(const struct FileInfo& info);
     Mode defaultMode() const;
     void showMessage(const QString& text);
     void updateStatus();
@@ -140,6 +154,17 @@ private:
     QLabel* m_noteIcon;
     QLabel* m_titleIcon;
     QFrame* m_sheet = nullptr;  // preview column: the inset surface content sits on
+    // Preview column, as an inspector: type and size under the name, a
+    // Preview / Details switch, the main facts, actions and keys below.
+    QLabel* m_subtitle = nullptr;
+    QWidget* m_segment = nullptr;
+    QToolButton* m_segPreview = nullptr;
+    QToolButton* m_segDetails = nullptr;
+    QWidget* m_extras = nullptr;
+    QWidget* m_factsBox = nullptr;
+    QGridLayout* m_factsGrid = nullptr;
+    QWidget* m_actionsBox = nullptr;
+    QWidget* m_statusRow = nullptr;
     void updateSheet();
     QString m_titleText;
     void setTitle(const QString& text, const QIcon& icon);

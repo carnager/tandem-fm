@@ -37,6 +37,13 @@
     </message>
 </context>
 <context>
+    <name>QCoreApplication::QCoreApplication::QObject</name>
+    <message>
+        <source>Contains</source>
+        <translation>Enthält</translation>
+    </message>
+</context>
+<context>
     <name>QObject</name>
     <message>
         <source>Not a readable archive</source>
@@ -4890,12 +4897,28 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Details: Typ, Zeiten, Berechtigungen, Eigentümer, Prüfsumme… (I)</translation>
     </message>
     <message>
+        <source>Preview</source>
+        <translation>Vorschau</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Details</translation>
+    </message>
+    <message>
+        <source>Everything about the file (Ctrl+I)</source>
+        <translation>Alles über die Datei (Strg+I)</translation>
+    </message>
+    <message>
         <source>Wrap lines</source>
         <translation>Zeilen umbrechen</translation>
     </message>
     <message>
         <source>Wrap long lines (W)</source>
         <translation>Lange Zeilen umbrechen (W)</translation>
+    </message>
+    <message>
+        <source>Ctrl+Q  hide   ·   Ctrl+I  details</source>
+        <translation>Strg+Q  ausblenden   ·   Strg+I  Details</translation>
     </message>
     <message>
         <source>Find (Enter / F3: next, Shift+F3: previous, Esc: close)</source>

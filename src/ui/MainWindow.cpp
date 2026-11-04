@@ -13,6 +13,7 @@
 #include "ui/FileView.h"
 #include "ui/ThumbGrid.h"
 #include "ui/IconCache.h"
+#include "ui/KeyButton.h"
 #include "ui/JobManager.h"
 #include "ui/CommandBar.h"
 #include "ui/SyncDialog.h"
@@ -80,122 +81,6 @@
 namespace tandem {
 
 namespace {
-
-// Bottom bar button: the key as a key cap, the command, and where it goes
-// ("F5  Copy 4  → Projects").
-class FKeyButton : public QAbstractButton {
-public:
-    FKeyButton(const QString& keys, const QString& label, QWidget* parent)
-        : QAbstractButton(parent), m_keys(keys.split(QLatin1Char('+'))), m_label(label)
-    {
-        setObjectName(QStringLiteral("fkey-") + keys);
-        setAccessibleName(label);
-        setFocusPolicy(Qt::NoFocus);
-        setCursor(Qt::PointingHandCursor);
-        setAttribute(Qt::WA_Hover);
-        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    }
-    // In the selection bar: a framed pill; primary = the accent.
-    void setBoxed(bool boxed, bool primary = false)
-    {
-        m_boxed = boxed;
-        m_primary = primary;
-        update();
-    }
-    void setKeys(const QString& keys)
-    {
-        const QStringList k = keys.split(QLatin1Char('+'));
-        if (k == m_keys)
-            return;
-        m_keys = k;
-        updateGeometry();
-        update();
-    }
-    void setText(const QString& label, const QString& detail = {})
-    {
-        if (label == m_label && detail == m_detail)
-            return;
-        m_label = label;
-        m_detail = detail;
-        setAccessibleName(text());  // what screen readers (and tests) read
-        updateGeometry();
-        update();
-    }
-    QSize sizeHint() const override
-    {
-        const QFontMetrics fm(font());
-        return {capsWidth() + 8 + fm.horizontalAdvance(text()) + 24, fm.height() + 16};
-    }
-
-protected:
-    void paintEvent(QPaintEvent*) override
-    {
-        const Theme& t = theme();
-        QPainter p(this);
-        p.setRenderHint(QPainter::Antialiasing);
-        if (m_boxed) {
-            QColor bg = m_primary ? t.cursorActive : t.base;
-            if (underMouse() || isDown())
-                bg = m_primary ? t.dropTarget : t.cursorInactive;
-            p.setPen(QPen(m_primary ? t.accent : t.control, 1));
-            p.setBrush(bg);
-            p.drawRoundedRect(QRectF(rect()).adjusted(1.5, 1.5, -1.5, -1.5), 8, 8);
-        } else if (isDown() || underMouse()) {
-            p.setPen(QPen(t.border, 1));
-            p.setBrush(isDown() ? t.cursorActive : t.header);
-            p.drawRoundedRect(QRectF(rect()).adjusted(1.5, 1.5, -1.5, -1.5), 8, 8);
-        }
-        const QFontMetrics fm(font());
-        QFont kf = font();
-        kf.setPointSizeF(kf.pointSizeF() * 0.82);
-        kf.setWeight(QFont::DemiBold);
-        const QFontMetrics kfm(kf);
-        int x = 12;
-        const int capH = kfm.height() + 4;
-        const int capY = (height() - capH) / 2;
-        p.setFont(kf);
-        for (const QString& k : m_keys) {  // key caps, like the keys on the keyboard
-            if (k.isEmpty())
-                continue;
-            const int w = qMax(capH, kfm.horizontalAdvance(k) + 10);
-            const QRectF cap(x, capY, w, capH);
-            p.setPen(QPen(t.control, 1));
-            p.setBrush(t.header);
-            p.drawRoundedRect(cap.adjusted(0.5, 0.5, -0.5, -0.5), 4.5, 4.5);
-            p.setPen(t.text);
-            p.drawText(cap, Qt::AlignCenter, k);
-            x += w + 3;
-        }
-        if (!m_keys.join(QString()).isEmpty())
-            x += 5;
-        p.setFont(font());
-        p.setPen(t.text);
-        p.drawText(QRect(x, 0, width() - x, height()), Qt::AlignLeft | Qt::AlignVCenter, m_label);
-        if (!m_detail.isEmpty()) {
-            x += fm.horizontalAdvance(m_label + QLatin1Char(' '));
-            p.setPen(t.dimText);
-            p.drawText(QRect(x, 0, width() - x, height()), Qt::AlignLeft | Qt::AlignVCenter, m_detail);
-        }
-    }
-
-private:
-    QString text() const { return m_detail.isEmpty() ? m_label : m_label + QLatin1Char(' ') + m_detail; }
-    int capsWidth() const
-    {
-        QFont kf = font();
-        kf.setPointSizeF(kf.pointSizeF() * 0.82);
-        const QFontMetrics kfm(kf);
-        int w = 0;
-        for (const QString& k : m_keys)
-            if (!k.isEmpty())
-                w += qMax(kfm.height() + 4, kfm.horizontalAdvance(k) + 10) + 3;
-        return w;
-    }
-
-    QStringList m_keys;
-    QString m_label, m_detail;
-    bool m_boxed = false, m_primary = false;
-};
 
 // A label with a long and a short text: the long one when it fits.
 class FittingLabel : public QLabel {
@@ -743,14 +628,14 @@ QWidget* MainWindow::createFKeyBar()
         [this] { deleteSelected(false); },
     };
     for (size_t i = 0; i < std::size(keys); ++i) {
-        auto* b = new FKeyButton(QLatin1String(keys[i].first), tr(keys[i].second), bar);
+        auto* b = new KeyButton(QLatin1String(keys[i].first), tr(keys[i].second), bar);
         connect(b, &QAbstractButton::clicked, this, fns[i]);
         l->addWidget(b);
         m_fkeys[QLatin1String(keys[i].first)] = b;
     }
     l->addStretch(1);
     // All the other commands are a key away (the key is filled in by updateFKeys).
-    auto* all = new FKeyButton(QStringLiteral("Ctrl+Shift+P"), tr("All commands"), bar);
+    auto* all = new KeyButton(QStringLiteral("Ctrl+Shift+P"), tr("All commands"), bar);
     connect(all, &QAbstractButton::clicked, this, [this] { commandPalette(); });
     l->addWidget(all);
     m_fkeys[QStringLiteral("all")] = all;
@@ -830,12 +715,12 @@ void MainWindow::updateFKeys()
         target = baseName(target.endsWith(QLatin1Char('/')) ? target.chopped(1) : target);
     const QString to = target.isEmpty() ? QString() : QStringLiteral("→ ") + target;
     auto count = [marked](const QString& verb) { return marked > 0 ? QStringLiteral("%1 %2").arg(verb).arg(marked) : verb; };
-    static_cast<FKeyButton*>(m_fkeys.value(QStringLiteral("F5")))->setText(count(tr("Copy")), to);
-    static_cast<FKeyButton*>(m_fkeys.value(QStringLiteral("F6")))->setText(count(tr("Move")), to);
-    static_cast<FKeyButton*>(m_fkeys.value(QStringLiteral("F8")))->setText(count(tr("Trash")));
+    static_cast<KeyButton*>(m_fkeys.value(QStringLiteral("F5")))->setText(count(tr("Copy")), to);
+    static_cast<KeyButton*>(m_fkeys.value(QStringLiteral("F6")))->setText(count(tr("Move")), to);
+    static_cast<KeyButton*>(m_fkeys.value(QStringLiteral("F8")))->setText(count(tr("Trash")));
     for (QAction* a : actions())
         if (a->property("commandId").toString() == QLatin1String("command-palette") && !a->shortcut().isEmpty())
-            static_cast<FKeyButton*>(m_fkeys.value(QStringLiteral("all")))
+            static_cast<KeyButton*>(m_fkeys.value(QStringLiteral("all")))
                 ->setKeys(a->shortcut().toString(QKeySequence::NativeText));
     updateSelectionBars(target);
 }
@@ -890,7 +775,7 @@ void MainWindow::updateSelectionBars(const QString& target)
         l->addWidget(summary, 1);
         auto button = [&](const QString& keys, const QString& label, const QString& detail, bool primary,
                           std::function<void()> fn) {
-            auto* b = new FKeyButton(keys, label, bar);
+            auto* b = new KeyButton(keys, label, bar);
             b->setObjectName(QStringLiteral("selection-") + (keys.isEmpty() ? label : keys));
             b->setText(label, detail);
             b->setBoxed(true, primary);
@@ -909,7 +794,7 @@ void MainWindow::updateSelectionBars(const QString& target)
                 if (action.choices.isEmpty()) {
                     button(QString(), action.title, QString(), false, [this, plugin, action, p] { runPluginAction(plugin, action, p); });
                 } else {
-                    FKeyButton* b = nullptr;
+                    KeyButton* b = nullptr;
                     b = button(QString(), action.title, QStringLiteral("▾"), false, [] {});
                     auto* menu = new QMenu(b);
                     menu->addAction(tr("Loading…"))->setEnabled(false);
@@ -1408,6 +1293,43 @@ void MainWindow::toggleQuickView()
     active()->view()->setFocus();
 }
 
+// Under the preview: open it, edit it, and the plugin actions that fit it.
+QList<ViewerAction> MainWindow::previewActions(Panel* p, const FileEntry& e)
+{
+    QList<ViewerAction> out;
+    QPointer<Panel> panel(p);
+    out.append({QStringLiteral("Enter"), tr("Open"), [panel](QWidget*) {
+                    if (panel)
+                        panel->openCurrent();
+                }, true});
+    if (!e.isDir)
+        out.append({QStringLiteral("F4"), tr("Edit"), [this](QWidget*) { editCurrent(); }});
+    PluginContext ctx = pluginContext(p);
+    ctx.selection = {p->currentPath()};  // the previewed file, whatever is marked
+    for (const Plugin& plugin : std::as_const(m_plugins)) {
+        if (!plugin.error.isEmpty() || pluginTrust(plugin) != PluginTrust::On)
+            continue;
+        for (const PluginAction& action : plugin.actions) {
+            if (action.forFolder || !pluginApplies(action, ctx))
+                continue;
+            out.append({QString(), action.choices.isEmpty() ? action.title : action.title + QStringLiteral(" ▾"),
+                        [this, plugin, action, panel](QWidget* button) {
+                            if (!panel)
+                                return;
+                            if (action.choices.isEmpty()) {
+                                runPluginAction(plugin, action, panel);
+                                return;
+                            }
+                            auto* menu = new QMenu(this);
+                            menu->setAttribute(Qt::WA_DeleteOnClose);
+                            fillPluginChoices(menu, plugin, action, panel);
+                            menu->popup(button->mapToGlobal(QPoint(0, button->height())));
+                        }});
+        }
+    }
+    return out;
+}
+
 void MainWindow::updateQuickView()
 {
     if (m_quickView2) {  // each panel previews its own cursor
@@ -1466,6 +1388,7 @@ void MainWindow::updatePreviewFor(ViewerWindow* preview, Panel* p)
         preview->setProperty("remoteWanted", QVariant());
         preview->setGitHint(p->tab()->model()->gitStatus(e->name));
         preview->showFile(p->currentPath());
+        preview->setActions(previewActions(p, *e));
         // Prepare the neighbours, so moving on is instant (like yazi's preloaders).
         const FileModel* m = p->tab()->model();
         const int row = p->view()->currentRow();
