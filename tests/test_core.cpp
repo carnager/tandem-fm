@@ -28,6 +28,8 @@
 
 #include <QScopeGuard>
 #include <QSettings>
+
+#include "core/TomlSettings.h"
 #include <QDateTime>
 #include <QFile>
 #include <QElapsedTimer>
@@ -1825,7 +1827,7 @@ private slots:
         setAuthHandler({});
     }
 
-    // --config-dir: settings and folder history in one chosen folder, as INI.
+    // --config-dir: settings and folder history in one chosen folder, as TOML.
     void configDir()
     {
         QTemporaryDir tmp;
@@ -1835,11 +1837,11 @@ private slots:
         QCOMPARE(args, QStringList({"/some/path", "other"}));
         QCOMPARE(tandem::configDir(), tmp.filePath("sync"));
         QSettings().setValue("test/key", 42);
-        const QString file = QSettings().fileName();  // sync/<organization>/<application>.ini
-        QVERIFY2(file.startsWith(tmp.filePath("sync/")) && file.endsWith(".ini"), qPrintable(file));
+        const QString file = QSettings().fileName();  // sync/<organization>/<application>.toml
+        QVERIFY2(file.startsWith(tmp.filePath("sync/")) && file.endsWith(".toml"), qPrintable(file));
         QSettings().sync();
         QVERIFY(QFile::exists(file));
-        QCOMPARE(QSettings(file, QSettings::IniFormat).value("test/key").toInt(), 42);
+        QCOMPARE(QSettings(file, tomlFormat()).value("test/key").toInt(), 42);
         FolderHistory::instance().setStoragePath(QString());  // an earlier test set its own
         QCOMPARE(FolderHistory::instance().storagePath(), QFileInfo(file).path() + "/folders.tsv");
 
@@ -1847,6 +1849,122 @@ private slots:
         setupConfigDir(args);
         QVERIFY(args.isEmpty());
         QCOMPARE(tandem::configDir(), tmp.filePath("other"));
+    }
+
+    // Settings as TOML: typed values, edits change single lines, comments stay,
+    // window state goes to its own file, and a broken hand edit is never overwritten.
+    void tomlSettings()
+    {
+        QTemporaryDir tmp;
+        useConfigDir(tmp.path());
+        auto restore = qScopeGuard([] { useConfigDir(QString()); });
+        const QString file = QSettings().fileName();
+        QVERIFY(QDir().mkpath(QFileInfo(file).path()));
+        {
+            QFile f(file);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("# my notes\n\n[view]\n# a comment about the theme\ntheme = \"nord\"  \nlistZoom = 100\n");
+        }
+        {
+            QSettings s;
+            QCOMPARE(s.value("view/theme").toString(), QString("nord"));
+            QCOMPARE(s.value("view/listZoom").toInt(), 100);
+            s.setValue("view/listZoom", 120);
+            s.setValue("view/fileColors", true);
+            s.setValue("tools/editor", "nvim \"%f\"");
+            s.setValue("network/recent", QStringList{"sftp://a", "smb://b"});  // state
+            s.setValue("window/geometry", QByteArray("\x01\x02\xff", 3));      // state, bytes
+            s.setValue("left/tabSlots", QVariantList{1, 2});
+        }
+        const QString text = [&] {
+            QFile f(file);
+            f.open(QIODevice::ReadOnly);
+            return QString::fromUtf8(f.readAll());
+        }();
+        QVERIFY2(text.contains("# my notes") && text.contains("# a comment about the theme"), qPrintable(text));
+        QVERIFY2(text.contains("listZoom = 120") && text.contains("fileColors = true"), qPrintable(text));
+        QVERIFY2(text.contains("theme = \"nord\"  "), qPrintable(text));  // untouched line, as written
+        QVERIFY2(text.contains("[tools]\neditor = \"nvim \\\"%f\\\"\""), qPrintable(text));
+        QVERIFY2(!text.contains("geometry") && !text.contains("recent"), qPrintable(text));
+        QVERIFY(QFile::exists(stateFilePath()));
+        QCOMPARE(stateFilePath(), tmp.filePath("state.toml"));
+        {
+            QSettings s;
+            QCOMPARE(s.value("window/geometry").toByteArray(), QByteArray("\x01\x02\xff", 3));
+            QCOMPARE(s.value("network/recent").toStringList(), QStringList({"sftp://a", "smb://b"}));
+            QCOMPARE(s.value("left/tabSlots").toList().value(1).toInt(), 2);
+            QCOMPARE(s.value("tools/editor").toString(), QString("nvim \"%f\""));
+            s.remove("view/listZoom");
+        }
+        {
+            QFile f(file);
+            f.open(QIODevice::ReadOnly);
+            const QString t = QString::fromUtf8(f.readAll());
+            QVERIFY2(!t.contains("listZoom") && t.contains("# a comment about the theme"), qPrintable(t));
+        }
+        // A typo by hand: Tandem reads nothing from it, says where, and leaves it alone.
+        {
+            QFile f(file);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("[view]\ntheme = nord\n");
+        }
+        {
+            QSettings s;
+            s.setValue("view/showHidden", true);
+            s.sync();
+            QVERIFY(s.status() != QSettings::NoError);
+        }
+        QVERIFY2(tomlSettingsError().contains("line 2"), qPrintable(tomlSettingsError()));
+        QFile f(file);
+        f.open(QIODevice::ReadOnly);
+        QCOMPARE(f.readAll(), QByteArray("[view]\ntheme = nord\n"));
+    }
+
+    // Line edits: a commented-out default is reused; removing can leave it commented.
+    void tomlLines()
+    {
+        const QString base = "[keys]\n# copy = \"F5\"\nmove = \"F6\"\n\n[modal]\ndown = \"j\"\n";
+        QString t = setTomlLine(base, "keys", "copy", QString("[\"F2\"]"));
+        QCOMPARE(t, QString("[keys]\ncopy = [\"F2\"]\nmove = \"F6\"\n\n[modal]\ndown = \"j\"\n"));
+        t = setTomlLine(t, "keys", "copy", std::nullopt, "\"F5\"");
+        QCOMPARE(t, base);
+        t = setTomlLine(base, "keys", "trash", QString("\"F8\""));  // new: after the table's last line
+        QCOMPARE(t, QString("[keys]\n# copy = \"F5\"\nmove = \"F6\"\ntrash = \"F8\"\n\n[modal]\ndown = \"j\"\n"));
+        t = setTomlLine(base, "plugins/pocket link", "x", QString("1"));  // new table, quoted key
+        QVERIFY2(t.endsWith("[plugins.\"pocket link\"]\nx = 1\n"), qPrintable(t));
+        QVariantMap m;
+        QVERIFY(parseToml(t, &m));
+        QCOMPARE(m.value("plugins/pocket link/x").toInt(), 1);
+        QCOMPARE(m.value("modal/down").toString(), QString("j"));
+    }
+
+    // The old INI file moves into the TOML files once, typed, keys handed on.
+    void settingsMigration()
+    {
+        QTemporaryDir tmp;
+        useConfigDir(tmp.path());
+        auto restore = qScopeGuard([] { useConfigDir(QString()); });
+        const QString ini = QSettings(QSettings::IniFormat, QSettings::UserScope, QCoreApplication::organizationName(),
+                                      QCoreApplication::applicationName()).fileName();
+        QVERIFY(QDir().mkpath(QFileInfo(ini).path()));
+        {
+            QFile f(ini);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("[view]\nfileColors=true\nlistZoom=109\ntheme=nord\n[left]\ntabSlots=1, 2\n"
+                    "tabs=/a, /b\n[keys]\ncopy=F2\n");
+        }
+        QVariantMap keys;
+        migrateOldSettings(QSettings::IniFormat, QString(), &keys);
+        QCOMPARE(keys.value("keys/copy").toString(), QString("F2"));
+        QVERIFY(!QFile::exists(ini));
+        QVERIFY(QFile::exists(ini + ".bak"));
+        QSettings s;
+        QCOMPARE(s.value("view/fileColors").typeId(), QMetaType::Bool);
+        QCOMPARE(s.value("view/listZoom").typeId(), QMetaType::Int);
+        QCOMPARE(s.value("left/tabs").toStringList(), QStringList({"/a", "/b"}));
+        QCOMPARE(s.value("left/tabSlots").toList().value(1).typeId(), QMetaType::Int);
+        QVERIFY(!s.contains("keys/copy"));
+        migrateOldSettings(QSettings::IniFormat, QString(), &keys);  // once: nothing left to do
     }
 
     void pluginManifest()

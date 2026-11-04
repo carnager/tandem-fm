@@ -6,6 +6,7 @@
 #include "core/Util.h"
 #include "ui/FileColors.h"
 #include "ui/FileModel.h"
+#include "ui/Keymap.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
@@ -417,11 +418,16 @@ void FileView::moveCursorBy(int delta)
 bool FileView::event(QEvent* e)
 {
     if (m_vim && e->type() == QEvent::ShortcutOverride) {
-        // Vim's Ctrl+D / Ctrl+U scroll instead of running window commands.
+        // Modal keys win over window shortcuts (Ctrl+D scrolls, not bookmarks).
         auto* ke = static_cast<QKeyEvent*>(e);
-        if ((ke->modifiers() & Qt::ControlModifier) && (ke->key() == Qt::Key_D || ke->key() == Qt::Key_U)) {
-            e->accept();
-            return true;
+        if (ke->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) {
+            QStringList seq = m_pending;
+            seq << Keymap::tokenFor(ke);
+            for (const Keymap::Binding& b : Keymap::instance().modalBindings())
+                if (b.sequence.mid(0, seq.size()) == seq) {
+                    e->accept();
+                    return true;
+                }
         }
     }
     if (e->type() == QEvent::KeyPress) {
@@ -479,8 +485,8 @@ void FileView::keyPressEvent(QKeyEvent* e)
         }
         break;
     case Qt::Key_Escape:
-        if (m_visual || m_pendingSort) {  // leaves visual mode, keeping its marks
-            m_pendingSort = false;
+        if (m_visual || !m_pending.isEmpty()) {  // leaves visual mode, keeping its marks
+            m_pending.clear();
             emit hintRequested(QString());
             setVisual(0);
             return;
@@ -541,102 +547,8 @@ void FileView::keyPressEvent(QKeyEvent* e)
         break;
     }
 
-    if (m_vim) {
-        const int page = qMax(1, viewport()->height() / qMax(1, sizeHintForRow(0)));
-        if (mods == Qt::ControlModifier && (e->key() == Qt::Key_D || e->key() == Qt::Key_U)) {
-            moveCursorBy(e->key() == Qt::Key_D ? page / 2 : -page / 2);
-            return;
-        }
-        if (!(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
-            const QString t = e->text();
-            // ,<key>: sort, like yazi.
-            if (m_pendingSort) {
-                m_pendingSort = false;
-                emit hintRequested(QString());
-                static const QHash<QString, QString> sorts = {
-                    {QStringLiteral("n"), QStringLiteral("sort-by-name")},
-                    {QStringLiteral("e"), QStringLiteral("sort-by-extension")},
-                    {QStringLiteral("m"), QStringLiteral("sort-by-date")},
-                    {QStringLiteral("s"), QStringLiteral("sort-by-size")},
-                };
-                if (sorts.contains(t))
-                    emit commandIdRequested(sorts.value(t));
-                return;
-            }
-            if (t == QLatin1String(",")) {
-                m_pendingSort = true;
-                emit hintRequested(tr("Sort by:  n name  ·  e extension  ·  m modified  ·  s size"));
-                return;
-            }
-            // g followed by anything but g: a bookmark chain (gh = home…), like yazi.
-            if (m_lastG && QDateTime::currentMSecsSinceEpoch() - m_lastG < 600 && !t.isEmpty() &&
-                t != QLatin1String("g") && t.at(0).isPrint()) {
-                m_lastG = 0;
-                emit bookmarkJumpRequested(t);
-                return;
-            }
-            if (t == QLatin1String("'")) { emit bookmarkJumpRequested(QString()); return; }
-            if (t == QLatin1String("!")) { emit commandRequested(); return; }
-            if (t == QLatin1String("m")) { emit bookmarkAssignRequested(); return; }
-            if (t == QLatin1String("j")) { moveCursorBy(1); return; }
-            if (t == QLatin1String("k")) { moveCursorBy(-1); return; }
-            if (t == QLatin1String("h")) { emit parentRequested(); return; }
-            if (t == QLatin1String("l")) { emit openRequested(); return; }
-            if (t == QLatin1String("G")) { setCurrentRow(model() ? model()->rowCount() - 1 : 0); return; }
-            if (t == QLatin1String("g")) {
-                const qint64 now = QDateTime::currentMSecsSinceEpoch();
-                if (now - m_lastG < 600) {
-                    setCurrentRow(0);
-                    m_lastG = 0;
-                } else {
-                    m_lastG = now;
-                }
-                return;
-            }
-            if (t == QLatin1String("/")) { emit quickSearchRequested(QString()); return; }
-            if (t == QLatin1String("n")) { emit searchNextRequested(1); return; }
-            if (t == QLatin1String("N")) { emit searchNextRequested(-1); return; }
-            if (t == QLatin1String(":")) { emit paletteRequested(); return; }
-            // v / V: visual mode, moving marks (or unmarks) a range.
-            if (t == QLatin1String("v") || t == QLatin1String("V")) {
-                const int mode = t == QLatin1String("v") ? 1 : -1;
-                setVisual(m_visual == mode ? 0 : mode);
-                return;
-            }
-            // Commands on the selection and around it, yazi's keys.
-            static const QHash<QString, QString> commands = {
-                {QStringLiteral("y"), QStringLiteral("copy-to-clipboard")},
-                {QStringLiteral("x"), QStringLiteral("cut-to-clipboard")},
-                {QStringLiteral("p"), QStringLiteral("paste")},
-                {QStringLiteral("d"), QStringLiteral("move-to-trash")},
-                {QStringLiteral("D"), QStringLiteral("delete-permanently")},
-                {QStringLiteral("r"), QStringLiteral("rename")},
-                {QStringLiteral("a"), QStringLiteral("create")},
-                {QStringLiteral("."), QStringLiteral("show-hidden-files")},
-                {QStringLiteral("f"), QStringLiteral("filter-as-you-type")},
-                {QStringLiteral("s"), QStringLiteral("search-files-names-or-contents")},
-                {QStringLiteral("z"), QStringLiteral("jump-to-folder-search")},
-                {QStringLiteral("t"), QStringLiteral("new-tab")},
-                {QStringLiteral("q"), QStringLiteral("close-tab")},
-                {QStringLiteral("["), QStringLiteral("previous-tab")},
-                {QStringLiteral("]"), QStringLiteral("next-tab")},
-                {QStringLiteral("w"), QStringLiteral("jobs")},
-                {QStringLiteral("K"), QStringLiteral("preview-up")},
-                {QStringLiteral("J"), QStringLiteral("preview-down")},
-                {QStringLiteral("~"), QStringLiteral("keyboard-shortcuts")},
-            };
-            QString id = commands.value(t);
-            if (t.size() == 1 && t.at(0) >= QLatin1Char('1') && t.at(0) <= QLatin1Char('9'))
-                id = QStringLiteral("tab-") + t;  // tab slots
-            if (!id.isEmpty()) {
-                setVisual(0);  // the marks it made stay for the command
-                emit commandIdRequested(id);
-                return;
-            }
-            if (!t.isEmpty() && t.at(0).isPrint() && t != QLatin1String(" "))
-                return;  // in vim mode letters are commands, not quick search
-        }
-    }
+    if (m_vim && modalKey(e))
+        return;
 
     const QString text = e->text();
     if (!text.isEmpty() && text.at(0).isPrint() && !(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
@@ -644,6 +556,102 @@ void FileView::keyPressEvent(QKeyEvent* e)
         return;
     }
     QTreeView::keyPressEvent(e);
+}
+
+// Modal keys from keys.toml: single keys and sequences ("g g", ", n").
+// While a sequence is open, a hint shows what can follow.
+bool FileView::modalKey(QKeyEvent* e)
+{
+    const QString token = Keymap::tokenFor(e);
+    if (token.isEmpty() || token == QLatin1String("Shift") || token == QLatin1String("Ctrl") ||
+        token == QLatin1String("Alt") || token == QLatin1String("Meta"))
+        return false;
+    const QList<Keymap::Binding>& bindings = Keymap::instance().modalBindings();
+    QStringList prefix;  // bookmark-prefix: then a free key is a bookmark
+    for (const Keymap::Binding& b : bindings)
+        if (b.action == QLatin1String("bookmark-prefix"))
+            prefix = b.sequence;
+    QStringList seq = m_pending;
+    seq << token;
+    const Keymap::Binding* exact = nullptr;
+    QList<const Keymap::Binding*> longer;
+    for (const Keymap::Binding& b : bindings) {
+        if (b.action == QLatin1String("bookmark-prefix"))
+            continue;
+        if (b.sequence == seq)
+            exact = &b;
+        else if (b.sequence.size() > seq.size() && b.sequence.mid(0, seq.size()) == seq)
+            longer.append(&b);
+    }
+    if (!longer.isEmpty() || (seq == prefix && !exact)) {
+        m_pending = seq;  // wait for the rest
+        QStringList next;
+        for (const Keymap::Binding* b : std::as_const(longer)) {
+            const QString title = Keymap::actionTitle ? Keymap::actionTitle(b->action) : b->action;
+            next << QStringLiteral("%1 %2").arg(b->sequence.mid(seq.size()).join(QLatin1Char(' ')), title);
+        }
+        if (seq == prefix)
+            next << tr("any other key: that bookmark");
+        emit hintRequested(seq.join(QLatin1Char(' ')) + QStringLiteral("  →  ") + next.join(QStringLiteral("  ·  ")));
+        return true;
+    }
+    const bool hadPending = !m_pending.isEmpty();
+    m_pending.clear();
+    if (hadPending)
+        emit hintRequested(QString());
+    if (exact) {
+        runModalAction(exact->action);
+        return true;
+    }
+    if (hadPending && seq.mid(0, seq.size() - 1) == prefix && token.size() == 1 && token.at(0).isPrint()) {
+        emit bookmarkJumpRequested(token);
+        return true;
+    }
+    if (hadPending)  // the sequence went nowhere: the key on its own
+        return modalKey(e);
+    // Letters are commands in modal mode, never quick search.
+    const QString t = e->text();
+    const Qt::KeyboardModifiers mods = e->modifiers() & ~Qt::KeypadModifier;
+    return !(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) && !t.isEmpty() &&
+           t.at(0).isPrint() && t != QLatin1String(" ");
+}
+
+void FileView::runModalAction(const QString& action)
+{
+    const int page = qMax(1, viewport()->height() / qMax(1, sizeHintForRow(0)));
+    static const QHash<QString, int> builtins = {
+        {QStringLiteral("down"), 1},          {QStringLiteral("up"), 2},
+        {QStringLiteral("parent"), 3},        {QStringLiteral("open"), 4},
+        {QStringLiteral("top"), 5},           {QStringLiteral("bottom"), 6},
+        {QStringLiteral("half-page-down"), 7}, {QStringLiteral("half-page-up"), 8},
+        {QStringLiteral("visual"), 9},        {QStringLiteral("visual-unmark"), 10},
+        {QStringLiteral("find"), 11},         {QStringLiteral("find-next"), 12},
+        {QStringLiteral("find-previous"), 13}, {QStringLiteral("palette"), 14},
+        {QStringLiteral("command-line"), 15}, {QStringLiteral("bookmark-jump"), 16},
+        {QStringLiteral("bookmark-set"), 17},
+    };
+    switch (builtins.value(action)) {
+    case 1: moveCursorBy(1); return;
+    case 2: moveCursorBy(-1); return;
+    case 3: emit parentRequested(); return;
+    case 4: emit openRequested(); return;
+    case 5: setCurrentRow(0); return;
+    case 6: setCurrentRow(model() ? model()->rowCount() - 1 : 0); return;
+    case 7: moveCursorBy(page / 2); return;
+    case 8: moveCursorBy(-page / 2); return;
+    case 9: setVisual(m_visual == 1 ? 0 : 1); return;
+    case 10: setVisual(m_visual == -1 ? 0 : -1); return;
+    case 11: emit quickSearchRequested(QString()); return;
+    case 12: emit searchNextRequested(1); return;
+    case 13: emit searchNextRequested(-1); return;
+    case 14: emit paletteRequested(); return;
+    case 15: emit commandRequested(); return;
+    case 16: emit bookmarkJumpRequested(QString()); return;
+    case 17: emit bookmarkAssignRequested(); return;
+    default: break;
+    }
+    setVisual(0);  // the marks it made stay for the command
+    emit commandIdRequested(action);
 }
 
 void FileView::focusInEvent(QFocusEvent* e)

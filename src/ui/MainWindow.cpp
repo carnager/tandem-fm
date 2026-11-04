@@ -14,6 +14,7 @@
 #include "ui/ThumbGrid.h"
 #include "ui/IconCache.h"
 #include "ui/KeyButton.h"
+#include "ui/Keymap.h"
 #include "ui/JobManager.h"
 #include "ui/CommandBar.h"
 #include "ui/SyncDialog.h"
@@ -531,7 +532,56 @@ void MainWindow::createMenus()
     QMenu* help = bar->addMenu(tr("&Help"));
     addCommand(help, QT_TR_NOOP("Command palette…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_P)}, [this] { commandPalette(); });
     addCommand(help, QT_TR_NOOP("Keyboard shortcuts"), {K(Qt::Key_F1)}, [this] { showShortcuts(); });
-    applyKeyBindings(actions());  // keys changed in the settings
+    setupKeymap();
+}
+
+// keys.toml: listed in full the first time, applied now and on every save.
+void MainWindow::setupKeymap()
+{
+    QList<Keymap::Command> commands;
+    for (QAction* a : actions()) {
+        const QString id = a->property("commandId").toString();
+        if (id.isEmpty())
+            continue;
+        QStringList keys;
+        for (const QKeySequence& k : a->property("defaultKeys").value<QList<QKeySequence>>())
+            keys << k.toString(QKeySequence::PortableText);
+        commands.append({id, keys});
+    }
+    Keymap& km = Keymap::instance();
+    km.setCommands(commands);
+    Keymap::actionTitle = [this](const QString& id) {
+        for (QAction* a : actions())
+            if (a->property("commandId").toString() == id)
+                return a->text().remove(QLatin1Char('&')).section(QLatin1Char('\t'), 0, 0);
+        return id;
+    };
+    km.ensureFile();
+    applyKeymap();
+    connect(&km, &Keymap::changed, this, &MainWindow::applyKeymap, Qt::UniqueConnection);
+}
+
+void MainWindow::applyKeymap()
+{
+    Keymap& km = Keymap::instance();
+    QStringList problems = applyKeyBindings(actions() + m_pluginActions);
+    QSet<QString> ids;
+    for (QAction* a : actions() + m_pluginActions)
+        ids.insert(a->property("commandId").toString());
+    for (const Keymap::Binding& b : km.modalBindings())
+        if (!ids.contains(b.action) && !Keymap::builtinActions().contains(b.action))
+            problems << tr("%1: no such command").arg(b.action);
+    scheduleFKeyUpdate();
+    QString message;
+    if (!km.error().isEmpty())
+        message = tr("%1 (the keys from before stay)").arg(km.error());
+    else if (!problems.isEmpty())
+        message = tr("keys.toml: %1").arg(problems.join(QStringLiteral(" · ")));
+    if (!message.isEmpty())  // once the window stands
+        QTimer::singleShot(0, this, [this, message] {
+            if (Panel* p = active())
+                p->showMessage(message, true);
+        });
 }
 
 // On checksum files it checks; on anything else it computes.

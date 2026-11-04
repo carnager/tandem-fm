@@ -23,6 +23,7 @@
 #include "ui/FileView.h"
 #include "ui/ThumbGrid.h"
 #include "ui/FuzzyPopup.h"
+#include "ui/Keymap.h"
 #include "ui/KeyChordPopup.h"
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
@@ -55,6 +56,7 @@
 #include <QSplitter>
 #include <QTabBar>
 #include <QToolButton>
+#include <QSaveFile>
 #include <QSettings>
 #include <QImage>
 #include <QImageReader>
@@ -192,6 +194,7 @@ private slots:
         installAuthDialogs();
         FolderHistory::instance().setStoragePath(m_tmp.filePath("folders.tsv"));
         QSettings().clear();  // test mode keeps settings in ~/.qttest across runs: start clean
+        QFile::remove(Keymap::instance().path());  // and key bindings
 
         QVERIFY(QDir().mkpath(L("sub/deep")));
         QVERIFY(QDir().mkpath(R()));
@@ -1767,6 +1770,62 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // keys.toml: every command listed; saving it changes keys at once, modal ones too.
+    void keysToml()
+    {
+        Keymap& km = Keymap::instance();
+        const QString path = km.path();
+        QString original;
+        {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::ReadOnly));
+            original = QString::fromUtf8(f.readAll());
+        }
+        QVERIFY2(original.contains("# copy = \"F5\"") && original.contains("# top = \"g g\""), qPrintable(original.left(400)));
+        auto write = [&](const QString& text) {
+            QSaveFile f(path);  // like an editor: a new file in its place
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(text.toUtf8());
+            QVERIFY(f.commit());
+        };
+        auto restore = qScopeGuard([&] {
+            write(original);
+            QTRY_VERIFY(km.modalBindings().size() == Keymap::modalDefaults().size());
+            QSettings().setValue("input/vimKeys", false);
+            m_left->setVimKeys(false);
+        });
+        QAction* copy = nullptr;
+        for (QAction* a : m_window->actions())
+            if (a->property("commandId").toString() == "copy")
+                copy = a;
+        QVERIFY(copy);
+        QString text = original;
+        text.replace("# copy = \"F5\"", "copy = [\"F2\", \"Ctrl+F5\"]");
+        text.replace("# down = \"j\"", "down = \"n\"");  // n was find-next
+        write(text);
+        QTRY_COMPARE(copy->shortcuts(), QList<QKeySequence>({QKeySequence(Qt::Key_F2), QKeySequence(Qt::CTRL | Qt::Key_F5)}));
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTRY_VERIFY(!m_left->tab()->isLoading());
+        m_left->setVimKeys(true);
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "sub");
+        const int row = m_left->view()->currentRow();
+        QTest::keyClick(m_left->view(), Qt::Key_N);
+        QCOMPARE(m_left->view()->currentRow(), row + 1);
+        QTest::keyClick(m_left->view(), Qt::Key_J);  // no longer bound: nothing
+        QCOMPARE(m_left->view()->currentRow(), row + 1);
+        QTest::keyClicks(m_left->view(), "gg");  // sequences still work
+        QCOMPARE(m_left->view()->currentRow(), 0);
+
+        // A typo: the keys from before stay, and the message says where.
+        write(text + "\nbroken = \n");
+        QTRY_VERIFY(!km.error().isEmpty());
+        QVERIFY2(km.error().contains("line"), qPrintable(km.error()));
+        QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F2));
+    }
+
     // Ctrl+,: settings; keys can be changed, conflicts resolved, defaults restored.
     void settingsAndKeys()
     {
@@ -1794,8 +1853,8 @@ private slots:
         QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F6));
         QVERIFY(move->shortcuts().isEmpty());  // gave it up
         QVERIFY(dlg.keyNote()->text().contains("Move"));
-        QCOMPARE(QSettings().value("keys/copy").toStringList(), QStringList({"F6"}));
-        QCOMPARE(QSettings().value("keys/move").toStringList(), QStringList({"none"}));
+        QCOMPARE(Keymap::instance().commandKeys("copy"), std::optional<QStringList>(QStringList({"F6"})));
+        QCOMPARE(Keymap::instance().commandKeys("move"), std::optional<QStringList>(QStringList()));
         // A restart applies them: simulate with the saved values.
         copy->setShortcut(QKeySequence(Qt::Key_F5));
         applyKeyBindings(m_window->actions());
@@ -1805,7 +1864,7 @@ private slots:
                 b->click();
         QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F5));
         QCOMPARE(move->shortcut(), QKeySequence(Qt::Key_F6));
-        QVERIFY(!QSettings().contains("keys/copy") && !QSettings().contains("keys/move"));
+        QVERIFY(!Keymap::instance().commandKeys("copy") && !Keymap::instance().commandKeys("move"));
     }
 
     // F1: grouped shortcuts in columns, with a filter.

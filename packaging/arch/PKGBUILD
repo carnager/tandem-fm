@@ -7,7 +7,7 @@ arch=('x86_64' 'aarch64')
 url="https://github.com/carnager/tandem-fm"
 license=('GPL-3.0-or-later')
 depends=('qt6-base' 'qt6-svg' 'qt6-webengine' 'libarchive' 'hicolor-icon-theme')
-makedepends=('cmake' 'ninja' 'git' 'qt6-tools' 'libssh' 'smbclient' 'libsecret' 'acl' 'glib2' 'syntax-highlighting')
+makedepends=('cmake' 'ninja' 'git' 'qt6-tools' 'tomlplusplus' 'libssh' 'smbclient' 'libsecret' 'acl' 'glib2' 'syntax-highlighting')
 optdepends=('libssh: built-in SFTP (needed if it was there at build time)'
             'smbclient: built-in SMB'
             'libsecret: server passwords in the desktop keyring'

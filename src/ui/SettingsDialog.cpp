@@ -1,5 +1,7 @@
 #include "ui/SettingsDialog.h"
 
+#include "ui/Keymap.h"
+
 #include "ui/FileColors.h"
 #include "ui/FontPicker.h"
 #include "ui/FileModel.h"
@@ -58,19 +60,29 @@ QString keysText(const QList<QKeySequence>& keys)
 
 }  // namespace
 
-void applyKeyBindings(const QList<QAction*>& actions)
+QStringList applyKeyBindings(const QList<QAction*>& actions)
 {
-    QSettings s;
+    QStringList problems;
     for (QAction* a : actions) {
         const QString id = a->property("commandId").toString();
-        if (id.isEmpty() || !s.contains(QStringLiteral("keys/") + id))
+        if (id.isEmpty())
             continue;
+        const std::optional<QStringList> set = Keymap::instance().commandKeys(id);
+        if (!set) {  // not in keys.toml (any more): the default
+            a->setShortcuts(defaultKeys(a));
+            continue;
+        }
         QList<QKeySequence> keys;
-        for (const QString& k : s.value(QStringLiteral("keys/") + id).toStringList())
-            if (!k.isEmpty() && k != QLatin1String("none"))
-                keys << QKeySequence::fromString(k, QKeySequence::PortableText);
+        for (const QString& k : *set) {
+            const QKeySequence seq = QKeySequence::fromString(k, QKeySequence::PortableText);
+            if (seq.isEmpty() || seq[0].key() == Qt::Key_unknown)
+                problems << QStringLiteral("%1 = \"%2\"").arg(id, k);
+            else
+                keys << seq;
+        }
         a->setShortcuts(keys);
     }
+    return problems;
 }
 
 void saveKeyBinding(QAction* a)
@@ -78,15 +90,14 @@ void saveKeyBinding(QAction* a)
     const QString id = a->property("commandId").toString();
     if (id.isEmpty())
         return;
-    QSettings s;
     if (a->shortcuts() == defaultKeys(a)) {
-        s.remove(QStringLiteral("keys/") + id);
+        Keymap::instance().setCommandKeys(id, std::nullopt);
         return;
     }
     QStringList keys;
     for (const QKeySequence& k : a->shortcuts())
         keys << k.toString(QKeySequence::PortableText);
-    s.setValue(QStringLiteral("keys/") + id, keys.isEmpty() ? QStringList{QStringLiteral("none")} : keys);
+    Keymap::instance().setCommandKeys(id, keys);
 }
 
 // ------------------------------------------------------------------ dialog

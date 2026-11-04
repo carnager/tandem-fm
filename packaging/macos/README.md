@@ -8,7 +8,7 @@ contributors on their Macs, not by the maintainer.
 With the Xcode command line tools and Homebrew:
 
 ```sh
-brew install cmake ninja qt libarchive libssh
+brew install cmake ninja qt libarchive libssh tomlplusplus
 brew install fd ripgrep ffmpeg   # optional, as on Linux
 ./packaging/macos/build.sh
 ```

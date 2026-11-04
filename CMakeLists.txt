@@ -16,6 +16,7 @@ add_library(tandem_core STATIC
   src/core/FileEntry.h
   src/core/Util.h src/core/Util.cpp
   src/core/ConfigDir.h src/core/ConfigDir.cpp
+  src/core/TomlSettings.h src/core/TomlSettings.cpp
   src/core/Plugins.h src/core/Plugins.cpp
   src/core/Sorting.h src/core/Sorting.cpp
   src/core/DirLister.h src/core/DirLister.cpp
@@ -56,6 +57,9 @@ else()
 endif()
 find_package(LibArchive 3.3 REQUIRED)
 target_link_libraries(tandem_core PUBLIC Qt6::Core PRIVATE LibArchive::LibArchive)
+# toml++ (header-only here): settings and key bindings as TOML files.
+find_path(TOMLPP_INCLUDE_DIR toml++/toml.hpp REQUIRED)
+target_include_directories(tandem_core PRIVATE ${TOMLPP_INCLUDE_DIR})
 target_compile_options(tandem_core PRIVATE -Wall -Wextra)
 
 # Widgets UI, as a library so tests can drive the real window.
@@ -65,6 +69,7 @@ add_library(tandem_ui STATIC
   src/ui/FileColors.h src/ui/FileColors.cpp
   src/ui/FontPicker.h src/ui/FontPicker.cpp
   src/ui/KeyButton.h
+  src/ui/Keymap.h src/ui/Keymap.cpp
   src/ui/FileModel.h src/ui/FileModel.cpp
   src/ui/FileView.h src/ui/FileView.cpp
   src/ui/DirTab.h src/ui/DirTab.cpp

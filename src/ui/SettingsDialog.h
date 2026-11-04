@@ -53,8 +53,9 @@ private:
     QWidget* m_pluginList = nullptr;
 };
 
-// Keys the user changed, stored per command id ("keys/<id>"); applied at start.
-void applyKeyBindings(const QList<class QAction*>& actions);
+// Keys the user changed, kept in keys.toml per command id; applied at start and on every save.
+// From keys.toml; returns entries whose keys it can't read ("copy = \"Fx\"").
+QStringList applyKeyBindings(const QList<class QAction*>& actions);
 void saveKeyBinding(QAction* action);  // drops the setting when it's the default again
 
 }  // namespace tandem

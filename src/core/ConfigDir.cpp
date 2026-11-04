@@ -1,7 +1,10 @@
 #include "core/ConfigDir.h"
 
+#include "core/TomlSettings.h"
+
 #include <QDir>
 #include <QSettings>
+#include <QStandardPaths>
 
 namespace tandem {
 
@@ -33,12 +36,15 @@ void useConfigDir(const QString& dirIn)
     if (dir == QLatin1String("~") || dir.startsWith(QLatin1String("~/")))
         dir = QDir::homePath() + dir.mid(1);
     g_dir = dir.isEmpty() ? QString() : QDir::cleanPath(QDir::current().absoluteFilePath(dir));
+    // TOML everywhere; the old INI path stays set so its file can be migrated.
+    QSettings::setDefaultFormat(tomlFormat());
     if (g_dir.isEmpty()) {
-        QSettings::setDefaultFormat(QSettings::NativeFormat);
+        const QString xdg = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+        QSettings::setPath(tomlFormat(), QSettings::UserScope, xdg);
         return;
     }
-    QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, g_dir);
+    QSettings::setPath(tomlFormat(), QSettings::UserScope, g_dir);
 }
 
 QString configDir()

@@ -748,6 +748,10 @@
             <numerusform>%1 und %n weitere</numerusform>
         </translation>
     </message>
+    <message>
+        <source>line %1: %2</source>
+        <translation>Zeile %1: %2</translation>
+    </message>
 </context>
 <context>
     <name>Shortcuts</name>
@@ -1056,16 +1060,16 @@
         <translation>Beenden</translation>
     </message>
     <message>
+        <source>Modal keys (defaults; keys.toml changes them)</source>
+        <translation>Modale Tasten (Vorgaben; in keys.toml änderbar)</translation>
+    </message>
+    <message>
         <source>Bookmark key (gh: home)</source>
         <translation>Lesezeichen-Taste (gh: Home)</translation>
     </message>
     <message>
         <source>Down / up</source>
         <translation>Runter / hoch</translation>
-    </message>
-    <message>
-        <source>Modal keys (Settings › Behaviour)</source>
-        <translation>Modale Tasten (Einstellungen › Verhalten)</translation>
     </message>
     <message>
         <source>Out of / into a folder</source>
@@ -1833,8 +1837,8 @@
 <context>
     <name>tandem::FileView</name>
     <message>
-        <source>Sort by:  n name  ·  e extension  ·  m modified  ·  s size</source>
-        <translation>Sortieren nach:  n Name  ·  e Endung  ·  m Änderung  ·  s Größe</translation>
+        <source>any other key: that bookmark</source>
+        <translation>jede andere Taste: dieses Lesezeichen</translation>
     </message>
     <message numerus="yes">
         <source>%n item(s)</source>
@@ -2433,6 +2437,18 @@
     <message>
         <source>Keyboard shortcuts</source>
         <translation>Tastenkürzel</translation>
+    </message>
+    <message>
+        <source>%1: no such command</source>
+        <translation>%1: diesen Befehl gibt es nicht</translation>
+    </message>
+    <message>
+        <source>%1 (the keys from before stay)</source>
+        <translation>%1 (die bisherigen Tasten bleiben)</translation>
+    </message>
+    <message>
+        <source>keys.toml: %1</source>
+        <translation>keys.toml: %1</translation>
     </message>
     <message>
         <source>Checksums</source>

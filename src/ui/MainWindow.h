@@ -81,6 +81,8 @@ private:
     void showContextMenu(Panel* panel, const QPoint& pos, bool onItem);
     void addOpenWithMenu(QMenu* menu, const QStringList& paths);
     void fillBookmarksMenu(QMenu* menu);
+    void setupKeymap();
+    void applyKeymap();
     QList<struct ViewerAction> previewActions(Panel* p, const FileEntry& e);
     // Plugins: read on a worker, then their actions become commands.
     void loadPlugins(std::function<void()> then = {});

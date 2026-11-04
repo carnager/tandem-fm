@@ -90,6 +90,7 @@ signals:
     void searchFinished(bool found);
 
 protected:
+    bool eventFilter(QObject* obj, QEvent* e) override;
     void closeEvent(QCloseEvent* e) override;
     void paintEvent(QPaintEvent* e) override;
     void resizeEvent(QResizeEvent* e) override;

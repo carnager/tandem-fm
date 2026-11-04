@@ -175,7 +175,8 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     bold.setWeight(QFont::DemiBold);
     m_title->setFont(bold);
     m_title->setTextFormat(Qt::PlainText);
-    m_title->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);  // elided in resizeEvent
+    m_title->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_title->installEventFilter(this);  // shortened to fit whenever its width changes
     if (embedded) {
         // A caption over the name, so it reads as a label, not a path bar.
         auto* titles = new QVBoxLayout;
@@ -504,6 +505,13 @@ void ViewerWindow::resizeEvent(QResizeEvent* e)
 {
     QWidget::resizeEvent(e);
     setTitle(m_titleText, QIcon());
+}
+
+bool ViewerWindow::eventFilter(QObject* obj, QEvent* e)
+{
+    if (obj == m_title && e->type() == QEvent::Resize)
+        m_title->setText(m_title->fontMetrics().elidedText(m_titleText, Qt::ElideMiddle, qMax(40, m_title->width())));
+    return QWidget::eventFilter(obj, e);
 }
 
 void ViewerWindow::setTitle(const QString& text, const QIcon& icon)

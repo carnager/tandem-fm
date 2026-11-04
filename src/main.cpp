@@ -1,7 +1,9 @@
 #include "core/Backend.h"
 #include "core/ConfigDir.h"
 #include "core/DirWatcher.h"
+#include "core/TomlSettings.h"
 #include "ui/AuthDialogs.h"
+#include "ui/Keymap.h"
 #include "ui/Network.h"
 #include "ui/MainWindow.h"
 #include "ui/Theme.h"
@@ -30,6 +32,10 @@ int main(int argc, char** argv)
     for (int i = 1; i < argc; ++i)
         paths << QString::fromLocal8Bit(argv[i]);
     tandem::setupConfigDir(paths);  // before anything reads settings
+    // Older versions kept everything in one INI file (a plist on macOS).
+    QVariantMap oldKeys;
+    tandem::migrateOldSettings(tandem::configDir().isEmpty() ? QSettings::NativeFormat : QSettings::IniFormat,
+                               QString(), &oldKeys);
 
     QApplication app(argc, argv);
     QApplication::setApplicationDisplayName(QStringLiteral("Tandem"));
@@ -55,6 +61,7 @@ int main(int argc, char** argv)
     tandem::installAuthDialogs();
     tandem::Network::instance().recentServers();  // drops passwords older versions stored
 
+    tandem::Keymap::instance().setPendingImport(oldKeys);
     tandem::MainWindow w(paths);
     w.show();
 

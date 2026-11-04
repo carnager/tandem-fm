@@ -91,6 +91,8 @@ signals:
 protected:
     bool event(QEvent* e) override;
     void keyPressEvent(QKeyEvent* e) override;
+    bool modalKey(QKeyEvent* e);
+    void runModalAction(const QString& action);
     void keyboardSearch(const QString&) override {}
     void focusInEvent(QFocusEvent* e) override;
     void mousePressEvent(QMouseEvent* e) override;
@@ -127,11 +129,10 @@ private:
     QString m_visualAnchor;  // where visual mode began, by name
     QString m_visualPath;
     QSet<QString> m_visualBase;  // marks before visual mode began
-    bool m_pendingSort = false;  // ',' waits for the sort key
+    QStringList m_pending;  // modal keys typed so far of a longer sequence ("g", ",")
     bool m_arrowFolders = true;
     int m_zoomOfColumns = 100;  // the zoom the column widths were made for
     QList<int> m_autoHidden;  // columns hidden because the panel is narrow
-    qint64 m_lastG = 0;  // for "gg"
     ThumbGrid* m_grid = nullptr;
 };
 
