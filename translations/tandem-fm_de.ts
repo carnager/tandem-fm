@@ -4850,6 +4850,26 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Die beiden Dateien vergleichen</translation>
     </message>
     <message>
+        <source>Downloading %1 …</source>
+        <translation>Lade %1 herunter …</translation>
+    </message>
+    <message>
+        <source>Cannot download %1: %2</source>
+        <translation>%1 kann nicht heruntergeladen werden: %2</translation>
+    </message>
+    <message>
+        <source>Install a diff tool (meld, kdiff3, …) or diff to compare files.</source>
+        <translation>Installiere ein Vergleichsprogramm (meld, kdiff3, …) oder diff, um Dateien zu vergleichen.</translation>
+    </message>
+    <message>
+        <source>Comparing %1 took too long.</source>
+        <translation>Der Vergleich von %1 hat zu lange gedauert.</translation>
+    </message>
+    <message>
+        <source>Cannot compare %1.</source>
+        <translation>%1 kann nicht verglichen werden.</translation>
+    </message>
+    <message>
         <source>The files are identical.</source>
         <translation>Die Dateien sind identisch.</translation>
     </message>

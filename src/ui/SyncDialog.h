@@ -95,6 +95,7 @@ private:
     void cycleAction(int visibleRow);
     void showContextMenu(const QPoint& pos);
     void compareFiles(int visibleRow);
+    void showDiff(const QString& title, const QString& text);
     void updateSummary();
     void updateFilters();
     void saveOptions();

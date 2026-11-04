@@ -1,5 +1,6 @@
 #include "ui/SyncDialog.h"
 
+#include "core/Backend.h"
 #include "core/Job.h"
 #include "core/Util.h"
 #include "ui/IconCache.h"
@@ -18,6 +19,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QProcess>
+#include <QPointer>
 #include <QPushButton>
 #include <QSettings>
 #include <QStandardPaths>
@@ -670,35 +672,96 @@ void SyncDialog::compareFiles(int row)
     const CompareItem& it = m_model->item(row);
     if (!(it.left.exists && it.right.exists) || it.left.isDir || it.right.isDir)
         return;
-    const QString a = joinPath(m_left, it.rel), b = joinPath(m_right, it.rel);
-    QString tool = QSettings().value(QStringLiteral("tools/diff")).toString();
-    if (tool.isEmpty()) {
-        for (const char* t : {"meld", "kdiff3", "kompare", "diffuse"}) {
-            if (!QStandardPaths::findExecutable(QLatin1String(t)).isEmpty()) {
-                tool = QLatin1String(t);
-                break;
+    const QString rel = it.rel;
+    const QString a = joinPath(m_left, rel), b = joinPath(m_right, rel);
+    const QString setTool = QSettings().value(QStringLiteral("tools/diff")).toString();
+    if (isRemoteLocation(a) || isRemoteLocation(b))
+        m_status->setText(tr("Downloading %1 …").arg(baseName(rel)));
+
+    // Downloads, looking for tools and diff itself all touch the disk or
+    // the network: done on a worker.
+    QPointer<SyncDialog> self(this);
+    ioPool()->start([self, a, b, rel, setTool] {
+        // Diff tools can't read server locations: give them local copies.
+        QString local[2] = {a, b};
+        for (QString& path : local) {
+            if (!isRemoteLocation(path))
+                continue;
+            const QString remote = path;
+            path = remoteCachePath(remote);
+            FileStat st;
+            int err = statAt(remote, st);
+            if (err == 0 && !cachedCopyIsFresh(path, st.size, st.mtime))
+                err = downloadFile(remote, path, nullptr);
+            if (err) {
+                const QString msg = tr("Cannot download %1: %2").arg(remote, errnoString(err));
+                postToUi([self, msg] {
+                    if (self)
+                        self->m_status->setText(msg);
+                });
+                return;
             }
         }
-    }
-    if (!tool.isEmpty() && QProcess::startDetached(tool, {a, b}))
-        return;
-    // No diff tool: show unified diff output.
-    QProcess p;
-    p.start(QStringLiteral("diff"), {QStringLiteral("-u"), a, b});
-    p.waitForFinished(5000);
-    QString out = QString::fromLocal8Bit(p.readAllStandardOutput());
-    if (out.isEmpty())
-        out = tr("The files are identical.");
+
+        QString tool = setTool;
+        if (tool.isEmpty()) {
+            for (const char* t : {"meld", "kdiff3", "kompare", "diffuse"}) {
+                if (!QStandardPaths::findExecutable(QLatin1String(t)).isEmpty()) {
+                    tool = QLatin1String(t);
+                    break;
+                }
+            }
+        }
+        if (!tool.isEmpty() && QProcess::startDetached(tool, {local[0], local[1]})) {
+            postToUi([self] {
+                if (self)
+                    self->updateSummary();
+            });
+            return;
+        }
+
+        // No diff tool: show unified diff output. diff says 0 for the
+        // same, 1 for different and 2 for trouble.
+        QProcess p;
+        p.start(QStringLiteral("diff"), {QStringLiteral("-u"), local[0], local[1]});
+        QString out, error;
+        if (!p.waitForStarted()) {
+            error = tr("Install a diff tool (meld, kdiff3, …) or diff to compare files.");
+        } else if (!p.waitForFinished(60000)) {
+            p.kill();
+            p.waitForFinished();
+            error = tr("Comparing %1 took too long.").arg(baseName(rel));
+        } else if (p.exitStatus() != QProcess::NormalExit || p.exitCode() > 1) {
+            const QString why = QString::fromLocal8Bit(p.readAllStandardError()).trimmed().section(QLatin1Char('\n'), 0, 0);
+            error = why.isEmpty() ? tr("Cannot compare %1.").arg(baseName(rel)) : why;
+        } else {
+            out = p.exitCode() == 0 ? tr("The files are identical.") : QString::fromLocal8Bit(p.readAllStandardOutput());
+        }
+        postToUi([self, rel, out, error] {
+            if (!self)
+                return;
+            if (!error.isEmpty()) {
+                self->m_status->setText(error);
+                return;
+            }
+            self->updateSummary();
+            self->showDiff(rel, out);
+        });
+    });
+}
+
+void SyncDialog::showDiff(const QString& title, const QString& text)
+{
     auto* dlg = new QDialog(this);
     dlg->setAttribute(Qt::WA_DeleteOnClose);
-    dlg->setWindowTitle(it.rel);
+    dlg->setWindowTitle(title);
     dlg->resize(860, 560);
     auto* l = new QVBoxLayout(dlg);
-    auto* text = new QPlainTextEdit(out, dlg);
-    text->setReadOnly(true);
-    text->setFont(monoFont());
-    text->setLineWrapMode(QPlainTextEdit::NoWrap);
-    l->addWidget(text);
+    auto* view = new QPlainTextEdit(text, dlg);
+    view->setReadOnly(true);
+    view->setFont(monoFont());
+    view->setLineWrapMode(QPlainTextEdit::NoWrap);
+    l->addWidget(view);
     dlg->show();
 }
 

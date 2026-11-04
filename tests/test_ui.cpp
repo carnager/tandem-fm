@@ -1642,6 +1642,41 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    void compareRemoteFiles()
+    {
+        // Diff can't read server locations: Tandem downloads first, and a
+        // failed diff never reads as "identical".
+        QTemporaryDir serverDir, localDir;
+        writeFile(serverDir.filePath("a.txt"), "server\n");
+        writeFile(localDir.filePath("a.txt"), "local\n");
+        auto backend = std::make_shared<TestBackend>(serverDir.path());
+        registerBackend("test", backend);
+        auto unregister = qScopeGuard([] { registerBackend("test", nullptr); });
+        const QVariant oldTool = QSettings().value("tools/diff");
+        auto restore = qScopeGuard([oldTool] {
+            if (oldTool.isValid())
+                QSettings().setValue("tools/diff", oldTool);
+            else
+                QSettings().remove("tools/diff");
+        });
+        QSettings().setValue("tools/diff", "/nonexistent/tandem-diff");  // use the built-in view
+        if (QStandardPaths::findExecutable("diff").isEmpty())
+            QSKIP("diff is not installed");
+
+        SyncDialog dlg(localDir.path(), "test://srv/", [](const SyncPlan&) { return QList<Job*>{}; }, m_window.get());
+        dlg.show();
+        QTRY_VERIFY(!dlg.isComparing());
+        dlg.model()->setShown(SyncModel::GroupDiffers, true);
+        const int row = dlg.model()->rowOf("a.txt");
+        QVERIFY(row >= 0);
+        dlg.view()->setCurrentIndex(dlg.model()->index(row, 0));
+        QTest::keyClick(dlg.view(), Qt::Key_Return);
+        QPlainTextEdit* text = nullptr;
+        QTRY_VERIFY((text = dlg.findChild<QPlainTextEdit*>()) != nullptr);
+        QVERIFY(text->toPlainText().contains("-local"));
+        QVERIFY(text->toPlainText().contains("+server"));
+    }
+
     void backgroundRefreshKeepsLatestCursorAndMarks()
     {
         QTemporaryDir serverDir;
