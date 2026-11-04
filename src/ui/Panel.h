@@ -129,6 +129,8 @@ signals:
     // Inside an archive renames are archive rewrites, which MainWindow queues.
     void archiveRenameRequested(const QString& from, const QString& to);
     void trashRequested();
+    // The servers window; addUri: start a new saved server from this address.
+    void serversRequested(const QString& addUri);
     void cursorChanged(Panel* panel);
     void paletteRequested();
     void bookmarkJumpRequested(const QString& keys);

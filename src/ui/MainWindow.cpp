@@ -26,6 +26,7 @@
 #include "ui/DuplicatesDialog.h"
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
+#include "ui/ServersDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/ShortcutsDialog.h"
 #include "ui/TrashDialog.h"
@@ -213,6 +214,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
         connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
         connect(p, &Panel::trashRequested, this, &MainWindow::showTrash);
+        connect(p, &Panel::serversRequested, this, &MainWindow::showServers);
         connect(p, &Panel::archiveRenameRequested, this, [this, p](const QString& from, const QString& to) {
             ArchiveChanges c;
             c.rename.append({p->innerPath(from), p->innerPath(to)});
@@ -404,6 +406,7 @@ void MainWindow::createMenus()
     addCommand(go, QT_TR_NOOP("Locations (left)"), {K(Qt::ALT | Qt::Key_F1)}, [this] { m_left->showMountMenu(); });
     addCommand(go, QT_TR_NOOP("Locations (right)"), {K(Qt::ALT | Qt::Key_F2)}, [this] { m_right->showMountMenu(); });
     addCommand(go, QT_TR_NOOP("Connect to server…"), {K(Qt::CTRL | Qt::Key_K)}, [this] { active()->connectDialog(); });
+    addCommand(go, QT_TR_NOOP("Servers…"), {}, [this] { showServers(); });
     addCommand(go, QT_TR_NOOP("Trash…"), {}, [this] { showTrash(); });
     go->addSeparator();
     addCommand(go, QT_TR_NOOP("Swap panels"), {K(Qt::CTRL | Qt::Key_U)}, [this] { swapPanels(); });
@@ -571,6 +574,7 @@ void MainWindow::setupKeymap()
                 return a->text().remove(QLatin1Char('&')).section(QLatin1Char('\t'), 0, 0);
         return id;
     };
+    ServerList::instance().load();  // servers.toml, watched from here on
     km.ensureFile();
     applyKeymap();
     connect(&km, &Keymap::changed, this, &MainWindow::applyKeymap, Qt::UniqueConnection);
@@ -642,6 +646,18 @@ void MainWindow::findDuplicates()
     connect(&dlg, &DuplicatesDialog::showRequested, this, [p](const QString& path) {
         p->navigate(parentPath(path), baseName(path));
     });
+    dlg.exec();
+}
+
+// Saved servers: edit them, or connect the active panel to one.
+void MainWindow::showServers(const QString& addUri)
+{
+    ServersDialog dlg(this, addUri);
+    QPointer<Panel> target(active());
+    dlg.onConnect = [target](const QString& uri) {
+        if (target)
+            target->connectTo(uri);
+    };
     dlg.exec();
 }
 

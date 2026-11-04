@@ -310,6 +310,16 @@
     </message>
 </context>
 <context>
+    <name>tandem::ServersDialog</name>
+    <message numerus="yes">
+        <source>Import %n host(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>tandem::SyncDialog</name>
     <message numerus="yes">
         <source>Comparing … %n folder(s)</source>

@@ -32,6 +32,8 @@
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
 #include "ui/SettingsDialog.h"
+#include "ui/ServersDialog.h"
+#include "core/Servers.h"
 #include "ui/ShortcutsDialog.h"
 #include "ui/TrashDialog.h"
 #include "ui/Panel.h"
@@ -1762,6 +1764,107 @@ private slots:
         m_right->navigate(R());
         QTRY_COMPARE(rightModel()->path(), R());
         QVERIFY(ioPool()->waitForDone(5000));
+    }
+
+    // Servers: saved with their login, imported from the SSH config, offered
+    // under their name in Locations; a recent one is saved with Ctrl+S.
+    void savedServersWindow()
+    {
+        ServerList& list = ServerList::instance();
+        const QList<SavedServer> before = list.servers();
+        QStringList stored;
+        setKeyringHooksForTests({[](const QString&, const QString&, const QString&) { return std::optional<StoredLogin>(); },
+                                 [&stored](const QString& protocol, const QString& server, const StoredLogin& login) {
+                                     stored << protocol + " " + server + " " + login.domain + "\\" + login.user + " " + login.password;
+                                     return true;
+                                 }});
+        auto restore = qScopeGuard([&] {
+            QVERIFY(ioPool()->waitForDone(5000));
+            setKeyringHooksForTests({});
+            list.save(before);
+            Network::instance().forgetServer("sftp://zed@other.lan");
+        });
+        QVERIFY(list.save({}));
+        QTemporaryDir tmp;
+        writeFile(tmp.filePath("ssh_config"), "Host box\n  HostName box.lan\n  User bob\n  IdentityFile ~/.ssh/box\nHost *\n  User x\n");
+
+        {
+            ServersDialog dlg(m_window.get());
+            dlg.sshConfigPath = tmp.filePath("ssh_config");
+            dlg.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&dlg));
+            for (auto* b : dlg.findChildren<QPushButton*>())
+                if (b->text() == QObject::tr("&Add"))
+                    b->click();
+            for (auto* b : dlg.findChildren<QToolButton*>())
+                if (b->text() == QObject::tr("SMB (Windows share)"))
+                    b->click();
+            dlg.findChild<QLineEdit*>("name")->setText("Qwertz share");
+            dlg.findChild<QLineEdit*>("host")->setText("nas.lan");
+            dlg.findChild<QLineEdit*>("user")->setText("bob");
+            dlg.findChild<QLineEdit*>("domain")->setText("HOME");
+            dlg.findChild<QLineEdit*>("password")->setText("secret");
+            dlg.findChild<QLineEdit*>("folder")->setText("media");
+            QVERIFY(!dlg.findChild<QLineEdit*>("keyFile")->isVisibleTo(&dlg));  // SSH only
+
+            answerNextDialog([](QWidget* w) {
+                auto* picks = w->findChild<QListWidget*>();
+                QVERIFY(picks);
+                QCOMPARE(picks->count(), 1);  // "Host *" isn't a server
+                picks->item(0)->setCheckState(Qt::Checked);
+                acceptDialog(w);
+            });
+            dlg.importFromSsh();
+            QCOMPARE(dlg.servers().size(), 2);
+            QVERIFY(dlg.save());
+        }
+        QCOMPARE(list.servers().size(), 2);
+        QCOMPARE(list.servers()[0].uri(), QString("smb://HOME;bob@nas.lan/media"));
+        QCOMPARE(list.servers()[1].uri(), QString("sftp://bob@box.lan"));
+        QCOMPARE(list.servers()[1].keyFile, QString("~/.ssh/box"));
+        QTRY_COMPARE(stored, QStringList({"smb nas.lan HOME\\bob secret"}));
+        QVERIFY(readFile(list.path()).contains("key-file = \"~/.ssh/box\""));
+        QVERIFY(!readFile(list.path()).contains("secret"));  // passwords stay in the keyring
+
+        // Locations: saved servers by name; a recent one only when not saved.
+        Network::instance().rememberServer("sftp://bob@box.lan");
+        Network::instance().rememberServer("sftp://zed@other.lan");
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        auto openLocations = [&]() -> FuzzyPopup* {
+            m_left->showLocations();
+            FuzzyPopup* popup = nullptr;
+            [&] { QTRY_VERIFY([&] {
+                for (auto* p : m_window->findChildren<FuzzyPopup*>())
+                    if (p->isVisible())
+                        popup = p;
+                return popup != nullptr;
+            }()); }();
+            return popup;
+        };
+        FuzzyPopup* popup = openLocations();
+        QVERIFY(popup);
+        QTest::keyClicks(QApplication::focusWidget(), "qwertz");
+        QTRY_VERIFY(popup->currentItem());
+        QCOMPARE(popup->currentItem()->key, QString("saved:smb://HOME;bob@nas.lan/media"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_A, Qt::ControlModifier);
+        QTest::keyClicks(QApplication::focusWidget(), "bob@box");
+        QTRY_VERIFY(popup->currentItem());
+        QVERIFY(!popup->currentItem()->key.startsWith("recent:"));  // listed as the saved "box"
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_A, Qt::ControlModifier);
+        QTest::keyClicks(QApplication::focusWidget(), "other.lan");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == "recent:sftp://zed@other.lan");
+        QString offered;
+        answerNextDialog([&offered](QWidget* w) {
+            if (auto* d = qobject_cast<ServersDialog*>(w))
+                offered = d->servers().last().uri();
+            QMetaObject::invokeMethod(w, "reject", Qt::QueuedConnection);
+        });
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_S, Qt::ControlModifier);
+        QTRY_COMPARE(offered, QString("sftp://zed@other.lan"));
+        QTRY_VERIFY(!QApplication::activeModalWidget());
+        QCOMPARE(list.servers().size(), 2);  // cancelled: nothing saved
     }
 
     // Server folders notice changes made elsewhere (polled while shown).

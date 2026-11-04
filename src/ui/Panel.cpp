@@ -7,6 +7,7 @@
 #include "core/FileOps.h"
 #include "core/Mounts.h"
 #include "core/Remote.h"
+#include "core/Servers.h"
 #include "core/Util.h"
 #include "core/Job.h"
 #include "ui/DirTab.h"
@@ -1526,14 +1527,24 @@ QList<PopupItem> Panel::locationItems()
             });
         }
     }
+    const QString saved = tr("Servers");
+    for (const SavedServer& s : ServerList::instance().servers()) {
+        const QString uri = s.uri();
+        add(saved, IconCache::themed(s.type == QLatin1String("smb") ? "folder-remote" : "network-server", "network-server"),
+            s.name, uri, QStringLiteral("saved:") + uri, [this, uri] { connectTo(uri); });
+    }
     for (const QString& uri : Network::instance().recentServers()) {
+        if (ServerList::instance().find(uri))
+            continue;  // saved: listed above, under its name
         const QUrl u(uri);
         const QString title = u.host().isEmpty() ? uri : (u.userName().isEmpty() ? u.host() : u.userName() + QLatin1Char('@') + u.host());
         add(recent, IconCache::themed("network-server", "folder-remote"), title, uri, QStringLiteral("recent:") + uri,
-            [this, uri] { connectTo(uri); }, tr("Del forgets"));
+            [this, uri] { connectTo(uri); }, tr("Ctrl+S saves · Del forgets"));
     }
     add(QString(), IconCache::themed("network-connect", "network-server"), tr("Connect to server…"),
         tr("sftp, smb, WebDAV, ftp"), {}, [this] { connectDialog(); }, QStringLiteral("Ctrl+K"));
+    add(QString(), IconCache::themed("preferences-system-network", "network-server"), tr("Servers…"),
+        tr("save servers with their login, import from the SSH config"), {}, [this] { emit serversRequested({}); });
     return items;
 }
 
@@ -1560,6 +1571,13 @@ void Panel::showLocations()
             return it;
         };
         m_locations->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
+            if (it && e->key() == Qt::Key_S && e->modifiers() == Qt::ControlModifier &&
+                it->key.startsWith(QLatin1String("recent:"))) {
+                const QString uri = it->key.mid(7);
+                m_locations->hide();
+                emit serversRequested(uri);
+                return true;
+            }
             if (e->key() != Qt::Key_Delete || !it)
                 return false;
             if (it->key.startsWith(QLatin1String("recent:"))) {
@@ -1578,7 +1596,7 @@ void Panel::showLocations()
     }
     emit activated(this);
     m_locations->openUnder(m_mountButton, tr("Where to? Type to filter, or a path or server address"),
-                           locationItems(), tr("Enter opens · Del ejects a drive or forgets a server · Esc closes"));
+                           locationItems(), tr("Enter opens · Del ejects a drive or forgets a server · Ctrl+S saves it · Esc closes"));
 }
 
 // "smb://bob:secret@nas": the backend gets the password for this session,

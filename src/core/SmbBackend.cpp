@@ -221,7 +221,8 @@ public:
             // First contact: what the keyring has for this server (GVfs's too),
             // else a user in the location means "log in as".
             const QUrl root(locationRoot(location));
-            if (const auto login = findLogin(QStringLiteral("smb"), root.host(), root.userName())) {
+            // "DOMAIN;bob" in the location: the keyring knows the login as "bob".
+            if (const auto login = findLogin(QStringLiteral("smb"), root.host(), splitUser(root.userName(), {}).user)) {
                 Credentials c;
                 c.user = login->user;
                 c.domain = login->domain;

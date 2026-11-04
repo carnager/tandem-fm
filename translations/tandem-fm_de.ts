@@ -2387,6 +2387,10 @@
         <translation>In offenen Tab, Lesezeichen oder Ordner verschieben…</translation>
     </message>
     <message>
+        <source>Servers…</source>
+        <translation>Server…</translation>
+    </message>
+    <message>
         <source>&amp;Bookmarks</source>
         <translation>&amp;Lesezeichen</translation>
     </message>
@@ -3723,10 +3727,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>nicht eingehängt: Enter hängt ein</translation>
     </message>
     <message>
-        <source>Del forgets</source>
-        <translation>Entf vergisst</translation>
-    </message>
-    <message>
         <source>Connect to server…</source>
         <translation>Mit Server verbinden…</translation>
     </message>
@@ -3745,10 +3745,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Where to? Type to filter, or a path or server address</source>
         <translation>Wohin? Tippen zum Filtern, oder ein Pfad oder eine Serveradresse</translation>
-    </message>
-    <message>
-        <source>Enter opens · Del ejects a drive or forgets a server · Esc closes</source>
-        <translation>Enter öffnet · Entf wirft ein Laufwerk aus oder vergisst einen Server · Esc schließt</translation>
     </message>
     <message>
         <source>Tandem was built without GIO: mount with sshfs/rclone and browse the folder</source>
@@ -3773,6 +3769,26 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Recent servers</source>
         <translation>Zuletzt benutzte Server</translation>
+    </message>
+    <message>
+        <source>Servers</source>
+        <translation>Server</translation>
+    </message>
+    <message>
+        <source>Ctrl+S saves · Del forgets</source>
+        <translation>Strg+S speichert · Entf vergisst</translation>
+    </message>
+    <message>
+        <source>Servers…</source>
+        <translation>Server…</translation>
+    </message>
+    <message>
+        <source>save servers with their login, import from the SSH config</source>
+        <translation>Server mit Anmeldung speichern, aus der SSH-Konfiguration übernehmen</translation>
+    </message>
+    <message>
+        <source>Enter opens · Del ejects a drive or forgets a server · Ctrl+S saves it · Esc closes</source>
+        <translation>Enter öffnet · Entf wirft ein Laufwerk aus oder vergisst einen Server · Strg+S speichert ihn · Esc schließt</translation>
     </message>
     <message>
         <source>%1: %2</source>
@@ -4297,6 +4313,152 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>After</source>
         <translation>Danach</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::ServersDialog</name>
+    <message>
+        <source>Servers</source>
+        <translation>Server</translation>
+    </message>
+    <message>
+        <source>&amp;Add</source>
+        <translation>&amp;Hinzufügen</translation>
+    </message>
+    <message>
+        <source>&amp;Remove</source>
+        <translation>&amp;Entfernen</translation>
+    </message>
+    <message>
+        <source>&amp;Import from SSH config…</source>
+        <translation>Aus SSH-Konfiguration &amp;übernehmen…</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <source>SSH (sftp)</source>
+        <translation>SSH (sftp)</translation>
+    </message>
+    <message>
+        <source>SMB (Windows share)</source>
+        <translation>SMB (Windows-Freigabe)</translation>
+    </message>
+    <message>
+        <source>Type</source>
+        <translation>Art</translation>
+    </message>
+    <message>
+        <source>nas.lan or 192.168.1.10</source>
+        <translation>nas.lan oder 192.168.1.10</translation>
+    </message>
+    <message>
+        <source>Host</source>
+        <translation>Host</translation>
+    </message>
+    <message>
+        <source>default</source>
+        <translation>Standard</translation>
+    </message>
+    <message>
+        <source>Port</source>
+        <translation>Port</translation>
+    </message>
+    <message>
+        <source>User</source>
+        <translation>Benutzer</translation>
+    </message>
+    <message>
+        <source>usually empty</source>
+        <translation>meist leer</translation>
+    </message>
+    <message>
+        <source>Domain</source>
+        <translation>Domäne</translation>
+    </message>
+    <message>
+        <source>empty: keep the saved one, or ask</source>
+        <translation>leer: das gespeicherte behalten oder fragen</translation>
+    </message>
+    <message>
+        <source>no keyring: asked when connecting</source>
+        <translation>kein Schlüsselbund: wird beim Verbinden gefragt</translation>
+    </message>
+    <message>
+        <source>Password</source>
+        <translation>Passwort</translation>
+    </message>
+    <message>
+        <source>empty: the agent and the usual keys</source>
+        <translation>leer: der Agent und die üblichen Schlüssel</translation>
+    </message>
+    <message>
+        <source>Choose a key file</source>
+        <translation>Schlüsseldatei wählen</translation>
+    </message>
+    <message>
+        <source>Key file</source>
+        <translation>Schlüsseldatei</translation>
+    </message>
+    <message>
+        <source>empty: the home folder</source>
+        <translation>leer: der Persönliche Ordner</translation>
+    </message>
+    <message>
+        <source>Start in</source>
+        <translation>Starten in</translation>
+    </message>
+    <message>
+        <source>Save and &amp;connect</source>
+        <translation>Speichern und &amp;verbinden</translation>
+    </message>
+    <message>
+        <source>%1. Fix it in an editor; Tandem won&apos;t overwrite it.</source>
+        <translation>%1. Korrigiere es in einem Editor; Tandem überschreibt die Datei nicht.</translation>
+    </message>
+    <message>
+        <source>New server</source>
+        <translation>Neuer Server</translation>
+    </message>
+    <message>
+        <source>share/folder; empty: the list of shares</source>
+        <translation>Freigabe/Ordner; leer: die Liste der Freigaben</translation>
+    </message>
+    <message>
+        <source>A server needs a host.</source>
+        <translation>Ein Server braucht einen Host.</translation>
+    </message>
+    <message>
+        <source>Cannot write %1</source>
+        <translation>%1 kann nicht geschrieben werden</translation>
+    </message>
+    <message>
+        <source>Import from SSH config</source>
+        <translation>Aus SSH-Konfiguration übernehmen</translation>
+    </message>
+    <message>
+        <source>No hosts found in %1.</source>
+        <translation>Keine Hosts in %1 gefunden.</translation>
+    </message>
+    <message>
+        <source>Pick the hosts to copy. Later changes to the SSH config don&apos;t change them.</source>
+        <translation>Wähle die Hosts, die übernommen werden. Spätere Änderungen an der SSH-Konfiguration ändern sie nicht.</translation>
+    </message>
+    <message>
+        <source>Already saved</source>
+        <translation>Schon gespeichert</translation>
+    </message>
+    <message numerus="yes">
+        <source>Import %n host(s)</source>
+        <translation>
+            <numerusform>%n Host übernehmen</numerusform>
+            <numerusform>%n Hosts übernehmen</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Import</source>
+        <translation>Übernehmen</translation>
     </message>
 </context>
 <context>

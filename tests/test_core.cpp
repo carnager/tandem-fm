@@ -30,6 +30,7 @@
 #include <QSettings>
 
 #include "core/TomlSettings.h"
+#include "core/Servers.h"
 #include <QDateTime>
 #include <QFile>
 #include <QElapsedTimer>
@@ -1342,6 +1343,105 @@ private slots:
         }
     }
 
+    void savedServers()
+    {
+        SavedServer nas;
+        nas.name = "NAS";
+        nas.type = "smb";
+        nas.host = "nas.lan";
+        nas.user = "bob";
+        nas.domain = "WORKGROUP";
+        nas.folder = "media/";
+        QCOMPARE(nas.uri(), QString("smb://WORKGROUP;bob@nas.lan/media"));
+        SavedServer box;
+        box.name = "Box \"one\"";
+        box.host = "box";
+        box.port = 2222;
+        box.keyFile = "~/.ssh/box";
+        QCOMPARE(box.uri(), QString("sftp://box:2222"));
+        box.port = 22;
+        QCOMPARE(box.authority(), QString("sftp://box"));  // the default port isn't written
+
+        // The file round-trips; entries without a host are dropped.
+        QList<SavedServer> back;
+        QVERIFY(parseServersToml(serversToml({nas, box}), &back));
+        QCOMPARE(back, (QList<SavedServer>{nas, box}));
+        QVERIFY(parseServersToml("[[server]]\nname = \"x\"\n[[server]]\nhost = \"h\"\nfuture = 1\n", &back));
+        QCOMPARE(back.size(), 1);
+        QCOMPARE(back.first().name, QString("h"));
+        QCOMPARE(back.first().type, QString("sftp"));
+        QString error;
+        QVERIFY(!parseServersToml("[[server]\n", &back, &error));
+        QVERIFY(error.startsWith("line 1"));
+
+        // Back from an address, domain and all.
+        const SavedServer parsed = serverFromUri("smb://WORKGROUP;bob@nas.lan:4450/media");
+        QCOMPARE(parsed.domain, QString("WORKGROUP"));
+        QCOMPARE(parsed.user, QString("bob"));
+        QCOMPARE(parsed.port, 4450);
+        QCOMPARE(parsed.folder, QString("/media"));
+        QCOMPARE(serverFromUri("sftp://bob@host:22/").port, 0);
+
+        // Saved, read back by a fresh load, found for locations on that server.
+        QTemporaryDir tmp;
+        useConfigDir(tmp.path());
+        auto restore = qScopeGuard([] {
+            useConfigDir(QString());
+            ServerList::instance().load();
+        });
+        ServerList& list = ServerList::instance();
+        QVERIFY(list.save({nas, box}));
+        QVERIFY(QFile::exists(tmp.filePath("tandem-fm/servers.toml")) || QFile::exists(list.path()));
+        QVERIFY(list.load());
+        QCOMPARE(list.servers().size(), 2);
+        QCOMPARE(list.find("sftp://box/home/x")->name, box.name);
+        QCOMPARE(list.find("sftp://box:22/home/x")->name, box.name);
+        QVERIFY(!list.find("sftp://box:2222/"));
+        QVERIFY(!list.find("sftp://alice@box/"));
+        QCOMPARE(list.find(nas.uri() + "/deeper")->name, QString("NAS"));
+        QVERIFY(!list.find("/home/box"));
+    }
+
+    void sshConfigImport()
+    {
+        QTemporaryDir tmp;
+        QVERIFY(QDir().mkpath(tmp.filePath("conf.d")));
+        writeFile(tmp.filePath("config"),
+                  "# hosts\n"
+                  "Include " + tmp.filePath("conf.d").toUtf8() + "/*.conf\n"
+                  "Host web web2\n"
+                  "    HostName example.org\n"
+                  "    User deploy\n"
+                  "    Port 2200\n"
+                  "    IdentityFile ~/.ssh/deploy\n"
+                  "Host web\n"
+                  "    User other\n"   // the first value wins, like ssh
+                  "Host *.lan !bad\n"
+                  "    User nobody\n"
+                  "Match host x\n"
+                  "    User matched\n"
+                  "Host plain\n"
+                  "  Port=22\n"
+                  "Host *\n"
+                  "    User everyone\n");
+        writeFile(tmp.filePath("conf.d/a.conf"), "Host \"quoted\"\n  HostName 10.0.0.1\n");
+        const QList<SavedServer> hosts = readSshConfig(tmp.filePath("config"));
+        QStringList names;
+        for (const SavedServer& h : hosts)
+            names << h.name;
+        QCOMPARE(names, QStringList({"quoted", "web", "web2", "plain"}));
+        QCOMPARE(hosts[0].host, QString("10.0.0.1"));
+        QCOMPARE(hosts[1].host, QString("example.org"));
+        QCOMPARE(hosts[1].user, QString("deploy"));
+        QCOMPARE(hosts[1].port, 2200);
+        QCOMPARE(hosts[1].keyFile, QString("~/.ssh/deploy"));
+        QCOMPARE(hosts[2].user, QString("deploy"));
+        QCOMPARE(hosts[3].host, QString("plain"));
+        QCOMPARE(hosts[3].port, 0);
+        QVERIFY(hosts[3].user.isEmpty());  // Host * defaults stay ssh's business
+        QVERIFY(readSshConfig(tmp.filePath("missing")).isEmpty());
+    }
+
     void folderCompare()
     {
         QTemporaryDir tmp;
@@ -1854,6 +1954,46 @@ private slots:
         QVERIFY(!denied.errorText.isEmpty());
 
         setAuthHandler({});
+    }
+
+    // A key file saved with the server is used to log in.
+    void sftpSavedKeyFile()
+    {
+        registerBuiltinBackends();
+        if (!hasBackend("sftp"))
+            QSKIP("built without libssh");
+        SshServer server;
+        if (!server.start())
+            QSKIP("could not start a test sshd");
+        setAuthHandler([](const AuthQuestion& q) -> std::optional<QString> {
+            if (q.kind == AuthQuestion::Kind::HostKey)
+                return QString("yes");
+            return std::nullopt;
+        });
+        const QByteArray key = qgetenv("TANDEM_SSH_IDENTITY");
+        QTemporaryDir tmp;
+        qputenv("TANDEM_SSH_IDENTITY", QFile::encodeName(tmp.filePath("nokey")));
+        useConfigDir(tmp.path());
+        auto restore = qScopeGuard([key] {
+            qputenv("TANDEM_SSH_IDENTITY", key);
+            useConfigDir(QString());
+            ServerList::instance().load();
+            setAuthHandler({});
+        });
+        const QString user = qEnvironmentVariable("USER");
+        const QString home = QString("sftp://%1@localhost:%2/").arg(user).arg(server.port());
+        ListOptions opt;
+        QVERIFY(listLocation(home + "tmp", opt).error != 0);  // no key it knows
+
+        SavedServer saved;
+        saved.name = "test";
+        saved.host = "127.0.0.1";
+        saved.port = server.port();
+        saved.user = user;
+        saved.keyFile = QFile::decodeName(key);
+        QVERIFY(ServerList::instance().save({saved}));
+        const ListResult l = listLocation(saved.authority() + "/tmp", opt);
+        QVERIFY2(l.error == 0, qPrintable(l.errorText + " / " + server.log()));
     }
 
     // --config-dir: settings and folder history in one chosen folder, as TOML.

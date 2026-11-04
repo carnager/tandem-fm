@@ -29,8 +29,10 @@ and folders.*
   operations with Ctrl+Z.
 - **Work with servers and archives.** Connect over SFTP or SMB, with other
   protocols available through GVfs. Browse archives like folders, extract
-  files, and update ZIP, 7z and tar archives. Store server passwords in the
-  desktop keyring when available.
+  files, and update ZIP, 7z and tar archives. Save servers with their user,
+  port and key file under **Servers…**, or import them from `~/.ssh/config`;
+  they are kept in `servers.toml` and passwords in the desktop keyring when
+  available.
 - **Look before you open.** An integrated viewer and content previews handle
   text, hex, images, PDF, Markdown, fonts, video and audio. Browse pictures
   with a thumbnail grid and see Git status alongside your files.

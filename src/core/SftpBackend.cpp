@@ -10,10 +10,13 @@
 #include "core/Backend.h"
 #include "core/Keyring.h"
 #include "core/Permissions.h"
+#include "core/Servers.h"
 #include "core/Util.h"
 
 #ifdef TANDEM_HAVE_LIBSSH
 
+#include <QDir>
+#include <QFile>
 #include <QHash>
 #include <QElapsedTimer>
 #include <QUrl>
@@ -294,6 +297,14 @@ public:
             ssh_options_set(c->ssh, SSH_OPTIONS_KNOWNHOSTS, kh.constData());
         if (const QByteArray id = qgetenv("TANDEM_SSH_IDENTITY"); !id.isEmpty())
             ssh_options_set(c->ssh, SSH_OPTIONS_ADD_IDENTITY, id.constData());
+        // A key file saved with the server is tried before the others.
+        if (const auto saved = ServerList::instance().find(location); saved && !saved->keyFile.isEmpty()) {
+            QString key = saved->keyFile;
+            if (key == QLatin1String("~") || key.startsWith(QLatin1String("~/")))
+                key = QDir::homePath() + key.mid(1);
+            const QByteArray id = QFile::encodeName(key);
+            ssh_options_set(c->ssh, SSH_OPTIONS_IDENTITY, id.constData());
+        }
         const long timeout = 15;
         ssh_options_set(c->ssh, SSH_OPTIONS_TIMEOUT, &timeout);
         ssh_callbacks_init(&c->callbacks);

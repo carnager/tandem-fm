@@ -43,6 +43,7 @@ add_library(tandem_core STATIC
   src/core/Search.h src/core/Search.cpp
   src/core/FolderCompare.h src/core/FolderCompare.cpp
   src/core/Remote.h src/core/Remote.cpp
+  src/core/Servers.h src/core/Servers.cpp
   src/core/Backend.h src/core/Backend.cpp
   src/core/BackendCopy.cpp
   src/core/SftpBackend.cpp
@@ -95,6 +96,7 @@ add_library(tandem_ui STATIC
   src/ui/Thumbnails.h src/ui/Thumbnails.cpp
   src/ui/ThumbGrid.h src/ui/ThumbGrid.cpp
   src/ui/Network.h src/ui/Network.cpp
+  src/ui/ServersDialog.h src/ui/ServersDialog.cpp
   src/ui/AuthDialogs.h src/ui/AuthDialogs.cpp
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
