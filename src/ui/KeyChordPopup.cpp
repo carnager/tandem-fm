@@ -258,6 +258,10 @@ void KeyChordPopup::place()
     QWidget* w = parentWidget();
     const int width = qMin(860, w->width() - 40);
     setFixedWidth(width);
+    // The grid was just refilled: let it measure the new rows before the
+    // popup takes its height, or the rows are squeezed and cut off.
+    m_gridLayout->activate();
+    layout()->activate();
     adjustSize();
     move((w->width() - width) / 2, w->height() - height() - 64);
 }

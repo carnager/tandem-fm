@@ -2335,6 +2335,23 @@ private slots:
         QTRY_COMPARE(rightModel()->path(), R());
         m_left->view()->setFocus();
 
+        // Regression: with more bookmarks than fit one row, every row gets
+        // its full height (rows were squeezed and the text cut off).
+        h.setBookmark(L("sub"), "a");
+        h.setBookmark(L(), "b");
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(chords->isVisible());
+        QApplication::processEvents();
+        for (QLabel* label : chords->findChildren<QLabel*>()) {
+            if (!label->isVisible())
+                continue;
+            QVERIFY2(label->height() >= label->sizeHint().height(), qPrintable(label->text()));
+            QVERIFY(chords->rect().contains(label->mapTo(chords, label->rect().bottomRight())));
+        }
+        QTest::keyClick(chords, Qt::Key_Escape);
+        QTRY_VERIFY(!chords->isVisible());
+        h.setPinned(L(), false);
+
         for (const QString& p : {L("sub"), L("sub/deep"), R()})
             h.setPinned(p, false);
         m_left->navigate(L());
