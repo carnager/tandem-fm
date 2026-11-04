@@ -352,7 +352,7 @@ void MainWindow::createMenus()
                                                      [this] { copyOrMoveTo(CopyJob::Mode::Copy); });
     m_actions[QStringLiteral("moveTo")] = addCommand(files, QT_TR_NOOP("Move to an open tab, bookmark or folder…"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_F6)},
                                                      [this] { copyOrMoveTo(CopyJob::Mode::Move); });
-    m_actions[QStringLiteral("rename")] = addCommand(files, QT_TR_NOOP("Rename"), {K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
+    m_actions[QStringLiteral("rename")] = addCommand(files, QT_TR_NOOP("Rename"), {K(Qt::Key_F2), K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
     m_actions[QStringLiteral("multiRename")] =
         addCommand(files, QT_TR_NOOP("Multi-rename…"), {K(Qt::CTRL | Qt::Key_M)}, [this] { multiRename(); });
     m_actions[QStringLiteral("editorRename")] =
@@ -701,10 +701,12 @@ QWidget* MainWindow::createFKeyBar()
     l->setContentsMargins(0, 0, 0, 0);
     l->setSpacing(2);
     const std::pair<const char*, const char*> keys[] = {
-        {"F3", QT_TR_NOOP("View")}, {"F4", QT_TR_NOOP("Edit")},       {"F5", QT_TR_NOOP("Copy")},
-        {"F6", QT_TR_NOOP("Move")}, {"F7", QT_TR_NOOP("New folder")}, {"F8", QT_TR_NOOP("Trash")},
+        {"F2", QT_TR_NOOP("Rename")}, {"F3", QT_TR_NOOP("View")}, {"F4", QT_TR_NOOP("Edit")},
+        {"F5", QT_TR_NOOP("Copy")},   {"F6", QT_TR_NOOP("Move")}, {"F7", QT_TR_NOOP("New folder")},
+        {"F8", QT_TR_NOOP("Trash")},
     };
     const std::function<void()> fns[] = {
+        [this] { active()->startRename(); },
         [this] { viewCurrent(); },
         [this] { editCurrent(); },
         [this] { copyOrMove(CopyJob::Mode::Copy); },

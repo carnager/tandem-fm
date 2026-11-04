@@ -95,7 +95,7 @@ tandem-fm ~/Projects ~/Downloads
 | F3 / F4 | View / edit |
 | F5 / F6 | Copy / move to the other panel |
 | F7 / F8 | New folder / move to trash |
-| Shift+F6 | Rename |
+| F2, Shift+F6 | Rename |
 | Ctrl+M | Rename multiple files |
 | Ctrl+Q | Show or hide previews |
 | Ctrl+F | Filter the current folder |

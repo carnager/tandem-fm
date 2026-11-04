@@ -884,6 +884,25 @@ private slots:
         QTRY_COMPARE(m_left->currentName(), QString("renamed.txt"));
     }
 
+    // F2 renames in place, like Shift+F6, and has a button in the F-key bar.
+    void renameWithF2()
+    {
+        writeFile(L("f2.txt"), "x");
+        QTRY_VERIFY(leftModel()->rowOf("f2.txt") >= 0);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "f2.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_F2);
+        QLineEdit* editor = nullptr;
+        QTRY_VERIFY((editor = qobject_cast<QLineEdit*>(QApplication::focusWidget())));
+        editor->setText("f2-renamed.txt");
+        QTest::keyClick(editor, Qt::Key_Return);
+        QTRY_VERIFY(QFile::exists(L("f2-renamed.txt")));
+        QVERIFY(!QFile::exists(L("f2.txt")));
+        QVERIFY(m_window->findChild<QAbstractButton*>("fkey-F2"));
+    }
+
     void deletePermanentlyWithShiftF8()
     {
         moveCursorTo(m_left, "made");
