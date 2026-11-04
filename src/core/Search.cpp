@@ -32,7 +32,8 @@ QString clean(QString line)
     return line;
 }
 
-// Streams stdout lines of a process into batches.
+// Streams the NUL-separated names a process prints into batches. Names may
+// contain newlines, so lines won't do.
 QString runProcess(const QString& program, const QStringList& args, const QString& cwd,
                    const std::atomic<bool>* cancel, int limit,
                    const std::function<void(const QStringList&)>& onBatch)
@@ -62,7 +63,7 @@ QString runProcess(const QString& program, const QStringList& args, const QStrin
         const bool more = p.waitForReadyRead(100) || p.bytesAvailable() > 0;
         pending += p.readAllStandardOutput();
         qsizetype nl;
-        while ((nl = pending.indexOf('\n')) >= 0) {
+        while ((nl = pending.indexOf('\0')) >= 0) {
             const QString line = clean(QFile::decodeName(pending.left(nl)));
             pending.remove(0, nl + 1);
             if (line.isEmpty() || line == QLatin1String("."))
@@ -145,7 +146,7 @@ QString runSearch(const SearchSpec& spec, const std::atomic<bool>* cancel, int l
         const QString fd = findTool({"fd", "fdfind"});
         if (fd.isEmpty())
             return builtinNameSearch(spec, cancel, limit, onBatch);
-        QStringList args{QStringLiteral("--color"), QStringLiteral("never")};
+        QStringList args{QStringLiteral("--color"), QStringLiteral("never"), QStringLiteral("--print0")};
         if (spec.all)
             args << QStringLiteral("--hidden") << QStringLiteral("--no-ignore");
         const bool wild = spec.query.contains(QLatin1Char('*')) || spec.query.contains(QLatin1Char('?'));
@@ -158,7 +159,7 @@ QString runSearch(const SearchSpec& spec, const std::atomic<bool>* cancel, int l
     }
     const QString rg = findTool({"rg"});
     if (!rg.isEmpty()) {
-        QStringList args{QStringLiteral("--files-with-matches"), QStringLiteral("--no-messages"),
+        QStringList args{QStringLiteral("--files-with-matches"), QStringLiteral("--null"), QStringLiteral("--no-messages"),
                          QStringLiteral("--smart-case"), QStringLiteral("--fixed-strings")};
         if (spec.all)
             args << QStringLiteral("--hidden") << QStringLiteral("--no-ignore");
@@ -168,11 +169,11 @@ QString runSearch(const SearchSpec& spec, const std::atomic<bool>* cancel, int l
     const QString grep = findTool({"grep"});
     if (grep.isEmpty())
         return QObject::tr("Install ripgrep (rg) to search file contents");
-    QStringList args{QStringLiteral("-rlIF")};
+    QStringList args{QStringLiteral("-rlIF"), QStringLiteral("--null")};
     if (spec.query == spec.query.toLower())
         args << QStringLiteral("-i");
     if (!spec.all)
-        args << QStringLiteral("--exclude-dir=.*");
+        args << QStringLiteral("--exclude-dir=.?*");  // not ".*": that also matches the "." we start in
     args << QStringLiteral("-e") << spec.query << QStringLiteral(".");
     return runProcess(grep, args, spec.root, cancel, limit, onBatch);
 }

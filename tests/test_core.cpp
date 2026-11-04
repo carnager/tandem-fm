@@ -1324,6 +1324,22 @@ private slots:
         QCOMPARE(run({{}, "fuzzy", false, true}).size(), 4);                // incl. hidden & build
         QVERIFY(run({{}, "needle", true, false}).first().startsWith("ERROR"));
         qputenv("PATH", oldPath);
+
+        // A newline is allowed in names: still one result, not two.
+        writeFile(tmp.filePath("src/line\nbreak.txt"), "needle");
+        QCOMPARE(run({{}, "break", false, false}), QStringList({"src/line\nbreak.txt"}));
+        QCOMPARE(run({{}, "needle", true, false}), QStringList({"src/Fuzzy.cpp", "src/line\nbreak.txt"}));
+        // Same with grep when rg is missing.
+        const QString grep = QStandardPaths::findExecutable("grep");
+        if (!grep.isEmpty()) {
+            QVERIFY(QDir().mkpath(tmp.filePath("only-grep")));
+            QVERIFY(QFile::link(grep, tmp.filePath("only-grep/grep")));
+            qputenv("PATH", QFile::encodeName(tmp.filePath("only-grep")));
+            const QStringList found = run({{}, "needle", true, false});
+            qputenv("PATH", oldPath);
+            QVERIFY(found.contains("src/line\nbreak.txt"));
+            QVERIFY(!found.contains("src/line"));
+        }
     }
 
     void folderCompare()
