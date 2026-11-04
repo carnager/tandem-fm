@@ -1,4 +1,4 @@
-# Tandem
+# <img src="data/tandem-fm.svg" alt="Tandem logo" width="64" height="64" align="absmiddle"> Tandem
 
 **A two-panel file manager for Linux, built for the keyboard.**
 
