@@ -160,7 +160,7 @@ private:
     QString previewMode() const;  // "each" (default), "bottom", "right"
     void openSettings(int page = 0);
     void showTrash();
-    void showServers(const QString& addUri = {});
+    void showServers(const QString& uri = {});
     void findDuplicates();
     void showDiskUsage();
     void showChecksums();

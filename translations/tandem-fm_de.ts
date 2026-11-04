@@ -3727,6 +3727,18 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>nicht eingehängt: Enter hängt ein</translation>
     </message>
     <message>
+        <source>Ctrl+E edits</source>
+        <translation>Strg+E bearbeitet</translation>
+    </message>
+    <message>
+        <source>Edit servers…</source>
+        <translation>Server bearbeiten…</translation>
+    </message>
+    <message>
+        <source>add, change, import from the SSH config</source>
+        <translation>hinzufügen, ändern, aus der SSH-Konfiguration übernehmen</translation>
+    </message>
+    <message>
         <source>Connect to server…</source>
         <translation>Mit Server verbinden…</translation>
     </message>
@@ -3745,6 +3757,10 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Where to? Type to filter, or a path or server address</source>
         <translation>Wohin? Tippen zum Filtern, oder ein Pfad oder eine Serveradresse</translation>
+    </message>
+    <message>
+        <source>Enter opens · Esc closes</source>
+        <translation>Enter öffnet · Esc schließt</translation>
     </message>
     <message>
         <source>Tandem was built without GIO: mount with sshfs/rclone and browse the folder</source>
@@ -3777,18 +3793,6 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Ctrl+S saves · Del forgets</source>
         <translation>Strg+S speichert · Entf vergisst</translation>
-    </message>
-    <message>
-        <source>Servers…</source>
-        <translation>Server…</translation>
-    </message>
-    <message>
-        <source>save servers with their login, import from the SSH config</source>
-        <translation>Server mit Anmeldung speichern, aus der SSH-Konfiguration übernehmen</translation>
-    </message>
-    <message>
-        <source>Enter opens · Del ejects a drive or forgets a server · Ctrl+S saves it · Esc closes</source>
-        <translation>Enter öffnet · Entf wirft ein Laufwerk aus oder vergisst einen Server · Strg+S speichert ihn · Esc schließt</translation>
     </message>
     <message>
         <source>%1: %2</source>

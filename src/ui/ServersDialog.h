@@ -23,8 +23,8 @@ namespace tandem {
 class ServersDialog : public QDialog {
     Q_OBJECT
 public:
-    // addUri: start with a new server made from this address (a recent one).
-    explicit ServersDialog(QWidget* parent, const QString& addUri = {});
+    // uri: show that saved server, or start a new one made from the address.
+    explicit ServersDialog(QWidget* parent, const QString& uri = {});
 
     // Connect (saves first) calls this with the server's address.
     std::function<void(const QString& uri)> onConnect;

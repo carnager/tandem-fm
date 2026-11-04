@@ -650,9 +650,9 @@ void MainWindow::findDuplicates()
 }
 
 // Saved servers: edit them, or connect the active panel to one.
-void MainWindow::showServers(const QString& addUri)
+void MainWindow::showServers(const QString& uri)
 {
-    ServersDialog dlg(this, addUri);
+    ServersDialog dlg(this, uri);
     QPointer<Panel> target(active());
     dlg.onConnect = [target](const QString& uri) {
         if (target)

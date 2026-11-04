@@ -19,6 +19,8 @@ struct PopupItem {
     QString title;
     QString subtitle;
     QString hint;            // right-aligned, e.g. a shortcut
+    bool hintWhenCurrent = false;  // the hint shows on the current row only
+    QString badge;           // a small tag at the right edge, e.g. "SSH"
     QIcon icon;
     bool matchSubtitle = false;  // match (and highlight) the subtitle instead of the title
     int bonus = 0;               // added to the fuzzy score (frecency, pins…)

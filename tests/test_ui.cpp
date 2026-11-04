@@ -1865,6 +1865,31 @@ private slots:
         QTRY_COMPARE(offered, QString("sftp://zed@other.lan"));
         QTRY_VERIFY(!QApplication::activeModalWidget());
         QCOMPARE(list.servers().size(), 2);  // cancelled: nothing saved
+
+        // Saved and recent servers carry a type badge, the address without
+        // its scheme; Ctrl+E opens the saved one in the servers window.
+        popup = openLocations();
+        QVERIFY(popup);
+        QTest::keyClicks(popup->findChild<QLineEdit*>(), "qwertz");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key.startsWith("saved:"));
+        QCOMPARE(popup->currentItem()->badge, QString("SMB"));
+        QCOMPARE(popup->currentItem()->subtitle, QString("HOME;bob@nas.lan/media"));
+        QString shown;
+        answerNextDialog([&shown](QWidget* w) {
+            if (auto* d = qobject_cast<ServersDialog*>(w))
+                shown = d->list()->currentItem() ? d->list()->currentItem()->text() : QString("?");
+            QMetaObject::invokeMethod(w, "reject", Qt::QueuedConnection);
+        });
+        QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_E, Qt::ControlModifier);
+        QTRY_COMPARE(shown, QString("Qwertz share"));
+        QTRY_VERIFY(!QApplication::activeModalWidget());
+        QCOMPARE(list.servers().size(), 2);  // nothing added
+
+        // The servers window is offered in the Servers section itself.
+        popup = openLocations();
+        QTest::keyClicks(popup->findChild<QLineEdit*>(), "edit servers");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->title == "Edit servers…");
+        QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_Escape);
     }
 
     // Server folders notice changes made elsewhere (polled while shown).

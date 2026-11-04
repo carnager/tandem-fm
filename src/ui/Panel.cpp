@@ -1474,12 +1474,50 @@ static bool isSystemMount(const MountPoint& m)
     return home == m.path || home.startsWith(m.path + QLatin1Char('/'));  // "Home" covers it
 }
 
+namespace {
+
+// A short tag for the kind of place: a URL scheme, GVfs mount or filesystem.
+QString kindBadge(QString kind)
+{
+    kind = kind.toLower();
+    if (kind.startsWith(QLatin1String("fuse.")))
+        kind = kind.mid(5);
+    if (kind == QLatin1String("sftp") || kind == QLatin1String("ssh"))
+        return QStringLiteral("SSH");
+    if (kind.startsWith(QLatin1String("smb")) || kind == QLatin1String("cifs"))
+        return QStringLiteral("SMB");
+    if (kind.startsWith(QLatin1String("dav")) || kind.startsWith(QLatin1String("webdav")))
+        return QStringLiteral("DAV");
+    if (kind.startsWith(QLatin1String("ftp")))
+        return QStringLiteral("FTP");
+    if (kind.startsWith(QLatin1String("nfs")))
+        return QStringLiteral("NFS");
+    if (kind == QLatin1String("fuseblk"))
+        return QStringLiteral("FUSE");
+    return kind.toUpper();
+}
+
+// "/run/user/1000/gvfs/smb-share:server=nas,share=media" → "smb-share".
+QString gvfsKind(const QString& path)
+{
+    const int at = path.indexOf(QLatin1String("/gvfs/"));
+    if (at < 0)
+        return {};
+    const QString name = path.mid(at + 6).section(QLatin1Char('/'), 0, 0);
+    return name.section(QLatin1Char(':'), 0, 0);
+}
+
+}  // namespace
+
 QList<PopupItem> Panel::locationItems()
 {
     QList<PopupItem> items;
     auto add = [&](const QString& section, const QIcon& icon, const QString& title, const QString& subtitle,
-                   const QString& key, std::function<void()> run, const QString& hint = {}) {
+                   const QString& key, std::function<void()> run, const QString& hint = {},
+                   const QString& badge = {}) {
         PopupItem it;
+        it.badge = badge;
+        it.hintWhenCurrent = !key.isEmpty();  // per-item keys; actions show theirs always
         it.section = section;
         it.icon = icon;
         it.title = title;
@@ -1502,16 +1540,19 @@ QList<PopupItem> Panel::locationItems()
             continue;
         const char* icon = m.isNetwork ? "network-server" : (m.isRemovable ? "drive-removable-media" : "drive-harddisk");
         add(m.isNetwork ? network : drives, IconCache::themed(icon, "drive-harddisk"), baseName(m.path),
-            QStringLiteral("%1  ·  %2").arg(tildePath(m.path), m.fsType), QStringLiteral("mount:") + m.path,
-            [this, p = m.path] { navigate(p); }, m.isRemovable ? tr("Del ⏏") : QString());
+            tildePath(m.path), QStringLiteral("mount:") + m.path, [this, p = m.path] { navigate(p); },
+            m.isRemovable ? tr("Del ⏏") : QString(), kindBadge(m.fsType));
     }
     for (const Place& pl : Network::instance().places()) {
         const QIcon icon = IconCache::themed(pl.iconName.toUtf8().constData(),
                                              pl.network ? "network-server" : "drive-removable-media");
         if (!pl.path.isEmpty()) {
             const auto r = remoteRootOf(pl.path);
-            add(pl.network ? network : drives, icon, pl.name, r ? r->label : tildePath(pl.path),
-                QStringLiteral("mount:") + pl.path, [this, p = pl.path] { navigate(p); }, tr("Del ⏏"));
+            const QString kind = gvfsKind(pl.path);
+            const QString label = r ? r->label.section(QLatin1String("://"), -1) : tildePath(pl.path);
+            add(pl.network ? network : drives, icon, pl.name, label,
+                QStringLiteral("mount:") + pl.path, [this, p = pl.path] { navigate(p); }, tr("Del ⏏"),
+                kind.isEmpty() ? QString() : kindBadge(kind));
         } else {
             add(pl.network ? network : drives, icon, pl.name, tr("not mounted: Enter mounts it"), {}, [this, id = pl.volumeId] {
                 showMessage(tr("Mounting…"));
@@ -1528,23 +1569,30 @@ QList<PopupItem> Panel::locationItems()
         }
     }
     const QString saved = tr("Servers");
+    // An address without its scheme: the badge names the kind.
+    auto bare = [](const QString& uri) { return uri.section(QLatin1String("://"), 1); };
     for (const SavedServer& s : ServerList::instance().servers()) {
         const QString uri = s.uri();
         add(saved, IconCache::themed(s.type == QLatin1String("smb") ? "folder-remote" : "network-server", "network-server"),
-            s.name, uri, QStringLiteral("saved:") + uri, [this, uri] { connectTo(uri); });
+            s.name, bare(uri), QStringLiteral("saved:") + uri, [this, uri] { connectTo(uri); }, tr("Ctrl+E edits"),
+            kindBadge(s.type));
     }
+    add(saved, IconCache::themed("preferences-system-network", "network-server"), tr("Edit servers…"),
+        tr("add, change, import from the SSH config"), {}, [this] { emit serversRequested({}); });
     for (const QString& uri : Network::instance().recentServers()) {
         if (ServerList::instance().find(uri))
             continue;  // saved: listed above, under its name
         const QUrl u(uri);
         const QString title = u.host().isEmpty() ? uri : (u.userName().isEmpty() ? u.host() : u.userName() + QLatin1Char('@') + u.host());
-        add(recent, IconCache::themed("network-server", "folder-remote"), title, uri, QStringLiteral("recent:") + uri,
-            [this, uri] { connectTo(uri); }, tr("Ctrl+S saves · Del forgets"));
+        QString where = u.port() > 0 ? QStringLiteral(":%1").arg(u.port()) : QString();
+        if (u.path().size() > 1)
+            where += u.path();
+        add(recent, IconCache::themed("network-server", "folder-remote"), title, u.host().isEmpty() ? QString() : where,
+            QStringLiteral("recent:") + uri, [this, uri] { connectTo(uri); }, tr("Ctrl+S saves · Del forgets"),
+            kindBadge(u.scheme()));
     }
     add(QString(), IconCache::themed("network-connect", "network-server"), tr("Connect to server…"),
         tr("sftp, smb, WebDAV, ftp"), {}, [this] { connectDialog(); }, QStringLiteral("Ctrl+K"));
-    add(QString(), IconCache::themed("preferences-system-network", "network-server"), tr("Servers…"),
-        tr("save servers with their login, import from the SSH config"), {}, [this] { emit serversRequested({}); });
     return items;
 }
 
@@ -1571,9 +1619,11 @@ void Panel::showLocations()
             return it;
         };
         m_locations->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
-            if (it && e->key() == Qt::Key_S && e->modifiers() == Qt::ControlModifier &&
-                it->key.startsWith(QLatin1String("recent:"))) {
-                const QString uri = it->key.mid(7);
+            const bool saved = it && it->key.startsWith(QLatin1String("saved:"));
+            const bool recent = it && it->key.startsWith(QLatin1String("recent:"));
+            if (e->modifiers() == Qt::ControlModifier &&
+                ((recent && e->key() == Qt::Key_S) || (saved && e->key() == Qt::Key_E))) {
+                const QString uri = it->key.section(QLatin1Char(':'), 1);
                 m_locations->hide();
                 emit serversRequested(uri);
                 return true;
@@ -1596,7 +1646,7 @@ void Panel::showLocations()
     }
     emit activated(this);
     m_locations->openUnder(m_mountButton, tr("Where to? Type to filter, or a path or server address"),
-                           locationItems(), tr("Enter opens · Del ejects a drive or forgets a server · Ctrl+S saves it · Esc closes"));
+                           locationItems(), tr("Enter opens · Esc closes"));
 }
 
 // "smb://bob:secret@nas": the backend gets the password for this session,

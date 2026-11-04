@@ -56,7 +56,7 @@ void storePassword(const SavedServer& s, const QString& password)
 
 }  // namespace
 
-ServersDialog::ServersDialog(QWidget* parent, const QString& addUri) : QDialog(parent)
+ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(parent)
 {
     setWindowTitle(tr("Servers"));
     resize(760, 460);
@@ -221,8 +221,11 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& addUri) : QDialog(p
     }
     for (const SavedServer& s : saved.servers())
         addServer(s);
-    if (!addUri.isEmpty()) {
-        SavedServer s = serverFromUri(addUri);
+    const auto known = uri.isEmpty() ? std::nullopt : saved.find(uri);
+    if (known) {
+        m_list->setCurrentRow(int(m_servers.indexOf(*known)));
+    } else if (!uri.isEmpty()) {
+        SavedServer s = serverFromUri(uri);
         if (!s.host.isEmpty())
             addServer(s);
     } else if (m_list->count() > 0) {

@@ -5,6 +5,7 @@
 
 #include <QApplication>
 #include <QGraphicsDropShadowEffect>
+#include <QHash>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -97,6 +98,19 @@ static void drawHighlighted(QPainter* p, const QRect& r, const QString& text, co
     layout.draw(p, QPointF(r.left(), r.top() + (r.height() - line.height()) / 2));
 }
 
+namespace {
+int badgeHue(const QString& badge)
+{
+    static const QHash<QString, int> known = {
+        {QStringLiteral("SSH"), 210}, {QStringLiteral("SMB"), 28},   {QStringLiteral("DAV"), 280},
+        {QStringLiteral("FTP"), 130}, {QStringLiteral("NFS"), 175},  {QStringLiteral("MTP"), 330},
+    };
+    if (auto h = known.find(badge.toUpper()); h != known.end())
+        return *h;
+    return int(qHash(badge.toUpper()) % 360);
+}
+}  // namespace
+
 void PopupDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QModelIndex& idx) const
 {
     const auto* model = static_cast<const PopupModel*>(idx.model());
@@ -136,8 +150,30 @@ void PopupDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QM
         it->icon.paint(p, QRect(r.left(), r.top() + (r.height() - s) / 2, s, s));
         r.setLeft(r.left() + s + 10);
     }
+    // Badge (kind of place) as a tinted tag at the right edge; its hue
+    // follows the text, so the same kind always looks the same.
+    if (!it->badge.isEmpty()) {
+        QFont bf = opt.font;
+        bf.setPointSizeF(bf.pointSizeF() * 0.78);
+        bf.setBold(true);
+        bf.setLetterSpacing(QFont::PercentageSpacing, 106);
+        const QFontMetrics bfm(bf);
+        const int w = qMax(bfm.horizontalAdvance(it->badge) + 12, bfm.height() * 3);
+        const QRect tag(r.right() - w, r.top() + (r.height() - bfm.height() - 4) / 2, w, bfm.height() + 4);
+        const int hue = badgeHue(it->badge);
+        QColor bg = QColor::fromHsl(hue, 150, t.dark ? 120 : 150);
+        bg.setAlpha(t.dark ? 70 : 55);
+        p->setPen(Qt::NoPen);
+        p->setBrush(bg);
+        p->drawRoundedRect(QRectF(tag), 4, 4);
+        p->setFont(bf);
+        p->setPen(QColor::fromHsl(hue, 120, t.dark ? 195 : 60));
+        p->drawText(tag, Qt::AlignCenter, it->badge);
+        p->setFont(opt.font);
+        r.setRight(tag.left() - 10);
+    }
     // Hint (shortcut) as a small key cap on the right.
-    if (!it->hint.isEmpty()) {
+    if (!it->hint.isEmpty() && (!it->hintWhenCurrent || (opt.state & QStyle::State_Selected))) {
         QFont hf = opt.font;
         hf.setPointSizeF(hf.pointSizeF() * 0.9);
         const QFontMetrics hfm(hf);
