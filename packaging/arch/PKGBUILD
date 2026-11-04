@@ -19,6 +19,7 @@ optdepends=('libssh: built-in SFTP (needed if it was there at build time)'
             'ripgrep: searching file contents'
             'fd: fast name search'
             'meld: comparing two files from the sync dialog'
+            '7zip: password-protected 7z archives (and opening encrypted RAR)'
             'pocketlink: "Send to phone" plugin')
 provides=('tandem-fm')
 conflicts=('tandem-fm')
