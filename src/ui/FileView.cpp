@@ -740,12 +740,13 @@ void FileView::drawRow(QPainter* p, const QStyleOptionViewItem& opt, const QMode
         p->drawRoundedRect(r, kRowRadius, kRowRadius);
     }
     if (idx.row() == currentIndex().row()) {
-        if (m_active && hasFocus()) {  // where the keys go: tinted, with a clear edge
-            p->setPen(QPen(withAlpha(t.accent, 0.55), 1));
-            p->setBrush(withAlpha(t.accent, t.dark ? 0.17 : 0.14));
+        // The panel's edge already says where the keys go: the row is only tinted.
+        if (m_active && hasFocus()) {
+            p->setPen(Qt::NoPen);
+            p->setBrush(withAlpha(t.accent, t.dark ? 0.22 : 0.16));
         } else if (m_active) {
-            p->setPen(QPen(withAlpha(t.accent, 0.4), 1));
-            p->setBrush(withAlpha(t.accent, 0.07));
+            p->setPen(Qt::NoPen);
+            p->setBrush(withAlpha(t.accent, 0.10));
         } else {
             p->setPen(QPen(t.cursorInactive, 1));
             p->setBrush(Qt::NoBrush);

@@ -61,7 +61,11 @@ private:
     void updateTransfers();
     void updateSelectionBars(const QString& target);
 
-    void copyOrMove(CopyJob::Mode mode);
+    // target: a folder chosen elsewhere (the picker); ask: still show the
+    // destination dialog with it filled in; now: start without queueing.
+    void copyOrMove(CopyJob::Mode mode, const QString& target = {}, bool ask = true, bool now = false);
+    // Pick where to: the tabs of both panels, bookmarks, recent folders, a typed path.
+    void copyOrMoveTo(CopyJob::Mode mode, QWidget* anchor = nullptr);
     void deleteSelected(bool permanent);
     void makeFolder(const QString& given = {});  // asks for a name unless given
     void viewCurrent();

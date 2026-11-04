@@ -325,12 +325,17 @@ void FuzzyPopup::place()
     for (int r = 0; r < qMin(kVisibleRows, m_model->rowCount()); ++r)
         listHeight += m_list->itemDelegate()->sizeHint(opt, m_model->index(r)).height();
     if (m_anchor) {  // a drop-down under the field: a handful of rows, the rest scroll
-        const QPoint at = m_anchor->mapTo(w, QPoint(0, m_anchor->height() + 4));
-        const int maxList = w->height() - at.y() - 110;
+        QPoint at = m_anchor->mapTo(w, QPoint(0, m_anchor->height() + 4));
+        const int top = m_anchor->mapTo(w, QPoint(0, 0)).y() - 4;
+        const bool above = w->height() - at.y() < top;  // near the bottom (the selection bar): open upwards
+        const int maxList = (above ? top : w->height() - at.y()) - 110;
         m_list->setFixedHeight(qBound(40, listHeight + 4, qMax(120, maxList)));
         adjustSize();
         const int dw = qMin(480, w->width() - 20);
-        setGeometry(qBound(10, at.x() - 6, w->width() - dw - 10), at.y(), dw, sizeHint().height());
+        const int h = sizeHint().height();
+        if (above)
+            at.setY(qMax(4, top - h));
+        setGeometry(qBound(10, at.x() - 6, w->width() - dw - 10), at.y(), dw, h);
         return;
     }
     m_list->setFixedHeight(qMax(listHeight + 4, 40));
@@ -363,7 +368,10 @@ bool FuzzyPopup::eventFilter(QObject* obj, QEvent* e)
     }
     if (e->type() == QEvent::ShortcutOverride) {
         // Ctrl+keys belong to the popup while it's open, not to window shortcuts.
-        if (static_cast<QKeyEvent*>(e)->modifiers() & Qt::ControlModifier) {
+        // So do Enter and Tab with any modifier (Shift+Enter: start right away).
+        const auto* ke = static_cast<QKeyEvent*>(e);
+        if ((ke->modifiers() & Qt::ControlModifier) || ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter
+            || ke->key() == Qt::Key_Tab) {
             e->accept();
             return true;
         }

@@ -645,6 +645,41 @@ private slots:
         QVERIFY(!m_right->selectionBar()->isVisible());  // only the active panel has one
     }
 
+    // Copy to any open tab, also one that is not shown: picked from a list.
+    void copyToAnOpenTab()
+    {
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTemporaryDir hidden;
+        DirTab* extra = m_right->addTab(hidden.path(), false);  // a tab in the background
+        auto closeIt = qScopeGuard([this] {
+            m_right->cycleTab(1);
+            if (m_right->tab()->model()->path() != R())
+                m_right->closeCurrentTab();
+            QTRY_COMPARE(m_right->tab()->model()->path(), R());
+        });
+        QVERIFY(extra);
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+        QTRY_VERIFY(!m_left->tab()->isLoading());
+        moveCursorTo(m_left, "file2.txt");
+        QCOMPARE(m_left->currentPath(), L("file2.txt"));
+        QTest::keyClick(m_left->view(), Qt::Key_F5, Qt::AltModifier | Qt::ShiftModifier);
+        FuzzyPopup* popup = nullptr;
+        QTRY_VERIFY([&] {
+            for (auto* p : m_window->findChildren<FuzzyPopup*>())
+                if (p->isVisible())
+                    popup = p;
+            return popup != nullptr;
+        }());
+        QTest::keyClicks(QApplication::focusWidget(), QFileInfo(hidden.path()).fileName());
+        QCOMPARE(m_left->currentPath(), L("file2.txt"));
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == hidden.path());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return, Qt::ShiftModifier);  // right away
+        QTRY_VERIFY(QFile::exists(hidden.filePath("file2.txt")));
+        QVERIFY(QFile::exists(L("file2.txt")));  // copied, not moved
+    }
+
     // A transfer shows in the panel it goes to; a drag says what dropping would do.
     void transfersWhereTheyHappen()
     {

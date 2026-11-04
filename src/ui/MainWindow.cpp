@@ -330,6 +330,10 @@ void MainWindow::createMenus()
     files->addSeparator();
     m_actions[QStringLiteral("copy")] = addCommand(files, QT_TR_NOOP("Copy…"), {K(Qt::Key_F5)}, [this] { copyOrMove(CopyJob::Mode::Copy); });
     m_actions[QStringLiteral("move")] = addCommand(files, QT_TR_NOOP("Move…"), {K(Qt::Key_F6)}, [this] { copyOrMove(CopyJob::Mode::Move); });
+    m_actions[QStringLiteral("copyTo")] = addCommand(files, QT_TR_NOOP("Copy to an open tab, bookmark or folder…"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_F5)},
+                                                     [this] { copyOrMoveTo(CopyJob::Mode::Copy); });
+    m_actions[QStringLiteral("moveTo")] = addCommand(files, QT_TR_NOOP("Move to an open tab, bookmark or folder…"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_F6)},
+                                                     [this] { copyOrMoveTo(CopyJob::Mode::Move); });
     m_actions[QStringLiteral("rename")] = addCommand(files, QT_TR_NOOP("Rename"), {K(Qt::SHIFT | Qt::Key_F6)}, [this] { active()->startRename(); });
     m_actions[QStringLiteral("multiRename")] =
         addCommand(files, QT_TR_NOOP("Multi-rename…"), {K(Qt::CTRL | Qt::Key_M)}, [this] { multiRename(); });
@@ -784,6 +788,17 @@ void MainWindow::updateSelectionBars(const QString& target)
             return b;
         };
         button(QStringLiteral("F5"), tr("Copy to"), target, true, [this] { copyOrMove(CopyJob::Mode::Copy); });
+        {  // …or anywhere else: open tabs, bookmarks, recent folders
+            auto* more = new QToolButton(bar);
+            more->setObjectName(QStringLiteral("selection-elsewhere"));
+            more->setText(QStringLiteral("▾"));
+            more->setToolTip(tr("Copy to another tab, a bookmark or a recent folder (Alt+Shift+F5)"));
+            more->setAccessibleName(tr("Copy elsewhere"));
+            more->setAutoRaise(true);
+            more->setFocusPolicy(Qt::NoFocus);
+            connect(more, &QToolButton::clicked, this, [this, more] { copyOrMoveTo(CopyJob::Mode::Copy, more); });
+            l->addWidget(more);
+        }
         button(QStringLiteral("F6"), tr("Move"), QString(), false, [this] { copyOrMove(CopyJob::Mode::Move); });
         for (const Plugin& plugin : std::as_const(m_plugins)) {
             if (!plugin.error.isEmpty() || pluginTrust(plugin) != PluginTrust::On)
@@ -852,10 +867,11 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* e)
 
 // --------------------------------------------------------------- commands
 
-void MainWindow::copyOrMove(CopyJob::Mode mode)
+void MainWindow::copyOrMove(CopyJob::Mode mode, const QString& target, bool ask, bool startNow)
 {
     Panel* src = active();
     Panel* dst = other();
+    const QString targetDir = target.isEmpty() ? dst->path() : target;
     const QStringList paths = src->selectedPaths();
     if (paths.isEmpty())
         return;
@@ -870,10 +886,11 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
             src->showMessage(why, true);
             return;
         }
-        bool now = false;
-        const QString dest = askDestination(this, move ? tr("Move out") : tr("Extract"),
-                                            (move ? tr("Move %1 out of the archive to:") : tr("Extract %1 to:")).arg(describeItems(paths)),
-                                            dst->path(), &now);
+        bool now = startNow;
+        const QString dest = !ask ? targetDir
+                                  : askDestination(this, move ? tr("Move out") : tr("Extract"),
+                                                   (move ? tr("Move %1 out of the archive to:") : tr("Extract %1 to:")).arg(describeItems(paths)),
+                                                   targetDir, &now);
         if (dest.isEmpty())
             return;
         QStringList inner;
@@ -898,17 +915,17 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
             src->unmarkAll();
         return;
     }
-    if (dst->inArchive() && src->isRemote()) {
+    if (target.isEmpty() && dst->inArchive() && src->isRemote()) {
         dst->showMessage(tr("Only local files can go into an archive: download them first"), true);
         return;
     }
     const QString title = mode == CopyJob::Mode::Copy ? tr("Copy") : tr("Move");
-    QString initial = dst->path();
+    QString initial = targetDir;
     if (!initial.endsWith(QLatin1Char('/')))
         initial += QLatin1Char('/');
-    bool now = false;
+    bool now = startNow;
     const QString text =
-        askDestination(this, title, tr("%1 %2 to:").arg(title, describeItems(paths)), initial, &now);
+        !ask ? initial : askDestination(this, title, tr("%1 %2 to:").arg(title, describeItems(paths)), initial, &now);
     if (text.isEmpty())
         return;
 
@@ -934,6 +951,109 @@ void MainWindow::copyOrMove(CopyJob::Mode mode)
     m_jobs->add(job);
     if (!src->hasSelectionOverride())
         src->unmarkAll();
+}
+
+void MainWindow::copyOrMoveTo(CopyJob::Mode mode, QWidget* anchor)
+{
+    Panel* src = active();
+    const QStringList paths = src->selectedPaths();
+    if (paths.isEmpty())
+        return;
+    const bool copy = mode == CopyJob::Mode::Copy;
+    const QString home = QDir::homePath();
+    auto shortPath = [&home](const QString& p) {
+        return p.startsWith(home + QLatin1Char('/')) || p == home ? QLatin1Char('~') + p.mid(home.size()) : p;
+    };
+    static const QIcon folder = IconCache::themed("folder");
+    static const QIcon pin = IconCache::themed("pin", "emblem-favorite");
+    QSet<QString> seen{src->path()};  // where they already are is no target
+    QList<PopupItem> items;
+    auto add = [&](const QString& path, const QString& hint, const QString& section, const QIcon& icon, int bonus) {
+        if (path.isEmpty() || seen.contains(path))
+            return;
+        seen.insert(path);
+        PopupItem it;
+        it.key = path;
+        it.title = path == QLatin1String("/") ? path : baseName(path);
+        it.subtitle = shortPath(path);
+        it.matchSubtitle = true;
+        it.hint = hint;
+        it.icon = icon;
+        it.section = section;
+        it.bonus = bonus;
+        it.run = [this, mode, path] { copyOrMove(mode, path, false); };
+        items.append(it);
+    };
+    // Open tabs: the other panel's first, the one it shows on top.
+    const QString tabs = tr("Open tabs");
+    for (Panel* p : {other(), src}) {
+        const QString side = p == m_left ? tr("left") : tr("right");
+        const QStringList tp = p->tabPaths();
+        const QList<int> numbers = p->tabSlots();
+        QList<int> order;
+        order.append(p->currentTabIndex());
+        for (int i = 0; i < tp.size(); ++i)
+            if (i != p->currentTabIndex())
+                order.append(i);
+        for (int i : order) {
+            if (i < 0 || i >= tp.size())
+                continue;
+            const QString hint = tp.size() > 1 ? QStringLiteral("%1 · %2").arg(side).arg(numbers.value(i, i + 1)) : side;
+            add(tp[i], hint, tabs, IconCache::themed("tab-new", "folder"), 2000);
+        }
+    }
+    for (const FolderHistory::Bookmark& b : FolderHistory::instance().bookmarks())
+        add(b.path, b.key, tr("Bookmarks"), pin, 1000);
+    int recent = 0;
+    for (const FolderHistory::Item& f : FolderHistory::instance().items()) {
+        if (recent >= 40)
+            break;
+        if (!seen.contains(f.path))
+            ++recent;
+        add(f.path, QString(), tr("Recent folders"), f.pinned ? pin : folder, int(12 * std::log2(1 + f.frecency)));
+    }
+    // A typed path is a target too.
+    m_popup->queryItem = [this, mode, copy](const QString& q) -> std::optional<PopupItem> {
+        if (!q.startsWith(QLatin1Char('/')) && !q.startsWith(QLatin1Char('~')) && !isRemoteLocation(q))
+            return std::nullopt;
+        PopupItem it;
+        it.key = q;
+        it.title = (copy ? tr("Copy to %1") : tr("Move to %1")).arg(q);
+        it.icon = IconCache::themed("folder");
+        it.run = [this, mode, q] { copyOrMove(mode, q, false); };
+        return it;
+    };
+    // Tab: fill in the destination dialog instead, to check or change it.
+    // Shift+Enter: start right away instead of queueing.
+    QPointer<Panel> source(src);
+    m_popup->keyHandler = [this, mode, source](QKeyEvent* e, const PopupItem* it) {
+        if (!it)
+            return false;
+        const QString path = it->key;
+        const bool tab = e->key() == Qt::Key_Tab;
+        const bool now = (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) && (e->modifiers() & Qt::ShiftModifier);
+        if (!tab && !now)
+            return false;
+        QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);  // close the picker first
+        QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
+        QTimer::singleShot(0, this, [this, mode, path, tab, now, source] {
+            if (!source)
+                return;
+            source->view()->setFocus();  // the files come from there, wherever focus went
+            setActive(source);
+            copyOrMove(mode, path, tab, now);
+        });
+        return true;
+        return false;
+    };
+    const QString what = describeItems(paths);
+    const QString placeholder = (copy ? tr("Copy %1 to…") : tr("Move %1 to…")).arg(what);
+    const QString footer = tr("Enter: %1   ·   Shift+Enter: start right away   ·   Tab: check the path first")
+                               .arg(copy ? tr("copy") : tr("move"));
+    if (anchor)
+        m_popup->openUnder(anchor, placeholder, items, footer);
+    else
+        m_popup->open(placeholder, items, footer);
 }
 
 void MainWindow::deleteSelected(bool permanent)
@@ -1522,6 +1642,7 @@ void MainWindow::commandPalette()
         }
     }
     m_popup->keyHandler = nullptr;
+    m_popup->queryItem = nullptr;
     const QString placeholder = tr("Go to a folder, find a file, run a command");
     const QString footer = tr("Enter: run or open   ·   Ctrl+J: folders only");
     if (m_searchField && m_searchField->isVisible())
@@ -1555,6 +1676,7 @@ QList<PopupItem> MainWindow::folderItems() const
 
 void MainWindow::jumpToFolder()
 {
+    m_popup->queryItem = nullptr;
     m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
         if (!it)
             return false;

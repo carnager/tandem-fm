@@ -2363,6 +2363,14 @@
         <translation>Mit Server verbinden…</translation>
     </message>
     <message>
+        <source>Copy to an open tab, bookmark or folder…</source>
+        <translation>In offenen Tab, Lesezeichen oder Ordner kopieren…</translation>
+    </message>
+    <message>
+        <source>Move to an open tab, bookmark or folder…</source>
+        <translation>In offenen Tab, Lesezeichen oder Ordner verschieben…</translation>
+    </message>
+    <message>
         <source>&amp;Bookmarks</source>
         <translation>&amp;Lesezeichen</translation>
     </message>
@@ -2477,6 +2485,14 @@
         <translation>Kopieren nach</translation>
     </message>
     <message>
+        <source>Copy to another tab, a bookmark or a recent folder (Alt+Shift+F5)</source>
+        <translation>In einen anderen Tab, ein Lesezeichen oder einen letzten Ordner kopieren (Alt+Umschalt+F5)</translation>
+    </message>
+    <message>
+        <source>Copy elsewhere</source>
+        <translation>Woandershin kopieren</translation>
+    </message>
+    <message>
         <source>Unmark</source>
         <translation>Markierung aufheben</translation>
     </message>
@@ -2507,6 +2523,54 @@
     <message>
         <source>%1 %2 to:</source>
         <translation>%1: %2 nach:</translation>
+    </message>
+    <message>
+        <source>Open tabs</source>
+        <translation>Offene Tabs</translation>
+    </message>
+    <message>
+        <source>left</source>
+        <translation>links</translation>
+    </message>
+    <message>
+        <source>right</source>
+        <translation>rechts</translation>
+    </message>
+    <message>
+        <source>Bookmarks</source>
+        <translation>Lesezeichen</translation>
+    </message>
+    <message>
+        <source>Recent folders</source>
+        <translation>Letzte Ordner</translation>
+    </message>
+    <message>
+        <source>Copy to %1</source>
+        <translation>Nach %1 kopieren</translation>
+    </message>
+    <message>
+        <source>Move to %1</source>
+        <translation>Nach %1 verschieben</translation>
+    </message>
+    <message>
+        <source>Copy %1 to…</source>
+        <translation>%1 kopieren nach…</translation>
+    </message>
+    <message>
+        <source>Move %1 to…</source>
+        <translation>%1 verschieben nach…</translation>
+    </message>
+    <message>
+        <source>Enter: %1   ·   Shift+Enter: start right away   ·   Tab: check the path first</source>
+        <translation>Enter: %1   ·   Umschalt+Enter: sofort starten   ·   Tab: Pfad erst prüfen</translation>
+    </message>
+    <message>
+        <source>copy</source>
+        <translation>kopieren</translation>
+    </message>
+    <message>
+        <source>move</source>
+        <translation>verschieben</translation>
     </message>
     <message>
         <source>Delete from archive</source>
@@ -3517,6 +3581,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>%1 free of %2</source>
         <translation>%1 von %2 frei</translation>
+    </message>
+    <message>
+        <source>New tab (Ctrl+T)</source>
+        <translation>Neuer Tab (Strg+T)</translation>
+    </message>
+    <message>
+        <source>New tab</source>
+        <translation>Neuer Tab</translation>
     </message>
     <message>
         <source>Searching %1 for “%2” …  %3 found   (Esc stops)</source>

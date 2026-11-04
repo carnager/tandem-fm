@@ -52,6 +52,19 @@
 namespace tandem {
 
 namespace {
+// Its minimum would make room for scroll arrows, leaving a gap before the +
+// with a single tab: as wide as the tabs, shrinking (with arrows) when tight.
+class TabStrip : public QTabBar {
+public:
+    using QTabBar::QTabBar;
+    QSize minimumSizeHint() const override
+    {
+        return {qMin(sizeHint().width(), 90), QTabBar::minimumSizeHint().height()};
+    }
+};
+}  // namespace
+
+namespace {
 
 // "2.4 TiB free" after a little bar of how full the drive is.
 class SpaceChip : public QWidget {
@@ -102,9 +115,12 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     layout->setContentsMargins(kCardInset + 1, kCardInset + 4, kCardInset + 1, kCardInset + 1);
     layout->setSpacing(0);
 
-    m_tabBar = new QTabBar(this);
+    m_tabBar = new TabStrip(this);
     m_tabBar->setDocumentMode(true);
     m_tabBar->setExpanding(false);
+    m_tabBar->setDrawBase(false);
+    m_tabBar->setUsesScrollButtons(true);
+    m_tabBar->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);  // as wide as its tabs: the + follows them
     m_tabBar->setMovable(false);  // order is the tab numbers
     m_tabBar->setFocusPolicy(Qt::NoFocus);
     m_tabBar->setElideMode(Qt::ElideMiddle);
@@ -112,11 +128,34 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
         "QTabBar { background: transparent; }"
         "QTabBar::tab { background: transparent; color: @dimText; padding: 4px 12px; margin: 6px 2px 0 2px;"
         "  border: none; border-radius: 8px; max-width: 220px; }"
-        "QTabBar::tab:first { margin-left: 8px; }"
+        "QTabBar::tab:first, QTabBar::tab:only-one { margin-left: 8px; }"
         "QTabBar::tab:selected { color: @text; background: @altBase; }"
         "QTabBar::tab:hover:!selected { color: @text; }"));
-    m_tabBar->hide();
-    layout->addWidget(m_tabBar);
+    {  // always there: the tabs, and a button for one more
+        auto* row = new QWidget(this);
+        auto* rl = new QHBoxLayout(row);
+        rl->setContentsMargins(0, 0, 6, 0);
+        rl->setSpacing(2);
+        rl->addWidget(m_tabBar);
+        auto* plus = new QToolButton(row);
+        plus->setObjectName(QStringLiteral("newTab"));
+        plus->setText(QStringLiteral("+"));
+        plus->setToolTip(tr("New tab (Ctrl+T)"));
+        plus->setAccessibleName(tr("New tab"));
+        plus->setAutoRaise(true);
+        plus->setFocusPolicy(Qt::NoFocus);
+        setThemeStyle(plus, QStringLiteral(
+            "QToolButton { color: @dimText; border: none; border-radius: 7px; padding: 1px 8px; margin-top: 6px; }"
+            "QToolButton:hover { color: @text; background: @altBase; }"));
+        connect(plus, &QToolButton::clicked, this, [this] {
+            addTab(path());
+            if (m_tabs.size() > 0)
+                view()->setFocus();
+        });
+        rl->addWidget(plus);
+        rl->addStretch(1);
+        layout->addWidget(row);
+    }
 
     m_header = new QWidget(this);
     m_header->setObjectName(QStringLiteral("panelHeader"));
@@ -569,7 +608,6 @@ DirTab* Panel::addTab(const QString& path, bool activate, int slot)
         if (m_current >= index)
             m_current++;
     }
-    m_tabBar->setVisible(m_tabs.size() > 1);
     t->navigate(path);
     updateTabTitles();  // after navigate: the title comes from the path being loaded
     if (activate || m_current < 0)
@@ -591,7 +629,6 @@ void Panel::closeCurrentTab()
         QSignalBlocker block(m_tabBar);
         m_tabBar->removeTab(index);
     }
-    m_tabBar->setVisible(m_tabs.size() > 1);
     updateTabTitles();
     showTab(qMin(index, int(m_tabs.size()) - 1));
     t->deleteLater();
