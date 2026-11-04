@@ -3,6 +3,9 @@
 #include "core/Util.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
+#ifdef Q_OS_MACOS
+#include "ui/MacFileIcons.h"
+#endif
 
 #include <QDateTime>
 #include <QLocale>
@@ -17,7 +20,16 @@
 
 namespace tandem {
 
-FileModel::FileModel(QObject* parent) : QAbstractTableModel(parent) {}
+FileModel::FileModel(QObject* parent) : QAbstractTableModel(parent)
+{
+#ifdef Q_OS_MACOS
+    m_macIcons = new MacFileIcons(this);
+    connect(m_macIcons, &MacFileIcons::ready, this, [this] {
+        if (!m_entries.empty())
+            emit dataChanged(index(0, ColName), index(int(m_entries.size()) - 1, ColName), {Qt::DecorationRole});
+    });
+#endif
+}
 
 int FileModel::rowCount(const QModelIndex& parent) const
 {
@@ -106,8 +118,13 @@ QVariant FileModel::data(const QModelIndex& index, int role) const
             return e->name;
         break;
     case Qt::DecorationRole:
-        if (index.column() == ColName)
+        if (index.column() == ColName) {
+#ifdef Q_OS_MACOS
+            return m_macIcons->get(*e, m_localIconPaths ? filePath(index.row()) : QString());
+#else
             return IconCache::forEntry(*e);
+#endif
+        }
         break;
     case Qt::TextAlignmentRole:
         if (index.column() == ColSize)
@@ -356,6 +373,9 @@ void FileModel::setFilter(const QString& text)
 
 void FileModel::setListing(const QString& path, std::vector<FileEntry>&& entries)
 {
+#ifdef Q_OS_MACOS
+    m_macIcons->reset(path == m_path);
+#endif
     beginResetModel();
     if (path != m_path) {
         m_git.clear();
@@ -399,6 +419,9 @@ void FileModel::removeRow(int row)
 void FileModel::applyUpdates(std::vector<EntryUpdate>&& updates)
 {
     for (auto& [name, maybe] : updates) {
+#ifdef Q_OS_MACOS
+        m_macIcons->invalidate(joinPath(m_path, name));
+#endif
         const int row = rowOf(name);
         if (row < 0) {
             // Maybe it's set aside by the filter.

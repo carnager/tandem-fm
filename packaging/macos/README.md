@@ -22,6 +22,10 @@ notarized, so the first start needs a right click → Open.
 - Folder changes come from kqueue. It sees files appear and disappear, but not
   files that change in place, so shown folders are also re-read every 5 seconds.
 - Copies keep Finder metadata (tags, extended attributes, ACLs).
+- With the system icon theme, the file panels use native macOS type icons and
+  Finder's icons for local files and folders, including custom icons. Icons
+  load in the background; servers and archives use type icons without looking
+  up individual paths.
 - SMB shares (`smb://server/share/folder`) are mounted by macOS, with its own
   login dialog and Keychain, and browsed under `/Volumes` like any folder.
   Finder sees them too. SFTP is built in, as on Linux. GVfs protocols

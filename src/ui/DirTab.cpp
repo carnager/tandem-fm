@@ -313,6 +313,9 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
                 sortEntries(result->entries, t->m_model->sortSpec());
             // Item counts of subfolders: only where reading them is cheap.
             t->m_model->setCountable(!result->remote && !result->inArchive && !networkFs, t->m_showHidden);
+#ifdef Q_OS_MACOS
+            t->m_model->setLocalIconPaths(!result->remote && !result->inArchive && !networkFs);
+#endif
             t->m_model->setListing(result->path, std::move(result->entries));
             t->m_model->restoreMarks(restore);
             if (old != result->path)
@@ -440,6 +443,9 @@ void DirTab::startSearch(const SearchSpec& spec)
     m_search = spec;
     m_inSearch = true;
     m_model->setCountable(false, false);  // results are paths below the folder
+#ifdef Q_OS_MACOS
+    m_model->setLocalIconPaths(false);
+#endif
     m_searchRunning = true;
     m_searchFound = 0;
     m_searchError.clear();

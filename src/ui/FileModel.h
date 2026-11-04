@@ -49,6 +49,9 @@ public:
     // Folders show how many items they hold, counted on a worker for the
     // rows that are painted; only where that is cheap (local folders).
     void setCountable(bool on, bool hidden);
+#ifdef Q_OS_MACOS
+    void setLocalIconPaths(bool on) { m_localIconPaths = on; }
+#endif
     std::optional<int> itemCount(const FileEntry& e) const;  // asks for it when unknown
 
     // Dates as "12 min ago", "Yesterday 14:20", "3 Nov"; or exact.
@@ -120,6 +123,10 @@ private:
     mutable QHash<QString, int> m_counts;
     mutable QSet<QString> m_countQueue;
     mutable bool m_countScheduled = false;
+#ifdef Q_OS_MACOS
+    class MacFileIcons* m_macIcons = nullptr;
+    bool m_localIconPaths = false;
+#endif
 };
 
 }  // namespace tandem
