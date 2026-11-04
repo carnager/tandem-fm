@@ -2043,15 +2043,25 @@ void MainWindow::editInArchive(Panel* p, const QString& path)
         return;
     }
     withExtracted(p, path, [this, editCopy, archive, inner](const QString& extracted) {
-        QDir().mkpath(parentPath(editCopy));
-        QFile::remove(editCopy);
-        if (!QFile::copy(extracted, editCopy)) {
-            active()->showMessage(tr("Cannot copy %1 for editing").arg(baseName(inner)), true);
-            return;
-        }
-        QFile::setPermissions(editCopy, QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup | QFile::ReadOther);
-        m_editedArchive.insert(editCopy, {archive, inner});
-        watchEdit(editCopy);
+        // A big member takes a while to copy: on a worker.
+        QPointer<MainWindow> self(this);
+        ioPool()->start([self, extracted, editCopy, archive, inner] {
+            QDir().mkpath(parentPath(editCopy));
+            QFile::remove(editCopy);
+            const bool ok = QFile::copy(extracted, editCopy);
+            if (ok)
+                QFile::setPermissions(editCopy, QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup | QFile::ReadOther);
+            postToUi([self, ok, editCopy, archive, inner] {
+                if (!self)
+                    return;
+                if (!ok) {
+                    self->active()->showMessage(tr("Cannot copy %1 for editing").arg(baseName(inner)), true);
+                    return;
+                }
+                self->m_editedArchive.insert(editCopy, {archive, inner});
+                self->watchEdit(editCopy);
+            });
+        });
     });
 }
 
@@ -2147,9 +2157,12 @@ void MainWindow::createLink()
     const QStringList targets = p->selectedPaths();
     if (targets.isEmpty() || refuseInArchive(p) || other()->inArchive())
         return;
+    // The listing already knows which are folders: no need to ask the disk.
     bool anyDir = false;
-    for (const QString& t : targets)
-        anyDir |= QFileInfo(t).isDir();
+    const QSet<QString> chosen(targets.begin(), targets.end());
+    const FileModel* model = p->tab()->model();
+    for (int r = 0; r < model->count() && !anyDir; ++r)
+        anyDir = model->entry(r)->isDir && chosen.contains(model->filePath(r));
     const bool remote = p->isRemote() || other()->isRemote();
     const bool single = targets.size() == 1;
 
@@ -2209,23 +2222,38 @@ void MainWindow::createLink()
     QString dest = expandUserPath(where->text().trimmed());
     if (!dest.startsWith(QLatin1Char('/')) && !isRemoteLocation(dest))
         dest = joinPath(p->path(), dest);
-    QList<QPair<QString, QString>> made;
-    QStringList errors;
-    for (const QString& t : targets) {
-        const QString link = single && !QFileInfo(dest).isDir() ? dest : joinPath(dest, baseName(t));
-        if (const int e = makeLink(t, link, kind))
-            errors << tr("%1: %2").arg(baseName(link), errnoString(e));
-        else
-            made.append({link, QString()});
-    }
-    if (!made.isEmpty())
-        pushUndo({UndoEntry::Kind::Create, plural(tr("%n link(s)", nullptr, int(made.size())), int(made.size())), {}, made});
-    p->showMessage(errors.isEmpty() ? plural(tr("Created %n link(s)", nullptr, int(made.size())), int(made.size()))
-                                    : errors.first(),
-                   !errors.isEmpty());
-    for (Panel* panel : {m_left, m_right})
-        if (panel->isRemote())
-            panel->refresh();
+    // Checking the destination and making links can be slow on a server.
+    QPointer<MainWindow> self(this);
+    QPointer<Panel> panel(p);
+    ioPool()->start([self, panel, targets, dest, kind, single] {
+        bool destIsDir = false;
+        if (single) {
+            FileStat st;
+            destIsDir = isRemoteLocation(dest) ? statAt(dest, st) == 0 && st.isDir : QFileInfo(dest).isDir();
+        }
+        QList<QPair<QString, QString>> made;
+        QStringList errors;
+        for (const QString& t : targets) {
+            const QString link = single && !destIsDir ? dest : joinPath(dest, baseName(t));
+            if (const int e = makeLink(t, link, kind))
+                errors << tr("%1: %2").arg(baseName(link), errnoString(e));
+            else
+                made.append({link, QString()});
+        }
+        postToUi([self, panel, made, errors] {
+            if (!self)
+                return;
+            const int n = int(made.size());
+            if (n > 0)
+                self->pushUndo({UndoEntry::Kind::Create, plural(tr("%n link(s)", nullptr, n), n), {}, made});
+            if (panel)
+                panel->showMessage(errors.isEmpty() ? plural(tr("Created %n link(s)", nullptr, n), n) : errors.first(),
+                                   !errors.isEmpty());
+            for (Panel* each : {self->m_left, self->m_right})
+                if (each->isRemote())
+                    each->refresh();
+        });
+    });
 }
 
 // Alt+A. Reading permissions (ACLs, flags) can touch slow mounts: off the UI thread.

@@ -6,6 +6,9 @@
 #include "core/Backend.h"
 #include "core/Util.h"
 
+#include <QCoreApplication>
+#include <QThread>
+
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -18,6 +21,7 @@ public:
 
     std::atomic<int> latencyMs{0};
     std::atomic<int> calls{0};
+    std::atomic<int> uiThreadCalls{0};  // must stay 0: servers are slow
 
     QString local(const QString& uri) const
     {
@@ -64,6 +68,8 @@ private:
     void wait()
     {
         ++calls;
+        if (QCoreApplication::instance() && QThread::currentThread() == QCoreApplication::instance()->thread())
+            ++uiThreadCalls;
         if (const int ms = latencyMs.load())
             std::this_thread::sleep_for(std::chrono::milliseconds(ms));
     }

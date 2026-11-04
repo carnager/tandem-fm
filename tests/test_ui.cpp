@@ -1845,6 +1845,37 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // On a server the link is made by a worker, never the UI thread.
+    void createLinkOnServer()
+    {
+        QTemporaryDir serverDir;
+        QVERIFY(QDir().mkpath(serverDir.filePath("src")));
+        QVERIFY(QDir().mkpath(serverDir.filePath("dst")));
+        writeFile(serverDir.filePath("src/target.txt"), "t");
+        auto backend = std::make_shared<TestBackend>(serverDir.path());
+        registerBackend("test", backend);
+        auto unregister = qScopeGuard([] { registerBackend("test", nullptr); });
+        m_left->navigate("test://srv/src");
+        m_right->navigate("test://srv/dst");
+        QTRY_COMPARE(leftModel()->path(), QString("test://srv/src"));
+        QTRY_COMPARE(rightModel()->path(), QString("test://srv/dst"));
+        QTRY_VERIFY(leftModel()->rowOf("target.txt") >= 0);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "target.txt");
+        backend->uiThreadCalls = 0;
+        answerNextDialog([](QWidget* w) { acceptDialog(w); });
+        QTest::keyClick(m_left->view(), Qt::Key_F5, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(QFileInfo(serverDir.filePath("dst/target.txt")).isSymLink());
+        QCOMPARE(backend->uiThreadCalls.load(), 0);
+        m_left->navigate(L());
+        m_right->navigate(R());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTRY_COMPARE(rightModel()->path(), R());
+        QVERIFY(ioPool()->waitForDone(5000));
+    }
+
     // keys.toml: every command listed; saving it changes keys at once, modal ones too.
     void keysToml()
     {
