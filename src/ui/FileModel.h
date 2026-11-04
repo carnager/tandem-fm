@@ -64,8 +64,7 @@ public:
     const FileEntry* entry(int row) const;
     int rowOf(const QString& name) const;
     QString filePath(int row) const;
-    QIcon fileIcon(int row, int pixels = 64) const;
-    void prepareIcons(int visibleItems, int pixels) const;
+    QIcon fileIcon(int row) const;
     int count() const { return int(m_entries.size()); }
 
     SortSpec sortSpec() const { return m_sort; }
@@ -127,7 +126,6 @@ private:
     mutable QSet<QString> m_countQueue;
     mutable bool m_countScheduled = false;
 #ifdef Q_OS_MACOS
-    class MacFileIcons* m_macIcons = nullptr;
     bool m_localIconPaths = false;
 #endif
 };

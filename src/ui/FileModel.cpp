@@ -23,34 +23,25 @@ namespace tandem {
 FileModel::FileModel(QObject* parent) : QAbstractTableModel(parent)
 {
 #ifdef Q_OS_MACOS
-    m_macIcons = new MacFileIcons(this);
-    connect(m_macIcons, &MacFileIcons::ready, this, [this] {
-        if (!m_entries.empty())
-            emit dataChanged(index(0, ColName), index(int(m_entries.size()) - 1, ColName), {Qt::DecorationRole});
+    connect(&MacFileIcons::instance(), &MacFileIcons::ready, this, [this](const QString& path) {
+        if (!m_localIconPaths)
+            return;
+        const int row = rowOf(baseName(path));
+        if (row >= 0 && filePath(row) == path)
+            emit dataChanged(index(row, ColName), index(row, ColName), {Qt::DecorationRole});
     });
 #endif
 }
 
-QIcon FileModel::fileIcon(int row, int pixels) const
+QIcon FileModel::fileIcon(int row) const
 {
     const FileEntry* e = entry(row);
     if (!e)
         return {};
 #ifdef Q_OS_MACOS
-    return m_macIcons->get(*e, m_localIconPaths ? filePath(row) : QString(), pixels);
+    return MacFileIcons::instance().get(*e, m_localIconPaths ? filePath(row) : QString());
 #else
-    Q_UNUSED(pixels);
     return IconCache::forEntry(*e);
-#endif
-}
-
-void FileModel::prepareIcons(int visibleItems, int pixels) const
-{
-#ifdef Q_OS_MACOS
-    m_macIcons->setVisibleItems(visibleItems, pixels);
-#else
-    Q_UNUSED(visibleItems);
-    Q_UNUSED(pixels);
 #endif
 }
 
@@ -141,9 +132,8 @@ QVariant FileModel::data(const QModelIndex& index, int role) const
             return e->name;
         break;
     case Qt::DecorationRole:
-        if (index.column() == ColName) {
+        if (index.column() == ColName)
             return fileIcon(index.row());
-        }
         break;
     case Qt::TextAlignmentRole:
         if (index.column() == ColSize)
@@ -392,9 +382,6 @@ void FileModel::setFilter(const QString& text)
 
 void FileModel::setListing(const QString& path, std::vector<FileEntry>&& entries)
 {
-#ifdef Q_OS_MACOS
-    m_macIcons->reset(path == m_path);
-#endif
     beginResetModel();
     if (path != m_path) {
         m_git.clear();
@@ -438,9 +425,6 @@ void FileModel::removeRow(int row)
 void FileModel::applyUpdates(std::vector<EntryUpdate>&& updates)
 {
     for (auto& [name, maybe] : updates) {
-#ifdef Q_OS_MACOS
-        m_macIcons->invalidate(joinPath(m_path, name));
-#endif
         const int row = rowOf(name);
         if (row < 0) {
             // Maybe it's set aside by the filter.

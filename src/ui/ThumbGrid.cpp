@@ -197,8 +197,6 @@ void ThumbGrid::paintEvent(QPaintEvent*)
     const bool local = !isRemoteLocation(m->path()) && QFileInfo(m->path()).isDir();
     const QFontMetrics fm = fontMetrics();
     m_onScreen.clear();
-    const int visibleItems = qMax(0, qMin(m->count(), (lastRow + 1) * cols) - firstRow * cols);
-    m->prepareIcons(visibleItems, qRound(qMin(96, m_thumb * 2 / 3) * devicePixelRatioF()));
 
     for (int row = firstRow * cols; row < qMin(m->count(), (lastRow + 1) * cols); ++row) {
         const FileEntry* e = m->entry(row);
@@ -249,8 +247,7 @@ void ThumbGrid::paintEvent(QPaintEvent*)
             p.restore();
         } else {
             const int is = qMin(96, m_thumb * 2 / 3);
-            const QIcon icon = e->isParent ? IconCache::themed("go-up", "go-previous")
-                                         : m->fileIcon(row, qRound(is * devicePixelRatioF()));
+            const QIcon icon = e->isParent ? IconCache::themed("go-up", "go-previous") : m->fileIcon(row);
             icon.paint(&p, QRect(pic.center().x() - is / 2, pic.center().y() - is / 2, is, is));
         }
         // The name, on up to two lines.
