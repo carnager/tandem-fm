@@ -1411,8 +1411,8 @@ private slots:
             qputenv("PATH", QFile::encodeName(tmp.filePath("only-grep")));
             const QStringList found = run({{}, "needle", true, false});
             qputenv("PATH", oldPath);
-            QVERIFY(found.contains("src/line\nbreak.txt"));
-            QVERIFY(!found.contains("src/line"));
+            // grep doesn't read .gitignore, but must still skip hidden folders.
+            QCOMPARE(found, QStringList({"build/fuzzy.o", "src/Fuzzy.cpp", "src/line\nbreak.txt"}));
         }
     }
 
@@ -2383,6 +2383,9 @@ private slots:
     // A phone held by another program: who has it, from a fake /proc.
     void mtpHolders()
     {
+#ifdef Q_OS_MACOS
+        QSKIP("MTP through GVfs/KIO and /proc is Linux-only");
+#endif
         QCOMPARE(usbNodeFromMtpError("Unable to open MTP device \u201c001,019\u201d"), QString("/dev/bus/usb/001/019"));
         QCOMPARE(usbNodeFromMtpError("Konnte MTP-Ger\u00e4t \u00bb003,007\u00ab nicht \u00f6ffnen"), QString("/dev/bus/usb/003/007"));
         QCOMPARE(usbNodeFromMtpError("Permission denied"), QString());

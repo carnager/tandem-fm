@@ -23,10 +23,10 @@ QString findTool(std::initializer_list<const char*> names)
     return {};
 }
 
-QString clean(QString line)
+QString clean(QString line, const QString& prefix)
 {
-    if (line.startsWith(QLatin1String("./")))
-        line = line.mid(2);
+    if (line.startsWith(prefix))
+        line = line.mid(prefix.size());
     while (line.endsWith(QLatin1Char('/')))
         line.chop(1);
     return line;
@@ -36,7 +36,8 @@ QString clean(QString line)
 // contain newlines, so lines won't do.
 QString runProcess(const QString& program, const QStringList& args, const QString& cwd,
                    const std::atomic<bool>* cancel, int limit,
-                   const std::function<void(const QStringList&)>& onBatch)
+                   const std::function<void(const QStringList&)>& onBatch,
+                   const QString& prefix = QStringLiteral("./"))
 {
     QProcess p;
     p.setWorkingDirectory(cwd);
@@ -64,7 +65,7 @@ QString runProcess(const QString& program, const QStringList& args, const QStrin
         pending += p.readAllStandardOutput();
         qsizetype nl;
         while ((nl = pending.indexOf('\0')) >= 0) {
-            const QString line = clean(QFile::decodeName(pending.left(nl)));
+            const QString line = clean(QFile::decodeName(pending.left(nl)), prefix);
             pending.remove(0, nl + 1);
             if (line.isEmpty() || line == QLatin1String("."))
                 continue;
@@ -82,7 +83,7 @@ QString runProcess(const QString& program, const QStringList& args, const QStrin
             break;
     }
     if (!pending.isEmpty())
-        batch.append(clean(QFile::decodeName(pending)));
+        batch.append(clean(QFile::decodeName(pending), prefix));
     flush();
     // rg/grep exit 1 when nothing matched; that's not an error.
     if (p.exitStatus() != QProcess::NormalExit || p.exitCode() > 1) {
@@ -174,8 +175,18 @@ QString runSearch(const SearchSpec& spec, const std::atomic<bool>* cancel, int l
         args << QStringLiteral("-i");
     if (!spec.all)
         args << QStringLiteral("--exclude-dir=.?*");  // not ".*": that also matches the "." we start in
+#ifdef Q_OS_MACOS
+    // BSD grep applies --exclude-dir to a "." start too, so start at the root itself.
+    QString start = spec.root;
+    while (start.size() > 1 && start.endsWith(QLatin1Char('/')))
+        start.chop(1);
+    args << QStringLiteral("-e") << spec.query << QStringLiteral("--") << start;
+    return runProcess(grep, args, spec.root, cancel, limit, onBatch,
+                      start == QLatin1String("/") ? start : start + QLatin1Char('/'));
+#else
     args << QStringLiteral("-e") << spec.query << QStringLiteral(".");
     return runProcess(grep, args, spec.root, cancel, limit, onBatch);
+#endif
 }
 
 }  // namespace tandem
