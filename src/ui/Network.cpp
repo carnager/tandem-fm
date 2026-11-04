@@ -9,7 +9,9 @@
 #include "ui/MacSmb.h"
 #endif
 
+#include "core/Mounts.h"
 #include "core/Remote.h"
+#include "core/Util.h"
 
 #include <QCheckBox>
 #include <QDialog>
@@ -264,6 +266,25 @@ GMountOperation* makeOperation(MountCall* call)
     return call->op;
 }
 
+// A phone another program holds fails with a bare "Unable to open MTP
+// device"; say who has it instead.
+void reportFailure(Network::Done done, const QString& msg)
+{
+    const QString node = usbNodeFromMtpError(msg);
+    if (node.isEmpty()) {
+        done(QString(), msg);
+        return;
+    }
+    ioPool()->start([done = std::move(done), msg, node] {
+        const QStringList who = usbDeviceHolders(node);
+        postToUi([done, msg, who] {
+            done(QString(), who.isEmpty() ? msg
+                                          : QObject::tr("The phone is in use by %1. Close it there, then try again.")
+                                                .arg(who.join(QStringLiteral(", "))));
+        });
+    });
+}
+
 void onMounted(GObject* source, GAsyncResult* res, gpointer data)
 {
     std::unique_ptr<MountCall> call(static_cast<MountCall*>(data));
@@ -273,7 +294,10 @@ void onMounted(GObject* source, GAsyncResult* res, gpointer data)
         const bool aborted = g_error_matches(err, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED);
         const QString msg = takeError(err);
         if (!already) {
-            call->done(QString(), aborted ? QObject::tr("Cancelled") : msg);
+            if (aborted)
+                call->done(QString(), QObject::tr("Cancelled"));
+            else
+                reportFailure(std::move(call->done), msg);
             return;
         }
     }
@@ -294,7 +318,7 @@ void onVolumeMounted(GObject* source, GAsyncResult* res, gpointer data)
     GError* err = nullptr;
     GVolume* volume = G_VOLUME(source);
     if (!g_volume_mount_finish(volume, res, &err)) {
-        call->done(QString(), takeError(err));
+        reportFailure(std::move(call->done), takeError(err));
         return;
     }
     QString path;

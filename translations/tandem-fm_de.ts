@@ -470,6 +470,10 @@
         <translation>Anonym verbinden</translation>
     </message>
     <message>
+        <source>The phone is in use by %1. Close it there, then try again.</source>
+        <translation>Das Handy wird gerade von %1 benutzt. Schließe es dort und versuche es dann noch mal.</translation>
+    </message>
+    <message>
         <source>Mounted, but GVfs has no local path for it (is gvfsd-fuse running?)</source>
         <translation>Eingehängt, aber GVfs liefert keinen lokalen Pfad (läuft gvfsd-fuse?)</translation>
     </message>

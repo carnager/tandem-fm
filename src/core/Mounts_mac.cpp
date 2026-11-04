@@ -29,4 +29,6 @@ bool isNetworkFilesystem(const QString& path)
     struct statfs st;
     return ::statfs(QFile::encodeName(path).constData(), &st) == 0 && !(st.f_flags & MNT_LOCAL);
 }
+QString usbNodeFromMtpError(const QString&) { return {}; }
+QStringList usbDeviceHolders(const QString&, const QString&) { return {}; }
 } // namespace tandem

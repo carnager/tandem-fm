@@ -1,8 +1,12 @@
 #include "core/Mounts.h"
 
 #include <sys/vfs.h>
+#include <unistd.h>
 
+#include <QCoreApplication>
+#include <QDir>
 #include <QFile>
+#include <QRegularExpression>
 #include <QSet>
 
 namespace tandem {
@@ -100,6 +104,47 @@ bool isNetworkFilesystem(const QString& path)
     default:
         return false;
     }
+}
+
+QString usbNodeFromMtpError(const QString& error)
+{
+    static const QRegularExpression re(QStringLiteral("MTP.*\\b(\\d{3}),(\\d{3})\\b"));
+    const auto m = re.match(error);
+    return m.hasMatch() ? QStringLiteral("/dev/bus/usb/%1/%2").arg(m.captured(1), m.captured(2)) : QString();
+}
+
+QStringList usbDeviceHolders(const QString& node, const QString& procRoot)
+{
+    QStringList out;
+    const QByteArray target = QFile::encodeName(node);
+    const QString self = QString::number(QCoreApplication::applicationPid());
+    const QStringList pids = QDir(procRoot).entryList({QStringLiteral("[0-9]*")}, QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString& pid : pids) {
+        if (pid == self)
+            continue;
+        const QString fdDir = procRoot + QLatin1Char('/') + pid + QStringLiteral("/fd");
+        bool holds = false;
+        for (const QString& fd : QDir(fdDir).entryList(QDir::AllEntries | QDir::System | QDir::NoDotAndDotDot)) {
+            char buf[256];
+            const ssize_t n = ::readlink(QFile::encodeName(fdDir + QLatin1Char('/') + fd).constData(), buf, sizeof buf);
+            if (n > 0 && QByteArray(buf, int(n)) == target) {
+                holds = true;
+                break;
+            }
+        }
+        if (!holds)
+            continue;
+        QFile comm(procRoot + QLatin1Char('/') + pid + QStringLiteral("/comm"));
+        const QString name = comm.open(QIODevice::ReadOnly) ? QString::fromUtf8(comm.readAll()).trimmed() : pid;
+        if (name == QLatin1String("adb") || name.startsWith(QLatin1String("gvfs")))
+            continue;
+        const QString shown = name.startsWith(QLatin1String("kio"))
+                                  ? QStringLiteral("Dolphin (%1)").arg(name)
+                                  : name;
+        if (!out.contains(shown))
+            out << shown;
+    }
+    return out;
 }
 
 }  // namespace tandem

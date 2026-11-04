@@ -10,6 +10,7 @@
 #include "TestBackend.h"
 #include "SshServer.h"
 #include "core/GitStatus.h"
+#include "core/Mounts.h"
 #include "core/Trash.h"
 #include "core/Undo.h"
 #include "core/FolderHistory.h"
@@ -2001,6 +2002,33 @@ private slots:
         QCOMPARE(entries.size(), 2);
         QCOMPARE(entries[0], qMakePair(QString("Pixel 10"), QString("pixel")));
         QCOMPARE(entries[1], qMakePair(QString("Tablet"), QString("Tablet")));
+    }
+
+    // A phone held by another program: who has it, from a fake /proc.
+    void mtpHolders()
+    {
+        QCOMPARE(usbNodeFromMtpError("Unable to open MTP device \u201c001,019\u201d"), QString("/dev/bus/usb/001/019"));
+        QCOMPARE(usbNodeFromMtpError("Konnte MTP-Ger\u00e4t \u00bb003,007\u00ab nicht \u00f6ffnen"), QString("/dev/bus/usb/003/007"));
+        QCOMPARE(usbNodeFromMtpError("Permission denied"), QString());
+
+        QTemporaryDir proc;
+        const QString node = "/dev/bus/usb/001/019";
+        auto process = [&](const QString& pid, const QString& comm, const QString& fdTarget) {
+            QVERIFY(QDir().mkpath(proc.filePath(pid + "/fd")));
+            QFile f(proc.filePath(pid + "/comm"));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(comm.toUtf8() + "\n");
+            QVERIFY(QFile::link(fdTarget, proc.filePath(pid + "/fd/3")));
+        };
+        process("100", "kiod6", node);
+        process("200", "adb", node);             // doesn't block MTP
+        process("300", "gvfsd-mtp", node);       // GVfs itself
+        process("400", "simple-mtpfs", node);
+        process("500", "bash", "/dev/null");     // something else
+        QStringList who = usbDeviceHolders(node, proc.path());
+        who.sort();
+        QCOMPARE(who, QStringList({"Dolphin (kiod6)", "simple-mtpfs"}));
+        QVERIFY(usbDeviceHolders("/dev/bus/usb/009/009", proc.path()).isEmpty());
     }
 
     void helpers()
