@@ -23,30 +23,7 @@ namespace {
 #ifdef __APPLE__
 bool fillEntry(int dirfd, const char* name, FileEntry& e)
 {
-    struct stat st;
-    if (::fstatat(dirfd, name, &st, AT_SYMLINK_NOFOLLOW) != 0)
-        return false;
-    e.mode = st.st_mode;
-    e.size = st.st_size;
-    e.mtime = st.st_mtime;
-    e.iconRevision = int64_t(st.st_ctimespec.tv_sec) * 1000000000 + st.st_ctimespec.tv_nsec;
-    e.uid = st.st_uid;
-    e.gid = st.st_gid;
-    e.isLink = S_ISLNK(st.st_mode);
-    if (e.isLink) {
-        struct stat target;
-        if (::fstatat(dirfd, name, &target, 0) == 0) {
-            e.isDir = S_ISDIR(target.st_mode);
-            e.size = target.st_size;
-        } else {
-            e.brokenLink = true;
-        }
-    } else {
-        e.isDir = S_ISDIR(st.st_mode);
-    }
-    if (e.isDir)
-        e.size = -1;
-    return true;
+    return macStatEntry(dirfd, name, e);
 }
 #else
 constexpr unsigned kStatMask = STATX_TYPE | STATX_MODE | STATX_SIZE | STATX_MTIME | STATX_UID | STATX_GID;
@@ -124,7 +101,12 @@ ListResult listDirectory(const QString& path, const ListOptions& opt, const std:
     // afterwards and simply re-stat'ed, so no change can slip through.
     if (opt.watch)
         r.watch = DirWatcher::instance()->addWatch(np);
-
+#ifdef Q_OS_MACOS
+    auto bulk = localIcons ? macListEntries(dfd, opt.showHidden, cancel) : std::nullopt;
+    if (bulk)
+        r.entries = std::move(*bulk);
+    else
+#endif
     while (dirent* de = readdir(d)) {
         if (cancel && cancel->load(std::memory_order_relaxed)) {
             closedir(d);
@@ -145,13 +127,24 @@ ListResult listDirectory(const QString& path, const ListOptions& opt, const std:
             e.size = e.isDir ? -1 : 0;
         }
 #ifdef Q_OS_MACOS
-        if (localIcons && !e.isDir)
+        if (localIcons) {
             e.hasCustomIcon = macHasCustomIcon(dfd, n);
+            e.isPackage = e.isDir && macIsPackage(e.name);
+        }
 #endif
         e.key = makeSortKey(e.name);
         r.entries.push_back(std::move(e));
     }
     closedir(d);
+#ifdef Q_OS_MACOS
+    if (bulk && cancel && cancel->load(std::memory_order_relaxed)) {
+        DirWatcher::instance()->removeWatch(r.watch);
+        r.watch = -1;
+        r.entries.clear();
+        r.error = ECANCELED;
+        return r;
+    }
+#endif
 
     sortEntries(r.entries, opt.sort);
     r.sortedBy = opt.sort;
@@ -200,8 +193,10 @@ std::vector<EntryUpdate> statNames(const QString& dir, const QStringList& names,
         const QByteArray nn = toNative(name);
         if (dfd >= 0 && fillEntry(dfd, nn.constData(), e)) {
 #ifdef Q_OS_MACOS
-            if (localIcons && !e.isDir)
+            if (localIcons) {
                 e.hasCustomIcon = macHasCustomIcon(dfd, nn.constData());
+                e.isPackage = e.isDir && macIsPackage(e.name);
+            }
 #endif
             e.key = makeSortKey(e.name);
             out.emplace_back(name, std::move(e));

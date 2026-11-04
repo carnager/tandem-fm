@@ -65,6 +65,7 @@ public:
     int rowOf(const QString& name) const;
     QString filePath(int row) const;
     QIcon fileIcon(int row, int pixels = 64) const;
+    void prepareIcons(int visibleItems, int pixels) const;
     int count() const { return int(m_entries.size()); }
 
     SortSpec sortSpec() const { return m_sort; }

@@ -1,6 +1,7 @@
 #import <AppKit/AppKit.h>
 
 #include "core/Util.h"
+#include "core/MacFileIconInfo.h"
 #include "ui/FileModel.h"
 #include "ui/IconCache.h"
 #include "ui/MacFileIcons.h"
@@ -14,6 +15,9 @@
 #include <QTest>
 
 #include <atomic>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 using namespace tandem;
 
@@ -62,6 +66,7 @@ private slots:
         FileEntry entry;
         entry.name = "Custom folder";
         entry.isDir = true;
+        entry.hasCustomIcon = true;
         FileModel model;
         model.setLocalIconPaths(true);
         std::vector<FileEntry> entries{entry};
@@ -102,6 +107,7 @@ private slots:
         FileEntry folder;
         folder.name = "One";
         folder.isDir = true;
+        folder.hasCustomIcon = true;
         QSignalSpy ready(&icons, &MacFileIcons::ready);
         icons.get(folder);  // a remote/archive folder: no path is given to AppKit
         folder.name = "Two";
@@ -141,6 +147,7 @@ private slots:
         FileEntry folder;
         folder.name = "Folder";
         folder.isDir = true;
+        folder.hasCustomIcon = true;
         icons.get(folder, "/fixture/folder");
         QVERIFY(entered.tryAcquire(1, 2000));
         icons.reset();
@@ -164,6 +171,7 @@ private slots:
         FileEntry folder;
         folder.name = "Folder";
         folder.isDir = true;
+        folder.hasCustomIcon = true;
         QSignalSpy ready(&icons, &MacFileIcons::ready);
         icons.get(folder, "/fixture/folder");
         QTRY_VERIFY(!ready.isEmpty());
@@ -213,6 +221,7 @@ private slots:
         });
         FileEntry folder;
         folder.isDir = true;
+        folder.hasCustomIcon = true;
         QSignalSpy ready(&icons, &MacFileIcons::ready);
         icons.get(folder, "/fixture/folder");
         QVERIFY(entered.tryAcquire(1, 2000));
@@ -251,6 +260,7 @@ private slots:
         file.hasCustomIcon = false;
         file.isDir = true;
         file.name = "Package.app";
+        file.isPackage = true;
         ready.clear();
         icons.get(file, "/fixture/Package.app");
         QTRY_VERIFY(!ready.isEmpty());
@@ -264,13 +274,14 @@ private slots:
             ++calls;
             pixels = request.pixels;
             // Oversized loader results exercise byte-based eviction with few requests.
-            QImage image(512, 512, QImage::Format_ARGB32);
+            QImage image(1024, 1024, QImage::Format_ARGB32);
             image.fill(Qt::green);
             return image;
         });
         FileEntry folder;
         folder.name = "Folder";
         folder.isDir = true;
+        folder.hasCustomIcon = true;
         QSignalSpy ready(&icons, &MacFileIcons::ready);
         icons.get(folder, "/fixture/0");
         QTRY_VERIFY(!ready.isEmpty());
@@ -291,6 +302,152 @@ private slots:
         QCOMPARE(calls.load(), 8);  // old count-based cache would retain this icon
     }
 
+    void retinaGridSettles_data()
+    {
+        QTest::addColumn<int>("count");
+        QTest::addColumn<bool>("custom");
+        QTest::newRow("plain folders") << 60 << false;
+        QTest::newRow("custom folders") << 60 << true;
+        QTest::newRow("large custom grid") << 240 << true;
+    }
+
+    void retinaGridSettles()
+    {
+        QFETCH(int, count);
+        QFETCH(bool, custom);
+        std::atomic<int> calls{0};
+        MacFileIcons icons(nullptr, [&](const MacIconRequest& request) {
+            ++calls;
+            QImage image(request.pixels, request.pixels, QImage::Format_ARGB32);
+            image.fill(Qt::green);
+            return image;
+        });
+        icons.setVisibleItems(count, 192);
+        auto paint = [&] {
+            // Bound the failing case so a regression cannot spin forever.
+            if (calls.load() > count * 4)
+                return;
+            for (int i = 0; i < count; ++i) {
+                FileEntry folder;
+                folder.name = QString("Folder %1").arg(i);
+                folder.isDir = true;
+                folder.hasCustomIcon = custom;
+                icons.get(folder, "/fixture/" + folder.name, 192);
+            }
+        };
+        connect(&icons, &MacFileIcons::ready, &icons, paint);
+        paint();
+        const int expected = custom ? count : 1;
+        QTRY_VERIFY(calls.load() >= expected);
+        QTest::qWait(200);  // ready() repaints must settle with the entire working set cached
+        QCOMPARE(calls.load(), expected);
+        for (int i = 0; i < 10; ++i)
+            paint();
+        QTest::qWait(50);
+        QCOMPARE(calls.load(), expected);
+    }
+
+    void bulkListingMatchesStat()
+    {
+        QTemporaryDir temporary;
+        const QString filePath = temporary.filePath("file.txt");
+        {
+            QFile file(filePath);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write("fixture data");
+        }
+        QVERIFY(chmod(QFile::encodeName(filePath).constData(), 0751) == 0);
+        QVERIFY(QDir(temporary.path()).mkdir("Folder"));
+        QVERIFY(QFile::link(filePath, temporary.filePath("file link")));
+        QVERIFY(QFile::link(temporary.filePath("Folder"), temporary.filePath("folder link")));
+        QVERIFY(QFile::link(temporary.filePath("missing"), temporary.filePath("broken link")));
+        QVERIFY(mkfifo(QFile::encodeName(temporary.filePath("pipe")).constData(), 0600) == 0);
+        QFile hidden(temporary.filePath(".hidden"));
+        QVERIFY(hidden.open(QIODevice::WriteOnly));
+        hidden.close();
+        ListResult listing, visible, cancelled;
+        std::vector<EntryUpdate> stats;
+        bool done = false;
+        ioPool()->start([&] {
+            ListOptions options;
+            options.showHidden = true;
+            auto all = listDirectory(temporary.path(), options);
+            QStringList names;
+            for (const auto& e : all.entries)
+                names.append(e.name);
+            auto updates = statNames(temporary.path(), names, true);
+            auto shown = listDirectory(temporary.path(), {});
+            std::atomic<bool> stop{true};
+            auto stopped = listDirectory(temporary.path(), {}, &stop);
+            postToUi([&, all = std::move(all), updates = std::move(updates), shown = std::move(shown), stopped]() mutable {
+                listing = std::move(all);
+                stats = std::move(updates);
+                visible = std::move(shown);
+                cancelled = stopped;
+                done = true;
+            });
+        });
+        QTRY_VERIFY(done);
+        QCOMPARE(listing.error, 0);
+        QCOMPARE(listing.entries.size(), size_t(7));
+        QCOMPARE(visible.entries.size(), size_t(6));
+        QCOMPARE(cancelled.error, ECANCELED);
+        QVERIFY(cancelled.entries.empty());
+        for (const FileEntry& e : listing.entries) {
+            auto found = std::find_if(stats.begin(), stats.end(), [&](const EntryUpdate& u) { return u.first == e.name; });
+            QVERIFY(found != stats.end() && found->second);
+            const auto& st = *found->second;
+            QCOMPARE(e.mode, st.mode);
+            QCOMPARE(e.uid, st.uid);
+            QCOMPARE(e.gid, st.gid);
+            QCOMPARE(e.size, st.size);
+            QCOMPARE(e.mtime, st.mtime);
+            QCOMPARE(e.iconRevision, st.iconRevision);
+            QCOMPARE(e.isDir, st.isDir);
+            QCOMPARE(e.isLink, st.isLink);
+            QCOMPARE(e.brokenLink, st.brokenLink);
+        }
+    }
+
+    void bulkMetadataAcrossBatches()
+    {
+        QTemporaryDir temporary;
+        for (int i = 0; i < 1000; ++i) {
+            QFile file(temporary.filePath(QString(100, QLatin1Char('x')) + QString::number(i)));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+        }
+        const QString customName = QString::fromUtf8("Custom Grüße.txt");
+        QFile custom(temporary.filePath(customName));
+        QVERIFY(custom.open(QIODevice::WriteOnly));
+        custom.close();
+        QImage image(64, 64, QImage::Format_ARGB32);
+        image.fill(Qt::red);
+        QVERIFY(setFixtureIcon(custom.fileName(), image));
+        std::optional<std::vector<FileEntry>> flags;
+        bool done = false, invalidRejected = false;
+        ioPool()->start([&] {
+            const int fd = open(QFile::encodeName(temporary.path()).constData(), O_RDONLY | O_DIRECTORY);
+            auto result = macListEntries(fd, true);
+            if (fd >= 0)
+                close(fd);
+            const bool invalid = !macListEntries(-1, true).has_value();
+            postToUi([&, result = std::move(result), invalid] {
+                flags = result;
+                invalidRejected = invalid;
+                done = true;
+            });
+        });
+        QTRY_VERIFY(done);
+        QVERIFY(flags.has_value());
+        QSet<QString> customNames;
+        for (const FileEntry& e : *flags)
+            if (e.hasCustomIcon)
+                customNames.insert(e.name);
+        QCOMPARE(customNames, QSet<QString>({customName}));
+        QCOMPARE(flags->size(), size_t(1001));
+        QVERIFY(invalidRejected);
+    }
+
     void finderMetadataFromListing()
     {
         QTemporaryDir temporary;
@@ -301,9 +458,12 @@ private slots:
             QVERIFY(file.open(QIODevice::WriteOnly));
             file.write("fixture");
         }
+        for (const QString& name : {"Plain folder", "Custom folder", "Example.app", "Example.framework", "Example.rtfd", "Folder.txt"})
+            QVERIFY(QDir(temporary.path()).mkdir(name));
         QImage image(64, 64, QImage::Format_ARGB32);
         image.fill(Qt::red);
         QVERIFY(setFixtureIcon(custom, image));
+        QVERIFY(setFixtureIcon(temporary.filePath("Custom folder"), image));
         ListResult listing;
         bool done = false;
         ioPool()->start([&] {
@@ -318,6 +478,14 @@ private slots:
                 QVERIFY(!e.hasCustomIcon);
             if (e.name == "custom.txt")
                 customEntry = &e;
+            if (e.name == "Plain folder" || e.name == "Folder.txt") {
+                QVERIFY(!e.hasCustomIcon);
+                QVERIFY(!e.isPackage);
+            }
+            if (e.name == "Custom folder")
+                QVERIFY(e.hasCustomIcon);
+            if (e.name == "Example.app" || e.name == "Example.framework" || e.name == "Example.rtfd")
+                QVERIFY(e.isPackage);
         }
         QVERIFY(customEntry && customEntry->hasCustomIcon);
         const int64_t revision = customEntry->iconRevision;
@@ -360,6 +528,7 @@ private slots:
         });
         FileEntry folder;
         folder.isDir = true;
+        folder.hasCustomIcon = true;
         QSignalSpy ready(&icons, &MacFileIcons::ready);
         icons.get(folder);
         QTRY_VERIFY_WITH_TIMEOUT(!ready.isEmpty(), 1000);
@@ -376,6 +545,7 @@ private slots:
         MacFileIcons icons(nullptr, [&](const MacIconRequest&) { ++calls; return QImage(); });
         FileEntry folder;
         folder.isDir = true;
+        folder.hasCustomIcon = true;
         icons.get(folder, "/fixture/folder");
         QCOMPARE(calls.load(), 0);
     }

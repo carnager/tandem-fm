@@ -54,7 +54,11 @@ target_include_directories(tandem_core PUBLIC src)
 # Platform parts: inotify and /proc/self/mounts on Linux, kqueue and getfsstat on macOS.
 if(APPLE)
   target_sources(tandem_core PRIVATE src/core/DirWatcher_mac.cpp src/core/Mounts_mac.cpp
-    src/core/MacFileIconInfo.h src/core/MacFileIconInfo.cpp)
+    src/core/MacFileIconInfo.h src/core/MacFileIconInfo.mm)
+  find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+  target_link_libraries(tandem_core PRIVATE ${FOUNDATION_FRAMEWORK})
+  set_property(TARGET tandem_core PROPERTY OBJCXX_STANDARD 20)
+  set_source_files_properties(src/core/MacFileIconInfo.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 else()
   target_sources(tandem_core PRIVATE src/core/DirWatcher.cpp src/core/Mounts.cpp)
 endif()

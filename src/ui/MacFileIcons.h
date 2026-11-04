@@ -31,6 +31,7 @@ public:
     using Loader = std::function<QImage(const MacIconRequest&)>;
     explicit MacFileIcons(QObject* parent = nullptr, Loader loader = readMacFileIcon);
     QIcon get(const FileEntry& entry, const QString& localPath = {}, int pixels = 64);
+    void setVisibleItems(int count, int pixels);
     void reset(bool keepIcons = false);
     void invalidate(const QString& path);
 
@@ -50,7 +51,7 @@ private:
     void notify();
 
     Loader m_loader;
-    QCache<QString, Cached> m_icons{4 * 1024 * 1024};  // pixel bytes plus entry overhead
+    QCache<QString, Cached> m_icons{16 * 1024 * 1024};  // pixel bytes plus entry overhead
     QSet<QString> m_pending;
     QHash<QString, quint64> m_revisions;
     std::deque<Pending> m_queue;

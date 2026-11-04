@@ -44,6 +44,16 @@ QIcon FileModel::fileIcon(int row, int pixels) const
 #endif
 }
 
+void FileModel::prepareIcons(int visibleItems, int pixels) const
+{
+#ifdef Q_OS_MACOS
+    m_macIcons->setVisibleItems(visibleItems, pixels);
+#else
+    Q_UNUSED(visibleItems);
+    Q_UNUSED(pixels);
+#endif
+}
+
 int FileModel::rowCount(const QModelIndex& parent) const
 {
     return parent.isValid() ? 0 : int(m_entries.size());

@@ -197,6 +197,8 @@ void ThumbGrid::paintEvent(QPaintEvent*)
     const bool local = !isRemoteLocation(m->path()) && QFileInfo(m->path()).isDir();
     const QFontMetrics fm = fontMetrics();
     m_onScreen.clear();
+    const int visibleItems = qMax(0, qMin(m->count(), (lastRow + 1) * cols) - firstRow * cols);
+    m->prepareIcons(visibleItems, qRound(qMin(96, m_thumb * 2 / 3) * devicePixelRatioF()));
 
     for (int row = firstRow * cols; row < qMin(m->count(), (lastRow + 1) * cols); ++row) {
         const FileEntry* e = m->entry(row);

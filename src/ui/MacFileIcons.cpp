@@ -25,7 +25,7 @@ QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath, int pi
     if (entry.isParent || !IconCache::usesSystemTheme())
         return IconCache::forEntry(entry);
 
-    const QString path = entry.isDir || entry.hasCustomIcon ? localPath : QString();
+    const QString path = entry.isPackage || entry.hasCustomIcon ? localPath : QString();
     MacIconRequest request{entry.name, path, entry.isDir,
                            bool(entry.mode & (S_IXUSR | S_IXGRP | S_IXOTH)), qBound(16, pixels, 192)};
     QString key;
@@ -51,6 +51,15 @@ QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath, int pi
         pump();
     }
     return IconCache::forEntry(entry);
+}
+
+void MacFileIcons::setVisibleItems(int count, int pixels)
+{
+    const qint64 side = qBound(16, pixels, 192);
+    // Include room for keys and for list icons of these same entries. The working
+    // set must fit, or a ready() repaint could endlessly evict and reload icons.
+    const qint64 cost = qMax(0, count) * (side * side * 4 + 64 * 64 * 4 + 16384);
+    m_icons.setMaxCost(qMax(qint64(16 * 1024 * 1024), cost));
 }
 
 void MacFileIcons::reset(bool keepIcons)

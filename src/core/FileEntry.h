@@ -23,6 +23,7 @@ struct FileEntry {
     bool isParent = false;  // the ".." entry
     bool marked = false;
 #ifdef Q_OS_MACOS
+    bool isPackage = false;    // native directory type, resolved on a worker
     bool hasCustomIcon = false;  // FinderInfo, read by the listing worker
     int64_t iconRevision = 0;    // nanosecond ctime also catches xattr-only changes
 #endif
