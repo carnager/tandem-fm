@@ -250,7 +250,7 @@ Theme builtinDark()
     t.text = QColor(0xe4, 0xe6, 0xea);
     t.dimText = QColor(0x8a, 0x90, 0x9a);
     t.accent = QColor(0x6c, 0x9c, 0xff);
-    t.accentText = QColor(0xff, 0xff, 0xff);
+    t.accentText = QColor(0x1a, 0x1c, 0x20);  // white on this blue is hard to read (2.7:1)
     t.mark = QColor(0xff, 0xb4, 0x54);
     t.markBg = QColor(255, 180, 84, 26);
     t.cursorActive = QColor(108, 156, 255, 72);

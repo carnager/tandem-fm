@@ -278,6 +278,28 @@ private slots:
         m_left->setArrowFolders(true);
     }
 
+    // Text on the accent (primary buttons, selections) stays readable in
+    // Tandem's own themes: at least 4.5:1, as WCAG asks for normal text.
+    void ownThemesContrast()
+    {
+        auto luminance = [](const QColor& c) {
+            auto ch = [](double v) { return v <= 0.04045 ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4); };
+            return 0.2126 * ch(c.redF()) + 0.7152 * ch(c.greenF()) + 0.0722 * ch(c.blueF());
+        };
+        auto restore = qScopeGuard([] {
+            QSettings().remove("view/theme");
+            applyTheme(*qApp);
+        });
+        for (const char* id : {"tandem-dark", "tandem-light"}) {
+            QSettings().setValue("view/theme", id);
+            applyTheme(*qApp);
+            QCOMPARE(theme().id, QString(id));
+            const double a = luminance(theme().accent), b = luminance(theme().accentText);
+            const double ratio = (std::max(a, b) + 0.05) / (std::min(a, b) + 0.05);
+            QVERIFY2(ratio >= 4.5, qPrintable(QString("%1: %2:1").arg(id).arg(ratio, 0, 'f', 2)));
+        }
+    }
+
     void themes()
     {
         // Every shipped theme loads, and the list knows light from dark.
