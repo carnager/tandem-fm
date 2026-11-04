@@ -379,6 +379,14 @@ void FileView::setActive(bool active)
     viewport()->update();
 }
 
+void FileView::setTypingFor(bool on)
+{
+    if (m_typingFor == on)
+        return;
+    m_typingFor = on;
+    viewport()->update();
+}
+
 void FileView::setCurrentRow(int row, bool center)
 {
     if (!model() || model()->rowCount() == 0)
@@ -749,7 +757,7 @@ void FileView::drawRow(QPainter* p, const QStyleOptionViewItem& opt, const QMode
     }
     if (idx.row() == currentIndex().row()) {
         // The panel's edge already says where the keys go: the row is only tinted.
-        if (m_active && hasFocus()) {
+        if (m_active && (hasFocus() || m_typingFor)) {
             p->setPen(Qt::NoPen);
             p->setBrush(withAlpha(t.accent, t.dark ? 0.22 : 0.16));
         } else if (m_active) {

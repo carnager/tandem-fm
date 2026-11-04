@@ -31,6 +31,8 @@ public:
 
     FileModel* fileModel() const;
     void setActive(bool active);
+    // The filter or quick search drives this list: its cursor shows as focused.
+    void setTypingFor(bool on);
     bool isActive() const { return m_active; }
     int currentRow() const { return currentIndex().row(); }
     void setVimKeys(bool on) { m_vim = on; if (!on) setVisual(0); }
@@ -126,6 +128,7 @@ private:
     bool m_maybeDrag = false;
     bool m_vim = false;
     int m_visual = 0;
+    bool m_typingFor = false;
     QString m_visualAnchor;  // where visual mode began, by name
     QString m_visualPath;
     QSet<QString> m_visualBase;  // marks before visual mode began

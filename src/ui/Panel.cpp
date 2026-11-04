@@ -1768,6 +1768,8 @@ void Panel::disconnectMount(const QString& mountPath)
 
 bool Panel::eventFilter(QObject* obj, QEvent* e)
 {
+    if ((obj == m_filterEdit || obj == m_search) && (e->type() == QEvent::FocusIn || e->type() == QEvent::FocusOut))
+        m_view->setTypingFor(e->type() == QEvent::FocusIn);
     if (e->type() == QEvent::KeyPress && static_cast<QKeyEvent*>(e)->key() == Qt::Key_Escape &&
         qobject_cast<QLineEdit*>(obj) && obj->parent() == m_pathBar) {
         m_view->setFocus();
