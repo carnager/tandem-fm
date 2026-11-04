@@ -1,126 +1,202 @@
 # Tandem
 
-A two-panel file manager for Linux, built for the keyboard. Total Commander
-keys, modern tools, Qt 6.
+**A two-panel file manager for Linux, built for the keyboard.**
 
-Linux is the main platform. A macOS build is experimental, see
-[packaging/macos](packaging/macos/README.md).
+Keep your source in one panel and your destination in the other. Browse with
+tabs, preview files in place, and copy, move or rename them with familiar
+Total Commander keys. Tandem is built with Qt 6 Widgets and C++20, with
+background file operations and built-in SFTP and SMB.
 
-## Features
+[Install](#install) · [Keyboard basics](#keyboard-basics) ·
+[Build from source](#build-from-source) · [Contribute](CONTRIBUTING.md)
 
-- Tabs, quick search, filter as you type, bookmarks on letter keys, fuzzy jump to any visited folder
-- Copy, move and delete in the background, queued per drive, with undo (Ctrl+Z)
-- Built-in SFTP and SMB, other protocols through GVfs; logins can go in the desktop keyring
-- Archives open like folders; zip, 7z and tar can be written to
-- Viewer and side preview: text, hex, images, PDF, video, audio, fonts, Markdown
-- Rename many files with a template and a live preview, or in your text editor
-- Compare and synchronize folders, also between servers
-- Permissions editor with ACLs and filesystem flags, locally and over SFTP
-- Find duplicates, disk usage, checksums, links, trash, thumbnails
-- Command palette (Ctrl+Shift+P), every key changeable, optional modal keys like vim and yazi, Git status
-- Themes: Nord, Dracula, Gruvbox, Catppuccin, Solarized, Tokyo Night and more, or your own; can follow the desktop's light and dark mode; optional colours by file type
-- Plugins: any program becomes a command on the selection, with menus to pick from ([docs/plugins.md](docs/plugins.md))
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/overview-light.png">
+  <img src="docs/screenshots/overview-dark.png" alt="Tandem showing an example project and release folder side by side, with tabs and Markdown previews." width="1440">
+</picture>
 
-F1 lists all keys.
+*Two file panels, with previews below them. All screenshots use example files
+and folders.*
+
+## What you can do
+
+- **Get around quickly.** Tabs in each panel, clickable paths, quick search,
+  filtering as you type, bookmarks on letter keys, and fuzzy search through
+  your visited folders. A command palette puts the rest within reach.
+- **Keep working during transfers.** Copy, move and delete in the background,
+  with progress, pause, cancel and queues per drive. Undo supported local
+  operations with Ctrl+Z.
+- **Work with servers and archives.** Connect over SFTP or SMB, with other
+  protocols available through GVfs. Browse archives like folders, extract
+  files, and update ZIP, 7z and tar archives. Store server passwords in the
+  desktop keyring when available.
+- **Look before you open.** An integrated viewer and content previews handle
+  text, hex, images, PDF, Markdown, fonts, video and audio. Browse pictures
+  with a thumbnail grid and see Git status alongside your files.
+- **Handle the bigger jobs.** Rename batches with a live preview, compare and
+  synchronize folders, find duplicates, inspect disk usage, calculate and
+  verify checksums, and edit permissions, ACLs and filesystem flags.
+- **Make it yours.** Rebind command keys, enable optional vim/yazi-style
+  modal keys, choose light and dark themes, or add your own theme. External
+  programs become file actions through [plugins](docs/plugins.md).
+
+Linux is the main platform. An experimental macOS build is available; see
+[the macOS notes](packaging/macos/README.md) for setup and platform differences.
+The interface is available in English and German.
 
 ## Install
 
-Arch Linux, from the `mooned` repository. Add to `/etc/pacman.conf`:
+### Arch Linux
 
-```
+Prebuilt packages for **x86_64** are available from the
+[mooned repository](https://repo.mooned.de/). Follow its signing-key setup,
+then add this to `/etc/pacman.conf`:
+
+```ini
 [mooned]
 Server = https://repo.mooned.de/$arch
 ```
 
-then `pacman -Sy tandem-fm-git`. The setup page at <https://repo.mooned.de>
-has the signing key. Or build the package yourself:
-`cd packaging/arch && makepkg -si`.
-
-## Build
+Update your system and install Tandem:
 
 ```sh
-cmake -S . -B build -G Ninja
+sudo pacman -Syu tandem-fm-git
+```
+
+The `-git` package follows the project's main branch. To build the Arch
+package yourself, clone this repository and run:
+
+```sh
+cd packaging/arch
+makepkg -si
+```
+
+### Other Linux distributions
+
+[Build from source](#build-from-source), then run `./build/tandem-fm` or
+install it with CMake.
+
+You can choose the starting folders on the command line:
+
+```sh
+tandem-fm ~/Projects ~/Downloads
+```
+
+## Keyboard basics
+
+| Key | Action |
+| --- | --- |
+| Tab | Switch panels |
+| Enter / Backspace | Open the current item / go to the parent folder |
+| Insert / Space | Mark or unmark an item |
+| F3 / F4 | View / edit |
+| F5 / F6 | Copy / move to the other panel |
+| F7 / F8 | New folder / move to trash |
+| Shift+F6 | Rename |
+| Ctrl+M | Rename multiple files |
+| Ctrl+Q | Show or hide previews |
+| Ctrl+F | Filter the current folder |
+| Alt+F7 | Search a local folder tree by name or file contents |
+| Ctrl+J | Jump to a visited folder |
+| Ctrl+Shift+P | Open the command palette |
+
+**F1** opens the searchable shortcut reference. Change command keys in
+**Settings → Keys**; **Ctrl+,** opens Settings. Modal keys are optional and
+can also be customized in `keys.toml`.
+
+## Rename with a preview
+
+Build names from counters, dates, EXIF dates and parts of the old name.
+Find and replace, regular expressions and case changes work together,
+and the preview highlights what will change before you apply it.
+
+![Batch rename preview turning numbered camera filenames into autumn-walk_001.jpg and similar names.](docs/screenshots/batch-rename.png)
+
+Prefer your editor? Send the names to a text editor, change them there,
+then review the resulting plan in Tandem.
+
+## Compare and synchronize
+
+Compare two folder trees and review the actions before copying anything.
+Copy changes in both directions or mirror one side onto the other. Change
+individual actions, leave files alone, or open a file comparison from the
+list. Synchronization works with local folders and supported servers.
+
+![Folder comparison showing which example files will be copied left or right, and why.](docs/screenshots/folder-sync.png)
+
+## Themes, settings and plugins
+
+Tandem includes its own light and dark themes alongside Nord, Dracula,
+Gruvbox, Catppuccin, Solarized, Tokyo Night and others. It can follow your
+desktop's light/dark preference. Custom themes are JSON files; optional
+file-type colours come from the theme too.
+
+Settings and key bindings live in readable TOML files. The settings dialog
+preserves your comments when changing values, and saved key bindings reload
+without restarting. Use `--config-dir` to keep settings, keys, open tabs,
+bookmarks and folder history together in a folder of your choice:
+
+```sh
+tandem-fm --config-dir ~/Sync/tandem
+```
+
+- [Themes](docs/themes.md): choose a theme, make your own, or colour files by type.
+- [Settings and keys](docs/configuration.md): file locations, TOML examples and portable configuration.
+- [Plugins](docs/plugins.md): turn scripts and installed tools into commands on your selection.
+
+## Build from source
+
+You need a C++20 compiler, CMake 3.24 or newer, Ninja, **Qt 6.5 or newer**
+(Core, Gui, Widgets, Pdf and Test), **libarchive 3.3 or newer**, and **toml++**.
+
+```sh
+git clone https://github.com/carnager/tandem-fm.git
+cd tandem-fm
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/tandem-fm [left] [right]
+./build/tandem-fm
 ```
 
-Needs Qt 6.5 or newer (with QtPdf), libarchive and toml++ (to build). Used when found: libssh 0.11 or newer (SFTP),
-smbclient (SMB), GIO (GVfs), libsecret (keyring), libacl (ACLs),
-KSyntaxHighlighting (syntax colours), qt6-tools (translations).
-At run time it uses `ffmpeg` for video and audio, `fd` and `rg` for search
-if installed.
+Optional integrations are enabled when their development libraries are
+found at build time:
 
-Tests: `ctest --test-dir build`.
+| Dependency | Enables |
+| --- | --- |
+| libssh ≥ 0.11 | Native SFTP |
+| libsmbclient | Native SMB |
+| GIO, with GVfs at runtime | Other network locations and devices |
+| libsecret | Server passwords in the desktop keyring |
+| libacl | POSIX ACL editing on Linux |
+| KSyntaxHighlighting for Qt 6 | Syntax highlighting in the viewer |
+| Qt Linguist tools | Compiled translations and translation updates |
 
-## Themes
+At runtime, `fd` speeds up filename search, `rg` handles content search,
+and `ffmpeg` provides video/audio previews and video thumbnails. Name search
+has a built-in fallback; content search can use `grep` when `rg` is missing.
+Install a diff tool such as `meld` for graphical file comparisons, or use
+the built-in display of `diff -u` output.
 
-Settings → Appearance picks a theme, or one for light and one for dark mode
-that follow the desktop. Own themes are JSON files in
-`~/.local/share/tandem-fm/themes/`; Tandem applies them as soon as they are
-saved. Only the colours you want to change are needed:
+To install the build:
 
-```json
-{
-  "name": "My theme",
-  "dark": true,
-  "colors": { "window": "#1e1e2e", "base": "#24273a", "text": "#cad3f5", "accent": "#f5a97f" }
-}
+```sh
+sudo cmake --install build
 ```
 
-"Copy to edit" in Settings writes the current theme with every colour as a
-starting point. A file named like a shipped theme (`nord.json`) replaces it.
+To run the tests:
 
-With *Color file names by type* switched on (Settings → Appearance), the
-`files` section colours names: kinds (`executable`, `image`, `video`,
-`audio`, `archive`, `document`, `folder`), name patterns and MIME types,
-which come first:
-
-```json
-"files": { "image": "#c4a7e7", "archive": "#eb6f92", "*.rs": "#f5a97f", "text/x-python": "#8aadf4" }
+```sh
+ctest --test-dir build --output-on-failure
 ```
-
-A theme without a `files` section gets colours made from its own.
-
-## Settings and keys
-
-Plain TOML files, made to be read and edited:
-
-- `~/.config/tandem-fm/tandem-fm.toml`: the settings. The settings dialog
-  changes single lines and keeps the rest, comments included.
-- `~/.config/tandem-fm/keys.toml`: the keys of every command, listed with
-  their defaults (commented out), and the modal, yazi-like keys. Saving the
-  file applies it right away; a mistake shows a message with the line.
-
-```toml
-[keys]
-copy = "F5"
-move-to-trash = ["F8", "Del"]
-delete-permanently = []          # no key
-
-[modal]
-top = "g g"                      # a sequence
-sort-by-size = ", s"
-down = ["j", "Down"]
-```
-
-Window size, columns and open tabs are Tandem's own business and live in
-`~/.local/state/tandem-fm/state.toml`. Settings from older versions
-(`tandem-fm.conf`) move over on the first start; the old file stays as
-`tandem-fm.conf.bak`.
-
-## Settings in another folder
-
-`tandem-fm --config-dir ~/Dropbox/tandem` (or `TANDEM_CONFIG_DIR=…`) keeps the
-settings, keys, state, bookmarks and folder history there instead of the usual
-places, on every platform: a synced folder shares them between computers.
-Changes from another computer apply at the next start (keys right away).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow (fork, branch, pull
-request) and [AGENTS.md](AGENTS.md) for the rules the code follows. Both
-apply to coding agents too.
+Bug reports, translations and focused improvements are welcome. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and
+[AGENTS.md](AGENTS.md) for the code and UI guidelines. For a bug report,
+include the steps to reproduce it, your platform, and whether it involves
+local files, a server or an archive.
 
 ## License
 
-GPL-3.0-or-later
+[GPL-3.0-or-later](LICENSE).
