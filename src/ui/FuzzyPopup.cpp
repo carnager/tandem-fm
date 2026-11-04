@@ -324,10 +324,7 @@ void FuzzyPopup::place()
     opt.initFrom(m_list);
     for (int r = 0; r < qMin(kVisibleRows, m_model->rowCount()); ++r)
         listHeight += m_list->itemDelegate()->sizeHint(opt, m_model->index(r)).height();
-    if (m_anchor) {  // a drop-down: may show more rows, as tall as the window allows
-        listHeight = 0;
-        for (int r = 0; r < m_model->rowCount(); ++r)
-            listHeight += m_list->itemDelegate()->sizeHint(opt, m_model->index(r)).height();
+    if (m_anchor) {  // a drop-down under the field: a handful of rows, the rest scroll
         const QPoint at = m_anchor->mapTo(w, QPoint(0, m_anchor->height() + 4));
         const int maxList = w->height() - at.y() - 110;
         m_list->setFixedHeight(qBound(40, listHeight + 4, qMax(120, maxList)));
