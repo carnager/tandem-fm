@@ -10,6 +10,7 @@
 
 #include <QAbstractTableModel>
 #include <QRegularExpression>
+#include <QIcon>
 #include <QSet>
 
 #include <vector>
@@ -63,6 +64,7 @@ public:
     const FileEntry* entry(int row) const;
     int rowOf(const QString& name) const;
     QString filePath(int row) const;
+    QIcon fileIcon(int row, int pixels = 64) const;
     int count() const { return int(m_entries.size()); }
 
     SortSpec sortSpec() const { return m_sort; }

@@ -41,11 +41,11 @@ QImage readMacFileIcon(const MacIconRequest& request)
         if (!icon)
             return {};
         icon = [icon copy];  // rasterization must not mutate a shared workspace image
-        NSRect rect = NSMakeRect(0, 0, 256, 256);
+        NSRect rect = NSMakeRect(0, 0, request.pixels, request.pixels);
         CGImageRef image = [icon CGImageForProposedRect:&rect context:nil hints:nil];
         if (!image)
             return {};
-        QImage result(256, 256, QImage::Format_RGBA8888_Premultiplied);
+        QImage result(request.pixels, request.pixels, QImage::Format_RGBA8888_Premultiplied);
         result.fill(Qt::transparent);
         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
         CGContextRef context = CGBitmapContextCreate(result.bits(), result.width(), result.height(), 8,

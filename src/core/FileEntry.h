@@ -22,6 +22,10 @@ struct FileEntry {
     bool brokenLink = false;
     bool isParent = false;  // the ".." entry
     bool marked = false;
+#ifdef Q_OS_MACOS
+    bool hasCustomIcon = false;  // FinderInfo, read by the listing worker
+    int64_t iconRevision = 0;    // nanosecond ctime also catches xattr-only changes
+#endif
 };
 
 }  // namespace tandem

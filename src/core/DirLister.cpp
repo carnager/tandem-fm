@@ -4,6 +4,9 @@
 
 #include "core/DirWatcher.h"
 #include "core/Util.h"
+#ifdef Q_OS_MACOS
+#include "core/MacFileIconInfo.h"
+#endif
 
 #include <QElapsedTimer>
 
@@ -26,6 +29,7 @@ bool fillEntry(int dirfd, const char* name, FileEntry& e)
     e.mode = st.st_mode;
     e.size = st.st_size;
     e.mtime = st.st_mtime;
+    e.iconRevision = int64_t(st.st_ctimespec.tv_sec) * 1000000000 + st.st_ctimespec.tv_nsec;
     e.uid = st.st_uid;
     e.gid = st.st_gid;
     e.isLink = S_ISLNK(st.st_mode);
@@ -111,6 +115,9 @@ ListResult listDirectory(const QString& path, const ListOptions& opt, const std:
         return r;
     }
     const int dfd = dirfd(d);
+#ifdef Q_OS_MACOS
+    const bool localIcons = macLocalIconMetadata(dfd);
+#endif
     r.entries.reserve(128);
 
     // Watch before reading: anything that changes while we read is reported
@@ -137,6 +144,10 @@ ListResult listDirectory(const QString& path, const ListOptions& opt, const std:
             e.isDir = de->d_type == DT_DIR;
             e.size = e.isDir ? -1 : 0;
         }
+#ifdef Q_OS_MACOS
+        if (localIcons && !e.isDir)
+            e.hasCustomIcon = macHasCustomIcon(dfd, n);
+#endif
         e.key = makeSortKey(e.name);
         r.entries.push_back(std::move(e));
     }
@@ -178,6 +189,9 @@ std::vector<EntryUpdate> statNames(const QString& dir, const QStringList& names,
     }
     const QByteArray np = toNative(dir);
     const int dfd = ::open(np.constData(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+#ifdef Q_OS_MACOS
+    const bool localIcons = dfd >= 0 && macLocalIconMetadata(dfd);
+#endif
     for (const QString& name : names) {
         if (!showHidden && name.startsWith(QLatin1Char('.')))
             continue;
@@ -185,6 +199,10 @@ std::vector<EntryUpdate> statNames(const QString& dir, const QStringList& names,
         e.name = name;
         const QByteArray nn = toNative(name);
         if (dfd >= 0 && fillEntry(dfd, nn.constData(), e)) {
+#ifdef Q_OS_MACOS
+            if (localIcons && !e.isDir)
+                e.hasCustomIcon = macHasCustomIcon(dfd, nn.constData());
+#endif
             e.key = makeSortKey(e.name);
             out.emplace_back(name, std::move(e));
         } else {

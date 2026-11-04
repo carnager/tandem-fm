@@ -31,6 +31,19 @@ FileModel::FileModel(QObject* parent) : QAbstractTableModel(parent)
 #endif
 }
 
+QIcon FileModel::fileIcon(int row, int pixels) const
+{
+    const FileEntry* e = entry(row);
+    if (!e)
+        return {};
+#ifdef Q_OS_MACOS
+    return m_macIcons->get(*e, m_localIconPaths ? filePath(row) : QString(), pixels);
+#else
+    Q_UNUSED(pixels);
+    return IconCache::forEntry(*e);
+#endif
+}
+
 int FileModel::rowCount(const QModelIndex& parent) const
 {
     return parent.isValid() ? 0 : int(m_entries.size());
@@ -119,11 +132,7 @@ QVariant FileModel::data(const QModelIndex& index, int role) const
         break;
     case Qt::DecorationRole:
         if (index.column() == ColName) {
-#ifdef Q_OS_MACOS
-            return m_macIcons->get(*e, m_localIconPaths ? filePath(index.row()) : QString());
-#else
-            return IconCache::forEntry(*e);
-#endif
+            return fileIcon(index.row());
         }
         break;
     case Qt::TextAlignmentRole:

@@ -18,6 +18,7 @@ struct MacIconRequest {
     QString name, path;  // path is empty on servers and inside archives
     bool folder = false;
     bool executable = false;
+    int pixels = 64;
 };
 
 // Blocking AppKit work. Only call from a worker; returns pixels, never a QPixmap.
@@ -29,7 +30,7 @@ class MacFileIcons : public QObject {
 public:
     using Loader = std::function<QImage(const MacIconRequest&)>;
     explicit MacFileIcons(QObject* parent = nullptr, Loader loader = readMacFileIcon);
-    QIcon get(const FileEntry& entry, const QString& localPath = {});
+    QIcon get(const FileEntry& entry, const QString& localPath = {}, int pixels = 64);
     void reset(bool keepIcons = false);
     void invalidate(const QString& path);
 
@@ -44,13 +45,12 @@ private:
     };
     struct Cached {
         QIcon icon;
-        quint64 generation;
     };
     void pump();
     void notify();
 
     Loader m_loader;
-    QCache<QString, Cached> m_icons{256};
+    QCache<QString, Cached> m_icons{4 * 1024 * 1024};  // pixel bytes plus entry overhead
     QSet<QString> m_pending;
     QHash<QString, quint64> m_revisions;
     std::deque<Pending> m_queue;

@@ -53,7 +53,8 @@ add_library(tandem_core STATIC
 target_include_directories(tandem_core PUBLIC src)
 # Platform parts: inotify and /proc/self/mounts on Linux, kqueue and getfsstat on macOS.
 if(APPLE)
-  target_sources(tandem_core PRIVATE src/core/DirWatcher_mac.cpp src/core/Mounts_mac.cpp)
+  target_sources(tandem_core PRIVATE src/core/DirWatcher_mac.cpp src/core/Mounts_mac.cpp
+    src/core/MacFileIconInfo.h src/core/MacFileIconInfo.cpp)
 else()
   target_sources(tandem_core PRIVATE src/core/DirWatcher.cpp src/core/Mounts.cpp)
 endif()

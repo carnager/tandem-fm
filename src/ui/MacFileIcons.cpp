@@ -20,18 +20,19 @@ MacFileIcons::MacFileIcons(QObject* parent, Loader loader) : QObject(parent), m_
     });
 }
 
-QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
+QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath, int pixels)
 {
     if (entry.isParent || !IconCache::usesSystemTheme())
         return IconCache::forEntry(entry);
 
-    MacIconRequest request{entry.name, localPath, entry.isDir,
-                           bool(entry.mode & (S_IXUSR | S_IXGRP | S_IXOTH))};
+    const QString path = entry.isDir || entry.hasCustomIcon ? localPath : QString();
+    MacIconRequest request{entry.name, path, entry.isDir,
+                           bool(entry.mode & (S_IXUSR | S_IXGRP | S_IXOTH)), qBound(16, pixels, 192)};
     QString key;
-    if (!localPath.isEmpty()) {
+    if (!path.isEmpty()) {
         key = QStringLiteral("path:") + localPath + QChar(0) + QString::number(m_revisions.value(localPath)) +
               QChar(0) + QString::number(entry.mtime) + QChar(0) + QString::number(entry.mode) +
-              QChar(0) + QString::number(entry.size);
+              QChar(0) + QString::number(entry.size) + QChar(0) + QString::number(entry.iconRevision);
     } else if (entry.isDir) {
         key = QStringLiteral("type:folder");
     } else if (request.executable && extensionOf(entry.name).isEmpty()) {
@@ -40,25 +41,25 @@ QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
         const QString ext = extensionOf(entry.name).toString().toLower();
         key = QStringLiteral("type:") + (ext.isEmpty() ? QLatin1Char('/') + entry.name : ext);
     }
+    key += QChar(0) + QString::number(request.pixels);
     const Cached* cached = m_icons.object(key);
-    if (cached && cached->generation == m_generation)
+    if (cached)
         return cached->icon.isNull() ? IconCache::forEntry(entry) : cached->icon;
     if (!m_pending.contains(key) && m_pending.size() < 256) {
         m_pending.insert(key);
         m_queue.push_back({key, request, m_generation});
         pump();
     }
-    // Keep the previous picture during a re-list, until its replacement is ready.
-    return cached && !cached->icon.isNull() ? cached->icon : IconCache::forEntry(entry);
+    return IconCache::forEntry(entry);
 }
 
 void MacFileIcons::reset(bool keepIcons)
 {
+    if (keepIcons)
+        return;  // unchanged keys and in-flight requests survive a re-list
     ++m_generation;
-    if (!keepIcons) {
-        m_icons.clear();
-        m_revisions.clear();
-    }
+    m_icons.clear();
+    m_revisions.clear();
     m_pending.clear();
     m_queue.clear();
 }
@@ -96,8 +97,10 @@ void MacFileIcons::pump()
                 if (task.generation == self->m_generation) {
                     self->m_pending.remove(task.key);
                     // Cache failures too: repainting must not retry a missing icon.
+                    const int cost = int(image.sizeInBytes()) + int(sizeof(Cached)) +
+                                     int(task.key.size() * sizeof(QChar)) + 128;
                     self->m_icons.insert(task.key, new Cached{
-                        image.isNull() ? QIcon() : QIcon(QPixmap::fromImage(image)), task.generation});
+                        image.isNull() ? QIcon() : QIcon(QPixmap::fromImage(image))}, cost);
                     self->notify();
                 }
                 self->pump();

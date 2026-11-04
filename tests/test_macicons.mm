@@ -10,6 +10,7 @@
 #include <QSemaphore>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QFile>
 #include <QTest>
 
 #include <atomic>
@@ -43,6 +44,8 @@ private slots:
         QVERIFY(!folder.isNull());
         QVERIFY(!pdf.isNull());
         QVERIFY(folder != pdf);
+        QCOMPARE(folder.size(), QSize(64, 64));
+        QCOMPARE(pdf.size(), QSize(64, 64));
     }
 
     void customFolder()
@@ -73,8 +76,8 @@ private slots:
         QIcon icon = model.data(model.index(row, FileModel::ColName), Qt::DecorationRole).value<QIcon>();
         QVERIFY(!icon.isNull());
         const QImage pixels = icon.pixmap(256).toImage();
-        QVERIFY2(pixels.pixelColor(128, 64).red() > 220, "Custom icon top should be red");
-        QVERIFY2(pixels.pixelColor(128, 192).blue() > 220, "Custom icon bottom should be blue");
+        QVERIFY2(pixels.pixelColor(pixels.width() / 2, pixels.height() / 4).red() > 220, "Custom icon top should be red");
+        QVERIFY2(pixels.pixelColor(pixels.width() / 2, pixels.height() * 3 / 4).blue() > 220, "Custom icon bottom should be blue");
         custom.fill(Qt::green);
         QVERIFY(setFixtureIcon(folder, custom));
         QSignalSpy refreshed(model.findChild<MacFileIcons*>(), &MacFileIcons::ready);
@@ -82,7 +85,7 @@ private slots:
         model.data(model.index(row, FileModel::ColName), Qt::DecorationRole);
         QTRY_VERIFY(!refreshed.isEmpty());
         icon = model.data(model.index(row, FileModel::ColName), Qt::DecorationRole).value<QIcon>();
-        QVERIFY(icon.pixmap(256).toImage().pixelColor(128, 64).green() > 220);
+        QVERIFY(icon.pixmap(64).toImage().pixelColor(32, 16).green() > 220);
     }
 
     void cachedAndOffThread()
@@ -149,12 +152,13 @@ private slots:
         QCOMPARE(icons.get(folder, "/fixture/folder").pixmap(32).toImage().pixelColor(16, 16), QColor(Qt::blue));
     }
 
-    void refreshKeepsPreviousIcon()
+    void relistReusesIcons()
     {
         std::atomic<int> calls{0};
-        MacFileIcons icons(nullptr, [&](const MacIconRequest&) {
-            QImage image(32, 32, QImage::Format_ARGB32);
-            image.fill(++calls == 1 ? Qt::red : Qt::blue);
+        MacFileIcons icons(nullptr, [&](const MacIconRequest& request) {
+            ++calls;
+            QImage image(request.pixels, request.pixels, QImage::Format_ARGB32);
+            image.fill(Qt::red);
             return image;
         });
         FileEntry folder;
@@ -163,11 +167,182 @@ private slots:
         QSignalSpy ready(&icons, &MacFileIcons::ready);
         icons.get(folder, "/fixture/folder");
         QTRY_VERIFY(!ready.isEmpty());
+        FileEntry file;
+        file.name = "file.txt";
         ready.clear();
-        icons.reset(true);
-        QCOMPARE(icons.get(folder, "/fixture/folder").pixmap(32).toImage().pixelColor(16, 16), QColor(Qt::red));
+        icons.get(file, "/fixture/file.txt");
         QTRY_VERIFY(!ready.isEmpty());
-        QCOMPARE(icons.get(folder, "/fixture/folder").pixmap(32).toImage().pixelColor(16, 16), QColor(Qt::blue));
+        QCOMPARE(calls.load(), 2);
+        for (int i = 0; i < 5; ++i) {
+            icons.reset(true);
+            icons.get(folder, "/fixture/folder");
+            icons.get(file, "/fixture/file.txt");
+        }
+        QTest::qWait(50);
+        QCOMPARE(calls.load(), 2);
+        ready.clear();
+        ++folder.iconRevision;  // Finder metadata can change without size or mtime
+        icons.get(folder, "/fixture/folder");
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(calls.load(), 3);
+        ready.clear();
+        ++folder.mtime;
+        icons.get(folder, "/fixture/folder");
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(calls.load(), 4);
+        ready.clear();
+        ++folder.size;
+        icons.get(folder, "/fixture/folder");
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(calls.load(), 5);
+    }
+
+    void relistKeepsInFlight()
+    {
+        std::atomic<int> calls{0};
+        QSemaphore entered, release;
+        auto unblock = qScopeGuard([&] { release.release(); });
+        MacFileIcons icons(nullptr, [&](const MacIconRequest&) {
+            if (++calls == 1) {
+                entered.release();
+                release.acquire();
+            }
+            QImage image(64, 64, QImage::Format_ARGB32);
+            image.fill(Qt::green);
+            return image;
+        });
+        FileEntry folder;
+        folder.isDir = true;
+        QSignalSpy ready(&icons, &MacFileIcons::ready);
+        icons.get(folder, "/fixture/folder");
+        QVERIFY(entered.tryAcquire(1, 2000));
+        icons.reset(true);
+        icons.get(folder, "/fixture/folder");
+        release.release();
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(calls.load(), 1);
+    }
+
+    void ordinaryFilesShareTypeIcons()
+    {
+        std::atomic<int> calls{0}, pathCalls{0};
+        MacFileIcons icons(nullptr, [&](const MacIconRequest& request) {
+            ++calls;
+            if (!request.path.isEmpty())
+                ++pathCalls;
+            QImage image(request.pixels, request.pixels, QImage::Format_ARGB32);
+            image.fill(Qt::green);
+            return image;
+        });
+        FileEntry file;
+        QSignalSpy ready(&icons, &MacFileIcons::ready);
+        for (int i = 0; i < 1000; ++i) {
+            file.name = QString("file%1.txt").arg(i);
+            icons.get(file, "/fixture/" + file.name);
+        }
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(calls.load(), 1);
+        QCOMPARE(pathCalls.load(), 0);
+        file.hasCustomIcon = true;
+        ready.clear();
+        icons.get(file, "/fixture/custom.txt");
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(pathCalls.load(), 1);
+        file.hasCustomIcon = false;
+        file.isDir = true;
+        file.name = "Package.app";
+        ready.clear();
+        icons.get(file, "/fixture/Package.app");
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(pathCalls.load(), 2);
+    }
+
+    void rasterSizesAndByteBudget()
+    {
+        std::atomic<int> calls{0}, pixels{0};
+        MacFileIcons icons(nullptr, [&](const MacIconRequest& request) {
+            ++calls;
+            pixels = request.pixels;
+            // Oversized loader results exercise byte-based eviction with few requests.
+            QImage image(512, 512, QImage::Format_ARGB32);
+            image.fill(Qt::green);
+            return image;
+        });
+        FileEntry folder;
+        folder.name = "Folder";
+        folder.isDir = true;
+        QSignalSpy ready(&icons, &MacFileIcons::ready);
+        icons.get(folder, "/fixture/0");
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(pixels.load(), 64);
+        ready.clear();
+        icons.get(folder, "/fixture/0", 192);
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(pixels.load(), 192);
+        for (int i = 1; i <= 5; ++i) {
+            ready.clear();
+            icons.get(folder, QString("/fixture/%1").arg(i));
+            QTRY_VERIFY(!ready.isEmpty());
+        }
+        QCOMPARE(calls.load(), 7);
+        ready.clear();
+        icons.get(folder, "/fixture/0");
+        QTRY_VERIFY(!ready.isEmpty());
+        QCOMPARE(calls.load(), 8);  // old count-based cache would retain this icon
+    }
+
+    void finderMetadataFromListing()
+    {
+        QTemporaryDir temporary;
+        const QString plain = temporary.filePath("plain.txt");
+        const QString custom = temporary.filePath("custom.txt");
+        for (const QString& path : {plain, custom}) {
+            QFile file(path);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write("fixture");
+        }
+        QImage image(64, 64, QImage::Format_ARGB32);
+        image.fill(Qt::red);
+        QVERIFY(setFixtureIcon(custom, image));
+        ListResult listing;
+        bool done = false;
+        ioPool()->start([&] {
+            auto result = listDirectory(temporary.path(), {});
+            postToUi([&, result = std::move(result)]() mutable { listing = std::move(result); done = true; });
+        });
+        QTRY_VERIFY(done);
+        QCOMPARE(listing.error, 0);
+        const FileEntry* customEntry = nullptr;
+        for (const FileEntry& e : listing.entries) {
+            if (e.name == "plain.txt")
+                QVERIFY(!e.hasCustomIcon);
+            if (e.name == "custom.txt")
+                customEntry = &e;
+        }
+        QVERIFY(customEntry && customEntry->hasCustomIcon);
+        const int64_t revision = customEntry->iconRevision;
+        QVERIFY(revision != 0);
+        QTest::qWait(10);
+        image.fill(Qt::blue);
+        QVERIFY(setFixtureIcon(custom, image));
+        std::vector<EntryUpdate> updates;
+        done = false;
+        ioPool()->start([&] {
+            auto result = statNames(temporary.path(), {"custom.txt"}, false);
+            postToUi([&, result = std::move(result)]() mutable { updates = std::move(result); done = true; });
+        });
+        QTRY_VERIFY(done);
+        QCOMPARE(updates.size(), size_t(1));
+        QVERIFY(updates[0].second && updates[0].second->hasCustomIcon);
+        QVERIFY(updates[0].second->iconRevision != revision);
+        // Selection uses worker-provided flags, not an xattr lookup in get().
+        MacFileIcons icons;
+        QSignalSpy ready(&icons, &MacFileIcons::ready);
+        const FileEntry entry = *updates[0].second;
+        icons.get(entry, custom);
+        QTRY_VERIFY(!ready.isEmpty());
+        const QImage pixels = icons.get(entry, custom).pixmap(64).toImage();
+        QVERIFY(pixels.pixelColor(32, 32).blue() > 220);
     }
 
     void systemChoiceWithFallbackTheme()
