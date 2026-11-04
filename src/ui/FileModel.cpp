@@ -30,6 +30,10 @@ FileModel::FileModel(QObject* parent) : QAbstractTableModel(parent)
         if (row >= 0 && filePath(row) == path)
             emit dataChanged(index(row, ColName), index(row, ColName), {Qt::DecorationRole});
     });
+    connect(&MacFileIcons::instance(), &MacFileIcons::changed, this, [this] {
+        if (!m_entries.empty())
+            emit dataChanged(index(0, ColName), index(int(m_entries.size()) - 1, ColName), {Qt::DecorationRole});
+    });
 #endif
 }
 

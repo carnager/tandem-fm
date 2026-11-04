@@ -3,9 +3,11 @@
 #include "core/Sorting.h"
 #include "core/Util.h"
 #include "ui/IconCache.h"
+#include "ui/Theme.h"
 
-#include <QCoreApplication>
+#include <QGuiApplication>
 #include <QPointer>
+#include <QStyleHints>
 #include <QThread>
 #include <sys/stat.h>
 
@@ -18,7 +20,23 @@ MacFileIcons& MacFileIcons::instance()
 }
 
 MacFileIcons::MacFileIcons(QObject* parent, TypeLoader types, PathLoader paths)
-    : QObject(parent), m_typeLoader(std::move(types)), m_pathLoader(std::move(paths)) {}
+    : QObject(parent), m_typeLoader(std::move(types)), m_pathLoader(std::move(paths))
+{
+    // System icons follow the appearance even when Tandem's theme doesn't.
+    connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, &MacFileIcons::reset);
+    connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this, &MacFileIcons::reset);
+}
+
+void MacFileIcons::reset()
+{
+    ++m_generation;  // lookups still running were made for the old appearance
+    m_types.clear();
+    m_paths.clear();
+    m_pending.clear();
+    m_queue.clear();
+    macForgetDrawnIcons();
+    emit changed();
+}
 
 QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
 {
@@ -47,7 +65,7 @@ QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
     const QString key = localPath + QChar(0) + QString::number(entry.iconRevision);
     if (!m_pending.contains(key)) {
         m_pending.insert(key);
-        m_queue.push_back({localPath, entry.iconRevision});
+        m_queue.push_back({localPath, entry.iconRevision, m_generation});
         pump();
     }
     return fallback;
@@ -67,6 +85,10 @@ void MacFileIcons::pump()
                 if (!self)
                     return;
                 --self->m_running;
+                if (request.generation != self->m_generation) {
+                    self->pump();
+                    return;
+                }
                 self->m_pending.remove(request.path + QChar(0) + QString::number(request.revision));
                 // Keep failures too, until ctime changes; a late, older lookup must not win.
                 auto it = self->m_paths.find(request.path);

@@ -11,11 +11,13 @@
 #include <QScopeGuard>
 #include <QSemaphore>
 #include <QSignalSpy>
+#include <QStyleHints>
 #include <QTemporaryDir>
 #include <QTest>
 #include <atomic>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 
 using namespace tandem;
 
@@ -106,6 +108,59 @@ private slots:
         FileEntry pdf;
         pdf.name = "document.pdf";
         QVERIFY(icon.pixmap(64).toImage() != macTypeIcon(pdf).pixmap(64).toImage());
+    }
+
+    void drawingsFollowAppearance()
+    {
+        FileEntry folder;
+        folder.isDir = true;
+        const QIcon icon = macTypeIcon(folder);
+        const qint64 drawn = icon.pixmap(QSize(32, 32), 2).cacheKey();
+        QCOMPARE(icon.pixmap(QSize(32, 32), 2).cacheKey(), drawn);
+        macForgetDrawnIcons();
+        const QPixmap redrawn = icon.pixmap(QSize(32, 32), 2);
+        QVERIFY(redrawn.cacheKey() != drawn);
+        QVERIFY(redrawn.toImage().pixelColor(32, 32).alpha() > 0);
+    }
+
+    void appearanceChangeResets()
+    {
+        int types = 0;
+        std::atomic<int> paths{0};
+        QSemaphore entered, release;
+        auto unblock = qScopeGuard([&] { release.release(10); });
+        const auto green = solidIcon(Qt::green), blue = solidIcon(Qt::blue), red = solidIcon(Qt::red);
+        MacFileIcons icons(nullptr, [&](const FileEntry&) { return ++types == 1 ? green : blue; }, [&](const QString&) {
+            if (++paths == 1) { entered.release(); release.acquire(); }
+            return red;
+        });
+        FileEntry file;
+        file.name = "Custom.txt";
+        file.hasCustomIcon = true;
+        QSignalSpy ready(&icons, &MacFileIcons::ready);
+        QSignalSpy changed(&icons, &MacFileIcons::changed);
+        QCOMPARE(icons.get(file, "/fixture/Custom.txt").cacheKey(), green.cacheKey());
+        QVERIFY(entered.tryAcquire(1, 2000));  // a lookup for the old appearance is running
+        emit QGuiApplication::styleHints()->colorSchemeChanged(Qt::ColorScheme::Dark);
+        QCOMPARE(changed.count(), 1);
+        QCOMPARE(icons.get(file, "/fixture/Custom.txt").cacheKey(), blue.cacheKey());  // type looked up again
+        QCOMPARE(types, 2);
+        QTRY_COMPARE(ready.count(), 1);  // the new lookup
+        release.release();
+        QTest::qWait(50);
+        QCOMPARE(ready.count(), 1);  // the old one is dropped
+        QCOMPARE(paths.load(), 2);
+        QCOMPARE(icons.get(file, "/fixture/Custom.txt").cacheKey(), red.cacheKey());
+
+        FileEntry pdf;
+        pdf.name = "Shared.pdf";
+        FileModel model;
+        model.setListing("/fixture/model", {pdf, file});
+        QSignalSpy repaint(&model, &QAbstractItemModel::dataChanged);
+        MacFileIcons::instance().reset();
+        QCOMPARE(repaint.count(), 1);
+        QCOMPARE(repaint.first().at(0).value<QModelIndex>().row(), 0);
+        QCOMPARE(repaint.first().at(1).value<QModelIndex>().row(), model.count() - 1);
     }
 
     void sharedAcrossModels()
@@ -301,6 +356,21 @@ private slots:
         left.fileIcon(fileRow);
         QTRY_COMPARE(changed.count(), 2);
         QVERIFY(left.fileIcon(fileRow).pixmap(64).toImage().pixelColor(32, 16).red() > 220);
+        {
+            // Drawn to pixels on the worker: drawing reads nothing from the file.
+            const QString copy = temporary.filePath("Copy.txt");
+            QVERIFY(QFile::copy(file.fileName(), copy));
+            QVERIFY(setFixtureIcon(copy, custom));
+            const QIcon loaded = macPathIcon(copy);
+            QVERIFY(removexattr(QFile::encodeName(copy).constData(), "com.apple.ResourceFork", XATTR_NOFOLLOW) == 0);
+            QVERIFY(QFile::remove(copy));
+            for (int side : {16, 24, 96}) {
+                const QImage image = loaded.pixmap(QSize(side, side), 2).toImage();
+                QCOMPARE(image.size(), QSize(side * 2, side * 2));
+                QVERIFY(image.pixelColor(side, side / 2).red() > 220);
+                QVERIFY(image.pixelColor(side, side * 3 / 2).blue() > 220);
+            }
+        }
         const auto oldMtime = left.entry(fileRow)->mtime;
         const auto oldCtime = left.entry(fileRow)->iconRevision;
         custom.fill(Qt::green);
