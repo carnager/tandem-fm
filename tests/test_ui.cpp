@@ -885,6 +885,7 @@ private slots:
     }
 
     // F2 renames in place, like Shift+F6, and has a button in the F-key bar.
+    // Enter confirms the new name without also opening the file.
     void renameWithF2()
     {
         writeFile(L("f2.txt"), "x");
@@ -893,6 +894,7 @@ private slots:
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_left->view()->setFocus();
         moveCursorTo(m_left, "f2.txt");
+        QSignalSpy opened(m_left->view(), &FileView::openRequested);
         QTest::keyClick(m_left->view(), Qt::Key_F2);
         QLineEdit* editor = nullptr;
         QTRY_VERIFY((editor = qobject_cast<QLineEdit*>(QApplication::focusWidget())));
@@ -900,6 +902,7 @@ private slots:
         QTest::keyClick(editor, Qt::Key_Return);
         QTRY_VERIFY(QFile::exists(L("f2-renamed.txt")));
         QVERIFY(!QFile::exists(L("f2.txt")));
+        QCOMPARE(opened.count(), 0);
         QVERIFY(m_window->findChild<QAbstractButton*>("fkey-F2"));
     }
 

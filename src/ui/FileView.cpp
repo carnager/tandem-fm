@@ -481,6 +481,12 @@ void FileView::keyPressEvent(QKeyEvent* e)
     switch (e->key()) {
     case Qt::Key_Return:
     case Qt::Key_Enter:
+        // The rename editor passes its Enter on: that confirms the name, it
+        // doesn't open the file.
+        if (state() == QAbstractItemView::EditingState) {
+            e->accept();
+            return;
+        }
         if (mods == Qt::NoModifier) {
             emit openRequested();
             return;
