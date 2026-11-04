@@ -4,6 +4,7 @@
 #include "core/DirWatcher.h"
 #include "core/FolderHistory.h"
 #include "ui/DirTab.h"
+#include "ui/Dialogs.h"
 #include "ui/FileModel.h"
 #include "ui/CommandBar.h"
 #include "ui/SyncDialog.h"
@@ -1812,6 +1813,27 @@ private slots:
     }
 
     // Ctrl+Shift+F5: a link in the other panel; Ctrl+Z takes it away again.
+    // Enter in a conflict overwrites only when that loses nothing newer.
+    void conflictDefault()
+    {
+        auto defaultAnswer = [](int64_t srcTime, int64_t dstTime) {
+            PromptRequest req;
+            req.kind = PromptRequest::Kind::Conflict;
+            req.srcPath = "/a/f";
+            req.dstPath = "/b/f";
+            req.srcTime = srcTime;
+            req.dstTime = dstTime;
+            PromptDialog dlg(req, nullptr);
+            for (QPushButton* b : dlg.findChildren<QPushButton*>())
+                if (b->isDefault())
+                    return b->text();
+            return QString();
+        };
+        QCOMPARE(defaultAnswer(2000, 1000), QObject::tr("&Overwrite"));
+        QCOMPARE(defaultAnswer(1000, 1000), QObject::tr("&Overwrite"));
+        QCOMPARE(defaultAnswer(1000, 2000), QObject::tr("&Skip"));
+    }
+
     void createLinks()
     {
         QVERIFY(QDir().mkpath(L("lk")));

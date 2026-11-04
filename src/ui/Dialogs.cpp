@@ -130,15 +130,18 @@ PromptDialog::PromptDialog(const PromptRequest& req, QWidget* parent) : QDialog(
         row->addWidget(b);
     };
     switch (req.kind) {
-    case PromptRequest::Kind::Conflict:
-        add(row1, tr("&Overwrite"), Answer::Overwrite, true);
+    case PromptRequest::Kind::Conflict: {
+        // Enter must not throw away a newer file.
+        const bool targetNewer = req.dstTime > req.srcTime;
+        add(row1, tr("&Overwrite"), Answer::Overwrite, !targetNewer);
         add(row1, tr("Overwrite &all"), Answer::OverwriteAll);
         add(row1, tr("Overwrite all &older"), Answer::OverwriteOlderAll);
-        add(row2, tr("&Skip"), Answer::Skip);
+        add(row2, tr("&Skip"), Answer::Skip, targetNewer);
         add(row2, tr("S&kip all"), Answer::SkipAll);
-        add(row2, tr("&Rename"), Answer::Rename);
-        add(row2, tr("Rename a&ll"), Answer::RenameAll);
+        add(row2, tr("Keep &both"), Answer::Rename);
+        add(row2, tr("Keep both for a&ll"), Answer::RenameAll);
         break;
+    }
     case PromptRequest::Kind::Error:
         add(row1, tr("&Retry"), Answer::Retry, true);
         add(row1, tr("&Skip"), Answer::Skip);

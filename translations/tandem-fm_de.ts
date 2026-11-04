@@ -4228,12 +4228,12 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>All&amp;e überspringen</translation>
     </message>
     <message>
-        <source>&amp;Rename</source>
-        <translation>&amp;Umbenennen</translation>
+        <source>Keep &amp;both</source>
+        <translation>Beide be&amp;halten</translation>
     </message>
     <message>
-        <source>Rename a&amp;ll</source>
-        <translation>Alle umbe&amp;nennen</translation>
+        <source>Keep both for a&amp;ll</source>
+        <translation>Immer beide behalte&amp;n</translation>
     </message>
     <message>
         <source>&amp;Retry</source>
