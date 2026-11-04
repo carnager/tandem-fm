@@ -2725,6 +2725,10 @@
         <translation>Das liegt auf einem Server, der keinen Papierkorb hat. Es kann nicht rückgängig gemacht werden.</translation>
     </message>
     <message>
+        <source>This is on a network share, which has no trash. It cannot be undone.</source>
+        <translation>Das liegt auf einer Netzwerkfreigabe, die keinen Papierkorb hat. Es kann nicht rückgängig gemacht werden.</translation>
+    </message>
+    <message>
         <source>This cannot be undone.</source>
         <translation>Dies kann nicht rückgängig gemacht werden.</translation>
     </message>

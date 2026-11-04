@@ -53,6 +53,8 @@ public:
 #endif
     }
     void poll();
+    // A local folder on a network share (NFS, SMB, sshfs…), as last listed.
+    bool onNetworkFs() const { return m_networkFs; }
 
     // Search results as a virtual folder: entries are paths relative to the
     // searched folder, so every file operation keeps working on them.

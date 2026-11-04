@@ -55,12 +55,27 @@ namespace tandem {
 namespace {
 // Its minimum would make room for scroll arrows, leaving a gap before the +
 // with a single tab: as wide as the tabs, shrinking (with arrows) when tight.
+// A single tab never shrinks: arrows to scroll through one tab only hide it
+// (macOS squeezed them over the label).
 class TabStrip : public QTabBar {
 public:
     using QTabBar::QTabBar;
     QSize minimumSizeHint() const override
     {
-        return {qMin(sizeHint().width(), 90), QTabBar::minimumSizeHint().height()};
+        const int w = count() <= 1 ? sizeHint().width() : qMin(sizeHint().width(), 90);
+        return {w, QTabBar::minimumSizeHint().height()};
+    }
+
+protected:
+    void tabInserted(int index) override
+    {
+        QTabBar::tabInserted(index);
+        setUsesScrollButtons(count() > 1);
+    }
+    void tabRemoved(int index) override
+    {
+        QTabBar::tabRemoved(index);
+        setUsesScrollButtons(count() > 1);
     }
 };
 }  // namespace
@@ -120,7 +135,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_tabBar->setDocumentMode(true);
     m_tabBar->setExpanding(false);
     m_tabBar->setDrawBase(false);
-    m_tabBar->setUsesScrollButtons(true);
+    m_tabBar->setUsesScrollButtons(false);  // TabStrip: on with two tabs or more
     m_tabBar->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);  // as wide as its tabs: the + follows them
     m_tabBar->setMovable(false);  // order is the tab numbers
     m_tabBar->setFocusPolicy(Qt::NoFocus);

@@ -1155,16 +1155,23 @@ void MainWindow::deleteSelected(bool permanent)
             p->unmarkAll();
         return;
     }
-    if (p->isRemote())
-        permanent = true;  // servers have no trash
+    // Servers have no trash; neither do network shares on macOS (they are
+    // mounted under /Volumes, and the Finder deletes there right away).
+    bool shareNoTrash = false;
+#ifdef Q_OS_MACOS
+    shareNoTrash = !p->isRemote() && p->tab()->onNetworkFs();
+#endif
+    if (p->isRemote() || shareNoTrash)
+        permanent = true;
     QMessageBox box(this);
     box.setIcon(permanent ? QMessageBox::Warning : QMessageBox::Question);
     box.setWindowTitle(permanent ? tr("Delete permanently") : tr("Move to trash"));
     box.setText(permanent ? tr("Permanently delete %1?").arg(describeItems(paths))
                           : tr("Move %1 to the trash?").arg(describeItems(paths)));
     if (permanent)
-        box.setInformativeText(p->isRemote() ? tr("This is on a server, which has no trash. It cannot be undone.")
-                                             : tr("This cannot be undone."));
+        box.setInformativeText(p->isRemote()   ? tr("This is on a server, which has no trash. It cannot be undone.")
+                               : shareNoTrash ? tr("This is on a network share, which has no trash. It cannot be undone.")
+                                              : tr("This cannot be undone."));
     box.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
     box.setDefaultButton(QMessageBox::Yes);
     if (box.exec() != QMessageBox::Yes)
