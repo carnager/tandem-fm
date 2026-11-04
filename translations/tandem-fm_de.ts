@@ -2621,6 +2621,14 @@
         <translation>Woandershin kopieren</translation>
     </message>
     <message>
+        <source>Move to another tab, a bookmark or a recent folder (Alt+Shift+F6)</source>
+        <translation>In einen anderen Tab, ein Lesezeichen oder einen letzten Ordner verschieben (Alt+Umschalt+F6)</translation>
+    </message>
+    <message>
+        <source>Move elsewhere</source>
+        <translation>Woandershin verschieben</translation>
+    </message>
+    <message>
         <source>Unmark</source>
         <translation>Markierung aufheben</translation>
     </message>

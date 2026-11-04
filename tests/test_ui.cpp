@@ -714,6 +714,47 @@ private slots:
         QVERIFY(QFile::exists(L("file2.txt")));  // copied, not moved
     }
 
+    // The selection bar's ▾ next to Move offers the same targets, and moves.
+    void moveToFromSelectionBar()
+    {
+        writeFile(L("to-move.txt"), "m");
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTemporaryDir hidden;
+        DirTab* extra = m_right->addTab(hidden.path(), false);
+        auto closeIt = qScopeGuard([this] {
+            m_right->cycleTab(1);
+            if (m_right->tab()->model()->path() != R())
+                m_right->closeCurrentTab();
+            QTRY_COMPARE(m_right->tab()->model()->path(), R());
+            QFile::remove(L("to-move.txt"));
+        });
+        QVERIFY(extra);
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+        QTRY_VERIFY(!m_left->tab()->isLoading());
+        QTRY_VERIFY(leftModel()->rowOf("to-move.txt") >= 0);
+        leftModel()->setMarkedNames({"to-move.txt"});
+        QFrame* bar = m_left->selectionBar();
+        QTRY_VERIFY(bar->isVisible());
+        QAbstractButton* more = nullptr;
+        QTRY_VERIFY((more = bar->findChild<QAbstractButton*>("selection-move-elsewhere")) != nullptr);
+        QCOMPARE(more->accessibleName(), QString("Move elsewhere"));
+        more->click();
+        FuzzyPopup* popup = nullptr;
+        QTRY_VERIFY([&] {
+            for (auto* p : m_window->findChildren<FuzzyPopup*>())
+                if (p->isVisible())
+                    popup = p;
+            return popup != nullptr;
+        }());
+        QTest::keyClicks(QApplication::focusWidget(), QFileInfo(hidden.path()).fileName());
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == hidden.path());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return, Qt::ShiftModifier);  // right away
+        QTRY_VERIFY(QFile::exists(hidden.filePath("to-move.txt")));
+        QTRY_VERIFY(!QFile::exists(L("to-move.txt")));  // moved, not copied
+    }
+
     // A transfer shows in the panel it goes to; a drag says what dropping would do.
     void transfersWhereTheyHappen()
     {

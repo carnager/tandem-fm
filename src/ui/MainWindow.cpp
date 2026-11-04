@@ -870,19 +870,24 @@ void MainWindow::updateSelectionBars(const QString& target)
             l->addWidget(b);
             return b;
         };
-        button(QStringLiteral("F5"), tr("Copy to"), target, true, [this] { copyOrMove(CopyJob::Mode::Copy); });
-        {  // …or anywhere else: open tabs, bookmarks, recent folders
+        // …or anywhere else: open tabs, bookmarks, recent folders
+        auto elsewhere = [&](CopyJob::Mode mode, const QString& name, const QString& tip, const QString& accessible) {
             auto* more = new QToolButton(bar);
-            more->setObjectName(QStringLiteral("selection-elsewhere"));
+            more->setObjectName(name);
             more->setText(QStringLiteral("▾"));
-            more->setToolTip(tr("Copy to another tab, a bookmark or a recent folder (Alt+Shift+F5)"));
-            more->setAccessibleName(tr("Copy elsewhere"));
+            more->setToolTip(tip);
+            more->setAccessibleName(accessible);
             more->setAutoRaise(true);
             more->setFocusPolicy(Qt::NoFocus);
-            connect(more, &QToolButton::clicked, this, [this, more] { copyOrMoveTo(CopyJob::Mode::Copy, more); });
+            connect(more, &QToolButton::clicked, this, [this, mode, more] { copyOrMoveTo(mode, more); });
             l->addWidget(more);
-        }
+        };
+        button(QStringLiteral("F5"), tr("Copy to"), target, true, [this] { copyOrMove(CopyJob::Mode::Copy); });
+        elsewhere(CopyJob::Mode::Copy, QStringLiteral("selection-elsewhere"),
+                  tr("Copy to another tab, a bookmark or a recent folder (Alt+Shift+F5)"), tr("Copy elsewhere"));
         button(QStringLiteral("F6"), tr("Move"), QString(), false, [this] { copyOrMove(CopyJob::Mode::Move); });
+        elsewhere(CopyJob::Mode::Move, QStringLiteral("selection-move-elsewhere"),
+                  tr("Move to another tab, a bookmark or a recent folder (Alt+Shift+F6)"), tr("Move elsewhere"));
         for (const Plugin& plugin : std::as_const(m_plugins)) {
             if (!plugin.error.isEmpty() || pluginTrust(plugin) != PluginTrust::On)
                 continue;
