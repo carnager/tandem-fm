@@ -3015,6 +3015,62 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // Ctrl+Shift+F: the filter through all subfolders, live; Alt+S takes the
+    // words to this folder only and back; marks stay while the words change.
+    void deepFilter()
+    {
+        QVERIFY(QDir().mkpath(L("deep/photos/2024")));
+        writeFile(L("deep/photos/2024/beach.raw"), "x");
+        writeFile(L("deep/photos/2024/beach.jpg"), "x");
+        writeFile(L("deep/notes.txt"), "x");
+        m_left->navigate(L("deep"));
+        QTRY_COMPARE(leftModel()->path(), L("deep"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+
+        QTest::keyClick(m_left->view(), Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(m_left->tab()->isLive());
+        auto* edit = qobject_cast<QLineEdit*>(QApplication::focusWidget());
+        QVERIFY(edit);
+        QTest::keyClicks(edit, "ph 24 raw");
+        QTRY_COMPARE(leftModel()->rowOf("photos/2024/beach.raw") >= 0, true);
+        QCOMPARE(leftModel()->rowOf("photos/2024/beach.jpg"), -1);
+        QTRY_COMPARE(m_left->tab()->searchFound(), 1);
+
+        // Into the list, mark it, change the words: the mark stays in view.
+        QTest::keyClick(edit, Qt::Key_Down);
+        QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(m_left->view()));
+        moveCursorTo(m_left, "photos/2024/beach.raw");
+        QTest::keyClick(m_left->view(), Qt::Key_Insert);
+        QTest::keyClick(m_left->view(), Qt::Key_Escape);  // back to the words
+        QCOMPARE(QApplication::focusWidget(), static_cast<QWidget*>(edit));
+        edit->setText("notes");
+        QTRY_VERIFY(leftModel()->rowOf("notes.txt") >= 0);
+        QVERIFY(leftModel()->rowOf("photos/2024/beach.raw") >= 0);
+        QCOMPARE(leftModel()->markedNames(), QStringList({"photos/2024/beach.raw"}));
+
+        // Alt+S: this folder only, same words; and back.
+        QTest::keyClick(edit, Qt::Key_S, Qt::AltModifier);
+        QTRY_VERIFY(!m_left->tab()->isSearch());
+        QTRY_COMPARE(leftModel()->path(), L("deep"));
+        QTRY_COMPARE(leftModel()->filter(), QString("notes"));
+        QCOMPARE(leftModel()->rowOf("photos"), -1);
+        QTest::keyClick(edit, Qt::Key_S, Qt::AltModifier);
+        QTRY_VERIFY(m_left->tab()->isLive());
+        QTRY_VERIFY(leftModel()->rowOf("notes.txt") >= 0);
+
+        // Esc in the words leaves, back in the folder, unfiltered.
+        QTest::keyClick(edit, Qt::Key_Escape);
+        QTRY_VERIFY(!m_left->tab()->isSearch());
+        QTRY_COMPARE(leftModel()->path(), L("deep"));
+        QVERIFY(leftModel()->filter().isEmpty());
+        QVERIFY(leftModel()->rowOf("photos") >= 0);
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
     void runCommandOnSelection()
     {
         CommandContext ctx;

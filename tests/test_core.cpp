@@ -1363,6 +1363,20 @@ private slots:
         QVERIFY(!gitStatusFor(QDir::rootPath()).inRepo);
     }
 
+    // The live filter: all words in the path, patterns on the name, smart case.
+    void pathMatcher()
+    {
+        QVERIFY(PathMatcher("  ").isEmpty());
+        QVERIFY(PathMatcher("ph 24 raw").matches("Photos/2024/x.raw"));
+        QVERIFY(!PathMatcher("ph 25 raw").matches("Photos/2024/x.raw"));
+        QVERIFY(PathMatcher("photos").matches("Photos/a.jpg"));
+        QVERIFY(!PathMatcher("Photos").matches("photos/a.jpg"));  // capitals: exact case
+        QVERIFY(PathMatcher("*.jpg").matches("Photos/a.JPG"));
+        QVERIFY(!PathMatcher("*.jpg").matches("x.jpg/readme"));   // the name, not a folder on the way
+        QVERIFY(PathMatcher("ph *.jpg").matches("Photos/a.jpg"));
+        QVERIFY(!PathMatcher("ph *.jpg").matches("Music/a.jpg"));
+    }
+
     void search()
     {
         QTemporaryDir tmp;
@@ -1389,6 +1403,11 @@ private slots:
                  QStringList({".hidden/fuzzy.txt", "build/fuzzy.o", "src/Fuzzy.cpp"}));
         QCOMPARE(run({{}, "fuzzy", false, true}, 2).size(), 2);  // limit
         QCOMPARE(run({{}, "", false, false}), QStringList());
+
+        QStringList tree;
+        QVERIFY(listTree(tmp.path(), false, nullptr, 1000, [&](const QStringList& b) { tree << b; }).isEmpty());
+        tree.sort();
+        QCOMPARE(tree, QStringList({"src", "src/Fuzzy.cpp", "src/deep", "src/deep/fuzzy.h"}));
 
         // Without fd/rg/grep: names still work (built-in walk), contents explain why not.
         const QByteArray oldPath = qgetenv("PATH");

@@ -1128,6 +1128,10 @@
         <translation>Diesen Ordner filtern</translation>
     </message>
     <message>
+        <source>Filter as you type, through all subfolders; Alt+S switches</source>
+        <translation>Filtern beim Tippen, durch alle Unterordner; Alt+S wechselt</translation>
+    </message>
+    <message>
         <source>Compare the panels: mark what&apos;s newer or missing</source>
         <translation>Seiten vergleichen: Neueres oder Fehlendes markieren</translation>
     </message>
@@ -2483,6 +2487,10 @@
         <translation>In offenen Tab, Lesezeichen oder Ordner verschieben…</translation>
     </message>
     <message>
+        <source>Filter with subfolders…</source>
+        <translation>Mit Unterordnern filtern…</translation>
+    </message>
+    <message>
         <source>Servers…</source>
         <translation>Server…</translation>
     </message>
@@ -3695,10 +3703,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Filter</translation>
     </message>
     <message>
-        <source>words or *.ext — Esc clears, Enter/↓ back to the list</source>
-        <translation>Wörter oder *.ext — Esc leert, Enter/↓ zurück zur Liste</translation>
-    </message>
-    <message>
         <source>Names</source>
         <translation>Namen</translation>
     </message>
@@ -3823,12 +3827,20 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Neuer Tab</translation>
     </message>
     <message>
+        <source>words or *.ext — Alt+S with subfolders, Esc clears, Enter/↓ back to the list</source>
+        <translation>Wörter oder *.ext – Alt+S mit Unterordnern, Esc leert, Enter/↓ zurück zur Liste</translation>
+    </message>
+    <message>
         <source>Searching %1 for “%2” …  %3 found   (Esc stops)</source>
         <translation>Durchsuche %1 nach „%2“ …  %3 gefunden   (Esc hält an)</translation>
     </message>
     <message>
         <source>Loading %1 …   (Esc to cancel)</source>
         <translation>%1 wird geladen …   (Esc zum Abbrechen)</translation>
+    </message>
+    <message>
+        <source>%1 of %2 found</source>
+        <translation>%1 von %2 gefunden</translation>
     </message>
     <message>
         <source>%1 shown, %2 hidden</source>
@@ -3865,6 +3877,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>%1 found</source>
         <translation>%1 gefunden</translation>
+    </message>
+    <message>
+        <source>Filter with subfolders</source>
+        <translation>Filter mit Unterordnern</translation>
+    </message>
+    <message>
+        <source>words in the path or *.ext — Alt+S this folder only, Esc leaves</source>
+        <translation>Wörter im Pfad oder *.ext – Alt+S nur dieser Ordner, Esc verlässt</translation>
     </message>
     <message>
         <source>Places</source>

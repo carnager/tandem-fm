@@ -393,6 +393,8 @@ void MainWindow::createMenus()
     addCommand(edit, QT_TR_NOOP("Invert marks\tNum *"), {}, [this] { active()->markGroup(0); });
     edit->addSeparator();
     addCommand(edit, QT_TR_NOOP("Filter as you type…"), {K(Qt::CTRL | Qt::Key_F)}, [this] { active()->startFilter(); });
+    addCommand(edit, QT_TR_NOOP("Filter with subfolders…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_F)},
+               [this] { active()->startDeepFilter(); });
 
     QMenu* go = bar->addMenu(tr("&Go"));
     addCommand(go, QT_TR_NOOP("Back"), {K(Qt::ALT | Qt::Key_Left)}, [this] { active()->back(); });
@@ -488,7 +490,7 @@ void MainWindow::createMenus()
 
     // Tools: the bigger jobs, each with its own window or bar.
     QMenu* tools = bar->addMenu(tr("T&ools"));
-    addCommand(tools, QT_TR_NOOP("Search files (names or contents)…"), {K(Qt::ALT | Qt::Key_F7), K(Qt::CTRL | Qt::SHIFT | Qt::Key_F)},
+    addCommand(tools, QT_TR_NOOP("Search files (names or contents)…"), {K(Qt::ALT | Qt::Key_F7)},
                [this] { active()->startSearchBar(); });
     addCommand(tools, QT_TR_NOOP("Find duplicate files…"), {K(Qt::ALT | Qt::SHIFT | Qt::Key_F7)}, [this] { findDuplicates(); });
     addCommand(tools, QT_TR_NOOP("Disk usage…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_U)}, [this] { showDiskUsage(); });

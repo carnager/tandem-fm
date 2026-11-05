@@ -61,7 +61,7 @@ QString DirTab::path() const
 QString DirTab::title() const
 {
     if (m_inSearch)
-        return QStringLiteral("⌕ %1").arg(m_search.query);
+        return QStringLiteral("⌕ %1").arg(m_live && m_search.query.isEmpty() ? QStringLiteral("…") : m_search.query);
     const QString p = path();
     if (const auto r = remoteRootOf(p); r && r->root == p)
         return r->label.section(QStringLiteral("://"), -1);
@@ -215,6 +215,8 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
     if (m_inSearch) {
         cancelSearch();
         m_inSearch = false;
+        m_live = false;
+        m_liveNames.clear();
         m_model->setListing(QString(), {});  // forget the results; the real listing follows
         emit searchChanged();
     }
@@ -429,7 +431,7 @@ void DirTab::cancelSearch()
     }
 }
 
-void DirTab::startSearch(const SearchSpec& spec)
+void DirTab::beginSearch(const SearchSpec& spec)
 {
     if (m_cancel)
         m_cancel->store(true);
@@ -442,6 +444,8 @@ void DirTab::startSearch(const SearchSpec& spec)
     setWatch(-1);
     m_search = spec;
     m_inSearch = true;
+    m_live = false;
+    m_liveNames.clear();
     m_model->setCountable(false, false);  // results are paths below the folder
 #ifdef Q_OS_MACOS
     m_model->setLocalIconPaths(false);
@@ -457,6 +461,11 @@ void DirTab::startSearch(const SearchSpec& spec)
     emit searchChanged();
 
     m_searchCancel = std::make_shared<std::atomic<bool>>(false);
+}
+
+void DirTab::startSearch(const SearchSpec& spec)
+{
+    beginSearch(spec);
     auto cancel = m_searchCancel;
     const quint64 gen = m_gen;
     QPointer<DirTab> self(this);
@@ -481,6 +490,101 @@ void DirTab::startSearch(const SearchSpec& spec)
             self->m_searchRunning = false;
             self->m_searchError = error;
             self->m_model->setSortSpec(self->m_model->sortSpec());  // results arrive unsorted
+            emit self->searchChanged();
+        });
+    });
+}
+
+namespace {
+constexpr int kLiveNames = 500000;  // names read at most
+constexpr int kLiveShown = 5000;    // matches shown at most
+}  // namespace
+
+void DirTab::startLiveSearch(const QString& root)
+{
+    SearchSpec spec;
+    spec.root = root;
+    beginSearch(spec);
+    m_live = true;
+    if (!m_liveTimer) {
+        m_liveTimer = new QTimer(this);
+        m_liveTimer->setSingleShot(true);
+        connect(m_liveTimer, &QTimer::timeout, this, &DirTab::filterLive);
+    }
+    emit searchChanged();
+
+    auto cancel = m_searchCancel;
+    const quint64 gen = m_gen;
+    QPointer<DirTab> self(this);
+    ioPool()->start([self, root, cancel, gen] {
+        const QString error = listTree(root, false, cancel.get(), kLiveNames, [&](const QStringList& batch) {
+            postToUi([self, gen, batch] {
+                if (!self || gen != self->m_gen || !self->isLive())
+                    return;
+                self->m_liveNames += batch;
+                // While names come in, matches are looked for now and then, not per batch.
+                if (!self->m_search.query.isEmpty() && !self->m_liveTimer->isActive())
+                    self->m_liveTimer->start(300);
+                emit self->searchChanged();
+            });
+        });
+        postToUi([self, gen, error, cancel] {
+            if (!self || gen != self->m_gen || cancel->load() || !self->isLive())
+                return;
+            self->m_searchRunning = false;
+            self->m_searchError = error;
+            self->m_liveTimer->start(0);
+            emit self->searchChanged();
+        });
+    });
+}
+
+void DirTab::setLiveQuery(const QString& query)
+{
+    if (!isLive() || query == m_search.query)
+        return;
+    m_search.query = query;
+    m_liveTimer->start(60);  // a pause in typing
+    emit searchChanged();
+}
+
+// Matches off the UI thread; marked items stay in the list whatever the query.
+void DirTab::filterLive()
+{
+    if (!isLive())
+        return;
+    const quint64 gen = ++m_liveGen;
+    const quint64 listGen = m_gen;
+    const QString root = m_search.root;
+    const QString query = m_search.query;
+    const QStringList names = m_liveNames;  // shared, not copied
+    const QSet<QString> marked = m_model->markedSet();
+    QPointer<DirTab> self(this);
+    ioPool()->start([self, gen, listGen, root, query, names, marked] {
+        const PathMatcher matcher(query);
+        QStringList shown;
+        int found = 0;
+        if (!matcher.isEmpty())
+            for (const QString& n : names)
+                if (matcher.matches(n) && ++found <= kLiveShown && !marked.contains(n))
+                    shown << n;
+        for (const QString& n : marked)
+            shown << n;
+        auto updates = std::make_shared<std::vector<EntryUpdate>>(statNames(root, shown, true));
+        postToUi([self, gen, listGen, found, updates] {
+            if (!self || gen != self->m_liveGen || listGen != self->m_gen || !self->isLive())
+                return;
+            std::vector<FileEntry> entries;
+            for (auto& [name, e] : *updates)
+                if (e)
+                    entries.push_back(std::move(*e));
+            const QString cursor = self->cursorName();
+            const QSet<QString> marked = self->m_model->markedSet();  // with any made meanwhile
+            self->m_searchFound = found;
+            self->m_model->setListing(self->m_search.root, std::move(entries));
+            self->m_model->setSortSpec(self->m_model->sortSpec());
+            self->m_model->restoreMarks(marked);
+            emit self->listingReady(cursor);
             emit self->searchChanged();
         });
     });

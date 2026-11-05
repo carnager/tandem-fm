@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QList>
+#include <QRegularExpression>
 #include <QString>
 #include <QStringList>
 
@@ -22,5 +24,26 @@ struct SearchSpec {
 // an empty string on success.
 QString runSearch(const SearchSpec& spec, const std::atomic<bool>* cancel, int limit,
                   const std::function<void(const QStringList& batch)>& onBatch);
+
+// Lists every file and folder below root (no hidden or .gitignore'd ones
+// unless `all`), in batches, like runSearch.
+QString listTree(const QString& root, bool all, const std::atomic<bool>* cancel, int limit,
+                 const std::function<void(const QStringList& batch)>& onBatch);
+
+// The live filter's matching, on paths relative to the searched folder:
+// every space-separated word must be in the path ("ph 24 raw" finds
+// Photos/2024/x.raw); one with * or ? is a pattern for the name itself.
+// Ignores case unless a word has capitals.
+class PathMatcher {
+public:
+    explicit PathMatcher(const QString& query);
+    bool isEmpty() const { return m_words.isEmpty() && m_patterns.isEmpty(); }
+    bool matches(const QString& path) const;
+
+private:
+    QStringList m_words;
+    QList<Qt::CaseSensitivity> m_wordCase;
+    QList<QRegularExpression> m_patterns;
+};
 
 }  // namespace tandem

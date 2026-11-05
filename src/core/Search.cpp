@@ -189,4 +189,43 @@ QString runSearch(const SearchSpec& spec, const std::atomic<bool>* cancel, int l
 #endif
 }
 
+QString listTree(const QString& root, bool all, const std::atomic<bool>* cancel, int limit,
+                 const std::function<void(const QStringList&)>& onBatch)
+{
+    SearchSpec spec;
+    spec.root = root;
+    spec.query = QStringLiteral("*");  // every name
+    spec.all = all;
+    return runSearch(spec, cancel, limit, onBatch);
+}
+
+PathMatcher::PathMatcher(const QString& query)
+{
+    for (const QString& word : query.split(QLatin1Char(' '), Qt::SkipEmptyParts)) {
+        const Qt::CaseSensitivity cs = word == word.toLower() ? Qt::CaseInsensitive : Qt::CaseSensitive;
+        if (word.contains(QLatin1Char('*')) || word.contains(QLatin1Char('?'))) {
+            m_patterns.append(QRegularExpression(QRegularExpression::wildcardToRegularExpression(word),
+                                                 cs == Qt::CaseInsensitive ? QRegularExpression::CaseInsensitiveOption
+                                                                           : QRegularExpression::NoPatternOption));
+        } else {
+            m_words.append(word);
+            m_wordCase.append(cs);
+        }
+    }
+}
+
+bool PathMatcher::matches(const QString& path) const
+{
+    for (int i = 0; i < m_words.size(); ++i)
+        if (!path.contains(m_words[i], m_wordCase[i]))
+            return false;
+    if (m_patterns.isEmpty())
+        return true;
+    const QString name = path.section(QLatin1Char('/'), -1);
+    for (const QRegularExpression& rx : m_patterns)
+        if (!rx.match(name).hasMatch())
+            return false;
+    return true;
+}
+
 }  // namespace tandem

@@ -65,6 +65,13 @@ public:
     int searchFound() const { return m_searchFound; }
     QString searchError() const { return m_searchError; }
     void cancelSearch();
+    // The live filter with subfolders (Ctrl+Shift+F): reads every name below
+    // root once, then each query shows the matching ones at once. Shares the
+    // search tab's results view, so everything works on them.
+    void startLiveSearch(const QString& root);
+    void setLiveQuery(const QString& query);
+    bool isLive() const { return m_inSearch && m_live; }
+    int liveTotal() const { return int(m_liveNames.size()); }  // names read so far
     static void setGitEnabled(bool on);
     void refreshGit();
     QString archivePath() const { return m_archivePath; }
@@ -129,6 +136,12 @@ private:
     int m_searchFound = 0;
     QString m_searchError;
     std::shared_ptr<std::atomic<bool>> m_searchCancel;
+    void beginSearch(const SearchSpec& spec);
+    void filterLive();
+    bool m_live = false;
+    QStringList m_liveNames;
+    quint64 m_liveGen = 0;
+    QTimer* m_liveTimer = nullptr;
     quint64 m_gitGen = 0;
     QTimer* m_gitTimer = nullptr;
     QString m_archivePath;

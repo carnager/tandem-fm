@@ -260,12 +260,12 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
         "QLabel { color: @dimText; }"));
     auto* fl = new QHBoxLayout(m_filterBar);
     fl->setContentsMargins(8, 4, 8, 4);
-    auto* filterLabel = new QLabel(tr("Filter"), m_filterBar);
+    m_filterLabel = new QLabel(tr("Filter"), m_filterBar);
     m_filterEdit = new QLineEdit(m_filterBar);
-    m_filterEdit->setPlaceholderText(tr("words or *.ext — Esc clears, Enter/↓ back to the list"));
+    m_filterEdit->setPlaceholderText(tr("words or *.ext — Alt+S with subfolders, Esc clears, Enter/↓ back to the list"));
     m_filterEdit->installEventFilter(this);
     m_filterInfo = new QLabel(m_filterBar);
-    fl->addWidget(filterLabel);
+    fl->addWidget(m_filterLabel);
     fl->addWidget(m_filterEdit, 1);
     fl->addWidget(m_filterInfo);
     m_filterBar->hide();
@@ -274,6 +274,10 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
         DirTab* t = tab();
         if (!t)
             return;
+        if (t->isLive()) {
+            t->setLiveQuery(text);
+            return;
+        }
         const QString keep = currentName();
         t->model()->setFilter(text);
         int row = t->model()->rowOf(keep);
@@ -464,7 +468,12 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     // Esc in the list closes one thing at a time, innermost first.
     connect(m_view, &FileView::escapePressed, this, [this] {
         DirTab* t = tab();
-        if (t && (t->isLoading() || t->isSearching()))
+        if (t && t->isLive()) {  // back to the query; Esc there leaves
+            if (m_filterBar->isVisible())
+                m_filterEdit->setFocus();
+            else
+                t->goUp();
+        } else if (t && (t->isLoading() || t->isSearching()))
             cancelLoading();  // stop what's running
         else if (m_searchBar->isVisible())
             m_searchBar->hide();
@@ -567,6 +576,8 @@ void Panel::bindTab(DirTab* t)
         if (ti >= 0)
             updateTabTitles();
         if (t == tab()) {
+            if (!t->isLive() && m_filterLabel->text() != tr("Filter"))
+                showFilterBarFor(t);  // the live search was left
             updateSearchUi();
             updateStatus();
         }
@@ -759,11 +770,7 @@ void Panel::showTab(int index)
         m_view->header()->setSortIndicator(int(s.column), s.descending ? Qt::DescendingOrder : Qt::AscendingOrder);
     }
     t->setCursorProvider([this] { return currentName(); });
-    {
-        QSignalBlocker block(m_filterEdit);
-        m_filterEdit->setText(t->model()->filter());
-    }
-    m_filterBar->setVisible(!t->model()->filter().isEmpty());
+    showFilterBarFor(t);
 
     const int row = t->model()->rowOf(t->savedCursor);
     m_view->setCurrentRow(row < 0 ? 0 : row);
@@ -787,7 +794,12 @@ void Panel::onListingReady(DirTab* t, const QString& focus)
         return;
     }
     applyViewMode();
-    m_filterBar->setVisible(!t->model()->filter().isEmpty());
+    if (!m_pendingFilter.isEmpty() && !t->isSearch()) {
+        t->model()->setFilter(m_pendingFilter);
+        m_pendingFilter.clear();
+    }
+    if (!m_filterEdit->hasFocus() || !t->isLive())
+        showFilterBarFor(t);
     const bool sameFolder = t->model()->path() == m_pathBeforeReset;
     int row = focus.isEmpty() ? 0 : t->model()->rowOf(focus);
     if (row < 0)  // the focused item is gone (deleted, moved): stay where it was, not at the top
@@ -1333,7 +1345,7 @@ void Panel::updateStatus()
     if (!m_message.isEmpty()) {
         text = m_message;
         color = m_messageError ? t.error : t.text;
-    } else if (tb && tb->isSearch() && tb->isSearching()) {
+    } else if (tb && tb->isSearch() && tb->isSearching() && !tb->isLive()) {
         text = tr("Searching %1 for “%2” …  %3 found   (Esc stops)")
                    .arg(tb->searchSpec().root, tb->searchSpec().query)
                    .arg(tb->searchFound());
@@ -1343,7 +1355,10 @@ void Panel::updateStatus()
         color = t.accent;
     } else if (tb) {
         const FileModel::Stats s = tb->model()->stats();
-        if (!tb->model()->filter().isEmpty())
+        if (tb->isLive())
+            m_filterInfo->setText(tr("%1 of %2 found").arg(tb->searchFound()).arg(tb->liveTotal()) +
+                                  (tb->isSearching() ? QStringLiteral(" …") : QString()));
+        else if (!tb->model()->filter().isEmpty())
             m_filterInfo->setText(tr("%1 shown, %2 hidden").arg(s.files + s.dirs).arg(tb->model()->hiddenByFilter()));
         if (s.markedFiles + s.markedDirs > 0) {
             text = tr("%1 of %2 files, %3 of %4 folders marked   ·   %5 of %6")
@@ -1427,13 +1442,90 @@ void Panel::updateSearchUi()
 
 void Panel::startFilter()
 {
+    DirTab* t = tab();
+    if (t && t->isLive()) {  // Ctrl+F in the live search: this folder only, same words
+        toggleFilterDepth();
+        return;
+    }
+    if (t)
+        showFilterBarFor(t);
     m_filterBar->show();
     m_filterEdit->setFocus();
     m_filterEdit->selectAll();
 }
 
+void Panel::startDeepFilter()
+{
+    if (isRemote()) {
+        showMessage(tr("Searching on servers isn't supported yet"), true);
+        return;
+    }
+    if (inArchive()) {
+        showMessage(tr("Searching inside archives isn't supported yet"), true);
+        return;
+    }
+    DirTab* t = tab();
+    if (!t)
+        return;
+    if (!t->isLive()) {
+        const QString words = t->model()->filter();
+        const QString root = t->isSearch() ? t->searchSpec().root : path();
+        t->startLiveSearch(root);
+        t->setLiveQuery(words);
+    }
+    showFilterBarFor(t);
+    m_filterEdit->setFocus();
+    m_filterEdit->selectAll();
+}
+
+// The bar as the tab needs it: the live search's words, or the folder's filter.
+void Panel::showFilterBarFor(DirTab* t)
+{
+    const bool live = t->isLive();
+    m_filterLabel->setText(live ? tr("Filter with subfolders") : tr("Filter"));
+    m_filterEdit->setPlaceholderText(live ? tr("words in the path or *.ext — Alt+S this folder only, Esc leaves")
+                                          : tr("words or *.ext — Alt+S with subfolders, Esc clears, Enter/↓ back to the list"));
+    {
+        QSignalBlocker block(m_filterEdit);
+        m_filterEdit->setText(live ? t->searchSpec().query : t->model()->filter());
+    }
+    if (!live)
+        m_filterInfo->clear();
+    m_filterBar->setVisible(live || !t->model()->filter().isEmpty() || m_filterEdit->hasFocus());
+    updateStatus();
+}
+
+// Alt+S in the bar: the same words, with or without subfolders.
+void Panel::toggleFilterDepth()
+{
+    DirTab* t = tab();
+    if (!t)
+        return;
+    const QString words = m_filterEdit->text();
+    if (t->isLive()) {
+        m_pendingFilter = words;
+        t->goUp();  // back to the folder; the filter follows its listing
+        m_filterLabel->setText(tr("Filter"));
+        m_filterBar->show();
+        m_filterEdit->setFocus();
+        return;
+    }
+    if (isRemote() || inArchive()) {
+        startDeepFilter();  // says why not
+        return;
+    }
+    t->model()->setFilter({});
+    t->startLiveSearch(path());
+    t->setLiveQuery(words);
+    showFilterBarFor(t);
+    m_filterEdit->setFocus();
+    m_filterEdit->end(false);
+}
+
 void Panel::clearFilter()
 {
+    if (DirTab* t = tab(); t && t->isLive())
+        t->goUp();  // leave the live search
     m_filterEdit->clear();
     m_filterBar->hide();
     if (DirTab* t = tab())
@@ -1895,6 +1987,10 @@ bool Panel::eventFilter(QObject* obj, QEvent* e)
     }
     if (obj == m_filterEdit && e->type() == QEvent::KeyPress) {
         auto* ke = static_cast<QKeyEvent*>(e);
+        if (ke->key() == Qt::Key_S && (ke->modifiers() & Qt::AltModifier)) {
+            toggleFilterDepth();
+            return true;
+        }
         if (ke->key() == Qt::Key_Escape) {
             clearFilter();
             return true;

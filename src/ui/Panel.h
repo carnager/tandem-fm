@@ -94,6 +94,8 @@ public:
     void expectName(const QString& name);
     void focusPathEdit();
     void startFilter();
+    // Ctrl+Shift+F: the filter bar, matching files in all subfolders too.
+    void startDeepFilter();
     void startSearchBar();  // Alt+F7
     void clearFilter();
     void showMountMenu();
@@ -197,6 +199,10 @@ private:
     QWidget* m_filterBar;
     QLineEdit* m_filterEdit;
     QLabel* m_filterInfo;
+    QLabel* m_filterLabel;
+    QString m_pendingFilter;  // for the folder listing on its way (Alt+S from subfolders)
+    void showFilterBarFor(DirTab* t);
+    void toggleFilterDepth();
 
     QTimer m_loadingTimer;
     QTimer m_messageTimer;

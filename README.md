@@ -102,6 +102,7 @@ tandem-fm ~/Projects ~/Downloads
 | Ctrl+Q | Show or hide previews |
 | Ctrl+F | Filter the current folder |
 | Alt+F7 | Search a local folder tree by name or file contents |
+| Ctrl+Shift+F | Filter as you type through all subfolders; results work like any folder |
 | Ctrl+J | Jump to a visited folder |
 | Alt+W | Open a workspace, or save the open tabs as one |
 | Ctrl+Shift+P | Open the command palette |
