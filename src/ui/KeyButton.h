@@ -28,9 +28,10 @@ public:
         m_primary = primary;
         update();
     }
+    QString keys() const { return m_keys.join(QLatin1Char('+')); }
     void setKeys(const QString& keys)
     {
-        const QStringList k = keys.split(QLatin1Char('+'));
+        const QStringList k = keys.isEmpty() ? QStringList() : keys.split(QLatin1Char('+'));
         if (k == m_keys)
             return;
         m_keys = k;

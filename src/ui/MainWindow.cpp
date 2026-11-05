@@ -527,7 +527,9 @@ void MainWindow::createMenus()
         QSettings().setValue(QStringLiteral("input/vimKeys"), on);
         m_left->setVimKeys(on);
         m_right->setVimKeys(on);
-        active()->showMessage(on ? tr("Modal keys on: letters are commands (F1 lists them)") : tr("Modal keys off"));
+        active()->showMessage(on ? tr("Modal keys on: letters are commands (%1 lists them)").arg(keyHint(QStringLiteral("keyboard-shortcuts")))
+                                 : tr("Modal keys off"));
+        scheduleFKeyUpdate();  // the hints show the letters
     });
     vim->setCheckable(true);
     m_actions[QStringLiteral("vim")] = vim;
@@ -790,6 +792,27 @@ void MainWindow::scheduleFKeyUpdate()
     });
 }
 
+QString MainWindow::keyHint(const QString& commandId, bool modal) const
+{
+    if (modal && m_actions.value(QStringLiteral("vim")) && m_actions.value(QStringLiteral("vim"))->isChecked()) {
+        // Modal built-ins that do what a command does.
+        static const QHash<QString, QString> same = {
+            {QStringLiteral("command-palette"), QStringLiteral("palette")},
+            {QStringLiteral("bookmark-this-folder"), QStringLiteral("bookmark-set")},
+            {QStringLiteral("bookmarks-key-chains"), QStringLiteral("bookmark-jump")},
+            {QStringLiteral("run-command"), QStringLiteral("command-line")},
+        };
+        const QString builtin = same.value(commandId);
+        for (const Keymap::Binding& b : Keymap::instance().modalBindings())
+            if (b.action == commandId || (!builtin.isEmpty() && b.action == builtin))
+                return b.sequence.join(QLatin1Char(' '));
+    }
+    for (QAction* a : actions())
+        if (a->property("commandId").toString() == commandId)
+            return a->shortcut().toString(QKeySequence::NativeText);
+    return {};
+}
+
 // "Copy 4 → Projects": how many go, and the folder they go to.
 void MainWindow::updateFKeys()
 {
@@ -812,10 +835,17 @@ void MainWindow::updateFKeys()
     static_cast<KeyButton*>(m_fkeys.value(QStringLiteral("F5")))->setText(count(tr("Copy")), to);
     static_cast<KeyButton*>(m_fkeys.value(QStringLiteral("F6")))->setText(count(tr("Move")), to);
     static_cast<KeyButton*>(m_fkeys.value(QStringLiteral("F8")))->setText(count(tr("Trash")));
-    for (QAction* a : actions())
-        if (a->property("commandId").toString() == QLatin1String("command-palette") && !a->shortcut().isEmpty())
-            static_cast<KeyButton*>(m_fkeys.value(QStringLiteral("all")))
-                ->setKeys(a->shortcut().toString(QKeySequence::NativeText));
+    // The keys as they are now: rebound in keys.toml, or modal letters.
+    static const std::pair<const char*, const char*> ids[] = {
+        {"F2", "rename"}, {"F3", "view"}, {"F4", "edit"}, {"F5", "copy"}, {"F6", "move"},
+        {"F7", "new-folder"}, {"F8", "move-to-trash"}, {"all", "command-palette"},
+    };
+    for (const auto& [button, id] : ids) {
+        auto* b = static_cast<KeyButton*>(m_fkeys.value(QLatin1String(button)));
+        const QString keys = keyHint(QLatin1String(id));
+        b->setKeys(keys);
+        b->setVisible(!keys.isEmpty() || QLatin1String(button) != QLatin1String("all"));
+    }
     updateSelectionBars(target);
 }
 
@@ -840,10 +870,14 @@ void MainWindow::updateSelectionBars(const QString& target)
                 for (const PluginAction& action : plugin.actions)
                     if (!action.forFolder && pluginApplies(action, ctx))
                         plugins << plugin.id + QLatin1Char('/') + action.id;
-        const QString state = QStringLiteral("%1|%2|%3|%4|%5|%6")
+        const QString copyKey = keyHint(QStringLiteral("copy")), moveKey = keyHint(QStringLiteral("move"));
+        const QString copyToKey = keyHint(QStringLiteral("copy-to-an-open-tab-bookmark-or-folder"));
+        const QString moveToKey = keyHint(QStringLiteral("move-to-an-open-tab-bookmark-or-folder"));
+        const QString state = QStringLiteral("%1|%2|%3|%4|%5|%6|%7")
                                   .arg(s.markedFiles).arg(s.markedDirs).arg(s.markedBytes)
                                   .arg(theme().serial)
-                                  .arg(target, plugins.join(QLatin1Char(',')));
+                                  .arg(target, plugins.join(QLatin1Char(',')),
+                                       QStringList{copyKey, moveKey, copyToKey, moveToKey}.join(QLatin1Char(',')));
         if (bar->property("state").toString() == state && bar->isVisible())
             continue;
         bar->setProperty("state", state);
@@ -878,23 +912,26 @@ void MainWindow::updateSelectionBars(const QString& target)
             return b;
         };
         // …or anywhere else: open tabs, bookmarks, recent folders
-        auto elsewhere = [&](CopyJob::Mode mode, const QString& name, const QString& tip, const QString& accessible) {
+        auto elsewhere = [&](CopyJob::Mode mode, const QString& name, const QString& tip, const QString& key,
+                             const QString& accessible) {
             auto* more = new QToolButton(bar);
             more->setObjectName(name);
             more->setText(QStringLiteral("▾"));
-            more->setToolTip(tip);
+            more->setToolTip(key.isEmpty() ? tip : QStringLiteral("%1 (%2)").arg(tip, key));
             more->setAccessibleName(accessible);
             more->setAutoRaise(true);
             more->setFocusPolicy(Qt::NoFocus);
             connect(more, &QToolButton::clicked, this, [this, mode, more] { copyOrMoveTo(mode, more); });
             l->addWidget(more);
         };
-        button(QStringLiteral("F5"), tr("Copy to"), target, true, [this] { copyOrMove(CopyJob::Mode::Copy); });
+        button(copyKey, tr("Copy to"), target, true, [this] { copyOrMove(CopyJob::Mode::Copy); })
+            ->setObjectName(QStringLiteral("selection-F5"));
         elsewhere(CopyJob::Mode::Copy, QStringLiteral("selection-elsewhere"),
-                  tr("Copy to another tab, a bookmark or a recent folder (Alt+Shift+F5)"), tr("Copy elsewhere"));
-        button(QStringLiteral("F6"), tr("Move"), QString(), false, [this] { copyOrMove(CopyJob::Mode::Move); });
+                  tr("Copy to another tab, a bookmark or a recent folder"), copyToKey, tr("Copy elsewhere"));
+        button(moveKey, tr("Move"), QString(), false, [this] { copyOrMove(CopyJob::Mode::Move); })
+            ->setObjectName(QStringLiteral("selection-F6"));
         elsewhere(CopyJob::Mode::Move, QStringLiteral("selection-move-elsewhere"),
-                  tr("Move to another tab, a bookmark or a recent folder (Alt+Shift+F6)"), tr("Move elsewhere"));
+                  tr("Move to another tab, a bookmark or a recent folder"), moveToKey, tr("Move elsewhere"));
         for (const Plugin& plugin : std::as_const(m_plugins)) {
             if (!plugin.error.isEmpty() || pluginTrust(plugin) != PluginTrust::On)
                 continue;
@@ -1700,7 +1737,7 @@ void MainWindow::commandPalette()
         if (a->text().isEmpty() || !a->isEnabled() || a->menu())
             continue;
         QString title = a->text().remove(QLatin1Char('&'));
-        QString hint = a->shortcut().toString(QKeySequence::NativeText);
+        QString hint = keyHint(a->property("commandId").toString());
         if (const int tab = int(title.indexOf(QLatin1Char('\t'))); tab >= 0) {
             hint = title.mid(tab + 1);
             title.truncate(tab);
@@ -1749,10 +1786,28 @@ void MainWindow::commandPalette()
             items.append(it);
         }
     }
-    m_popup->keyHandler = nullptr;
+    // The jump key (Ctrl+J) narrows to folders, keeping what was typed. The
+    // list's own Ctrl+J (down) would take it otherwise.
+    m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem*) {
+        bool jump = false;
+        for (QAction* a : actions())
+            if (a->property("commandId").toString() == QLatin1String("jump-to-folder-search"))
+                for (const QKeySequence& k : a->shortcuts())
+                    jump |= k.count() == 1 && k[0] == e->keyCombination();
+        if (!jump)
+            return false;
+        const QString query = m_popup->query();
+        QTimer::singleShot(0, this, [this, query] {  // not from inside the handler it replaces
+            jumpToFolder();
+            m_popup->setQuery(query);
+        });
+        return true;
+    };
     m_popup->queryItem = nullptr;
     const QString placeholder = tr("Go to a folder, find a file, run a command");
-    const QString footer = tr("Enter: run or open   ·   Ctrl+J: folders only");
+    const QString jumpKey = keyHint(QStringLiteral("jump-to-folder-search"), false);
+    const QString footer = jumpKey.isEmpty() ? tr("Enter: run or open")
+                                             : tr("Enter: run or open   ·   %1: folders only").arg(jumpKey);
     if (m_searchField && m_searchField->isVisible())
         m_popup->openUnder(m_searchField, placeholder, items, footer);
     else
@@ -1801,7 +1856,8 @@ void MainWindow::jumpToFolder()
         return false;
     };
     m_popup->open(tr("Jump to a folder: type parts of its path"), folderItems(),
-                  tr("Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   Ctrl+D: bookmark keys"));
+                  tr("Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   %1: bookmark keys")
+                      .arg(keyHint(QStringLiteral("bookmarks-key-chains"), false)));
 }
 
 // ------------------------------------------------------------ icon themes
@@ -3064,7 +3120,7 @@ void MainWindow::fillBookmarksMenu(QMenu* menu)
         if (it.pinned && it.key.isEmpty())
             pins << it.path;
     if (entries.isEmpty() && pins.isEmpty()) {
-        add(menu->addAction(tr("No bookmarks yet: Ctrl+Shift+D bookmarks the shown folder")))->setEnabled(false);
+        add(menu->addAction(tr("No bookmarks yet: %1 bookmarks the shown folder").arg(keyHint(QStringLiteral("bookmark-this-folder")))))->setEnabled(false);
         return;
     }
     // Names, with the folder above when two would look the same.
@@ -3470,7 +3526,7 @@ void MainWindow::saveWorkspacePicker()
         return it;
     };
     m_popup->open(tr("Save the open tabs as a workspace: type a name"), items,
-                  tr("Enter: save   ·   Alt+W opens one"));
+                  tr("Enter: save   ·   %1 opens one").arg(keyHint(QStringLiteral("workspaces"), false)));
 }
 
 // Each workspace is a command too, so it can have a key (Keys page, keys.toml).

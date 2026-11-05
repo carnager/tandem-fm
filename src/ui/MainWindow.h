@@ -36,6 +36,9 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
     friend class SettingsDialog;
 public:
+    // The key that runs a command now, for hints: with modal keys on, its
+    // letter (when it has one and `modal`), else its first shortcut.
+    QString keyHint(const QString& commandId, bool modal = true) const;
     explicit MainWindow(const QStringList& startPaths);
     // "each" (below each panel), "bottom" (below both) or "right".
     void setPreviewPosition(const QString& code);

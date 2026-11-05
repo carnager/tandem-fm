@@ -70,6 +70,7 @@ public:
     void setItems(const QList<PopupItem>& items);  // keeps the query (after pin/forget)
     const PopupItem* currentItem() const;
     QString query() const;
+    void setQuery(const QString& text);
 
     // Extra keys (e.g. Ctrl+P to pin). Return true when handled.
     std::function<bool(QKeyEvent*, const PopupItem*)> keyHandler;

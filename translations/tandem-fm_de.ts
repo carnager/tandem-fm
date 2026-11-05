@@ -2543,10 +2543,6 @@
         <translation>Modale Tasten (vim, yazi)</translation>
     </message>
     <message>
-        <source>Modal keys on: letters are commands (F1 lists them)</source>
-        <translation>Modale Tasten an: Buchstaben sind Befehle (F1 zeigt sie)</translation>
-    </message>
-    <message>
         <source>Modal keys off</source>
         <translation>Modale Tasten aus</translation>
     </message>
@@ -2633,20 +2629,16 @@
         <translation>Kopieren nach</translation>
     </message>
     <message>
-        <source>Copy to another tab, a bookmark or a recent folder (Alt+Shift+F5)</source>
-        <translation>In einen anderen Tab, ein Lesezeichen oder einen letzten Ordner kopieren (Alt+Umschalt+F5)</translation>
-    </message>
-    <message>
         <source>Copy elsewhere</source>
         <translation>Woandershin kopieren</translation>
     </message>
     <message>
-        <source>Move to another tab, a bookmark or a recent folder (Alt+Shift+F6)</source>
-        <translation>In einen anderen Tab, ein Lesezeichen oder einen letzten Ordner verschieben (Alt+Umschalt+F6)</translation>
-    </message>
-    <message>
         <source>Move elsewhere</source>
         <translation>Woandershin verschieben</translation>
+    </message>
+    <message>
+        <source>Move to another tab, a bookmark or a recent folder</source>
+        <translation>In einen anderen Tab, ein Lesezeichen oder einen letzten Ordner verschieben</translation>
     </message>
     <message>
         <source>Unmark</source>
@@ -2848,6 +2840,14 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>  (aus)</translation>
     </message>
     <message>
+        <source>Enter: run or open</source>
+        <translation>Enter: ausführen oder öffnen</translation>
+    </message>
+    <message>
+        <source>Enter: run or open   ·   %1: folders only</source>
+        <translation>Enter: ausführen oder öffnen   ·   %1: nur Ordner</translation>
+    </message>
+    <message>
         <source>pinned</source>
         <translation>angeheftet</translation>
     </message>
@@ -2856,8 +2856,8 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Zu einem Ordner springen: Teile des Pfads eingeben</translation>
     </message>
     <message>
-        <source>Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   Ctrl+D: bookmark keys</source>
-        <translation>Enter: öffnen   ·   Ctrl+P: anheften / lösen   ·   Shift+Del: vergessen   ·   Ctrl+D: Lesezeichen-Tasten</translation>
+        <source>Enter: save   ·   %1 opens one</source>
+        <translation>Enter: speichern   ·   %1 öffnet einen</translation>
     </message>
     <message>
         <source>Extracting %1 …</source>
@@ -3039,10 +3039,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Files in %1</source>
         <translation>Dateien in %1</translation>
-    </message>
-    <message>
-        <source>Enter: run or open   ·   Ctrl+J: folders only</source>
-        <translation>Enter: ausführen oder öffnen   ·   Strg+J: nur Ordner</translation>
     </message>
     <message>
         <source>The folder changed while editing; nothing renamed</source>
@@ -3275,10 +3271,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Nichts zur Auswahl</translation>
     </message>
     <message>
-        <source>No bookmarks yet: Ctrl+Shift+D bookmarks the shown folder</source>
-        <translation>Noch keine Lesezeichen: Strg+Umschalt+D legt eins für den gezeigten Ordner an</translation>
-    </message>
-    <message>
         <source>Open with</source>
         <translation>Öffnen mit</translation>
     </message>
@@ -3321,6 +3313,22 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>No terminal found. Set tools/terminal in the config.</source>
         <translation>Kein Terminal gefunden. tools/terminal in der Konfiguration setzen.</translation>
+    </message>
+    <message>
+        <source>Modal keys on: letters are commands (%1 lists them)</source>
+        <translation>Modale Tasten an: Buchstaben sind Befehle (%1 zeigt sie)</translation>
+    </message>
+    <message>
+        <source>Copy to another tab, a bookmark or a recent folder</source>
+        <translation>In einen anderen Tab, ein Lesezeichen oder einen letzten Ordner kopieren</translation>
+    </message>
+    <message>
+        <source>Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   %1: bookmark keys</source>
+        <translation>Enter: öffnen   ·   Strg+P: anheften / lösen   ·   Umschalt+Entf: vergessen   ·   %1: Lesezeichen-Tasten</translation>
+    </message>
+    <message>
+        <source>No bookmarks yet: %1 bookmarks the shown folder</source>
+        <translation>Noch keine Lesezeichen: %1 legt eins für den gezeigten Ordner an</translation>
     </message>
     <message>
         <source>Open with works on local files: F3 or Enter opens this one</source>
@@ -3425,10 +3433,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Save the open tabs as a workspace: type a name</source>
         <translation>Offene Tabs als Arbeitsbereich speichern: tippe einen Namen</translation>
-    </message>
-    <message>
-        <source>Enter: save   ·   Alt+W opens one</source>
-        <translation>Enter: speichern   ·   Alt+W öffnet einen</translation>
     </message>
     <message>
         <source>Workspaces</source>

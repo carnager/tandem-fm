@@ -284,6 +284,11 @@ void FuzzyPopup::open(const QString& placeholder, const QList<PopupItem>& items,
     m_edit->setFocus();
 }
 
+void FuzzyPopup::setQuery(const QString& text)
+{
+    m_edit->setText(text);  // refilters
+}
+
 void FuzzyPopup::openUnder(QWidget* anchor, const QString& placeholder, const QList<PopupItem>& items,
                            const QString& footer)
 {
