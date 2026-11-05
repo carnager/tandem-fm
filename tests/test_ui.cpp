@@ -43,6 +43,7 @@
 #include "core/Plugins.h"
 #include "ui/FileColors.h"
 #include "ui/Theme.h"
+#include "core/Workspaces.h"
 #include "ui/viewer/ImageView.h"
 #include "ui/viewer/ViewerWindow.h"
 
@@ -373,7 +374,7 @@ private slots:
                   "\\\"message\\\": \\\"marked\\\"}'\"]}]}");
 
         SettingsDialog settings(m_window.get());
-        settings.showPage(4);
+        settings.showPage(5);
         auto* reload = [&] {
             for (auto* b : settings.findChildren<QPushButton*>())
                 if (b->text() == tr("Reload"))
@@ -415,6 +416,125 @@ private slots:
         QTRY_VERIFY((reloaded = std::none_of(m_window->actions().cbegin(), m_window->actions().cend(), [](QAction* a) {
                          return a->property("commandId").toString().startsWith("plugin-marker");
                      })));
+    }
+
+    // Workspaces: Alt+W saves the open tabs under a new name; the workspace's
+    // own command brings them back in place of the tabs open then.
+    void workspaces()
+    {
+        auto restore = qScopeGuard([this] {
+            for (const Workspace& w : Workspaces::all())
+                Workspaces::remove(w.id);
+            Workspaces::setStartup(StartupMode::Session);
+            m_left->replaceTabs({L()}, 0);
+            m_right->replaceTabs({R()}, 0);
+            QTRY_COMPARE(leftModel()->path(), L());
+            QTRY_COMPARE(rightModel()->path(), R());
+            m_left->view()->setFocus();
+        });
+        m_left->replaceTabs({L(), L("sub")}, 1, {1, 4});
+        m_right->replaceTabs({R()}, 0);
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+        m_right->view()->setFocus();
+        QTRY_VERIFY(m_right->isActive());
+
+        auto visiblePopup = [this] {
+            for (auto* p : m_window->findChildren<FuzzyPopup*>())
+                if (p->isVisible())
+                    return p;
+            return static_cast<FuzzyPopup*>(nullptr);
+        };
+        QTest::keyClick(m_right->view(), Qt::Key_W, Qt::AltModifier);
+        FuzzyPopup* popup = nullptr;
+        QTRY_VERIFY((popup = visiblePopup()));
+        QTest::keyClicks(QApplication::focusWidget(), "Project");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->title.contains("Project"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_VERIFY(Workspaces::byName("Project"));
+        const Workspace saved = *Workspaces::byName("Project");
+        QCOMPARE(saved.left.paths, QStringList({L(), L("sub")}));
+        QCOMPARE(saved.left.numbers, QList<int>({1, 4}));
+        QCOMPARE(saved.left.current, 1);
+        QCOMPARE(saved.right.paths, QStringList({R()}));
+        QVERIFY(saved.rightActive);
+
+        // Its own command, for the palette and a key.
+        auto command = [this](int id) {
+            for (QAction* a : m_window->actions())
+                if (a->property("commandId").toString() == QString("workspace-%1").arg(id))
+                    return a;
+            return static_cast<QAction*>(nullptr);
+        };
+        QAction* open = command(saved.id);
+        QVERIFY(open);
+        QCOMPARE(open->text(), QString("Project"));
+
+        m_left->replaceTabs({R()}, 0);
+        m_right->replaceTabs({L(), R(), L("sub")}, 2);
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+        open->trigger();
+        QCOMPARE(m_left->tabPaths(), QStringList({L(), L("sub")}));
+        QCOMPARE(m_left->tabSlots(), QList<int>({1, 4}));
+        QCOMPARE(m_left->currentTabIndex(), 1);
+        QCOMPARE(m_right->tabPaths(), QStringList({R()}));  // replaced, not added to
+        QTRY_VERIFY(m_right->isActive());
+        QTRY_COMPARE(leftModel()->path(), L("sub"));
+
+        // Settings › Startup: renamed in place, the command follows; deleted, it goes.
+        {
+            SettingsDialog settings(m_window.get());
+            settings.showPage(2);
+            QTreeWidget* list = nullptr;
+            for (auto* t : settings.findChildren<QTreeWidget*>())
+                if (t->topLevelItemCount() == 1 && t->topLevelItem(0)->text(0) == "Project")
+                    list = t;
+            QVERIFY(list);
+            list->topLevelItem(0)->setText(0, "Renamed");
+            QTRY_COMPARE(Workspaces::byId(saved.id)->name, QString("Renamed"));
+            QTRY_VERIFY(command(saved.id) && command(saved.id)->text() == "Renamed");
+
+            QComboBox* startup = nullptr;
+            for (auto* c : settings.findChildren<QComboBox*>())
+                if (c->findData(QString("workspace:%1").arg(saved.id)) >= 0)
+                    startup = c;
+            QVERIFY(startup);
+            QCOMPARE(startup->currentData().toString(), QString("session"));  // the default
+            startup->setCurrentIndex(startup->findData(QString("workspace:%1").arg(saved.id)));
+            emit startup->activated(startup->currentIndex());
+            QCOMPARE(Workspaces::startupMode(), StartupMode::Workspace);
+        }
+
+        // At start: the workspace, unless folders are given; or home in both panels.
+        auto startedWith = [](const QStringList& args) {
+            const auto titles = Keymap::actionTitle;  // a window sets it to its own
+            auto restore = qScopeGuard([titles] { Keymap::actionTitle = titles; });
+            MainWindow other(args);
+            Panel* l = other.findChild<Panel*>("leftPanel");
+            Panel* r = other.findChild<Panel*>("rightPanel");
+            return QStringList{l->tabPaths().join(","), r->tabPaths().join(","), r->isActive() ? "right" : "left"};
+        };
+        QCOMPARE(startedWith({}), QStringList({L() + "," + L("sub"), R(), "right"}));
+        QCOMPARE(startedWith({L("sub")}), QStringList({L("sub"), R(), "right"}));
+        Workspaces::setStartup(StartupMode::Home);
+        QCOMPARE(startedWith({}), QStringList({QDir::homePath(), QDir::homePath(), "left"}));
+
+        {
+            SettingsDialog settings(m_window.get());
+            QPushButton* remove = nullptr;
+            QTreeWidget* list = nullptr;
+            for (auto* b : settings.findChildren<QPushButton*>())
+                if (b->text() == "Delete")
+                    remove = b;
+            for (auto* t : settings.findChildren<QTreeWidget*>())
+                if (t->topLevelItemCount() == 1 && t->topLevelItem(0)->text(0) == "Renamed")
+                    list = t;
+            QVERIFY(remove && list);
+            list->setCurrentItem(list->topLevelItem(0));
+            remove->click();
+            QVERIFY(Workspaces::all().isEmpty());
+            QVERIFY(!command(saved.id));
+        }
     }
 
     // Several archives at once: each unpacked next to itself, several
@@ -2328,7 +2448,7 @@ private slots:
     {
         SettingsDialog dlg(m_window.get());
         dlg.show();
-        dlg.showPage(3);
+        dlg.showPage(4);
         auto find = [&](const QString& text) -> QTreeWidgetItem* {
             for (int i = 0; i < dlg.keyList()->topLevelItemCount(); ++i)
                 if (dlg.keyList()->topLevelItem(i)->text(0).endsWith(text))

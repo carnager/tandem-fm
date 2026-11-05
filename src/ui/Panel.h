@@ -74,6 +74,9 @@ public:
     int currentTabIndex() const { return m_current; }
     void restoreTabs(const QStringList& paths, int current, const QList<int>& numbers = {},
                      const QList<bool>& grids = {});
+    // Closes every tab and opens these instead (a workspace).
+    void replaceTabs(const QStringList& paths, int current, const QList<int>& numbers = {},
+                     const QList<bool>& grids = {});
 
     void sortBy(SortColumn column);
     SortSpec sortSpec() const;

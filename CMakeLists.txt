@@ -46,6 +46,7 @@ add_library(tandem_core STATIC
   src/core/FolderCompare.h src/core/FolderCompare.cpp
   src/core/Remote.h src/core/Remote.cpp
   src/core/Servers.h src/core/Servers.cpp
+  src/core/Workspaces.h src/core/Workspaces.cpp
   src/core/Backend.h src/core/Backend.cpp
   src/core/BackendCopy.cpp
   src/core/SftpBackend.cpp

@@ -443,6 +443,11 @@ void MainWindow::createMenus()
     for (int i = 1; i <= 9; ++i)
         addCommand(tabs, tr("Tab %1").arg(i), {K(Qt::ALT | (Qt::Key_0 + i))}, [this, i] { active()->selectSlot(i); },
                    QStringLiteral("tab-%1").arg(i));
+    tabs->addSeparator();
+    addCommand(tabs, QT_TR_NOOP("Workspaces…"), {K(Qt::ALT | Qt::Key_W)}, [this] { showWorkspaces(); });
+    addCommand(tabs, QT_TR_NOOP("Save workspace…"), {}, [this] { saveWorkspacePicker(); });
+    m_workspaceMenu = tabs->addMenu(tr("Open workspace"));
+    installWorkspaceCommands();
 
     // View: how the panels look right now. Lasting choices are in Settings.
     QMenu* view = bar->addMenu(tr("&View"));
@@ -3364,6 +3369,128 @@ void MainWindow::makeFile(const QString& given)
     });
 }
 
+// ------------------------------------------------------------- workspaces
+
+Workspace MainWindow::currentWorkspace() const
+{
+    Workspace w;
+    for (auto [panel, tabs] : {std::pair{m_left, &w.left}, std::pair{m_right, &w.right}}) {
+        tabs->paths = panel->tabPaths();
+        tabs->numbers = panel->tabSlots();
+        tabs->grids = panel->tabGrids();
+        tabs->current = panel->currentTabIndex();
+    }
+    w.rightActive = m_active == m_right;
+    return w;
+}
+
+// Replaces the tabs in both panels.
+void MainWindow::openWorkspace(const Workspace& w)
+{
+    m_left->replaceTabs(w.left.paths, w.left.current, w.left.numbers, w.left.grids);
+    m_right->replaceTabs(w.right.paths, w.right.current, w.right.numbers, w.right.grids);
+    Panel* act = w.rightActive ? m_right : m_left;
+    setActive(act);
+    act->view()->setFocus();
+    act->showMessage(tr("Workspace “%1”").arg(w.name));
+}
+
+void MainWindow::saveCurrentAsWorkspace(int id, const QString& name)
+{
+    Workspace w = currentWorkspace();
+    w.id = id;
+    w.name = name.trimmed();
+    Workspaces::save(w);
+    installWorkspaceCommands();
+    active()->showMessage(tr("Workspace “%1” saved").arg(w.name));
+}
+
+// Alt+W: open one; a name that isn't there yet saves the open tabs under it.
+void MainWindow::showWorkspaces()
+{
+    QList<PopupItem> items;
+    const QIcon icon = IconCache::themed("view-split-left-right", "folder");
+    for (const Workspace& w : Workspaces::all()) {
+        PopupItem it;
+        it.title = w.name;
+        it.subtitle = Workspaces::describe(w);
+        it.icon = icon;
+        for (QAction* a : std::as_const(m_workspaceActions))
+            if (a->property("commandId").toString() == QStringLiteral("workspace-%1").arg(w.id))
+                it.hint = a->shortcut().toString(QKeySequence::NativeText);
+        it.run = [this, w] { openWorkspace(w); };
+        items.append(it);
+    }
+    m_popup->keyHandler = nullptr;
+    m_popup->queryItem = [this](const QString& query) -> std::optional<PopupItem> {
+        const QString name = query.trimmed();
+        if (name.isEmpty() || Workspaces::byName(name))
+            return std::nullopt;
+        PopupItem it;
+        it.title = tr("Save the open tabs as “%1”").arg(name);
+        it.icon = IconCache::themed("document-save", "document-save");
+        it.bonus = -1000;  // after the matches
+        it.run = [this, name] { saveCurrentAsWorkspace(0, name); };
+        return it;
+    };
+    m_popup->open(items.isEmpty() ? tr("No workspaces yet: type a name to save the open tabs")
+                                  : tr("Open a workspace, or type a new name to save the open tabs"),
+                  items, tr("Enter: open, in place of the tabs in both panels   ·   Settings › Startup: rename, delete"));
+}
+
+// Saves the open tabs: under a new name, or in place of a workspace.
+void MainWindow::saveWorkspacePicker()
+{
+    QList<PopupItem> items;
+    const QIcon icon = IconCache::themed("view-split-left-right", "folder");
+    for (const Workspace& w : Workspaces::all()) {
+        PopupItem it;
+        it.title = w.name;
+        it.subtitle = tr("Replace with the open tabs");
+        it.icon = icon;
+        const int id = w.id;
+        const QString name = w.name;
+        it.run = [this, id, name] { saveCurrentAsWorkspace(id, name); };
+        items.append(it);
+    }
+    m_popup->keyHandler = nullptr;
+    m_popup->queryItem = [this](const QString& query) -> std::optional<PopupItem> {
+        const QString name = query.trimmed();
+        if (name.isEmpty() || Workspaces::byName(name))
+            return std::nullopt;
+        PopupItem it;
+        it.title = tr("Save as “%1”").arg(name);
+        it.icon = IconCache::themed("document-save", "document-save");
+        it.bonus = 1000;
+        it.run = [this, name] { saveCurrentAsWorkspace(0, name); };
+        return it;
+    };
+    m_popup->open(tr("Save the open tabs as a workspace: type a name"), items,
+                  tr("Enter: save   ·   Alt+W opens one"));
+}
+
+// Each workspace is a command too, so it can have a key (Keys page, keys.toml).
+void MainWindow::installWorkspaceCommands()
+{
+    qDeleteAll(m_workspaceActions);
+    m_workspaceActions.clear();
+    m_workspaceMenu->clear();
+    for (const Workspace& w : Workspaces::all()) {
+        const int id = w.id;
+        QAction* a = addCommand(
+            m_workspaceMenu, w.name, {},
+            [this, id] {
+                if (const std::optional<Workspace> ws = Workspaces::byId(id))
+                    openWorkspace(*ws);
+            },
+            QStringLiteral("workspace-%1").arg(id));
+        a->setProperty("category", tr("Workspaces"));
+        m_workspaceActions.append(a);
+    }
+    m_workspaceMenu->menuAction()->setEnabled(!m_workspaceActions.isEmpty());
+    applyKeyBindings(m_workspaceActions);
+}
+
 // --------------------------------------------------------------- settings
 
 void MainWindow::loadSettings(const QStringList& startPaths)
@@ -3416,6 +3543,11 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         int argIndex;
     } panels[] = {{m_left, "left", 0}, {m_right, "right", 1}};
     const bool rows2 = s.value(QStringLiteral("view/rows2"), false).toBool();
+    // At start: the tabs from last time, a workspace, or home in both panels.
+    const StartupMode startup = Workspaces::startupMode();
+    std::optional<Workspace> startWorkspace;
+    if (startup == StartupMode::Workspace)
+        startWorkspace = Workspaces::byId(Workspaces::startupWorkspace());
     for (const auto& p : panels) {
         s.beginGroup(QLatin1String(p.key));
         SortSpec spec;
@@ -3430,17 +3562,33 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         QList<int> numbers;  // ("slots" is a Qt macro)
         for (const QVariant& v : s.value(QStringLiteral("tabSlots")).toList())
             numbers.append(v.toInt());
+        QList<bool> grids;
+        for (const QVariant& v : s.value(QStringLiteral("tabGrids")).toList())
+            grids.append(v.toBool());
+        if (startWorkspace) {
+            const PanelTabs& t = p.argIndex == 0 ? startWorkspace->left : startWorkspace->right;
+            tabs = t.paths;
+            current = t.current;
+            numbers = t.numbers;
+            grids = t.grids;
+        } else if (startup == StartupMode::Home) {
+            tabs = {QDir::homePath()};
+            current = 0;
+            numbers.clear();
+            grids.clear();
+        }
         if (p.argIndex < startPaths.size()) {
             tabs = {expandUserPath(QDir::current().absoluteFilePath(startPaths[p.argIndex]))};
             current = 0;
         }
-        QList<bool> grids;
-        for (const QVariant& v : s.value(QStringLiteral("tabGrids")).toList())
-            grids.append(v.toBool());
         p.panel->restoreTabs(tabs, current, numbers, grids);
         s.endGroup();
     }
     Panel* act = s.value(QStringLiteral("window/active")).toString() == QLatin1String("right") ? m_right : m_left;
+    if (startWorkspace)
+        act = startWorkspace->rightActive ? m_right : m_left;
+    else if (startup == StartupMode::Home)
+        act = m_left;
     setActive(act);
     act->view()->setFocus();
     if (s.value(QStringLiteral("view/preview"), false).toBool())

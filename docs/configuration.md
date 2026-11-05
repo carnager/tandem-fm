@@ -1,7 +1,7 @@
 # Settings and keys
 
-Open Settings with **Ctrl+,** to change appearance, behaviour, external tools,
-key bindings and plugins. Most changes apply immediately; a language change
+Open Settings with **Ctrl+,** to change appearance, behaviour, what opens at
+start, external tools, key bindings and plugins. Most changes apply immediately; a language change
 takes effect after restarting Tandem.
 
 Settings and key bindings are also plain TOML files you can edit yourself.
@@ -31,6 +31,37 @@ Window size, columns and open tabs are Tandem's own business and live in
 `~/.local/state/tandem-fm/state.toml`. Settings from older versions
 (`tandem-fm.conf`) move over on the first start; the old file stays as
 `tandem-fm.conf.bak`.
+
+## Startup and workspaces
+
+A workspace is the tabs of both panels under a name. **Alt+W** opens one in
+place of the tabs open now; type a name that isn't there yet to save the open
+tabs under it. **Save workspace…** (in the Tabs menu and the command palette)
+updates one. Each workspace is also a command, so it can get a key on the
+Keys page or in `keys.toml` (`workspace-<number>`).
+
+**Settings → Startup** chooses what opens when Tandem starts: the tabs from
+last time (the default), a workspace, or the home folder in both panels.
+The window's size and place are always kept, and folders given on the
+command line open instead. The same page renames, updates and deletes
+workspaces. They are kept in `tandem-fm.toml`:
+
+```toml
+[startup]
+open = "workspace"               # or "home"; missing: the tabs from last time
+workspace = 1
+
+[workspaces.1]
+id = 1
+name = "Photos"
+active = "left"
+
+[workspaces.1.left]
+tabs = ["/home/me/Pictures", "/home/me/Pictures/2026"]
+tabSlots = [1, 2]
+tabGrids = [true, true]
+currentTab = 0
+```
 
 ## Use another configuration folder
 

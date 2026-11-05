@@ -709,6 +709,24 @@ void Panel::restoreTabs(const QStringList& paths, int current, const QList<int>&
     applyViewMode();  // the first tab was shown before its mode was known
 }
 
+void Panel::replaceTabs(const QStringList& paths, int current, const QList<int>& numbers, const QList<bool>& grids)
+{
+    endQuickSearch();
+    std::vector<DirTab*> old;
+    old.swap(m_tabs);
+    m_current = -1;
+    {
+        QSignalBlocker block(m_tabBar);
+        while (m_tabBar->count())
+            m_tabBar->removeTab(0);
+    }
+    restoreTabs(paths, current, numbers, grids);
+    for (DirTab* t : old) {  // after: the view shows a new tab's model now
+        t->setCursorProvider(nullptr);
+        t->deleteLater();
+    }
+}
+
 void Panel::showTab(int index)
 {
     if (index < 0 || index >= int(m_tabs.size()))

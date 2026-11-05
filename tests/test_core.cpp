@@ -32,6 +32,7 @@
 
 #include "core/TomlSettings.h"
 #include "core/Servers.h"
+#include "core/Workspaces.h"
 #include <QDateTime>
 #include <QFile>
 #include <QElapsedTimer>
@@ -2091,6 +2092,60 @@ private slots:
         setupConfigDir(args);
         QVERIFY(args.isEmpty());
         QCOMPARE(tandem::configDir(), tmp.filePath("other"));
+    }
+
+    // Workspaces: kept in the settings file, sorted, names unique, ids stable.
+    void workspaces()
+    {
+        QTemporaryDir tmp;
+        useConfigDir(tmp.path());
+        auto restore = qScopeGuard([] { useConfigDir(QString()); });
+        QVERIFY(Workspaces::all().isEmpty());
+        QCOMPARE(Workspaces::startupMode(), StartupMode::Session);  // as before
+
+        Workspace photos;
+        photos.name = "  Photos ";
+        photos.left = {{"/p/a", "/p/b"}, {1, 3}, {true, false}, 1};
+        photos.right = {{QDir::homePath() + "/x"}, {1}, {false}, 0};
+        photos.rightActive = true;
+        const int photosId = Workspaces::save(photos);
+        Workspace code;
+        code.name = "code";
+        code.left.paths = code.right.paths = {"/c"};
+        const int codeId = Workspaces::save(code);
+        QVERIFY(photosId > 0 && codeId > 0 && photosId != codeId);
+
+        const QList<Workspace> all = Workspaces::all();
+        QCOMPARE(all.size(), 2);
+        QCOMPARE(all[0].name, QString("code"));  // by name
+        const Workspace back = *Workspaces::byName("PHOTOS");
+        QCOMPARE(back.name, QString("Photos"));
+        QCOMPARE(back.left.paths, QStringList({"/p/a", "/p/b"}));
+        QCOMPARE(back.left.numbers, QList<int>({1, 3}));
+        QCOMPARE(back.left.grids, QList<bool>({true, false}));
+        QCOMPARE(back.left.current, 1);
+        QVERIFY(back.rightActive);
+        QCOMPARE(Workspaces::describe(back), QString("/p/a, /p/b  │  ~/x"));
+
+        // The file itself holds them (TOML), not just a cache.
+        QSettings().sync();
+        QCOMPARE(QSettings(QSettings().fileName(), tomlFormat()).value("workspaces/size").toInt(), 2);
+
+        QVERIFY(!Workspaces::rename(codeId, "photos"));  // taken
+        QVERIFY(!Workspaces::rename(codeId, "  "));
+        QVERIFY(Workspaces::rename(codeId, "Work"));
+        QCOMPARE(Workspaces::byName("work")->id, codeId);  // same id: its key stays
+
+        Workspaces::setStartup(StartupMode::Workspace, photosId);
+        QCOMPARE(Workspaces::startupMode(), StartupMode::Workspace);
+        QCOMPARE(Workspaces::startupWorkspace(), photosId);
+        Workspaces::remove(photosId);
+        QCOMPARE(Workspaces::startupMode(), StartupMode::Session);  // its startup goes with it
+        QCOMPARE(Workspaces::all().size(), 1);
+        Workspaces::setStartup(StartupMode::Home);
+        QCOMPARE(Workspaces::startupMode(), StartupMode::Home);
+        Workspaces::setStartup(StartupMode::Session);
+        QVERIFY(!QSettings().contains("startup/open"));
     }
 
     // Settings as TOML: typed values, edits change single lines, comments stay,

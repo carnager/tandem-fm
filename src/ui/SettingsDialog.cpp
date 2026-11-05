@@ -11,6 +11,7 @@
 #include "ui/MainWindow.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
+#include "core/Workspaces.h"
 
 #include <QAction>
 #include <QApplication>
@@ -35,6 +36,8 @@
 #include <QSettings>
 #include <QStackedWidget>
 #include <QStandardPaths>
+#include <QStyledItemDelegate>
+#include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -112,6 +115,13 @@ QLabel* hint(const QString& text, QWidget* parent)
     setThemeStyle(l, QStringLiteral("color: @dimText;"));
     return l;
 }
+
+// For lists where only the first column can be edited.
+class NoEditDelegate : public QStyledItemDelegate {
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+    QWidget* createEditor(QWidget*, const QStyleOptionViewItem&, const QModelIndex&) const override { return nullptr; }
+};
 
 QLabel* title(const QString& text, QWidget* parent)
 {
@@ -236,6 +246,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
     const QList<QPair<QString, QString>> pages = {
         {tr("Appearance"), QStringLiteral("preferences-desktop-theme")},
         {tr("Behaviour"), QStringLiteral("preferences-system")},
+        {tr("Startup"), QStringLiteral("go-home")},
         {tr("Tools"), QStringLiteral("applications-utilities")},
         {tr("Keys"), QStringLiteral("preferences-desktop-keyboard")},
         {tr("Plugins"), QStringLiteral("preferences-plugin")},
@@ -246,6 +257,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
     m_pages = new QStackedWidget(this);
     m_pages->addWidget(appearancePage());
     m_pages->addWidget(behaviourPage());
+    m_pages->addWidget(startupPage());
     m_pages->addWidget(toolsPage());
     m_pages->addWidget(keysPage());
     m_pages->addWidget(pluginsPage());
@@ -525,6 +537,146 @@ QWidget* SettingsDialog::behaviourPage()
              toggle(tr("Notify when long operations finish"), m_window->m_actions.value(QStringLiteral("notifications"))),
              tr("A desktop notification when a copy or move that took a while is done and Tandem isn't in front."));
     return page.finish();
+}
+
+// What opens at start, and the workspaces: named sets of both panels' tabs.
+QWidget* SettingsDialog::startupPage()
+{
+    Page page(this);
+    m_startup = new QComboBox(this);
+    connect(m_startup, &QComboBox::activated, this, [this] {
+        const QString choice = m_startup->currentData().toString();
+        if (choice == QLatin1String("home"))
+            Workspaces::setStartup(StartupMode::Home);
+        else if (choice.startsWith(QLatin1String("workspace:")))
+            Workspaces::setStartup(StartupMode::Workspace, choice.section(QLatin1Char(':'), 1).toInt());
+        else
+            Workspaces::setStartup(StartupMode::Session);
+    });
+    page.add(tr("When Tandem starts"), m_startup,
+             tr("The window's size and place are always kept. Folders given on the command line open instead."));
+
+    m_workspaces = new QTreeWidget(this);
+    m_workspaces->setHeaderLabels({tr("Name"), tr("Folders (left  │  right)")});
+    m_workspaces->setRootIsDecorated(false);
+    m_workspaces->setMinimumHeight(180);
+    m_workspaces->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
+    m_workspaces->setItemDelegateForColumn(1, new NoEditDelegate(m_workspaces));
+    m_workspaces->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    connect(m_workspaces, &QTreeWidget::itemChanged, this, [this](QTreeWidgetItem* item, int column) {
+        if (m_fillingWorkspaces || column != 0)
+            return;
+        const int id = item->data(0, Qt::UserRole).toInt();
+        const bool ok = Workspaces::rename(id, item->text(0));
+        m_workspaceNote->setText(ok ? QString() : tr("Each workspace needs a name of its own."));
+        m_window->installWorkspaceCommands();
+        // Not from inside the item's own signal: refilling deletes it.
+        QTimer::singleShot(0, this, [this, id] { fillWorkspaces(id); });
+    });
+
+    auto* buttons = new QWidget(this);
+    auto* bh = new QHBoxLayout(buttons);
+    bh->setContentsMargins(0, 0, 0, 0);
+    auto* add = new QPushButton(tr("Save the open tabs"), buttons);
+    auto* update = new QPushButton(tr("Update from the open tabs"), buttons);
+    auto* rename = new QPushButton(tr("Rename"), buttons);
+    auto* remove = new QPushButton(tr("Delete"), buttons);
+    for (QPushButton* b : {add, update, rename, remove})
+        bh->addWidget(b);
+    bh->addStretch(1);
+    m_workspaceEdits = {update, rename, remove};
+    auto picked = [this] {
+        QTreeWidgetItem* item = m_workspaces->currentItem();
+        return item ? item->data(0, Qt::UserRole).toInt() : 0;
+    };
+    connect(m_workspaces, &QTreeWidget::currentItemChanged, this, [this] {
+        for (QPushButton* b : std::as_const(m_workspaceEdits))
+            b->setEnabled(m_workspaces->currentItem());
+    });
+    connect(add, &QPushButton::clicked, this, [this] {
+        QString name;
+        for (int n = 1; name.isEmpty() || Workspaces::byName(name); ++n)
+            name = tr("Workspace %1").arg(n);
+        Workspace w = m_window->currentWorkspace();
+        w.id = 0;
+        w.name = name;
+        const int id = Workspaces::save(w);
+        m_window->installWorkspaceCommands();
+        fillWorkspaces(id);
+        if (QTreeWidgetItem* item = m_workspaces->currentItem())
+            m_workspaces->editItem(item, 0);  // name it right away
+    });
+    connect(update, &QPushButton::clicked, this, [this, picked] {
+        const std::optional<Workspace> old = Workspaces::byId(picked());
+        if (!old)
+            return;
+        Workspace w = m_window->currentWorkspace();
+        w.id = old->id;
+        w.name = old->name;
+        Workspaces::save(w);
+        fillWorkspaces(w.id);
+    });
+    connect(rename, &QPushButton::clicked, this, [this] {
+        if (QTreeWidgetItem* item = m_workspaces->currentItem())
+            m_workspaces->editItem(item, 0);
+    });
+    connect(remove, &QPushButton::clicked, this, [this, picked] {
+        const int id = picked();
+        if (!id)
+            return;
+        Workspaces::remove(id);
+        const QString command = QStringLiteral("workspace-%1").arg(id);
+        if (Keymap::instance().commandKeys(command))  // a later workspace may get this id
+            Keymap::instance().setCommandKeys(command, std::nullopt);
+        m_window->installWorkspaceCommands();
+        fillWorkspaces();
+    });
+
+    page.add(tr("Workspaces"), m_workspaces);
+    page.add(QString(), buttons,
+             tr("A workspace is the tabs of both panels. Alt+W opens one, or saves the open tabs under a new name. "
+                "Each workspace is also a command, so it can have a key on the Keys page."));
+    m_workspaceNote = hint(QString(), this);
+    page.add(QString(), m_workspaceNote);
+    fillWorkspaces();
+    return page.finish();
+}
+
+void SettingsDialog::fillWorkspaces(int select)
+{
+    const QList<Workspace> list = Workspaces::all();
+    m_fillingWorkspaces = true;
+    m_workspaces->clear();
+    for (const Workspace& w : list) {
+        auto* item = new QTreeWidgetItem(m_workspaces, {w.name, Workspaces::describe(w)});
+        item->setData(0, Qt::UserRole, w.id);
+        item->setFlags(item->flags() | Qt::ItemIsEditable);
+        item->setToolTip(1, item->text(1));
+        if (w.id == select)
+            m_workspaces->setCurrentItem(item);
+    }
+    m_fillingWorkspaces = false;
+    for (QPushButton* b : std::as_const(m_workspaceEdits))
+        b->setEnabled(m_workspaces->currentItem());
+
+    QSignalBlocker block(m_startup);
+    m_startup->clear();
+    m_startup->addItem(tr("The tabs from last time"), QStringLiteral("session"));
+    m_startup->addItem(tr("Home folder in both panels"), QStringLiteral("home"));
+    for (const Workspace& w : list)
+        m_startup->addItem(tr("Workspace “%1”").arg(w.name), QStringLiteral("workspace:%1").arg(w.id));
+    switch (Workspaces::startupMode()) {
+    case StartupMode::Session:
+        m_startup->setCurrentIndex(0);
+        break;
+    case StartupMode::Home:
+        m_startup->setCurrentIndex(1);
+        break;
+    case StartupMode::Workspace:
+        m_startup->setCurrentIndex(
+            std::max(0, m_startup->findData(QStringLiteral("workspace:%1").arg(Workspaces::startupWorkspace()))));
+        break;
+    }
 }
 
 // Plugins run with the user's rights: each one is switched on by hand, and

@@ -2,6 +2,7 @@
 
 #include <QDialog>
 
+class QComboBox;
 class QKeySequenceEdit;
 class QLabel;
 class QLineEdit;
@@ -22,7 +23,7 @@ class SettingsDialog : public QDialog {
 public:
     explicit SettingsDialog(MainWindow* window);
 
-    void showPage(int index);  // 0 appearance, 1 behaviour, 2 tools, 3 keys, 4 plugins
+    void showPage(int index);  // 0 appearance, 1 behaviour, 2 startup, 3 tools, 4 keys, 5 plugins
     // For tests.
     QTreeWidget* keyList() const { return m_keys; }
     QKeySequenceEdit* keyEdit() const { return m_keyEdit; }
@@ -32,6 +33,8 @@ private:
     QWidget* appearancePage();
     QWidget* themeChooser();
     QWidget* behaviourPage();
+    QWidget* startupPage();
+    void fillWorkspaces(int select = 0);
     QWidget* toolsPage();
     QWidget* keysPage();
     QWidget* pluginsPage();
@@ -51,6 +54,11 @@ private:
     QPushButton* m_keyReset = nullptr;
     bool m_loadingKey = false;
     QWidget* m_pluginList = nullptr;
+    QComboBox* m_startup = nullptr;
+    QTreeWidget* m_workspaces = nullptr;
+    QList<QPushButton*> m_workspaceEdits;  // need a workspace picked
+    QLabel* m_workspaceNote = nullptr;
+    bool m_fillingWorkspaces = false;
 };
 
 // Keys the user changed, kept in keys.toml per command id; applied at start and on every save.

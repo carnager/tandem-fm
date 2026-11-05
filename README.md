@@ -23,7 +23,8 @@ and folders.*
 
 - **Get around quickly.** Tabs in each panel, clickable paths, quick search,
   filtering as you type, bookmarks on letter keys, and fuzzy search through
-  your visited folders. A command palette puts the rest within reach.
+  your visited folders. Save the tabs of both panels as a workspace and get
+  them back with Alt+W. A command palette puts the rest within reach.
 - **Keep working during transfers.** Copy, move and delete in the background,
   with progress, pause, cancel and queues per drive. Undo supported local
   operations with Ctrl+Z.
@@ -101,6 +102,7 @@ tandem-fm ~/Projects ~/Downloads
 | Ctrl+F | Filter the current folder |
 | Alt+F7 | Search a local folder tree by name or file contents |
 | Ctrl+J | Jump to a visited folder |
+| Alt+W | Open a workspace, or save the open tabs as one |
 | Ctrl+Shift+P | Open the command palette |
 
 **F1** opens the searchable shortcut reference. Change command keys in

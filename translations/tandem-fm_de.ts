@@ -2491,6 +2491,18 @@
         <translation>&amp;Lesezeichen</translation>
     </message>
     <message>
+        <source>Workspaces…</source>
+        <translation>Arbeitsbereiche…</translation>
+    </message>
+    <message>
+        <source>Save workspace…</source>
+        <translation>Arbeitsbereich speichern…</translation>
+    </message>
+    <message>
+        <source>Open workspace</source>
+        <translation>Arbeitsbereich öffnen</translation>
+    </message>
+    <message>
         <source>Preview: details instead of content</source>
         <translation>Vorschau: Details statt Inhalt</translation>
     </message>
@@ -3369,6 +3381,50 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>new file %1</source>
         <translation>Neue Datei %1</translation>
+    </message>
+    <message>
+        <source>Workspace “%1”</source>
+        <translation>Arbeitsbereich „%1“</translation>
+    </message>
+    <message>
+        <source>Workspace “%1” saved</source>
+        <translation>Arbeitsbereich „%1“ gespeichert</translation>
+    </message>
+    <message>
+        <source>Save the open tabs as “%1”</source>
+        <translation>Offene Tabs als „%1“ speichern</translation>
+    </message>
+    <message>
+        <source>No workspaces yet: type a name to save the open tabs</source>
+        <translation>Noch keine Arbeitsbereiche: tippe einen Namen, um die offenen Tabs zu speichern</translation>
+    </message>
+    <message>
+        <source>Open a workspace, or type a new name to save the open tabs</source>
+        <translation>Arbeitsbereich öffnen, oder einen neuen Namen tippen, um die offenen Tabs zu speichern</translation>
+    </message>
+    <message>
+        <source>Enter: open, in place of the tabs in both panels   ·   Settings › Startup: rename, delete</source>
+        <translation>Enter: öffnen, anstelle der Tabs in beiden Panels   ·   Einstellungen › Start: umbenennen, löschen</translation>
+    </message>
+    <message>
+        <source>Replace with the open tabs</source>
+        <translation>Durch die offenen Tabs ersetzen</translation>
+    </message>
+    <message>
+        <source>Save as “%1”</source>
+        <translation>Als „%1“ speichern</translation>
+    </message>
+    <message>
+        <source>Save the open tabs as a workspace: type a name</source>
+        <translation>Offene Tabs als Arbeitsbereich speichern: tippe einen Namen</translation>
+    </message>
+    <message>
+        <source>Enter: save   ·   Alt+W opens one</source>
+        <translation>Enter: speichern   ·   Alt+W öffnet einen</translation>
+    </message>
+    <message>
+        <source>Workspaces</source>
+        <translation>Arbeitsbereiche</translation>
     </message>
     <message>
         <source>Operations running</source>
@@ -4788,6 +4844,10 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Menüleiste zeigen (Strg+Umschalt+M)</translation>
     </message>
     <message>
+        <source>Startup</source>
+        <translation>Start</translation>
+    </message>
+    <message>
         <source>Font</source>
         <translation>Schrift</translation>
     </message>
@@ -4862,6 +4922,66 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>A desktop notification when a copy or move that took a while is done and Tandem isn&apos;t in front.</source>
         <translation>Eine Desktop-Benachrichtigung, wenn ein längeres Kopieren oder Verschieben fertig ist und Tandem nicht im Vordergrund liegt.</translation>
+    </message>
+    <message>
+        <source>When Tandem starts</source>
+        <translation>Beim Start von Tandem</translation>
+    </message>
+    <message>
+        <source>The window&apos;s size and place are always kept. Folders given on the command line open instead.</source>
+        <translation>Größe und Position des Fensters bleiben immer erhalten. Auf der Kommandozeile angegebene Ordner werden stattdessen geöffnet.</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <source>Folders (left  │  right)</source>
+        <translation>Ordner (links  │  rechts)</translation>
+    </message>
+    <message>
+        <source>Each workspace needs a name of its own.</source>
+        <translation>Jeder Arbeitsbereich braucht einen eigenen Namen.</translation>
+    </message>
+    <message>
+        <source>Save the open tabs</source>
+        <translation>Offene Tabs speichern</translation>
+    </message>
+    <message>
+        <source>Update from the open tabs</source>
+        <translation>Mit den offenen Tabs aktualisieren</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>Umbenennen</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Löschen</translation>
+    </message>
+    <message>
+        <source>Workspace %1</source>
+        <translation>Arbeitsbereich %1</translation>
+    </message>
+    <message>
+        <source>Workspaces</source>
+        <translation>Arbeitsbereiche</translation>
+    </message>
+    <message>
+        <source>A workspace is the tabs of both panels. Alt+W opens one, or saves the open tabs under a new name. Each workspace is also a command, so it can have a key on the Keys page.</source>
+        <translation>Ein Arbeitsbereich sind die Tabs beider Panels. Alt+W öffnet einen, oder speichert die offenen Tabs unter einem neuen Namen. Jeder Arbeitsbereich ist auch ein Befehl und kann auf der Seite Tasten eine Taste bekommen.</translation>
+    </message>
+    <message>
+        <source>The tabs from last time</source>
+        <translation>Die Tabs vom letzten Mal</translation>
+    </message>
+    <message>
+        <source>Home folder in both panels</source>
+        <translation>Persönlicher Ordner in beiden Panels</translation>
+    </message>
+    <message>
+        <source>Workspace “%1”</source>
+        <translation>Arbeitsbereich „%1“</translation>
     </message>
     <message>
         <source>Plugins are programs that run with your rights: switch on only those you trust. One that changes is switched off until you switch it on again. Their commands appear in the context menu, under Tools › Plugins, in the command palette and on the Keys page.</source>

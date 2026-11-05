@@ -5,6 +5,7 @@
 #include "core/FileOps.h"
 #include "core/MultiRename.h"
 #include "core/Plugins.h"
+#include "core/Workspaces.h"
 #include "core/Undo.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/IconCache.h"
@@ -93,6 +94,13 @@ private:
     // Fills `menu` with the action's entries once they are known.
     void fillPluginChoices(QMenu* menu, const Plugin& plugin, const PluginAction& action, Panel* panel);
     void addPluginItems(QMenu* menu, Panel* panel, bool onItem);
+    // Workspaces: named sets of both panels' tabs (Alt+W).
+    Workspace currentWorkspace() const;
+    void openWorkspace(const Workspace& workspace);
+    void showWorkspaces();
+    void saveWorkspacePicker();
+    void saveCurrentAsWorkspace(int id, const QString& name);
+    void installWorkspaceCommands();
     void makeFile(const QString& given = {});
     void createNew();  // yazi's a: a file, or a folder when the name ends with /
     void runCommandId(const QString& id);  // modal keys
@@ -186,6 +194,8 @@ private:
     QList<Plugin> m_plugins;
     QList<QAction*> m_pluginActions;
     QMenu* m_pluginMenu = nullptr;
+    QList<QAction*> m_workspaceActions;  // one command per workspace
+    QMenu* m_workspaceMenu = nullptr;
     QHash<QString, QAbstractButton*> m_fkeys;  // F3 … F8
     bool m_fkeyUpdatePending = false;
     QTimer* m_transferTimer = nullptr;
