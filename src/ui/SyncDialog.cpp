@@ -326,7 +326,7 @@ SyncDialog::SyncDialog(const QString& left, const QString& right, Runner runner,
         "QToolButton#show { color: @dimText; border: 1px solid transparent; border-radius: 12px; padding: 3px 12px; }"
         "QToolButton#show:checked { color: @text; background: @altBase; border-color: @border; }"
         "QToolButton#show:hover { border-color: @accent; }"
-        "QLabel#paths { font-weight: 600; font-size: 11pt; }"
+        "QLabel#paths { font-weight: 600; }"
         "QLabel#status, QLabel#keys { color: @dimText; }"));
 
     auto* layout = new QVBoxLayout(this);
@@ -338,6 +338,12 @@ SyncDialog::SyncDialog(const QString& left, const QString& right, Runner runner,
     top->setSpacing(10);
     m_paths = new QLabel(this);
     m_paths->setObjectName(QStringLiteral("paths"));
+    QFont pathsFont = font();
+    if (pathsFont.pointSizeF() > 0)
+        pathsFont.setPointSizeF(pathsFont.pointSizeF() * 1.1);
+    else
+        pathsFont.setPixelSize(qRound(pathsFont.pixelSize() * 1.1));  // relative: 11pt is small on macOS
+    m_paths->setFont(pathsFont);
     m_paths->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     m_paths->setToolTip(QStringLiteral("%1\n%2").arg(left, right));
     top->addWidget(m_paths, 1);

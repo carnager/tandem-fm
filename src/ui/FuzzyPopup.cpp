@@ -214,7 +214,7 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
     setThemeStyle(this, QStringLiteral(
         "#fuzzyPopup { background: @header; border: 1px solid @border; border-radius: 12px; }"
         "QLineEdit { background: @base; color: @text; border: 1px solid @border; border-radius: 8px;"
-        "  padding: 7px 10px; font-size: 11pt; }"
+        "  padding: 7px 10px; }"
         "QLineEdit:focus { border-color: @accent; }"
         "QListView { background: transparent; border: none; outline: none; }"
         "QLabel { color: @dimText; }"));
@@ -229,6 +229,14 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
     layout->setSpacing(8);
     m_edit = new QLineEdit(this);
     m_edit->installEventFilter(this);
+    // A little larger than the list. Relative, not "11pt" in the style:
+    // macOS counts 72 points to the inch, where 11pt is smaller than its 13pt.
+    QFont editFont = font();
+    if (editFont.pointSizeF() > 0)
+        editFont.setPointSizeF(editFont.pointSizeF() * 1.1);
+    else
+        editFont.setPixelSize(qRound(editFont.pixelSize() * 1.1));
+    m_edit->setFont(editFont);
     layout->addWidget(m_edit);
     m_model = new PopupModel(this);
     m_list = new QListView(this);
