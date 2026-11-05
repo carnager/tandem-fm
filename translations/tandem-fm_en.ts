@@ -188,6 +188,13 @@
         </translation>
     </message>
     <message numerus="yes">
+        <source>%n put on shelf %1</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>%n folder(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -231,6 +238,20 @@
     </message>
     <message numerus="yes">
         <source>%n operation(s) still running. Cancel them and quit?</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n put on shelf %1 (%2 there now)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Shelf %1: %n item(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
             <numerusform></numerusform>
@@ -313,6 +334,16 @@
     <name>tandem::ServersDialog</name>
     <message numerus="yes">
         <source>Import %n host(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>tandem::ShelfBar</name>
+    <message numerus="yes">
+        <source>Shelf %1: %n item(s), click to look in, drop to add</source>
         <translation type="unfinished">
             <numerusform></numerusform>
             <numerusform></numerusform>
