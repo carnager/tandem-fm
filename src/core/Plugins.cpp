@@ -81,6 +81,7 @@ bool parsePluginManifest(const QByteArray& json, Plugin& out)
         a.forFolder = ao.value(QLatin1String("on")).toString() == QLatin1String("folder");
         a.localOnly = ao.value(QLatin1String("local")).toBool(true);
         a.types = stringList(ao.value(QLatin1String("types")));
+        a.folders = ao.value(QLatin1String("folders")).toBool(true);
         a.keys = stringList(ao.value(QLatin1String("keys")));
         if (a.title.isEmpty() || a.run.isEmpty() || a.id.isEmpty())
             continue;  // incomplete: skipped, the others still work
@@ -158,7 +159,7 @@ bool pluginApplies(const PluginAction& a, const PluginContext& ctx)
         return false;
     if (a.forFolder)
         return !ctx.dir.isEmpty();
-    if (ctx.selection.isEmpty())
+    if (ctx.selection.isEmpty() || (!a.folders && ctx.hasFolder))
         return false;
     if (a.types.isEmpty())
         return true;

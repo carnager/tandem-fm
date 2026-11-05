@@ -1533,6 +1533,7 @@ QList<ViewerAction> MainWindow::previewActions(Panel* p, const FileEntry& e)
         out.append({QStringLiteral("F4"), tr("Edit"), [this](QWidget*) { editCurrent(); }});
     PluginContext ctx = pluginContext(p);
     ctx.selection = {p->currentPath()};  // the previewed file, whatever is marked
+    ctx.hasFolder = e.isDir;
     for (const Plugin& plugin : std::as_const(m_plugins)) {
         if (!plugin.error.isEmpty() || pluginTrust(plugin) != PluginTrust::On)
             continue;
@@ -2942,6 +2943,7 @@ PluginContext MainWindow::pluginContext(Panel* p) const
     ctx.dir = p->path();
     ctx.otherDir = (p == m_left ? m_right : m_left)->path();
     ctx.local = !p->isRemote() && !p->inArchive();
+    ctx.hasFolder = p->selectionHasFolder();
     return ctx;
 }
 

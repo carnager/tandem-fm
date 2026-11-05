@@ -40,6 +40,7 @@ public:
     QString currentName() const;
     QString currentPath() const;      // full path of the cursor entry ("" on "..")
     QStringList selectedPaths() const; // override, else marked entries, else the cursor entry
+    bool selectionHasFolder() const;   // among selectedPaths(), as listed
     // While a context menu runs, commands act on what was right-clicked.
     void setSelectionOverride(const QStringList& paths) { m_override = paths; }
     bool hasSelectionOverride() const { return !m_override.isEmpty(); }

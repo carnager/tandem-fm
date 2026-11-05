@@ -892,6 +892,17 @@ QStringList Panel::selectedPaths() const
     return out;
 }
 
+bool Panel::selectionHasFolder() const
+{
+    DirTab* t = tab();
+    if (!t || !m_override.isEmpty())
+        return false;
+    if (t->model()->stats().markedFiles + t->model()->stats().markedDirs > 0)
+        return t->model()->stats().markedDirs > 0;
+    const FileEntry* e = currentEntry();
+    return e && e->isDir && !e->isParent;
+}
+
 void Panel::navigate(const QString& p, const QString& focus)
 {
     if (DirTab* t = tab())

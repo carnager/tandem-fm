@@ -2349,6 +2349,16 @@ private slots:
         ctx.selection.clear();
         ctx.local = true;
         QVERIFY(!pluginApplies(send, ctx));
+        // "folders": false keeps an action away from folders.
+        PluginAction filesOnly;
+        filesOnly.run = {"x"};
+        filesOnly.folders = false;
+        ctx.selection = {"/data/Photos"};
+        ctx.hasFolder = true;
+        QVERIFY(!pluginApplies(filesOnly, ctx));
+        ctx.hasFolder = false;
+        QVERIFY(pluginApplies(filesOnly, ctx));
+        ctx.selection.clear();
 
         // Trust: on, changed, off (kept in the settings: a throwaway folder here).
         QTemporaryDir cfg;

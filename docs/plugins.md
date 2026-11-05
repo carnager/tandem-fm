@@ -58,6 +58,7 @@ Action fields:
 | `run` | The program and its arguments, as a list (no shell) or one string. A program starting with `./` is taken from the plugin's folder. |
 | `on` | `"selection"` (default): the marked files, or the one under the cursor. `"folder"`: the shown folder, from the menu that opens beside the files. |
 | `types` | Only for these files: MIME types (`"image/*"`, told by the name) or name patterns (`"*.pdf"`). Every selected item must match one. |
+| `folders` | `false`: not offered when a folder is among the selected items. |
 | `local` | `true` (default): not offered on servers or inside archives. |
 | `choices` | A program that prints entries to choose from, one per line, as `label` or `label<TAB>value`. The action becomes a submenu; the chosen value is `%c`. It gets five seconds. |
 | `keys` | Default keys, e.g. `["Ctrl+Alt+P"]`. |

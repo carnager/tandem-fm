@@ -27,6 +27,7 @@ struct PluginAction {
     bool forFolder = false;  // runs on the shown folder instead of the selection
     bool localOnly = true;   // not for servers and archives
     QStringList types;       // "image/*" (by name) or "*.pdf"; each selected item must match one
+    bool folders = true;     // offered when the selection holds a folder
     QStringList keys;        // default keys, portable text ("Ctrl+Alt+P")
 };
 
@@ -58,6 +59,7 @@ struct PluginContext {
     QString current;        // under the cursor
     QString dir, otherDir;  // shown folders, this panel and the other
     bool local = true;      // a plain folder: not a server, not inside an archive
+    bool hasFolder = false; // the selection holds a folder
 };
 bool pluginApplies(const PluginAction& a, const PluginContext& ctx);
 // Placeholders, without a shell: an argument "%s" becomes one argument per
