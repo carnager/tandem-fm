@@ -327,30 +327,37 @@ private slots:
         const auto green = solidIcon(Qt::green), red = solidIcon(Qt::red);
         MacFileIcons icons(nullptr, [&](const FileEntry&) { return green; }, [&](const QString&) { ++calls; return red; });
         QSignalSpy ready(&icons, &MacFileIcons::ready);
-        auto show = [&](int batch) {
-            for (int i = 0; i < 96; ++i) {
-                FileEntry folder;
-                folder.isDir = folder.hasCustomIcon = true;
-                icons.get(folder, QString("/fixture/%1/%2").arg(batch).arg(i));
+        // Like the thumbnail grid, every load repaints all that is on screen,
+        // so loads may take longer than kShownMs.
+        QList<int> onScreen;
+        auto paint = [&] {
+            for (int batch : onScreen) {
+                for (int i = 0; i < 96; ++i) {
+                    FileEntry folder;
+                    folder.isDir = folder.hasCustomIcon = true;
+                    icons.get(folder, QString("/fixture/%1/%2").arg(batch).arg(i));
+                }
             }
         };
+        connect(&icons, &MacFileIcons::ready, &icons, paint);
         static_assert(2 * 96 == MacFileIcons::kMaxPathIcons);
-        for (int batch = 0; batch < 4; ++batch)  // 384 at once, as on a very large screen
-            show(batch);
-        QTRY_COMPARE(ready.count(), 384);
-        for (int batch = 0; batch < 4; ++batch)
-            show(batch);
+        onScreen = {0, 1, 2, 3};  // 384 at once, as on a very large screen
+        paint();
+        QTRY_COMPARE_WITH_TIMEOUT(ready.count(), 384, 20000);
+        for (int i = 0; i < 10; ++i)
+            paint();
         QTest::qWait(50);
         QCOMPARE(calls.load(), 384);  // nothing reloaded
 
-        QTest::qWait(MacFileIcons::kShownMs + 100);  // now all off screen
-        show(3);
-        show(4);
-        QTRY_COMPARE(ready.count(), 384 + 96);
-        show(0);  // dropped to stay within the bound
-        QTRY_COMPARE(calls.load(), 384 + 96 + 96);
-        show(3);  // kept: shown recently
+        QTest::qWait(MacFileIcons::kShownMs + 100);
+        onScreen = {3, 4};  // the others are now off screen
+        paint();
+        QTRY_COMPARE_WITH_TIMEOUT(ready.count(), 384 + 96, 20000);
+        onScreen = {0, 3, 4};
+        paint();
+        QTRY_COMPARE_WITH_TIMEOUT(ready.count(), 384 + 96 + 96, 20000);
         QTest::qWait(50);
+        // Batch 0 was dropped to stay within the bound; batch 3 was kept.
         QCOMPARE(calls.load(), 384 + 96 + 96);
     }
 
