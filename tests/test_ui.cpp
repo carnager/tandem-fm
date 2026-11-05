@@ -983,6 +983,28 @@ private slots:
         leftModel()->markAll(false);
     }
 
+    // Shift with End/Home marks through the last/first file; with a page key
+    // it marks the files passed over, like Shift+Down held. From a marked
+    // file it unmarks instead.
+    void markWithShiftPageKeys()
+    {
+        moveCursorTo(m_left, "file1.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_End, Qt::ShiftModifier);
+        QCOMPARE(leftModel()->markedNames(), QStringList({"file1.txt", "file2.txt", "file10.txt", "photo.jpg"}));
+        QCOMPARE(m_left->currentName(), QString("photo.jpg"));
+        QTest::keyClick(m_left->view(), Qt::Key_Home, Qt::ShiftModifier);
+        QCOMPARE(leftModel()->markedNames(), QStringList());
+        QCOMPARE(m_left->view()->currentRow(), 0);
+
+        moveCursorTo(m_left, "file1.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_PageDown, Qt::ShiftModifier);  // the page reaches the end
+        QCOMPARE(leftModel()->markedNames(), QStringList({"file1.txt", "file2.txt", "file10.txt"}));
+        QCOMPARE(m_left->currentName(), QString("photo.jpg"));
+        QTest::keyClick(m_left->view(), Qt::Key_PageUp, Qt::ShiftModifier);
+        QCOMPARE(leftModel()->markedNames().size(), 5);  // everything but ..
+        leftModel()->markAll(false);
+    }
+
     void copyWithF5()
     {
         moveCursorTo(m_left, "file1.txt");

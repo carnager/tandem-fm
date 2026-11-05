@@ -93,6 +93,7 @@ tandem-fm ~/Projects ~/Downloads
 | Tab | Switch panels |
 | Enter / Backspace | Open the current item / go to the parent folder |
 | Insert / Space | Mark or unmark an item |
+| Shift+↑/↓/PgUp/PgDn/Home/End | Mark (or unmark) the files the cursor passes over |
 | F3 / F4 | View / edit |
 | F5 / F6 | Copy / move to the other panel |
 | F7 / F8 | New folder / move to trash |

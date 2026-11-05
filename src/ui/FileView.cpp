@@ -423,6 +423,27 @@ void FileView::moveCursorBy(int delta)
     setCurrentRow(currentRow() + delta);
 }
 
+void FileView::markTo(int target, bool includeTarget)
+{
+    FileModel* m = fileModel();
+    if (!m || !model() || model()->rowCount() == 0)
+        return;
+    const int from = currentRow();
+    target = std::clamp(target, 0, model()->rowCount() - 1);
+    if (target == from) {
+        if (includeTarget)
+            m->toggleMarked(from);
+        return;
+    }
+    const FileEntry* e = m->entry(from);
+    const bool on = !(e && e->marked);
+    // Like Shift+Down held: the file the cursor lands on stays as it was,
+    // except at the very top or bottom, where there is nothing further.
+    const int last = includeTarget ? target : target + (target > from ? -1 : 1);
+    m->setMarkedRange(from, last, on);
+    setCurrentRow(target);
+}
+
 bool FileView::event(QEvent* e)
 {
     if (m_vim && e->type() == QEvent::ShortcutOverride) {
@@ -466,9 +487,20 @@ void FileView::keyPressEvent(QKeyEvent* e)
         case Qt::Key_Down: step = cols; break;
         case Qt::Key_PageUp: step = -cols * m_grid->visibleRows(); break;
         case Qt::Key_PageDown: step = cols * m_grid->visibleRows(); break;
-        case Qt::Key_Home: setCurrentRow(0); return;
-        case Qt::Key_End: setCurrentRow(model() ? model()->rowCount() - 1 : 0); return;
+        case Qt::Key_Home:
+        case Qt::Key_End: {
+            const int target = e->key() == Qt::Key_Home ? 0 : (model() ? model()->rowCount() - 1 : 0);
+            if (mods & Qt::ShiftModifier)
+                markTo(target, true);
+            else
+                setCurrentRow(target);
+            return;
+        }
         default: break;
+        }
+        if (step && (mods & Qt::ShiftModifier) && (e->key() == Qt::Key_PageUp || e->key() == Qt::Key_PageDown)) {
+            markTo(currentRow() + step, false);
+            return;
         }
         if (step) {
             if ((mods & Qt::ShiftModifier) && m)
@@ -533,6 +565,21 @@ void FileView::keyPressEvent(QKeyEvent* e)
         if (mods == Qt::ShiftModifier && m) {
             m->toggleMarked(currentRow());
             moveCursorBy(e->key() == Qt::Key_Down ? 1 : -1);
+            return;
+        }
+        break;
+    case Qt::Key_PageUp:
+    case Qt::Key_PageDown:
+    case Qt::Key_Home:
+    case Qt::Key_End:
+        if (mods == Qt::ShiftModifier && m) {
+            const CursorAction action = e->key() == Qt::Key_PageUp     ? MovePageUp
+                                        : e->key() == Qt::Key_PageDown ? MovePageDown
+                                        : e->key() == Qt::Key_Home     ? MoveHome
+                                                                       : MoveEnd;
+            const QModelIndex to = moveCursor(action, Qt::NoModifier);
+            if (to.isValid())
+                markTo(to.row(), e->key() == Qt::Key_Home || e->key() == Qt::Key_End);
             return;
         }
         break;

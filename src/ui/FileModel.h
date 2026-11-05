@@ -72,6 +72,7 @@ public:
 
     void setMarked(int row, bool on);
     void toggleMarked(int row) { if (auto* e = entry(row)) setMarked(row, !e->marked); }
+    void setMarkedRange(int first, int last, bool on);  // both included, either order
     void markAll(bool on);
     void invertMarks();
     int markByPattern(const QString& patterns, bool on);

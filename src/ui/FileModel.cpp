@@ -563,6 +563,27 @@ void FileModel::setMarked(int row, bool on)
     emit statsChanged();
 }
 
+void FileModel::setMarkedRange(int first, int last, bool on)
+{
+    if (first > last)
+        std::swap(first, last);
+    first = std::max(first, 0);
+    last = std::min(last, int(m_entries.size()) - 1);
+    bool changed = false;
+    for (int row = first; row <= last; ++row) {
+        FileEntry& e = m_entries[size_t(row)];
+        if (e.isParent || e.marked == on)
+            continue;
+        e.marked = on;
+        accountMark(e, on ? +1 : -1);
+        changed = true;
+    }
+    if (!changed)
+        return;
+    emit dataChanged(index(first, 0), index(last, ColCount - 1));
+    emit statsChanged();
+}
+
 void FileModel::setMarkedNames(const QSet<QString>& names)
 {
     for (auto& e : m_entries) {

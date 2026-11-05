@@ -116,6 +116,9 @@ protected:
 private:
     friend class ThumbGrid;
     void moveCursorBy(int delta);
+    // Shift with a page or Home/End key: marks (or, from a marked file,
+    // unmarks) the files passed over, then moves there.
+    void markTo(int target, bool includeTarget);
     QString dropTargetFor(const QPoint& pos, int* row) const;
     void startFileDrag();
     void showHeaderMenu(const QPoint& pos);
