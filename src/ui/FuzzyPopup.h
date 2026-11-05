@@ -44,11 +44,6 @@ public:
     const PopupItem* item(int row) const;
     const QList<int>& positions(int row) const;
     QString header(int row) const { return row >= 0 && row < m_rows.size() ? m_rows[row].header : QString(); }
-    // Items whose key is a local path can be dragged out as files.
-    bool dragPaths = false;
-    Qt::ItemFlags flags(const QModelIndex& index) const override;
-    QStringList mimeTypes() const override;
-    QMimeData* mimeData(const QModelIndexList& indexes) const override;
 
 private:
     const QList<PopupItem>* m_items = nullptr;
@@ -76,8 +71,6 @@ public:
     const PopupItem* currentItem() const;
     QString query() const;
     void setQuery(const QString& text);
-    // Rows drag out as the files their keys name (after open(), which resets it).
-    void setDraggable(bool on);
 
     // Extra keys (e.g. Ctrl+P to pin). Return true when handled.
     std::function<bool(QKeyEvent*, const PopupItem*)> keyHandler;

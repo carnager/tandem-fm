@@ -6,6 +6,7 @@
 #include "core/FolderHistory.h"
 #include "ui/DirTab.h"
 #include "ui/KeyButton.h"
+#include "ui/ShelfPanel.h"
 #include "core/Shelves.h"
 #include "ui/DialogKeys.h"
 #include "ui/Dialogs.h"
@@ -3177,18 +3178,36 @@ private slots:
         QVERIFY(QFile::exists(L("shelf-src/one.txt")));  // copied, not moved
         QCOMPARE(Shelves::instance().items(3).size(), 2);  // still on the shelf
 
-        // Look in it: Del takes one off (the file stays), Ctrl+Del clears it.
+        // Look in it: the chip opens the shelf in the corner, where it stays
+        // while the panels have the keys. Files dropped on it go on the
+        // shelf; Del takes one off (the file stays); Clear empties it.
         QTRY_VERIFY(!shown());
+        auto* panel = m_window->findChild<ShelfPanel*>();
+        QVERIFY(panel && !panel->isVisible());
         m_window->findChild<QToolButton*>("shelf-3")->click();
-        QTRY_VERIFY((popup = shown()) != nullptr);
-        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("shelf-src/one.txt"));
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Delete);
-        QTRY_COMPARE(Shelves::instance().items(3), QStringList({L("shelf-src/two.txt")}));
+        QTRY_VERIFY(panel->isVisible());
+        QCOMPARE(panel->list()->count(), 2);
+        m_left->view()->setFocus();
+        QTest::qWait(50);
+        QVERIFY(panel->isVisible());
+
+        QMimeData data;
+        data.setUrls({QUrl::fromLocalFile(L("shelf-src/zz-pic.jpg"))});
+        QDragEnterEvent enter(QPoint(20, 10), Qt::CopyAction | Qt::LinkAction, &data, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(panel->list()->viewport(), &enter);
+        QDropEvent drop(QPointF(20, 10), Qt::CopyAction | Qt::LinkAction, &data, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(panel->list()->viewport(), &drop);
+        QTRY_COMPARE(Shelves::instance().items(3).size(), 3);
+        QTRY_COMPARE(panel->list()->count(), 3);
+
+        panel->list()->setFocus();
+        panel->list()->setCurrentRow(0);
+        QTest::keyClick(panel->list(), Qt::Key_Delete);
+        QTRY_COMPARE(Shelves::instance().items(3), QStringList({L("shelf-src/two.txt"), L("shelf-src/zz-pic.jpg")}));
         QVERIFY(QFile::exists(L("shelf-src/one.txt")));
-        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("shelf-src/two.txt"));
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Delete, Qt::ControlModifier);
+        panel->findChild<QToolButton*>("shelfClear")->click();
         QTRY_VERIFY(Shelves::instance().items(3).isEmpty());
-        QTRY_VERIFY(!shown());
+        QTRY_VERIFY(!panel->isVisible());
         QTRY_VERIFY(!m_window->findChild<QToolButton*>("shelf-3"));
 
         m_left->navigate(L());

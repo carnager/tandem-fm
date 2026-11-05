@@ -94,6 +94,7 @@ add_library(tandem_ui STATIC
   src/ui/EditNames.h src/ui/EditNames.cpp
   src/ui/FuzzyPopup.h src/ui/FuzzyPopup.cpp
   src/ui/ShelfBar.h src/ui/ShelfBar.cpp
+  src/ui/ShelfPanel.h src/ui/ShelfPanel.cpp
   src/ui/PathBar.h src/ui/PathBar.cpp
   src/ui/KeyChordPopup.h src/ui/KeyChordPopup.cpp
   src/ui/CommandBar.h src/ui/CommandBar.cpp

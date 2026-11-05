@@ -36,6 +36,7 @@
 #include "ui/TrashDialog.h"
 #include "ui/Panel.h"
 #include "ui/ShelfBar.h"
+#include "ui/ShelfPanel.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ViewerWindow.h"
 
@@ -756,6 +757,15 @@ QWidget* MainWindow::createFKeyBar()
         active()->showMessage(plural(tr("%n put on shelf %1", nullptr, added), added).arg(shelf));
     });
     l->addWidget(m_shelfBar, 1);
+    m_shelfPanel = new ShelfPanel(this);
+    m_shelfPanel->setAbove(bar);
+    connect(m_shelfPanel, &ShelfPanel::shownShelfChanged, m_shelfBar, &ShelfBar::setOpenShelf);
+    connect(m_shelfPanel, &ShelfPanel::showRequested, this, [this](const QString& path) {
+        active()->navigate(parentPath(path), baseName(path));
+        active()->view()->setFocus();
+    });
+    connect(m_shelfPanel, &ShelfPanel::copyRequested, this, [this](int shelf, bool move) { takeFromShelf(shelf, move); });
+    connect(m_shelfPanel, &ShelfPanel::dropped, m_shelfBar, &ShelfBar::dropped);  // the same as onto its chip
     // All the other commands are a key away (the key is filled in by updateFKeys).
     auto* all = new KeyButton(QStringLiteral("Ctrl+Shift+P"), tr("All commands"), bar);
     connect(all, &QAbstractButton::clicked, this, [this] { commandPalette(); });
@@ -3858,100 +3868,10 @@ void MainWindow::shelfPicker(bool take)
 
 void MainWindow::openShelf(int shelf)
 {
-    const QStringList paths = Shelves::instance().items(shelf);
-    if (paths.isEmpty())
-        return;
-    showShelfItems(shelf, {});
-    // Which are still there, and their icons: off the UI thread.
-    QPointer<MainWindow> self(this);
-    ioPool()->start([self, shelf, paths] {
-        QHash<QString, QStringList> byDir;
-        for (const QString& p : paths)
-            if (!isRemoteLocation(p))
-                byDir[parentPath(p)] << baseName(p);
-        auto found = std::make_shared<QHash<QString, FileEntry>>();
-        for (auto it = byDir.cbegin(); it != byDir.cend(); ++it)
-            for (auto& [name, e] : statNames(it.key(), it.value(), true))
-                if (e)
-                    found->insert(joinPath(it.key(), name), *e);
-        postToUi([self, shelf, paths, found] {
-            if (self && self->m_popup->isVisible() && self->m_popup->property("owner").toString() == QStringLiteral("shelf:%1").arg(shelf) &&
-                Shelves::instance().items(shelf) == paths)
-                self->showShelfItems(shelf, *found);
-        });
-    });
-}
-
-// The shelf's items in the popup: Enter shows one in the panel, Del takes it off.
-void MainWindow::showShelfItems(int shelf, const QHash<QString, FileEntry>& found)
-{
-    const QStringList paths = Shelves::instance().items(shelf);
-    const bool checked = !found.isEmpty() || paths.isEmpty();
-    const QString home = QDir::homePath();
-    QList<PopupItem> items;
-    for (const QString& path : paths) {
-        PopupItem it;
-        it.key = path;
-        it.title = baseName(path);
-        QString dir = parentPath(path);
-        if (dir == home || dir.startsWith(home + QLatin1Char('/')))
-            dir = QLatin1Char('~') + dir.mid(home.size());
-        it.subtitle = dir;
-        it.matchSubtitle = true;
-        const auto e = found.constFind(path);
-        if (e != found.cend())
-            it.icon = IconCache::forEntry(*e);
-        else if (checked && !isRemoteLocation(path))
-            it.hint = tr("gone");
-        if (it.icon.isNull())
-            it.icon = IconCache::themed("text-x-generic");
-        it.run = [this, path] { active()->navigate(parentPath(path), baseName(path)); };
-        items.append(it);
-    }
-    m_popup->queryItem = nullptr;
-    m_popup->keyHandler = [this, shelf](QKeyEvent* e, const PopupItem* it) {
-        const bool ctrl = e->modifiers() & Qt::ControlModifier;
-        if (e->key() == Qt::Key_Delete && ctrl) {  // the whole shelf
-            Shelves::instance().clear(shelf);
-            QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
-            QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
-            return true;
-        }
-        if (e->key() == Qt::Key_Delete && it) {  // off the shelf; the file stays
-            const QString path = it->key;
-            QTimer::singleShot(0, this, [this, shelf, path] {
-                Shelves::instance().remove(shelf, {path});
-                if (!Shelves::instance().items(shelf).isEmpty()) {
-                    openShelf(shelf);
-                } else if (m_popup->isVisible()) {  // nothing left to show
-                    QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
-                    QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
-                }
-            });
-            return true;
-        }
-        if (ctrl && (e->key() == Qt::Key_C || e->key() == Qt::Key_X)) {
-            const bool move = e->key() == Qt::Key_X;
-            QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
-            QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
-            QTimer::singleShot(0, this, [this, shelf, move] { takeFromShelf(shelf, move); });
-            return true;
-        }
-        return false;
-    };
-    const QString placeholder = plural(tr("Shelf %1: %n item(s)", nullptr, int(paths.size())), paths.size()).arg(shelf);
-    const QString footer = tr("Enter: show  ·  Ctrl+C / Ctrl+X: copy / move all here  ·  Del: take off  ·  Ctrl+Del: clear");
-    if (m_popup->isVisible() && m_popup->property("owner").toString() == QStringLiteral("shelf:%1").arg(shelf)) {
-        m_popup->setItems(items);  // keeps what was typed
-    } else {
-        QWidget* chip = m_shelfBar ? m_shelfBar->chip(shelf) : nullptr;
-        if (chip)
-            m_popup->openUnder(chip, placeholder, items, footer);
-        else
-            m_popup->open(placeholder, items, footer);
-    }
-    m_popup->setProperty("owner", QStringLiteral("shelf:%1").arg(shelf));
-    m_popup->setDraggable(true);
+    if (m_shelfPanel->isVisible() && m_shelfPanel->shelf() == shelf)
+        m_shelfPanel->close();  // its chip again: closes it
+    else
+        m_shelfPanel->showShelf(shelf);
 }
 
 }  // namespace tandem

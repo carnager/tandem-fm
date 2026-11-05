@@ -115,8 +115,7 @@ private:
     void putOnShelf(int shelf);  // 0: ask which
     void takeFromShelf(int shelf, bool move);  // 0: ask which
     void shelfPicker(bool take);
-    void openShelf(int shelf);
-    void showShelfItems(int shelf, const QHash<QString, FileEntry>& found);
+    void openShelf(int shelf);  // or closes it, when it's the one open
     bool refuseInArchive(Panel* p);
     Panel* previewOwner(QWidget* w) const;
     void returnFocusFromPreview(QWidget* w);
@@ -209,6 +208,7 @@ private:
     QMenu* m_workspaceMenu = nullptr;
     QHash<QString, QAbstractButton*> m_fkeys;  // F3 … F8
     class ShelfBar* m_shelfBar = nullptr;
+    class ShelfPanel* m_shelfPanel = nullptr;
     bool m_fkeyUpdatePending = false;
     QTimer* m_transferTimer = nullptr;
     QPushButton* m_searchField = nullptr;

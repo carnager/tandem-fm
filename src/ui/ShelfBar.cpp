@@ -20,6 +20,7 @@ ShelfBar::ShelfBar(QWidget* parent) : QWidget(parent)
         "QToolButton { color: @text; background: @base; border: 1px solid @border; border-radius: 10px;"
         "  padding: 2px 10px; }"
         "QToolButton:hover, QToolButton[target=\"true\"] { border-color: @accent; }"
+        "QToolButton[open=\"true\"] { border-color: @accent; background: @altBase; }"
         "QToolButton#shelf-new { color: @dimText; border-style: dashed; }"));
     m_layout = new QHBoxLayout(this);
     m_layout->setContentsMargins(8, 0, 8, 0);
@@ -53,6 +54,7 @@ void ShelfBar::rebuild()
         const int count = int(Shelves::instance().items(n).size());
         c->setObjectName(QStringLiteral("shelf-%1").arg(n));
         c->setProperty("shelf", n);
+        c->setProperty("open", n == m_open);
         c->setText(QStringLiteral("▤ %1 · %2").arg(n).arg(count));
         c->setToolTip(plural(tr("Shelf %1: %n item(s), click to look in, drop to add", nullptr, count), count).arg(n));
         c->setFocusPolicy(Qt::NoFocus);
@@ -61,6 +63,12 @@ void ShelfBar::rebuild()
         m_layout->insertWidget(at++, c);
         m_chips.append(c);
     }
+}
+
+void ShelfBar::setOpenShelf(int shelf)
+{
+    m_open = shelf;
+    rebuild();
 }
 
 int ShelfBar::shelfAt(const QPoint& pos) const

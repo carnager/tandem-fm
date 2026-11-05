@@ -250,13 +250,6 @@
             <numerusform></numerusform>
         </translation>
     </message>
-    <message numerus="yes">
-        <source>Shelf %1: %n item(s)</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
 </context>
 <context>
     <name>tandem::MultiRenameDialog</name>
@@ -344,6 +337,16 @@
     <name>tandem::ShelfBar</name>
     <message numerus="yes">
         <source>Shelf %1: %n item(s), click to look in, drop to add</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>tandem::ShelfPanel</name>
+    <message numerus="yes">
+        <source>Shelf %1 · %n item(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
             <numerusform></numerusform>

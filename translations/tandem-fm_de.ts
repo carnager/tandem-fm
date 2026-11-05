@@ -2938,21 +2938,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>1–9 oder Enter: dort ablegen   ·   ein Klick auf ein Regal unten schaut hinein</translation>
     </message>
     <message>
-        <source>gone</source>
-        <translation>weg</translation>
-    </message>
-    <message numerus="yes">
-        <source>Shelf %1: %n item(s)</source>
-        <translation>
-            <numerusform>Regal %1: %n Eintrag</numerusform>
-            <numerusform>Regal %1: %n Einträge</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>Enter: show  ·  Ctrl+C / Ctrl+X: copy / move all here  ·  Del: take off  ·  Ctrl+Del: clear</source>
-        <translation>Enter: zeigen  ·  Strg+C / Strg+X: alles hierher kopieren / verschieben  ·  Entf: herunternehmen  ·  Strg+Entf: leeren</translation>
-    </message>
-    <message>
         <source>Extracting %1 …</source>
         <translation>%1 wird entpackt …</translation>
     </message>
@@ -5244,6 +5229,48 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>
             <numerusform>Regal %1: %n Eintrag, Klick schaut hinein, Ablegen fügt hinzu</numerusform>
             <numerusform>Regal %1: %n Einträge, Klick schaut hinein, Ablegen fügt hinzu</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>tandem::ShelfPanel</name>
+    <message>
+        <source>Close (Esc)</source>
+        <translation>Schließen (Esc)</translation>
+    </message>
+    <message>
+        <source>Copy here</source>
+        <translation>Hierher kopieren</translation>
+    </message>
+    <message>
+        <source>Copy everything on the shelf into the active panel&apos;s folder</source>
+        <translation>Alles auf dem Regal in den Ordner des aktiven Panels kopieren</translation>
+    </message>
+    <message>
+        <source>Move here</source>
+        <translation>Hierher verschieben</translation>
+    </message>
+    <message>
+        <source>Move everything on the shelf into the active panel&apos;s folder</source>
+        <translation>Alles auf dem Regal in den Ordner des aktiven Panels verschieben</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>Leeren</translation>
+    </message>
+    <message>
+        <source>Take everything off this shelf (the files stay)</source>
+        <translation>Alles von diesem Regal nehmen (die Dateien bleiben)</translation>
+    </message>
+    <message>
+        <source>Drag files in or out  ·  Del takes off  ·  Enter shows</source>
+        <translation>Dateien hinein- oder herausziehen  ·  Entf nimmt herunter  ·  Enter zeigt</translation>
+    </message>
+    <message numerus="yes">
+        <source>Shelf %1 · %n item(s)</source>
+        <translation>
+            <numerusform>Regal %1 · %n Eintrag</numerusform>
+            <numerusform>Regal %1 · %n Einträge</numerusform>
         </translation>
     </message>
 </context>

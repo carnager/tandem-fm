@@ -16,6 +16,7 @@ class ShelfBar : public QWidget {
 public:
     explicit ShelfBar(QWidget* parent);
     QToolButton* chip(int shelf) const;  // null when that shelf is empty
+    void setOpenShelf(int shelf);        // its chip looks pressed
 
 signals:
     void openRequested(int shelf);
@@ -33,7 +34,8 @@ private:
     void setDragging(bool on);
     QHBoxLayout* m_layout;
     QList<QToolButton*> m_chips;
-    QToolButton* m_new;  // "＋ shelf", while something is dragged over
+    QToolButton* m_new;
+    int m_open = 0;  // "＋ shelf", while something is dragged over
 };
 
 }  // namespace tandem
