@@ -253,7 +253,7 @@ bool isStateKey(const QString& key)
     };
     static const QStringList groups = {
         QStringLiteral("left/"), QStringLiteral("right/"), QStringLiteral("plugins/"),
-        QStringLiteral("multiRename/"), QStringLiteral("sync/"),
+        QStringLiteral("multiRename/"), QStringLiteral("sync/"), QStringLiteral("shelves/"),
     };
     if (exact.contains(key))
         return true;

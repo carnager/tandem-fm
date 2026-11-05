@@ -6,6 +6,8 @@
 #include "core/Backend.h"
 #include "core/DesktopApps.h"
 #include "core/FolderHistory.h"
+#include "core/DirLister.h"
+#include "core/Shelves.h"
 #include "core/MultiRename.h"
 #include "core/Util.h"
 #include "ui/DirTab.h"
@@ -33,6 +35,7 @@
 #include "ui/ShortcutsDialog.h"
 #include "ui/TrashDialog.h"
 #include "ui/Panel.h"
+#include "ui/ShelfBar.h"
 #include "ui/Theme.h"
 #include "ui/viewer/ViewerWindow.h"
 
@@ -395,6 +398,18 @@ void MainWindow::createMenus()
     addCommand(edit, QT_TR_NOOP("Filter as you type…"), {K(Qt::CTRL | Qt::Key_F)}, [this] { active()->startFilter(); });
     addCommand(edit, QT_TR_NOOP("Filter with subfolders…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_F)},
                [this] { active()->startDeepFilter(); });
+    edit->addSeparator();
+    QMenu* shelves = edit->addMenu(tr("Shelves"));
+    addCommand(shelves, QT_TR_NOOP("Put on a shelf…"), {K(Qt::CTRL | Qt::Key_B)}, [this] { putOnShelf(0); });
+    addCommand(shelves, QT_TR_NOOP("Copy a shelf here…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_B)}, [this] { takeFromShelf(0, false); });
+    shelves->addSeparator();
+    for (int i = 1; i <= Shelves::kCount; ++i)
+        addCommand(shelves, tr("Put on shelf %1").arg(i), {}, [this, i] { putOnShelf(i); },
+                   QStringLiteral("put-on-shelf-%1").arg(i));
+    shelves->addSeparator();
+    for (int i = 1; i <= Shelves::kCount; ++i)
+        addCommand(shelves, tr("Copy shelf %1 here").arg(i), {}, [this, i] { takeFromShelf(i, false); },
+                   QStringLiteral("copy-shelf-%1-here").arg(i));
 
     QMenu* go = bar->addMenu(tr("&Go"));
     addCommand(go, QT_TR_NOOP("Back"), {K(Qt::ALT | Qt::Key_Left)}, [this] { active()->back(); });
@@ -731,7 +746,16 @@ QWidget* MainWindow::createFKeyBar()
         l->addWidget(b);
         m_fkeys[QLatin1String(keys[i].first)] = b;
     }
-    l->addStretch(1);
+    m_shelfBar = new ShelfBar(bar);
+    connect(m_shelfBar, &ShelfBar::openRequested, this, &MainWindow::openShelf);
+    connect(m_shelfBar, &ShelfBar::dropped, this, [this](int shelf, const QMimeData* mime) {
+        const QStringList paths = mime->hasFormat(kLocationsMime)
+                                      ? QString::fromUtf8(mime->data(kLocationsMime)).split(QChar(0), Qt::SkipEmptyParts)
+                                      : localPaths(mime->urls());
+        const int added = Shelves::instance().add(shelf, paths);
+        active()->showMessage(plural(tr("%n put on shelf %1", nullptr, added), added).arg(shelf));
+    });
+    l->addWidget(m_shelfBar, 1);
     // All the other commands are a key away (the key is filled in by updateFKeys).
     auto* all = new KeyButton(QStringLiteral("Ctrl+Shift+P"), tr("All commands"), bar);
     connect(all, &QAbstractButton::clicked, this, [this] { commandPalette(); });
@@ -1437,18 +1461,22 @@ void MainWindow::pasteInto(const QString& dir)
         return;
     const bool cut = mime->data(QStringLiteral("x-special/gnome-copied-files")).startsWith("cut") ||
                      mime->data(QStringLiteral("application/x-kde-cutselection")) == "1";
+    putInto(paths, dir, cut);
+    if (cut)
+        QApplication::clipboard()->clear();
+}
+
+void MainWindow::putInto(const QStringList& paths, const QString& dir, bool move)
+{
     if (Panel* ap = archivePanelFor(dir)) {
         if (std::any_of(paths.begin(), paths.end(), [](const QString& p) { return isRemoteLocation(p); })) {
             ap->showMessage(tr("Files from a server can't be pasted into an archive yet. Copy them to a local folder first."), true);
             return;
         }
-        if (addToArchive(ap, paths, ap->innerPath(dir), cut) && cut)
-            QApplication::clipboard()->clear();
+        addToArchive(ap, paths, ap->innerPath(dir), move);
         return;
     }
-    m_jobs->add(new CopyJob(cut ? CopyJob::Mode::Move : CopyJob::Mode::Copy, paths, dir));
-    if (cut)
-        QApplication::clipboard()->clear();
+    m_jobs->add(new CopyJob(move ? CopyJob::Mode::Move : CopyJob::Mode::Copy, paths, dir));
 }
 
 void MainWindow::swapPanels()
@@ -3718,6 +3746,212 @@ void MainWindow::closeEvent(QCloseEvent* e)
     if (m_jobs->runningCount() > 0)
         std::quick_exit(0);
     e->accept();
+}
+
+}  // namespace tandem
+
+// ------------------------------------------------------------ shelves
+
+namespace tandem {
+
+void MainWindow::putOnShelf(int shelf)
+{
+    if (shelf == 0) {
+        shelfPicker(false);
+        return;
+    }
+    Panel* p = active();
+    const QStringList paths = p->selectedPaths();
+    if (paths.isEmpty() || (paths.size() == 1 && p->currentEntry() && p->currentEntry()->isParent))
+        return;
+    const int added = Shelves::instance().add(shelf, paths);
+    const int total = int(Shelves::instance().items(shelf).size());
+    p->showMessage(added == 0 ? tr("Already on shelf %1").arg(shelf)
+                              : plural(tr("%n put on shelf %1 (%2 there now)", nullptr, added), added).arg(shelf).arg(total));
+    if (added > 0)
+        p->markAll(false);  // ready for the next ones
+}
+
+void MainWindow::takeFromShelf(int shelf, bool move)
+{
+    if (shelf == 0) {
+        shelfPicker(true);
+        return;
+    }
+    const QStringList paths = Shelves::instance().items(shelf);
+    Panel* p = active();
+    if (paths.isEmpty()) {
+        p->showMessage(tr("Shelf %1 is empty").arg(shelf), true);
+        return;
+    }
+    const QString dir = p->path();
+    putInto(paths, dir, move);
+    if (move) {  // they're here now
+        QStringList moved;
+        for (const QString& from : paths)
+            moved << joinPath(dir, baseName(from));
+        Shelves::instance().replace(shelf, paths, moved);
+    }
+}
+
+// Which shelf: a digit picks one, Enter the one used last.
+void MainWindow::shelfPicker(bool take)
+{
+    Panel* p = active();
+    const QStringList selection = take ? QStringList() : p->selectedPaths();
+    if (!take && selection.isEmpty())
+        return;
+    if (take && Shelves::instance().used().isEmpty()) {
+        p->showMessage(tr("The shelves are empty: %1 puts files on one").arg(keyHint(QStringLiteral("put-on-a-shelf"))), true);
+        return;
+    }
+    QList<PopupItem> items;
+    const int last = Shelves::instance().lastUsed();
+    QList<int> order{last};
+    for (int n = 1; n <= Shelves::kCount; ++n)
+        if (n != last)
+            order << n;
+    for (int n : order) {
+        const QStringList on = Shelves::instance().items(n);
+        if (take && on.isEmpty())
+            continue;
+        PopupItem it;
+        it.key = QString::number(n);
+        it.title = tr("Shelf %1").arg(n);
+        it.subtitle = on.isEmpty() ? tr("empty") : plural(tr("%n item(s)", nullptr, int(on.size())), on.size());
+        it.hint = QString::number(n);
+        it.icon = IconCache::themed("folder-documents", "folder");
+        it.run = [this, n, take] { take ? takeFromShelf(n, false) : putOnShelf(n); };
+        items.append(it);
+    }
+    m_popup->queryItem = nullptr;
+    m_popup->keyHandler = [this, take](QKeyEvent* e, const PopupItem* it) {
+        int n = 0;
+        if (e->key() >= Qt::Key_1 && e->key() <= Qt::Key_9 && !(e->modifiers() & ~Qt::KeypadModifier))
+            n = e->key() - Qt::Key_0;
+        const bool move = take && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) &&
+                          (e->modifiers() & Qt::ShiftModifier);
+        const bool look = take && e->key() == Qt::Key_Tab;
+        if (n == 0 && it && (move || look))
+            n = it->key.toInt();
+        if (n == 0 || (take && Shelves::instance().items(n).isEmpty()))
+            return n != 0;  // an empty shelf's digit: nothing to take
+        QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);  // close the picker first
+        QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
+        QTimer::singleShot(0, this, [this, n, take, move, look] {
+            if (look)
+                openShelf(n);
+            else if (take)
+                takeFromShelf(n, move);
+            else
+                putOnShelf(n);
+        });
+        return true;
+    };
+    if (take)
+        m_popup->open(tr("Copy a shelf here…"), items,
+                      tr("1–9 or Enter: copy here   ·   Shift+Enter: move here   ·   Tab: look in it"));
+    else
+        m_popup->open(tr("Put %1 on a shelf…").arg(describeItems(selection)), items,
+                      tr("1–9 or Enter: put it there   ·   click a shelf at the bottom to look in it"));
+}
+
+void MainWindow::openShelf(int shelf)
+{
+    const QStringList paths = Shelves::instance().items(shelf);
+    if (paths.isEmpty())
+        return;
+    showShelfItems(shelf, {});
+    // Which are still there, and their icons: off the UI thread.
+    QPointer<MainWindow> self(this);
+    ioPool()->start([self, shelf, paths] {
+        QHash<QString, QStringList> byDir;
+        for (const QString& p : paths)
+            if (!isRemoteLocation(p))
+                byDir[parentPath(p)] << baseName(p);
+        auto found = std::make_shared<QHash<QString, FileEntry>>();
+        for (auto it = byDir.cbegin(); it != byDir.cend(); ++it)
+            for (auto& [name, e] : statNames(it.key(), it.value(), true))
+                if (e)
+                    found->insert(joinPath(it.key(), name), *e);
+        postToUi([self, shelf, paths, found] {
+            if (self && self->m_popup->isVisible() && self->m_popup->property("owner").toString() == QStringLiteral("shelf:%1").arg(shelf) &&
+                Shelves::instance().items(shelf) == paths)
+                self->showShelfItems(shelf, *found);
+        });
+    });
+}
+
+// The shelf's items in the popup: Enter shows one in the panel, Del takes it off.
+void MainWindow::showShelfItems(int shelf, const QHash<QString, FileEntry>& found)
+{
+    const QStringList paths = Shelves::instance().items(shelf);
+    const bool checked = !found.isEmpty() || paths.isEmpty();
+    const QString home = QDir::homePath();
+    QList<PopupItem> items;
+    for (const QString& path : paths) {
+        PopupItem it;
+        it.key = path;
+        it.title = baseName(path);
+        QString dir = parentPath(path);
+        if (dir == home || dir.startsWith(home + QLatin1Char('/')))
+            dir = QLatin1Char('~') + dir.mid(home.size());
+        it.subtitle = dir;
+        it.matchSubtitle = true;
+        const auto e = found.constFind(path);
+        if (e != found.cend())
+            it.icon = IconCache::forEntry(*e);
+        else if (checked && !isRemoteLocation(path))
+            it.hint = tr("gone");
+        if (it.icon.isNull())
+            it.icon = IconCache::themed("text-x-generic");
+        it.run = [this, path] { active()->navigate(parentPath(path), baseName(path)); };
+        items.append(it);
+    }
+    m_popup->queryItem = nullptr;
+    m_popup->keyHandler = [this, shelf](QKeyEvent* e, const PopupItem* it) {
+        const bool ctrl = e->modifiers() & Qt::ControlModifier;
+        if (e->key() == Qt::Key_Delete && ctrl) {  // the whole shelf
+            Shelves::instance().clear(shelf);
+            QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+            QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
+            return true;
+        }
+        if (e->key() == Qt::Key_Delete && it) {  // off the shelf; the file stays
+            const QString path = it->key;
+            QTimer::singleShot(0, this, [this, shelf, path] {
+                Shelves::instance().remove(shelf, {path});
+                if (!Shelves::instance().items(shelf).isEmpty()) {
+                    openShelf(shelf);
+                } else if (m_popup->isVisible()) {  // nothing left to show
+                    QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+                    QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
+                }
+            });
+            return true;
+        }
+        if (ctrl && (e->key() == Qt::Key_C || e->key() == Qt::Key_X)) {
+            const bool move = e->key() == Qt::Key_X;
+            QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+            QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
+            QTimer::singleShot(0, this, [this, shelf, move] { takeFromShelf(shelf, move); });
+            return true;
+        }
+        return false;
+    };
+    const QString placeholder = plural(tr("Shelf %1: %n item(s)", nullptr, int(paths.size())), paths.size()).arg(shelf);
+    const QString footer = tr("Enter: show  ·  Ctrl+C / Ctrl+X: copy / move all here  ·  Del: take off  ·  Ctrl+Del: clear");
+    if (m_popup->isVisible() && m_popup->property("owner").toString() == QStringLiteral("shelf:%1").arg(shelf)) {
+        m_popup->setItems(items);  // keeps what was typed
+    } else {
+        QWidget* chip = m_shelfBar ? m_shelfBar->chip(shelf) : nullptr;
+        if (chip)
+            m_popup->openUnder(chip, placeholder, items, footer);
+        else
+            m_popup->open(placeholder, items, footer);
+    }
+    m_popup->setProperty("owner", QStringLiteral("shelf:%1").arg(shelf));
+    m_popup->setDraggable(true);
 }
 
 }  // namespace tandem

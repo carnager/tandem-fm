@@ -47,6 +47,7 @@ add_library(tandem_core STATIC
   src/core/Remote.h src/core/Remote.cpp
   src/core/Servers.h src/core/Servers.cpp
   src/core/Workspaces.h src/core/Workspaces.cpp
+  src/core/Shelves.h src/core/Shelves.cpp
   src/core/Backend.h src/core/Backend.cpp
   src/core/BackendCopy.cpp
   src/core/SftpBackend.cpp
@@ -92,6 +93,7 @@ add_library(tandem_ui STATIC
   src/ui/MultiRenameDialog.h src/ui/MultiRenameDialog.cpp
   src/ui/EditNames.h src/ui/EditNames.cpp
   src/ui/FuzzyPopup.h src/ui/FuzzyPopup.cpp
+  src/ui/ShelfBar.h src/ui/ShelfBar.cpp
   src/ui/PathBar.h src/ui/PathBar.cpp
   src/ui/KeyChordPopup.h src/ui/KeyChordPopup.cpp
   src/ui/CommandBar.h src/ui/CommandBar.cpp

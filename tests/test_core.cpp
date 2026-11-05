@@ -6,6 +6,7 @@
 #include "core/DirLister.h"
 #include "core/FileOps.h"
 #include "core/Search.h"
+#include "core/Shelves.h"
 #include "core/FolderCompare.h"
 #include "core/Remote.h"
 #include "TestBackend.h"
@@ -2114,6 +2115,36 @@ private slots:
     }
 
     // Workspaces: kept in the settings file, sorted, names unique, ids stable.
+    // Shelves: no doubles, order kept, moves follow, kept in the settings.
+    void shelves()
+    {
+        QTemporaryDir tmp;
+        useConfigDir(tmp.path());
+        auto restore = qScopeGuard([] {
+            for (int n = 1; n <= Shelves::kCount; ++n)
+                Shelves::instance().clear(n);
+            useConfigDir(QString());
+        });
+        Shelves& s = Shelves::instance();
+        QSignalSpy changed(&s, &Shelves::changed);
+        QCOMPARE(s.add(2, {"/a/x", "/b/y"}), 2);
+        QCOMPARE(s.add(2, {"/b/y", "/c/z"}), 1);  // y is there already
+        QCOMPARE(s.items(2), QStringList({"/a/x", "/b/y", "/c/z"}));
+        QCOMPARE(s.used(), QList<int>({2}));
+        QCOMPARE(s.lastUsed(), 2);
+        QCOMPARE(QSettings().value("shelves/2").toStringList(), s.items(2));
+        s.replace(2, {"/b/y"}, {"/d/y"});
+        QCOMPARE(s.items(2), QStringList({"/a/x", "/d/y", "/c/z"}));
+        s.remove(2, {"/a/x"});
+        QCOMPARE(s.items(2), QStringList({"/d/y", "/c/z"}));
+        QCOMPARE(s.add(0, {"/q"}), 0);  // no shelf 0
+        QCOMPARE(s.add(10, {"/q"}), 0);
+        s.clear(2);
+        QVERIFY(s.used().isEmpty());
+        QVERIFY(!QSettings().contains("shelves/2"));
+        QCOMPARE(changed.count(), 5);
+    }
+
     void workspaces()
     {
         QTemporaryDir tmp;

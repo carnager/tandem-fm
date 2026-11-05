@@ -6,6 +6,7 @@
 #include "core/FolderHistory.h"
 #include "ui/DirTab.h"
 #include "ui/KeyButton.h"
+#include "core/Shelves.h"
 #include "ui/DialogKeys.h"
 #include "ui/Dialogs.h"
 #include "ui/FileModel.h"
@@ -3112,6 +3113,83 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L("deep"));
         QVERIFY(leftModel()->filter().isEmpty());
         QVERIFY(leftModel()->rowOf("photos") >= 0);
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // Shelves: Ctrl+B and a digit puts the marked files on one (b1 with
+    // modal keys); a chip shows it; Ctrl+Shift+B copies it here; the chip
+    // opens it: Del takes one off, Ctrl+Del clears it.
+    void shelves()
+    {
+        auto cleanup = qScopeGuard([this] {
+            for (int n = 1; n <= Shelves::kCount; ++n)
+                Shelves::instance().clear(n);
+            m_left->setVimKeys(false);
+        });
+        // The popup that's open (the panels have one for locations too).
+        auto shown = [this]() -> FuzzyPopup* {
+            for (FuzzyPopup* f : m_window->findChildren<FuzzyPopup*>())
+                if (f->isVisible())
+                    return f;
+            return nullptr;
+        };
+        FuzzyPopup* popup = nullptr;
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        QVERIFY(QDir().mkpath(L("shelf-src")));
+        writeFile(L("shelf-src/one.txt"), "1");
+        writeFile(L("shelf-src/two.txt"), "2");
+        writeFile(L("shelf-src/zz-pic.jpg"), "p");
+        m_left->navigate(L("shelf-src"));
+        QTRY_COMPARE(leftModel()->path(), L("shelf-src"));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "one.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_Insert);
+        QTest::keyClick(m_left->view(), Qt::Key_Insert);
+        QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier);
+        QTRY_VERIFY((popup = shown()) != nullptr);
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_3);
+        QTRY_COMPARE(Shelves::instance().items(3), QStringList({L("shelf-src/one.txt"), L("shelf-src/two.txt")}));
+        QVERIFY(leftModel()->markedNames().isEmpty());  // ready for the next ones
+        QTRY_VERIFY(!shown());
+        QTRY_VERIFY(m_window->findChild<QToolButton*>("shelf-3"));
+
+        // Modal keys: b then the shelf's number.
+        m_left->setVimKeys(true);
+        moveCursorTo(m_left, "zz-pic.jpg");
+        QTest::keyClick(m_left->view(), Qt::Key_B);
+        QTest::keyClick(m_left->view(), Qt::Key_1);
+        QCOMPARE(Shelves::instance().items(1), QStringList({L("shelf-src/zz-pic.jpg")}));
+        m_left->setVimKeys(false);
+
+        // Copy shelf 3 into another folder.
+        QVERIFY(QDir().mkpath(L("shelved")));
+        m_left->navigate(L("shelved"));
+        QTRY_COMPARE(leftModel()->path(), L("shelved"));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY((popup = shown()) != nullptr);
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_3);
+        QTRY_VERIFY(QFile::exists(L("shelved/one.txt")));
+        QTRY_VERIFY(QFile::exists(L("shelved/two.txt")));
+        QVERIFY(QFile::exists(L("shelf-src/one.txt")));  // copied, not moved
+        QCOMPARE(Shelves::instance().items(3).size(), 2);  // still on the shelf
+
+        // Look in it: Del takes one off (the file stays), Ctrl+Del clears it.
+        QTRY_VERIFY(!shown());
+        m_window->findChild<QToolButton*>("shelf-3")->click();
+        QTRY_VERIFY((popup = shown()) != nullptr);
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("shelf-src/one.txt"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Delete);
+        QTRY_COMPARE(Shelves::instance().items(3), QStringList({L("shelf-src/two.txt")}));
+        QVERIFY(QFile::exists(L("shelf-src/one.txt")));
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("shelf-src/two.txt"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Delete, Qt::ControlModifier);
+        QTRY_VERIFY(Shelves::instance().items(3).isEmpty());
+        QTRY_VERIFY(!shown());
+        QTRY_VERIFY(!m_window->findChild<QToolButton*>("shelf-3"));
 
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());

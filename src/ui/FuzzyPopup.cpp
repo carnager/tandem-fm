@@ -9,6 +9,8 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMimeData>
+#include <QUrl>
 #include <QListView>
 #include <QPainter>
 #include <QTextLayout>
@@ -49,6 +51,32 @@ QVariant PopupModel::data(const QModelIndex& index, int role) const
     if (role == Qt::DecorationRole)
         return it->icon;
     return {};
+}
+
+Qt::ItemFlags PopupModel::flags(const QModelIndex& index) const
+{
+    Qt::ItemFlags f = QAbstractListModel::flags(index);
+    if (dragPaths && index.isValid())
+        f |= Qt::ItemIsDragEnabled;
+    return f;
+}
+
+QStringList PopupModel::mimeTypes() const
+{
+    return {QStringLiteral("text/uri-list")};
+}
+
+QMimeData* PopupModel::mimeData(const QModelIndexList& indexes) const
+{
+    QList<QUrl> urls;
+    for (const QModelIndex& i : indexes)
+        if (const PopupItem* it = item(i.row()); it && it->key.startsWith(QLatin1Char('/')))
+            urls.append(QUrl::fromLocalFile(it->key));
+    if (urls.isEmpty())
+        return nullptr;
+    auto* data = new QMimeData;
+    data->setUrls(urls);
+    return data;
 }
 
 const PopupItem* PopupModel::item(int row) const
@@ -248,6 +276,7 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
     m_list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     layout->addWidget(m_list, 1);
     m_footer = new QLabel(this);
+    m_footer->setWordWrap(true);  // a long one wraps rather than being cut off
     m_footer->hide();
     layout->addWidget(m_footer);
 
@@ -274,6 +303,8 @@ void FuzzyPopup::open(const QString& placeholder, const QList<PopupItem>& items,
         m_returnFocus = QApplication::focusWidget();
     m_items = items;
     m_edit->setPlaceholderText(placeholder);
+    setDraggable(false);
+    setProperty("owner", QVariant());  // callers mark their popup after opening it
     m_footer->setText(footer);
     m_footer->setVisible(!footer.isEmpty());
     m_edit->clear();
@@ -282,6 +313,14 @@ void FuzzyPopup::open(const QString& placeholder, const QList<PopupItem>& items,
     show();
     raise();
     m_edit->setFocus();
+}
+
+void FuzzyPopup::setDraggable(bool on)
+{
+    m_model->dragPaths = on;
+    m_list->setDragEnabled(on);
+    m_list->setDragDropMode(on ? QAbstractItemView::DragOnly : QAbstractItemView::NoDragDrop);
+    m_list->setDefaultDropAction(Qt::CopyAction);
 }
 
 void FuzzyPopup::setQuery(const QString& text)

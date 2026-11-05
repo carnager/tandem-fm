@@ -960,6 +960,14 @@
         <translation>Nichts markieren</translation>
     </message>
     <message>
+        <source>Put on a shelf (then 1…9); the shelves sit at the bottom</source>
+        <translation>Auf ein Regal legen (dann 1…9); die Regale sitzen unten</translation>
+    </message>
+    <message>
+        <source>Copy a shelf here (Shift+Enter moves, Tab looks in it)</source>
+        <translation>Ein Regal hierher kopieren (Umschalt+Enter verschiebt, Tab schaut hinein)</translation>
+    </message>
+    <message>
         <source>Calculate all folder sizes</source>
         <translation>Alle Ordnergrößen berechnen</translation>
     </message>
@@ -1174,6 +1182,10 @@
     <message>
         <source>Modal keys (defaults; keys.toml changes them)</source>
         <translation>Modale Tasten (Vorgaben; in keys.toml änderbar)</translation>
+    </message>
+    <message>
+        <source>Put on shelf 1…9 · copy shelf 1…9 here</source>
+        <translation>Auf Regal 1…9 legen · Regal 1…9 hierher kopieren</translation>
     </message>
     <message>
         <source>Bookmark key (gh: home)</source>
@@ -2491,6 +2503,26 @@
         <translation>Mit Unterordnern filtern…</translation>
     </message>
     <message>
+        <source>Shelves</source>
+        <translation>Regale</translation>
+    </message>
+    <message>
+        <source>Put on a shelf…</source>
+        <translation>Auf ein Regal legen…</translation>
+    </message>
+    <message>
+        <source>Copy a shelf here…</source>
+        <translation>Ein Regal hierher kopieren…</translation>
+    </message>
+    <message>
+        <source>Put on shelf %1</source>
+        <translation>Auf Regal %1 legen</translation>
+    </message>
+    <message>
+        <source>Copy shelf %1 here</source>
+        <translation>Regal %1 hierher kopieren</translation>
+    </message>
+    <message>
         <source>Servers…</source>
         <translation>Server…</translation>
     </message>
@@ -2597,6 +2629,13 @@
     <message>
         <source>New folder</source>
         <translation>Neuer Ordner</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n put on shelf %1</source>
+        <translation>
+            <numerusform>%n auf Regal %1 gelegt</numerusform>
+            <numerusform>%n auf Regal %1 gelegt</numerusform>
+        </translation>
     </message>
     <message>
         <source>Copying %1 here from %2</source>
@@ -2858,6 +2897,60 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Enter: save   ·   %1 opens one</source>
         <translation>Enter: speichern   ·   %1 öffnet einen</translation>
+    </message>
+    <message>
+        <source>Already on shelf %1</source>
+        <translation>Schon auf Regal %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n put on shelf %1 (%2 there now)</source>
+        <translation>
+            <numerusform>%n auf Regal %1 gelegt (jetzt %2 dort)</numerusform>
+            <numerusform>%n auf Regal %1 gelegt (jetzt %2 dort)</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Shelf %1 is empty</source>
+        <translation>Regal %1 ist leer</translation>
+    </message>
+    <message>
+        <source>The shelves are empty: %1 puts files on one</source>
+        <translation>Die Regale sind leer: %1 legt Dateien auf eins</translation>
+    </message>
+    <message>
+        <source>Shelf %1</source>
+        <translation>Regal %1</translation>
+    </message>
+    <message>
+        <source>empty</source>
+        <translation>leer</translation>
+    </message>
+    <message>
+        <source>1–9 or Enter: copy here   ·   Shift+Enter: move here   ·   Tab: look in it</source>
+        <translation>1–9 oder Enter: hierher kopieren   ·   Umschalt+Enter: hierher verschieben   ·   Tab: hineinschauen</translation>
+    </message>
+    <message>
+        <source>Put %1 on a shelf…</source>
+        <translation>%1 auf ein Regal legen…</translation>
+    </message>
+    <message>
+        <source>1–9 or Enter: put it there   ·   click a shelf at the bottom to look in it</source>
+        <translation>1–9 oder Enter: dort ablegen   ·   ein Klick auf ein Regal unten schaut hinein</translation>
+    </message>
+    <message>
+        <source>gone</source>
+        <translation>weg</translation>
+    </message>
+    <message numerus="yes">
+        <source>Shelf %1: %n item(s)</source>
+        <translation>
+            <numerusform>Regal %1: %n Eintrag</numerusform>
+            <numerusform>Regal %1: %n Einträge</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Enter: show  ·  Ctrl+C / Ctrl+X: copy / move all here  ·  Del: take off  ·  Ctrl+Del: clear</source>
+        <translation>Enter: zeigen  ·  Strg+C / Strg+X: alles hierher kopieren / verschieben  ·  Entf: herunternehmen  ·  Strg+Entf: leeren</translation>
     </message>
     <message>
         <source>Extracting %1 …</source>
@@ -5138,6 +5231,20 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>“%1” is now %2.</source>
         <translation>„%1“ ist jetzt %2.</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::ShelfBar</name>
+    <message>
+        <source>＋ shelf</source>
+        <translation>＋ Regal</translation>
+    </message>
+    <message numerus="yes">
+        <source>Shelf %1: %n item(s), click to look in, drop to add</source>
+        <translation>
+            <numerusform>Regal %1: %n Eintrag, Klick schaut hinein, Ablegen fügt hinzu</numerusform>
+            <numerusform>Regal %1: %n Einträge, Klick schaut hinein, Ablegen fügt hinzu</numerusform>
+        </translation>
     </message>
 </context>
 <context>
