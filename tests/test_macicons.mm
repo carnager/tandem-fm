@@ -14,6 +14,7 @@
 #include <QStyleHints>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimer>
 #include <atomic>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -263,15 +264,18 @@ private slots:
     {
         QTest::addColumn<int>("count");
         QTest::addColumn<bool>("custom");
-        QTest::newRow("plain") << 60 << false;
-        QTest::newRow("custom") << 60 << true;
-        QTest::newRow("large custom") << 240 << true;
+        QTest::addColumn<bool>("perFrame");  // a view paints once per frame, after many loads
+        QTest::newRow("plain") << 60 << false << false;
+        QTest::newRow("custom") << 60 << true << false;
+        QTest::newRow("large custom") << 240 << true << false;
+        QTest::newRow("large custom, per frame") << 240 << true << true;
     }
 
     void gridSettles()
     {
         QFETCH(int, count);
         QFETCH(bool, custom);
+        QFETCH(bool, perFrame);
         int types = 0;
         std::atomic<int> calls{0}, running{0}, peak{0};
         const auto green = solidIcon(Qt::green);
@@ -293,7 +297,16 @@ private slots:
                 icons.get(folder, "/fixture/" + folder.name).pixmap(QSize(96, 96), 2);
             }
         };
-        connect(&icons, &MacFileIcons::ready, &icons, paint);
+        QTimer frame;
+        frame.setSingleShot(true);
+        frame.setInterval(16);
+        connect(&frame, &QTimer::timeout, &icons, paint);
+        connect(&icons, &MacFileIcons::ready, &icons, [&] {
+            if (!perFrame)
+                paint();
+            else if (!frame.isActive())
+                frame.start();
+        });
         QSignalSpy ready(&icons, &MacFileIcons::ready);
         paint();
         QTRY_COMPARE(ready.count(), custom ? count : 0);
@@ -303,6 +316,41 @@ private slots:
         QCOMPARE(calls.load(), custom ? count : 0);
         QCOMPARE(types, 1);
         QVERIFY(peak.load() <= 2);
+    }
+
+    // More custom icons on screen than the cache holds: none is dropped while
+    // shown (each repaint would load it again), and once off screen they go.
+    void pathCacheKeepsShownIcons()
+    {
+        std::atomic<int> calls{0};
+        const auto green = solidIcon(Qt::green), red = solidIcon(Qt::red);
+        MacFileIcons icons(nullptr, [&](const FileEntry&) { return green; }, [&](const QString&) { ++calls; return red; });
+        QSignalSpy ready(&icons, &MacFileIcons::ready);
+        auto show = [&](int batch) {
+            for (int i = 0; i < 96; ++i) {
+                FileEntry folder;
+                folder.isDir = folder.hasCustomIcon = true;
+                icons.get(folder, QString("/fixture/%1/%2").arg(batch).arg(i));
+            }
+        };
+        static_assert(2 * 96 == MacFileIcons::kMaxPathIcons);
+        for (int batch = 0; batch < 4; ++batch)  // 384 at once, as on a very large screen
+            show(batch);
+        QTRY_COMPARE(ready.count(), 384);
+        for (int batch = 0; batch < 4; ++batch)
+            show(batch);
+        QTest::qWait(50);
+        QCOMPARE(calls.load(), 384);  // nothing reloaded
+
+        QTest::qWait(MacFileIcons::kShownMs + 100);  // now all off screen
+        show(3);
+        show(4);
+        QTRY_COMPARE(ready.count(), 384 + 96);
+        show(0);  // dropped to stay within the bound
+        QTRY_COMPARE(calls.load(), 384 + 96 + 96);
+        show(3);  // kept: shown recently
+        QTest::qWait(50);
+        QCOMPARE(calls.load(), 384 + 96 + 96);
     }
 
     void finderCustomIconsAndXattrChanges()

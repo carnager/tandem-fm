@@ -9,7 +9,9 @@
 #include <QPointer>
 #include <QStyleHints>
 #include <QThread>
+#include <algorithm>
 #include <sys/stat.h>
+#include <vector>
 
 namespace tandem {
 
@@ -25,6 +27,7 @@ MacFileIcons::MacFileIcons(QObject* parent, TypeLoader types, PathLoader paths)
     // System icons follow the appearance even when Tandem's theme doesn't.
     connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, &MacFileIcons::reset);
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this, &MacFileIcons::reset);
+    m_clock.start();
 }
 
 void MacFileIcons::reset()
@@ -60,8 +63,10 @@ QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
     if (localPath.isEmpty() || (!entry.hasCustomIcon && !entry.isPackage))
         return fallback;
 
-    if (const PathIcon* known = m_paths.object(localPath); known && known->revision == entry.iconRevision)
+    if (auto known = m_paths.find(localPath); known != m_paths.end() && known->revision == entry.iconRevision) {
+        known->shown = m_clock.elapsed();
         return known->icon.isNull() ? fallback : known->icon;
+    }
     const QString key = localPath + QChar(0) + QString::number(entry.iconRevision);
     if (!m_pending.contains(key)) {
         m_pending.insert(key);
@@ -69,6 +74,26 @@ QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
         pump();
     }
     return fallback;
+}
+
+// Drops the least recently shown path icons beyond kMaxPathIcons, but none
+// shown in the last kShownMs: those may still be on screen.
+void MacFileIcons::trim()
+{
+    if (m_paths.size() <= kMaxPathIcons)
+        return;
+    const qint64 recent = m_clock.elapsed() - kShownMs;
+    std::vector<std::pair<qint64, QString>> old;
+    for (auto it = m_paths.cbegin(); it != m_paths.cend(); ++it) {
+        if (it->shown < recent)
+            old.emplace_back(it->shown, it.key());
+    }
+    std::sort(old.begin(), old.end());
+    for (const auto& [shown, path] : old) {
+        if (m_paths.size() <= kMaxPathIcons)
+            break;
+        m_paths.remove(path);
+    }
 }
 
 void MacFileIcons::pump()
@@ -91,9 +116,12 @@ void MacFileIcons::pump()
                 }
                 self->m_pending.remove(request.path + QChar(0) + QString::number(request.revision));
                 // Keep failures too, until ctime changes; a late, older lookup must not win.
-                const PathIcon* known = self->m_paths.object(request.path);
-                if (!known || known->revision <= request.revision)
-                    self->m_paths.insert(request.path, new PathIcon{request.revision, icon});
+                const auto known = self->m_paths.constFind(request.path);
+                if (known == self->m_paths.cend() || known->revision <= request.revision) {
+                    // Counts as shown: a repaint asks for it right after ready().
+                    self->m_paths.insert(request.path, {request.revision, icon, self->m_clock.elapsed()});
+                    self->trim();
+                }
                 emit self->ready(request.path);
                 self->pump();
             });

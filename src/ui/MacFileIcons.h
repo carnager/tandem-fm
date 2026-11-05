@@ -2,7 +2,7 @@
 
 #include "core/FileEntry.h"
 
-#include <QCache>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QIcon>
 #include <QObject>
@@ -28,6 +28,12 @@ public:
     static MacFileIcons& instance();
     explicit MacFileIcons(QObject* parent = nullptr, TypeLoader types = macTypeIcon, PathLoader paths = macPathIcon);
     QIcon get(const FileEntry& entry, const QString& localPath = {});
+    // Each path icon holds ~170 KB of pixels; ~32 MB for this many.
+    static constexpr int kMaxPathIcons = 192;
+    // An icon asked for this recently may still be on screen, so it is never
+    // dropped: the next repaint would load it again, and with more than
+    // kMaxPathIcons on screen, that would never end.
+    static constexpr qint64 kShownMs = 1000;
     // Drops all icons and drawings; the theme or system appearance changed.
     void reset();
 
@@ -37,15 +43,14 @@ signals:
 
 private:
     struct Request { QString path; qint64 revision; quint64 generation; };
-    struct PathIcon { qint64 revision; QIcon icon; };
+    struct PathIcon { qint64 revision; QIcon icon; qint64 shown; };
     void pump();
+    void trim();
     TypeLoader m_typeLoader;
     PathLoader m_pathLoader;
     QHash<QString, QIcon> m_types;
-    // One entry per path; a new ctime replaces it. Each holds ~170 KB of
-    // pixels, so the least recently shown go first: 192 is ~32 MB, still far
-    // more than a list or grid shows at once.
-    QCache<QString, PathIcon> m_paths{192};
+    QHash<QString, PathIcon> m_paths;  // one entry per path; a new ctime replaces it
+    QElapsedTimer m_clock;             // for PathIcon::shown
     QSet<QString> m_pending;
     std::deque<Request> m_queue;
     quint64 m_generation = 0;
