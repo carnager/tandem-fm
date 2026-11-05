@@ -305,6 +305,33 @@ private slots:
         QVERIFY(peak.load() <= 2);
     }
 
+    void pathCacheStaysBounded()
+    {
+        std::atomic<int> calls{0};
+        const auto green = solidIcon(Qt::green), red = solidIcon(Qt::red);
+        MacFileIcons icons(nullptr, [&](const FileEntry&) { return green; }, [&](const QString&) { ++calls; return red; });
+        QSignalSpy ready(&icons, &MacFileIcons::ready);
+        auto show = [&](int batch) {
+            for (int i = 0; i < 96; ++i) {
+                FileEntry folder;
+                folder.isDir = folder.hasCustomIcon = true;
+                icons.get(folder, QString("/fixture/%1/%2").arg(batch).arg(i));
+            }
+        };
+        for (int batch = 0; batch < 4; ++batch) {  // 384 icons, shown 96 at a time
+            show(batch);
+            QTRY_COMPARE(ready.count(), (batch + 1) * 96);
+            QTest::qWait(10);
+        }
+        QCOMPARE(calls.load(), 384);
+        show(3);  // still kept: shown last
+        QTest::qWait(50);
+        QCOMPARE(calls.load(), 384);
+        show(0);  // long off screen: dropped to stay within the bound
+        QTRY_COMPARE(calls.load(), 384 + 96);
+        static_assert(MacFileIcons::kMaxPathIcons < 2 * 96 + 96);
+    }
+
     void finderCustomIconsAndXattrChanges()
     {
         QTemporaryDir temporary;

@@ -9,6 +9,8 @@
 #include <QPointer>
 #include <QStyleHints>
 #include <QThread>
+#include <QTimer>
+#include <algorithm>
 #include <sys/stat.h>
 
 namespace tandem {
@@ -60,8 +62,10 @@ QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
     if (localPath.isEmpty() || (!entry.hasCustomIcon && !entry.isPackage))
         return fallback;
 
-    if (const PathIcon* known = m_paths.object(localPath); known && known->revision == entry.iconRevision)
-        return known->icon.isNull() ? fallback : known->icon;
+    if (auto it = m_paths.find(localPath); it != m_paths.end() && it->revision == entry.iconRevision) {
+        touch(*it);
+        return it->icon.isNull() ? fallback : it->icon;
+    }
     const QString key = localPath + QChar(0) + QString::number(entry.iconRevision);
     if (!m_pending.contains(key)) {
         m_pending.insert(key);
@@ -69,6 +73,37 @@ QIcon MacFileIcons::get(const FileEntry& entry, const QString& localPath)
         pump();
     }
     return fallback;
+}
+
+void MacFileIcons::touch(PathIcon& icon)
+{
+    icon.shown = m_pass;
+    if (!m_passQueued) {
+        m_passQueued = true;
+        QTimer::singleShot(0, this, [this] {
+            ++m_pass;
+            m_passQueued = false;
+        });
+    }
+}
+
+void MacFileIcons::trim()
+{
+    if (m_paths.size() <= kMaxPathIcons)
+        return;
+    // Least recently shown first, but never one shown in this or the last
+    // paint: evicting a visible icon would make the next repaint reload it.
+    std::vector<std::pair<quint64, QString>> old;
+    for (auto it = m_paths.cbegin(); it != m_paths.cend(); ++it) {
+        if (it->shown + 1 < m_pass)
+            old.emplace_back(it->shown, it.key());
+    }
+    std::sort(old.begin(), old.end());
+    for (const auto& [shown, path] : old) {
+        if (m_paths.size() <= kMaxPathIcons)
+            break;
+        m_paths.remove(path);
+    }
 }
 
 void MacFileIcons::pump()
@@ -91,9 +126,13 @@ void MacFileIcons::pump()
                 }
                 self->m_pending.remove(request.path + QChar(0) + QString::number(request.revision));
                 // Keep failures too, until ctime changes; a late, older lookup must not win.
-                const PathIcon* known = self->m_paths.object(request.path);
-                if (!known || known->revision <= request.revision)
-                    self->m_paths.insert(request.path, new PathIcon{request.revision, icon});
+                auto it = self->m_paths.find(request.path);
+                if (it == self->m_paths.end() || it->revision <= request.revision) {
+                    PathIcon& stored = self->m_paths[request.path];
+                    stored = {request.revision, icon, 0};
+                    self->touch(stored);
+                    self->trim();
+                }
                 emit self->ready(request.path);
                 self->pump();
             });
