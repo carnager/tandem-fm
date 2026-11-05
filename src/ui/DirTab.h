@@ -4,6 +4,7 @@
 #include "core/Search.h"
 
 #include <QObject>
+#include <QPointer>
 #include <QTimer>
 #include <QHash>
 #include <QSet>
@@ -96,6 +97,10 @@ public:
     bool gridView = false;  // thumbnails instead of the list; stays while moving around
     int savedScroll = 0;
     int slot = 0;  // the tab's fixed number (Alt+slot); tabs are ordered by it
+    // Opened for search results: leaving them closes it, back to cameFrom.
+    // Opening a folder from the results makes it an ordinary tab.
+    bool madeForSearch = false;
+    QPointer<DirTab> cameFrom;
 
 signals:
     void loadingChanged(bool loading);

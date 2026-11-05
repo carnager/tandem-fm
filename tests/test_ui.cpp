@@ -2971,12 +2971,15 @@ private slots:
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_left->view()->setFocus();
+        DirTab* folderTab = m_left->tab();
 
         QTest::keyClick(m_left->view(), Qt::Key_F7, Qt::AltModifier);
         QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()));
         QTest::keyClicks(QApplication::focusWidget(), "report");
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_VERIFY(m_left->tab()->isSearch());
+        DirTab* resultsTab = m_left->tab();
+        QVERIFY(resultsTab != folderTab);  // results in a tab of their own
         QTRY_VERIFY(!m_left->tab()->isSearching());
         QTRY_VERIFY(leftModel()->rowOf("a/report.txt") >= 0);
         QVERIFY(leftModel()->rowOf("a/b/report-old.txt") >= 0);
@@ -3002,13 +3005,14 @@ private slots:
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_VERIFY(!m_left->tab()->isSearching());
         QTRY_COMPARE(m_left->tab()->searchFound(), 2);
+        QCOMPARE(m_left->tab(), resultsTab);  // searching again reuses it
         QVERIFY(leftModel()->rowOf("other.md") >= 0);
 
         // Esc leaves the results, back in the folder searched.
         m_left->view()->setFocus();
         QTest::keyClick(m_left->view(), Qt::Key_Escape);
-        QTRY_VERIFY(!m_left->tab()->isSearch());
-        QTRY_COMPARE(leftModel()->path(), L("srch"));
+        QTRY_COMPARE(m_left->tab(), folderTab);
+        QCOMPARE(leftModel()->path(), L("srch"));
         QVERIFY(leftModel()->rowOf("a") >= 0);
 
         m_left->navigate(L());
@@ -3029,8 +3033,14 @@ private slots:
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_left->view()->setFocus();
 
+        DirTab* folderTab = m_left->tab();
+        const QStringList tabsBefore = m_left->tabPaths();
         QTest::keyClick(m_left->view(), Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY(m_left->tab()->isLive());
+        // The results get a tab of their own, left out of the saved tabs.
+        QVERIFY(m_left->tab() != folderTab);
+        QCOMPARE(folderTab->model()->path(), L("deep"));
+        QCOMPARE(m_left->tabPaths(), tabsBefore);
         auto* edit = qobject_cast<QLineEdit*>(QApplication::focusWidget());
         QVERIFY(edit);
         QTest::keyClicks(edit, "ph 24 raw");
@@ -3052,17 +3062,20 @@ private slots:
 
         // Alt+S: this folder only, same words; and back.
         QTest::keyClick(edit, Qt::Key_S, Qt::AltModifier);
-        QTRY_VERIFY(!m_left->tab()->isSearch());
-        QTRY_COMPARE(leftModel()->path(), L("deep"));
+        QTRY_COMPARE(m_left->tab(), folderTab);
         QTRY_COMPARE(leftModel()->filter(), QString("notes"));
         QCOMPARE(leftModel()->rowOf("photos"), -1);
         QTest::keyClick(edit, Qt::Key_S, Qt::AltModifier);
         QTRY_VERIFY(m_left->tab()->isLive());
         QTRY_VERIFY(leftModel()->rowOf("notes.txt") >= 0);
 
-        // Esc in the words leaves, back in the folder, unfiltered.
+        QVERIFY(m_left->tab() != folderTab);
+        QVERIFY(folderTab->model()->filter().isEmpty());  // the words went along
+
+        // Esc in the words closes the results, back in the folder's tab.
         QTest::keyClick(edit, Qt::Key_Escape);
-        QTRY_VERIFY(!m_left->tab()->isSearch());
+        QTRY_COMPARE(m_left->tab(), folderTab);
+        QCOMPARE(m_left->tabPaths(), tabsBefore);
         QTRY_COMPARE(leftModel()->path(), L("deep"));
         QVERIFY(leftModel()->filter().isEmpty());
         QVERIFY(leftModel()->rowOf("photos") >= 0);

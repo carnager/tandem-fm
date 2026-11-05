@@ -72,7 +72,7 @@ public:
     QStringList tabPaths() const;
     QList<bool> tabGrids() const;  // which tabs show thumbnails
     QList<int> tabSlots() const;
-    int currentTabIndex() const { return m_current; }
+    int currentTabIndex() const;  // these four leave out tabs of search results
     void restoreTabs(const QStringList& paths, int current, const QList<int>& numbers = {},
                      const QList<bool>& grids = {});
     // Closes every tab and opens these instead (a workspace).
@@ -203,6 +203,9 @@ private:
     QLabel* m_filterLabel;
     QString m_pendingFilter;  // for the folder listing on its way (Alt+S from subfolders)
     void showFilterBarFor(DirTab* t);
+    DirTab* resultsTab();  // this one if it shows results, else a new one
+    void leaveResults();   // its tab closes if it was opened for them
+    std::vector<DirTab*> keptTabs() const;
     void toggleFilterDepth();
 
     QTimer m_loadingTimer;

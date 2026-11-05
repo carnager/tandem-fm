@@ -47,6 +47,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <chrono>
 #include <thread>
 
@@ -201,8 +202,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_searchChip->setToolTip(tr("Search results — click (or Esc) to leave"));
     m_searchChip->hide();
     connect(m_searchChip, &QToolButton::clicked, this, [this] {
-        if (DirTab* t = tab(); t && t->isSearch())
-            t->goUp();
+        leaveResults();
         m_view->setFocus();
     });
     hl->addWidget(m_mountButton);
@@ -472,7 +472,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
             if (m_filterBar->isVisible())
                 m_filterEdit->setFocus();
             else
-                t->goUp();
+                leaveResults();
         } else if (t && (t->isLoading() || t->isSearching()))
             cancelLoading();  // stop what's running
         else if (m_searchBar->isVisible())
@@ -670,7 +670,7 @@ void Panel::selectSlot(int slot)
 QList<int> Panel::tabSlots() const
 {
     QList<int> out;
-    for (DirTab* t : m_tabs)
+    for (DirTab* t : keptTabs())
         out.append(t->slot);
     return out;
 }
@@ -696,7 +696,7 @@ void Panel::cycleTab(int step)
 QStringList Panel::tabPaths() const
 {
     QStringList out;
-    for (DirTab* t : m_tabs)
+    for (DirTab* t : keptTabs())
         out.append(t->path());
     return out;
 }
@@ -704,7 +704,7 @@ QStringList Panel::tabPaths() const
 QList<bool> Panel::tabGrids() const
 {
     QList<bool> out;
-    for (DirTab* t : m_tabs)
+    for (DirTab* t : keptTabs())
         out.append(t->gridView);
     return out;
 }
@@ -971,14 +971,65 @@ QString Panel::innerPath(const QString& p) const
 
 void Panel::goUp()
 {
-    if (DirTab* t = tab())
+    if (DirTab* t = tab(); t && t->isSearch())
+        leaveResults();
+    else if (t)
         t->goUp();
 }
 
 void Panel::back()
 {
-    if (DirTab* t = tab())
+    if (DirTab* t = tab(); t && t->isSearch())
+        leaveResults();
+    else if (t)
         t->back();
+}
+
+DirTab* Panel::resultsTab()
+{
+    DirTab* t = tab();
+    if (!t || t->isSearch())
+        return t;
+    DirTab* r = addTab(t->path(), true);
+    r->madeForSearch = true;
+    r->cameFrom = t;
+    return r;
+}
+
+void Panel::leaveResults()
+{
+    DirTab* t = tab();
+    if (!t || !t->isSearch())
+        return;
+    if (!t->madeForSearch || m_tabs.size() < 2) {
+        t->goUp();  // back to the folder searched, in this tab
+        return;
+    }
+    t->cancelSearch();
+    const QPointer<DirTab> from = t->cameFrom;
+    closeCurrentTab();
+    if (from && tabIndexOf(from) >= 0)
+        showTab(tabIndexOf(from));
+    m_view->setFocus();
+}
+
+std::vector<DirTab*> Panel::keptTabs() const
+{
+    std::vector<DirTab*> out;
+    for (DirTab* t : m_tabs)
+        if (!(t->madeForSearch && t->isSearch()))
+            out.push_back(t);
+    return out;
+}
+
+int Panel::currentTabIndex() const
+{
+    DirTab* t = tab();
+    if (t && t->madeForSearch && t->isSearch() && t->cameFrom)
+        t = t->cameFrom;
+    const std::vector<DirTab*> kept = keptTabs();
+    const auto it = std::find(kept.begin(), kept.end(), t);
+    return it == kept.end() ? 0 : int(it - kept.begin());
 }
 
 void Panel::forward()
@@ -995,7 +1046,7 @@ void Panel::cancelLoading()
             t->cancelSearch();
             showMessage(tr("Search stopped"));
         } else {
-            t->goUp();  // leave the results
+            leaveResults();
         }
         return;
     }
@@ -1431,7 +1482,7 @@ void Panel::runSearch()
     spec.query = q;
     spec.contents = m_searchContents->isChecked();
     spec.all = m_searchAll->isChecked();
-    t->startSearch(spec);
+    resultsTab()->startSearch(spec);
     m_searchBar->hide();  // the header chip shows the search; Alt+F7 brings the bar back, filled in
     m_view->setFocus();
 }
@@ -1481,6 +1532,9 @@ void Panel::startDeepFilter()
     if (!t->isLive()) {
         const QString words = t->model()->filter();
         const QString root = t->isSearch() ? t->searchSpec().root : path();
+        if (!t->isSearch())
+            t->model()->setFilter({});  // the words go along to the results
+        t = resultsTab();
         t->startLiveSearch(root);
         t->setLiveQuery(words);
     }
@@ -1514,9 +1568,14 @@ void Panel::toggleFilterDepth()
         return;
     const QString words = m_filterEdit->text();
     if (t->isLive()) {
-        m_pendingFilter = words;
-        t->goUp();  // back to the folder; the filter follows its listing
-        m_filterLabel->setText(tr("Filter"));
+        leaveResults();
+        if (tab() != t) {  // back in the tab it came from
+            tab()->model()->setFilter(words);
+            showFilterBarFor(tab());
+        } else {
+            m_pendingFilter = words;  // the folder's listing is on its way
+            m_filterLabel->setText(tr("Filter"));
+        }
         m_filterBar->show();
         m_filterEdit->setFocus();
         return;
@@ -1525,10 +1584,12 @@ void Panel::toggleFilterDepth()
         startDeepFilter();  // says why not
         return;
     }
-    t->model()->setFilter({});
-    t->startLiveSearch(path());
-    t->setLiveQuery(words);
-    showFilterBarFor(t);
+    const QString root = path();
+    t->model()->setFilter({});  // the words go along to the results
+    DirTab* r = resultsTab();
+    r->startLiveSearch(root);
+    r->setLiveQuery(words);
+    showFilterBarFor(r);
     m_filterEdit->setFocus();
     m_filterEdit->end(false);
 }
@@ -1536,7 +1597,7 @@ void Panel::toggleFilterDepth()
 void Panel::clearFilter()
 {
     if (DirTab* t = tab(); t && t->isLive())
-        t->goUp();  // leave the live search
+        leaveResults();
     m_filterEdit->clear();
     m_filterBar->hide();
     if (DirTab* t = tab())

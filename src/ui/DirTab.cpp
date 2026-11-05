@@ -217,6 +217,7 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
         m_inSearch = false;
         m_live = false;
         m_liveNames.clear();
+        madeForSearch = false;
         m_model->setListing(QString(), {});  // forget the results; the real listing follows
         emit searchChanged();
     }
