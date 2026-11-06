@@ -112,6 +112,7 @@ protected:
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
     void applyVisual();
     void resizeEvent(QResizeEvent* e) override;
+    bool eventFilter(QObject* obj, QEvent* e) override;
 
 private:
     friend class ThumbGrid;
@@ -122,6 +123,8 @@ private:
     QString dropTargetFor(const QPoint& pos, int* row) const;
     void startFileDrag();
     void showHeaderMenu(const QPoint& pos);
+    int nameEdgeNeighbour(int x) const;  // the column right of the name column's edge at x, or -1
+    bool nameEdgeEvent(QMouseEvent* e);
 
     bool m_active = false;
     int m_dropRow = -1;
@@ -139,6 +142,10 @@ private:
     bool m_arrowFolders = true;
     int m_zoomOfColumns = 100;  // the zoom the column widths were made for
     QList<int> m_autoHidden;  // columns hidden because the panel is narrow
+    int m_edgeColumn = -1;    // while the name column's edge is dragged: the column resized instead
+    int m_edgeStartX = 0;
+    int m_edgeStartWidth = 0;
+    bool m_edgeCursor = false;  // the resize cursor is ours
     ThumbGrid* m_grid = nullptr;
 };
 
