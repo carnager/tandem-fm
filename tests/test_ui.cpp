@@ -10,6 +10,7 @@
 #include "core/Shelves.h"
 #include "ui/DialogKeys.h"
 #include "ui/Dialogs.h"
+#include "ui/EditNames.h"
 #include "ui/FileModel.h"
 #include "ui/CommandBar.h"
 #include "ui/SyncDialog.h"
@@ -1483,6 +1484,26 @@ private slots:
 
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
+    }
+
+    // GUI editors that hand the file to a window and return get their wait
+    // flag, so the names aren't read before they are edited.
+    void editorWaitFlags()
+    {
+        auto restore = qScopeGuard([] { QSettings().remove("tools/nameEditor"); });
+        QString error;
+        auto argv = [&](const QString& editor) {
+            QSettings().setValue("tools/nameEditor", editor);
+            return EditNamesSession::editorCommand("/t/names.txt", &error);
+        };
+        QCOMPARE(argv("code"), QStringList({"code", "--wait", "/t/names.txt"}));
+        QCOMPARE(argv("/usr/local/bin/code %f"), QStringList({"/usr/local/bin/code", "--wait", "/t/names.txt"}));
+        QCOMPARE(argv("code -w"), QStringList({"code", "-w", "/t/names.txt"}));  // already waits
+        QCOMPARE(argv("code --new-window --wait"), QStringList({"code", "--new-window", "--wait", "/t/names.txt"}));
+        QCOMPARE(argv("subl"), QStringList({"subl", "-w", "/t/names.txt"}));
+        QCOMPARE(argv("zed"), QStringList({"zed", "--wait", "/t/names.txt"}));
+        QCOMPARE(argv("kate -b"), QStringList({"kate", "-b", "/t/names.txt"}));  // not one of them
+        QCOMPARE(argv("vim"), QStringList({"vim", "/t/names.txt"}));
     }
 
     void renameInTextEditor()
