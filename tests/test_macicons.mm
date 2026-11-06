@@ -4,6 +4,7 @@
 #include "ui/FileModel.h"
 #include "ui/IconCache.h"
 #include "ui/MacFileIcons.h"
+#include "ui/MacOpenWith.h"
 
 #include <QApplication>
 #include <QFile>
@@ -461,6 +462,34 @@ private slots:
         QIcon::setThemeName("tandem-automatic-fallback-theme");
         icons.get(folder);
         QCOMPARE(calls, 1);
+    }
+
+    // "Open with" offers what Launch Services offers: TextEdit for text,
+    // Preview for PDF, the default app first, and only apps for every file.
+    void openWithApps()
+    {
+        QTemporaryDir temporary;
+        const QString text = temporary.filePath("notes.txt"), pdf = temporary.filePath("paper.pdf");
+        for (const QString& path : {text, pdf}) {
+            QFile file(path);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+        }
+        auto has = [](const QList<MacApp>& apps, const QString& path) {
+            return std::any_of(apps.cbegin(), apps.cend(), [&](const MacApp& a) { return a.path == path; });
+        };
+        const QList<MacApp> forText = macAppsForAll({text});
+        QVERIFY(has(forText, "/System/Applications/TextEdit.app"));
+        QVERIFY(forText.first().isDefault);
+        QCOMPARE(std::count_if(forText.cbegin(), forText.cend(), [](const MacApp& a) { return a.isDefault; }), 1);
+        for (const MacApp& app : forText) {
+            QVERIFY(!app.name.isEmpty() && !app.name.endsWith(".app"));
+            QVERIFY(app.path.endsWith(".app"));
+        }
+        QVERIFY(has(macAppsForAll({pdf}), "/System/Applications/Preview.app"));
+        const QList<MacApp> both = macAppsForAll({text, pdf});
+        for (const MacApp& app : both)
+            QVERIFY(has(forText, app.path) && has(macAppsForAll({pdf}), app.path));
+        QVERIFY(!macAppIcon("/System/Applications/TextEdit.app").isNull());
     }
 };
 

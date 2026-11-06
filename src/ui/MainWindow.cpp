@@ -58,6 +58,9 @@
 #endif
 #include <QCloseEvent>
 #include <QDesktopServices>
+#ifdef Q_OS_MACOS
+#include "ui/MacOpenWith.h"
+#endif
 #include <QDialog>
 #include <QDir>
 #include <QElapsedTimer>
@@ -3222,6 +3225,20 @@ void MainWindow::openWithPicker()
             p->showMessage(tr("Open with works on local files: F3 or Enter opens this one"), true);
         return;
     }
+    const QString dir = p->path();
+    QList<PopupItem> items;
+#ifdef Q_OS_MACOS
+    // The apps macOS offers for these files, as Finder's Open With does.
+    for (const MacApp& app : macAppsForAll(paths)) {
+        PopupItem it;
+        it.title = app.name;
+        it.subtitle = app.isDefault ? tr("default") : QString();
+        it.icon = macAppIcon(app.path);
+        it.key = app.path;
+        it.run = [this, app, paths] { openWithMacApp(app, paths); };
+        items.append(it);
+    }
+#else
     DesktopApps& registry = DesktopApps::instance();
     if (!registry.isLoaded()) {
         p->showMessage(tr("Still loading the applications, a moment…"));
@@ -3229,9 +3246,7 @@ void MainWindow::openWithPicker()
     }
     const QList<DesktopApp> apps = appsForAll(paths);
     const QString defaultId = registry.defaultFor(mimeChainFor(paths.first())).id;
-    const QString dir = p->path();
     const QString terminal = registry.defaultTerminal();
-    QList<PopupItem> items;
     for (const DesktopApp& app : apps) {
         PopupItem it;
         it.title = app.name;
@@ -3244,6 +3259,7 @@ void MainWindow::openWithPicker()
         };
         items.append(it);
     }
+#endif
     m_popup->keyHandler = nullptr;
     m_popup->queryItem = [this, paths, dir](const QString& q) -> std::optional<PopupItem> {
         if (q.trimmed().isEmpty())
@@ -3266,9 +3282,30 @@ void MainWindow::openWithPicker()
                   tr("Enter: open   ·   type a command to run it with the files"));
 }
 
+#ifdef Q_OS_MACOS
+void MainWindow::openWithMacApp(const MacApp& app, const QStringList& paths)
+{
+    QPointer<MainWindow> self(this);
+    macOpenWith(app.path, paths, [self, name = app.name](const QString& error) {
+        if (self && !error.isEmpty())
+            self->active()->showMessage(tr("Could not start %1: %2").arg(name, error), true);
+    });
+}
+#endif
+
 void MainWindow::addOpenWithMenu(QMenu* menu, const QStringList& paths)
 {
     QMenu* sub = menu->addMenu(tr("Open with"));
+#ifdef Q_OS_MACOS
+    const QList<MacApp> macApps = macAppsForAll(paths);
+    for (const MacApp& app : macApps) {
+        sub->addAction(macAppIcon(app.path), app.isDefault ? tr("%1 (default)").arg(app.name) : app.name, this,
+                       [this, app, paths] { openWithMacApp(app, paths); });
+    }
+    if (macApps.isEmpty())
+        sub->addAction(tr("No registered applications"))->setEnabled(false);
+    return;
+#endif
     DesktopApps& registry = DesktopApps::instance();
     if (!registry.isLoaded()) {
         sub->addAction(tr("Loading applications…"))->setEnabled(false);

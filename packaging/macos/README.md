@@ -33,6 +33,6 @@ notarized, so the first start needs a right click → Open.
 - The trash window opens the Trash in Finder; deleting to the trash and undo
   work as on Linux.
 - "Open terminal here" opens Terminal.app unless another terminal is set.
+- "Open with" lists the apps macOS offers, as Finder does.
 - Not available: desktop notifications, the system keyring for SFTP passwords,
-  ACL and file flag editing, "Open with" app lists (opening files with their
-  default app works).
+  ACL and file flag editing, choosing the default app ("Always open … with").
