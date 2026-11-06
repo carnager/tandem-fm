@@ -114,7 +114,7 @@ private:
     // Shelves: put the selection on one, look in one, copy or move one here.
     void putOnShelf(int shelf);  // 0: ask which
     void takeFromShelf(int shelf, bool move);  // 0: ask which
-    void shelfPicker(bool take);
+    void shelfPicker();
     void openShelf(int shelf);  // or closes it, when it's the one open
     bool refuseInArchive(Panel* p);
     Panel* previewOwner(QWidget* w) const;

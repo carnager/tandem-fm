@@ -49,7 +49,7 @@ const Entry kEntries[] = {
     {QT_TRANSLATE_NOOP("Shortcuts", "Selecting"), "Ctrl+A", QT_TRANSLATE_NOOP("Shortcuts", "Mark all")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Selecting"), "Ctrl+Shift+A", QT_TRANSLATE_NOOP("Shortcuts", "Mark none")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Selecting"), "Ctrl+B", QT_TRANSLATE_NOOP("Shortcuts", "Put on a shelf (then 1…9); the shelves sit at the bottom")},
-    {QT_TRANSLATE_NOOP("Shortcuts", "Selecting"), "Ctrl+Shift+B", QT_TRANSLATE_NOOP("Shortcuts", "Copy a shelf here (Shift+Enter moves, Tab looks in it)")},
+    {QT_TRANSLATE_NOOP("Shortcuts", "Selecting"), "Ctrl+Shift+B", QT_TRANSLATE_NOOP("Shortcuts", "Open the shelves: Enter copies here, Shift+Enter moves, 1–9 switch")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Selecting"), "Alt+Shift+Enter", QT_TRANSLATE_NOOP("Shortcuts", "Calculate all folder sizes")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Files"), "F3", QT_TRANSLATE_NOOP("Shortcuts", "View")},
     {QT_TRANSLATE_NOOP("Shortcuts", "Files"), "F4", QT_TRANSLATE_NOOP("Shortcuts", "Edit (on servers and in archives: a copy that saves back)")},

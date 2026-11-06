@@ -964,10 +964,6 @@
         <translation>Auf ein Regal legen (dann 1…9); die Regale sitzen unten</translation>
     </message>
     <message>
-        <source>Copy a shelf here (Shift+Enter moves, Tab looks in it)</source>
-        <translation>Ein Regal hierher kopieren (Umschalt+Enter verschiebt, Tab schaut hinein)</translation>
-    </message>
-    <message>
         <source>Calculate all folder sizes</source>
         <translation>Alle Ordnergrößen berechnen</translation>
     </message>
@@ -1194,6 +1190,10 @@
     <message>
         <source>Down / up</source>
         <translation>Runter / hoch</translation>
+    </message>
+    <message>
+        <source>Open the shelves: Enter copies here, Shift+Enter moves, 1–9 switch</source>
+        <translation>Regale öffnen: Enter kopiert hierher, Shift+Enter verschiebt, 1–9 wechselt</translation>
     </message>
     <message>
         <source>Out of / into a folder</source>
@@ -2924,10 +2924,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>empty</source>
         <translation>leer</translation>
-    </message>
-    <message>
-        <source>1–9 or Enter: copy here   ·   Shift+Enter: move here   ·   Tab: look in it</source>
-        <translation>1–9 oder Enter: hierher kopieren   ·   Umschalt+Enter: hierher verschieben   ·   Tab: hineinschauen</translation>
     </message>
     <message>
         <source>Put %1 on a shelf…</source>
@@ -5263,8 +5259,8 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Alles von diesem Regal nehmen (die Dateien bleiben)</translation>
     </message>
     <message>
-        <source>Drag files in or out  ·  Del takes off  ·  Enter shows</source>
-        <translation>Dateien hinein- oder herausziehen  ·  Entf nimmt herunter  ·  Enter zeigt</translation>
+        <source>Drag files in or out  ·  Enter copies here, Shift+Enter moves  ·  1–9 another shelf  ·  Del takes off</source>
+        <translation>Dateien hinein- oder herausziehen  ·  Enter kopiert hierher, Shift+Enter verschiebt  ·  1–9 anderes Regal  ·  Entf nimmt herunter</translation>
     </message>
     <message numerus="yes">
         <source>Shelf %1 · %n item(s)</source>

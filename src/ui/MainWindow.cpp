@@ -3767,7 +3767,7 @@ namespace tandem {
 void MainWindow::putOnShelf(int shelf)
 {
     if (shelf == 0) {
-        shelfPicker(false);
+        shelfPicker();
         return;
     }
     Panel* p = active();
@@ -3784,8 +3784,15 @@ void MainWindow::putOnShelf(int shelf)
 
 void MainWindow::takeFromShelf(int shelf, bool move)
 {
-    if (shelf == 0) {
-        shelfPicker(true);
+    if (shelf == 0) {  // which one: the panel shows them, and takes the keys
+        const QList<int> used = Shelves::instance().used();
+        if (used.isEmpty()) {
+            active()->showMessage(
+                tr("The shelves are empty: %1 puts files on one").arg(keyHint(QStringLiteral("put-on-a-shelf"))), true);
+            return;
+        }
+        const int last = Shelves::instance().lastUsed();
+        m_shelfPanel->showShelf(used.contains(last) ? last : used.first(), true);
         return;
     }
     const QStringList paths = Shelves::instance().items(shelf);
@@ -3804,66 +3811,40 @@ void MainWindow::takeFromShelf(int shelf, bool move)
     }
 }
 
-// Which shelf: a digit picks one, Enter the one used last (selected, not moved to the top).
-void MainWindow::shelfPicker(bool take)
+// Which shelf to put the selection on: a digit picks one, Enter the one used
+// last (selected, not moved to the top).
+void MainWindow::shelfPicker()
 {
     Panel* p = active();
-    const QStringList selection = take ? QStringList() : p->selectedPaths();
-    if (!take && selection.isEmpty())
+    const QStringList selection = p->selectedPaths();
+    if (selection.isEmpty())
         return;
-    if (take && Shelves::instance().used().isEmpty()) {
-        p->showMessage(tr("The shelves are empty: %1 puts files on one").arg(keyHint(QStringLiteral("put-on-a-shelf"))), true);
-        return;
-    }
     QList<PopupItem> items;
     const int last = Shelves::instance().lastUsed();
-    int lastRow = 0;
     for (int n = 1; n <= Shelves::kCount; ++n) {
         const QStringList on = Shelves::instance().items(n);
-        if (take && on.isEmpty())
-            continue;
-        if (n == last)
-            lastRow = int(items.size());
         PopupItem it;
         it.key = QString::number(n);
         it.title = tr("Shelf %1").arg(n);
         it.subtitle = on.isEmpty() ? tr("empty") : plural(tr("%n item(s)", nullptr, int(on.size())), on.size());
         it.hint = QString::number(n);
         it.icon = IconCache::themed("folder-documents", "folder");
-        it.run = [this, n, take] { take ? takeFromShelf(n, false) : putOnShelf(n); };
+        it.run = [this, n] { putOnShelf(n); };
         items.append(it);
     }
     m_popup->queryItem = nullptr;
-    m_popup->keyHandler = [this, take](QKeyEvent* e, const PopupItem* it) {
-        int n = 0;
-        if (e->key() >= Qt::Key_1 && e->key() <= Qt::Key_9 && !(e->modifiers() & ~Qt::KeypadModifier))
-            n = e->key() - Qt::Key_0;
-        const bool move = take && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) &&
-                          (e->modifiers() & Qt::ShiftModifier);
-        const bool look = take && e->key() == Qt::Key_Tab;
-        if (n == 0 && it && (move || look))
-            n = it->key.toInt();
-        if (n == 0 || (take && Shelves::instance().items(n).isEmpty()))
-            return n != 0;  // an empty shelf's digit: nothing to take
+    m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem*) {
+        if (e->key() < Qt::Key_1 || e->key() > Qt::Key_9 || (e->modifiers() & ~Qt::KeypadModifier))
+            return false;
+        const int n = e->key() - Qt::Key_0;
         QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);  // close the picker first
         QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
-        QTimer::singleShot(0, this, [this, n, take, move, look] {
-            if (look)
-                openShelf(n);
-            else if (take)
-                takeFromShelf(n, move);
-            else
-                putOnShelf(n);
-        });
+        QTimer::singleShot(0, this, [this, n] { putOnShelf(n); });
         return true;
     };
-    if (take)
-        m_popup->open(tr("Copy a shelf here…"), items,
-                      tr("1–9 or Enter: copy here   ·   Shift+Enter: move here   ·   Tab: look in it"));
-    else
-        m_popup->open(tr("Put %1 on a shelf…").arg(describeItems(selection)), items,
-                      tr("1–9 or Enter: put it there   ·   click a shelf at the bottom to look in it"));
-    m_popup->selectRow(lastRow);  // in number order, but Enter still picks the one used last
+    m_popup->open(tr("Put %1 on a shelf…").arg(describeItems(selection)), items,
+                  tr("1–9 or Enter: put it there   ·   click a shelf at the bottom to look in it"));
+    m_popup->selectRow(last - 1);
 }
 
 void MainWindow::openShelf(int shelf)

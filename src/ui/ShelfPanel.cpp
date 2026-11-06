@@ -7,6 +7,7 @@
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
 
+#include <QApplication>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QGraphicsDropShadowEffect>
@@ -167,7 +168,7 @@ ShelfPanel::ShelfPanel(QWidget* window) : QFrame(window)
     m_list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_list->installEventFilter(this);
-    connect(m_list, &QListWidget::itemActivated, this, [this](QListWidgetItem* it) {
+    connect(m_list, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem* it) {
         emit showRequested(it->data(kPathRole).toString());
     });
     layout->addWidget(m_list, 1);
@@ -191,7 +192,9 @@ ShelfPanel::ShelfPanel(QWidget* window) : QFrame(window)
     button(tr("Clear"), tr("Take everything off this shelf (the files stay)"), QStringLiteral("shelfClear"),
            [this] { Shelves::instance().clear(m_shelf); });
     layout->addLayout(buttons);
-    auto* hint = new QLabel(tr("Drag files in or out  ·  Del takes off  ·  Enter shows"), this);
+    auto* hint = new QLabel(tr("Drag files in or out  ·  Enter copies here, Shift+Enter moves  ·  "
+                               "1–9 another shelf  ·  Del takes off"), this);
+    hint->setWordWrap(true);
     layout->addWidget(hint);
 
     connect(&Shelves::instance(), &Shelves::changed, this, [this] {
@@ -206,22 +209,35 @@ ShelfPanel::ShelfPanel(QWidget* window) : QFrame(window)
     hide();
 }
 
-void ShelfPanel::showShelf(int shelf)
+void ShelfPanel::showShelf(int shelf, bool focus)
 {
     if (Shelves::instance().items(shelf).isEmpty())
         return;
+    if (focus && !m_list->hasFocus())
+        m_returnFocus = QApplication::focusWidget();
+    const bool other = shelf != m_shelf;
     m_shelf = shelf;
     fill();
     place();
     show();
     raise();
+    if (focus) {
+        m_list->setFocus();
+        if (other || !m_list->currentItem())
+            m_list->setCurrentRow(0);
+    }
     emit shownShelfChanged(shelf);
 }
 
 void ShelfPanel::close()
 {
-    if (m_list->hasFocus())
-        m_list->clearFocus();
+    if (m_list->hasFocus()) {
+        if (m_returnFocus)
+            m_returnFocus->setFocus();  // back to the panel the keys came from
+        else
+            m_list->clearFocus();
+    }
+    m_returnFocus = nullptr;
     hide();
     m_shelf = 0;
     emit shownShelfChanged(0);
@@ -326,7 +342,7 @@ bool ShelfPanel::eventFilter(QObject* obj, QEvent* e)
     if (obj == m_list && e->type() == QEvent::ShortcutOverride) {
         const int key = static_cast<QKeyEvent*>(e)->key();
         if (key == Qt::Key_Delete || key == Qt::Key_Backspace || key == Qt::Key_Escape ||
-            key == Qt::Key_Return || key == Qt::Key_Enter) {
+            key == Qt::Key_Return || key == Qt::Key_Enter || (key >= Qt::Key_1 && key <= Qt::Key_9)) {
             e->accept();
             return true;
         }
@@ -339,6 +355,19 @@ bool ShelfPanel::eventFilter(QObject* obj, QEvent* e)
         }
         if (ke->key() == Qt::Key_Escape) {
             close();
+            return true;
+        }
+        if (ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter) {
+            const int shelf = m_shelf;
+            const bool move = ke->modifiers() & Qt::ShiftModifier;
+            close();  // done with it: the keys go back to the panel
+            emit copyRequested(shelf, move);
+            return true;
+        }
+        if (ke->key() >= Qt::Key_1 && ke->key() <= Qt::Key_9 && !(ke->modifiers() & ~Qt::KeypadModifier)) {
+            const int n = ke->key() - Qt::Key_0;
+            if (!Shelves::instance().items(n).isEmpty())
+                showShelf(n, true);
             return true;
         }
     }

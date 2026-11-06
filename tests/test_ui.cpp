@@ -3181,9 +3181,20 @@ private slots:
         m_left->navigate(L("shelved"));
         QTRY_COMPARE(leftModel()->path(), L("shelved"));
         m_left->view()->setFocus();
+        // Ctrl+Shift+B opens the shelf panel on the last used one (1), with the
+        // keys: 3 switches to shelf 3, Enter copies it here and hands the keys back.
+        auto* panel = m_window->findChild<ShelfPanel*>();
         QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
-        QTRY_VERIFY((popup = shown()) != nullptr);
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_3);
+        QTRY_VERIFY(panel->isVisible());
+        QVERIFY(!shown());
+        QCOMPARE(panel->shelf(), 1);
+        QTRY_VERIFY(panel->list()->hasFocus());
+        QTest::keyClick(panel->list(), Qt::Key_3);
+        QCOMPARE(panel->shelf(), 3);
+        QCOMPARE(panel->list()->count(), 2);
+        QTest::keyClick(panel->list(), Qt::Key_Return);
+        QTRY_VERIFY(!panel->isVisible());
+        QVERIFY(m_left->view()->hasFocus());
         QTRY_VERIFY(QFile::exists(L("shelved/one.txt")));
         QTRY_VERIFY(QFile::exists(L("shelved/two.txt")));
         QVERIFY(QFile::exists(L("shelf-src/one.txt")));  // copied, not moved
@@ -3192,9 +3203,7 @@ private slots:
         // Look in it: the chip opens the shelf in the corner, where it stays
         // while the panels have the keys. Files dropped on it go on the
         // shelf; Del takes one off (the file stays); Clear empties it.
-        QTRY_VERIFY(!shown());
-        auto* panel = m_window->findChild<ShelfPanel*>();
-        QVERIFY(panel && !panel->isVisible());
+        QVERIFY(!panel->isVisible());
         m_window->findChild<QToolButton*>("shelf-3")->click();
         QTRY_VERIFY(panel->isVisible());
         QCOMPARE(panel->list()->count(), 2);
