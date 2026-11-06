@@ -51,6 +51,9 @@ workspaces. They are kept in `tandem-fm.toml`:
 open = "workspace"               # or "home"; missing: the tabs from last time
 workspace = 1
 
+[workspaces]
+size = 1                         # how many there are; without it, none are read
+
 [workspaces.1]
 id = 1
 name = "Photos"
