@@ -6,12 +6,15 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QMessageBox>
 #include <QProcess>
 #include <QPushButton>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+
+#include <algorithm>
 
 namespace tandem {
 
@@ -26,11 +29,34 @@ EditNamesSession::~EditNamesSession()
         m_process->disconnect(this);
 }
 
+// GUI editors whose command hands the file to a running window and returns
+// at once, unless told to wait: this session would end before any edit.
+static void addWaitFlag(QStringList& argv)
+{
+    static const QHash<QString, QStringList> flags = {
+        {QStringLiteral("code"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
+        {QStringLiteral("code-insiders"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
+        {QStringLiteral("codium"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
+        {QStringLiteral("cursor"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
+        {QStringLiteral("subl"), {QStringLiteral("-w"), QStringLiteral("--wait")}},
+        {QStringLiteral("zed"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
+        {QStringLiteral("mate"), {QStringLiteral("-w"), QStringLiteral("--wait")}},
+    };
+    if (argv.isEmpty())
+        return;
+    const auto known = flags.constFind(QFileInfo(argv.first()).fileName());
+    if (known == flags.cend())
+        return;
+    if (std::none_of(known->cbegin(), known->cend(), [&](const QString& f) { return argv.contains(f); }))
+        argv.insert(1, known->first());
+}
+
 QStringList EditNamesSession::editorCommand(const QString& file, QString* error)
 {
     const QString custom = QSettings().value(QStringLiteral("tools/nameEditor")).toString();
     if (!custom.isEmpty()) {
         QStringList argv = QProcess::splitCommand(custom);
+        addWaitFlag(argv);
         if (!argv.contains(QLatin1String("%f")))
             argv.append(QStringLiteral("%f"));
         argv.replaceInStrings(QStringLiteral("%f"), file);
@@ -47,7 +73,9 @@ QStringList EditNamesSession::editorCommand(const QString& file, QString* error)
             *error = QObject::tr("No terminal found for $EDITOR. Set tools/terminal or tools/nameEditor.");
             return {};
         }
-        return DesktopApps::terminalCommand(terminal, QProcess::splitCommand(editor) << file);
+        QStringList argv = QProcess::splitCommand(editor);
+        addWaitFlag(argv);
+        return DesktopApps::terminalCommand(terminal, argv << file);
     }
     if (!QStandardPaths::findExecutable(QStringLiteral("kate")).isEmpty())
         return {QStringLiteral("kate"), QStringLiteral("-b"), file};
