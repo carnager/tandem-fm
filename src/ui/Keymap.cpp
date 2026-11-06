@@ -159,24 +159,9 @@ const QList<std::pair<QString, QString>>& Keymap::modalDefaults()
         {QStringLiteral("tab-7"), QStringLiteral("7")},
         {QStringLiteral("tab-8"), QStringLiteral("8")},
         {QStringLiteral("tab-9"), QStringLiteral("9")},
-        {QStringLiteral("put-on-shelf-1"), QStringLiteral("b 1")},
-        {QStringLiteral("put-on-shelf-2"), QStringLiteral("b 2")},
-        {QStringLiteral("put-on-shelf-3"), QStringLiteral("b 3")},
-        {QStringLiteral("put-on-shelf-4"), QStringLiteral("b 4")},
-        {QStringLiteral("put-on-shelf-5"), QStringLiteral("b 5")},
-        {QStringLiteral("put-on-shelf-6"), QStringLiteral("b 6")},
-        {QStringLiteral("put-on-shelf-7"), QStringLiteral("b 7")},
-        {QStringLiteral("put-on-shelf-8"), QStringLiteral("b 8")},
-        {QStringLiteral("put-on-shelf-9"), QStringLiteral("b 9")},
-        {QStringLiteral("copy-shelf-1-here"), QStringLiteral("B 1")},
-        {QStringLiteral("copy-shelf-2-here"), QStringLiteral("B 2")},
-        {QStringLiteral("copy-shelf-3-here"), QStringLiteral("B 3")},
-        {QStringLiteral("copy-shelf-4-here"), QStringLiteral("B 4")},
-        {QStringLiteral("copy-shelf-5-here"), QStringLiteral("B 5")},
-        {QStringLiteral("copy-shelf-6-here"), QStringLiteral("B 6")},
-        {QStringLiteral("copy-shelf-7-here"), QStringLiteral("B 7")},
-        {QStringLiteral("copy-shelf-8-here"), QStringLiteral("B 8")},
-        {QStringLiteral("copy-shelf-9-here"), QStringLiteral("B 9")},
+        // Open the shelf pickers, which take the digit: "b 2" still puts on shelf 2.
+        {QStringLiteral("put-on-a-shelf"), QStringLiteral("b")},
+        {QStringLiteral("copy-a-shelf-here"), QStringLiteral("B")},
     };
     return d;
 }

@@ -5,12 +5,12 @@
 
 namespace tandem {
 
-// Shelves 1–9: files and folders put aside from anywhere, to copy or move
+// Shelves 1–4: files and folders put aside from anywhere, to copy or move
 // somewhere later. Kept in state.toml, so they last until cleared.
 class Shelves : public QObject {
     Q_OBJECT
 public:
-    static constexpr int kCount = 9;
+    static constexpr int kCount = 4;
     static Shelves& instance();
 
     QStringList items(int shelf) const;
@@ -22,6 +22,9 @@ public:
     void replace(int shelf, const QStringList& from, const QStringList& to);
     void clear(int shelf);
     int lastUsed() const { return m_last; }  // where Enter puts things
+    // Reads them from the settings again. Items on shelves 5–9 (there used
+    // to be nine) move onto an empty shelf, or onto the last one.
+    void reload();
 
 signals:
     void changed();

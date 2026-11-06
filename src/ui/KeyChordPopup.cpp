@@ -88,6 +88,53 @@ void KeyChordPopup::openAssign(const QString& path)
     refresh();
 }
 
+void KeyChordPopup::openChoices(const Choices& choices)
+{
+    if (!isVisible())
+        m_returnFocus = QApplication::focusWidget();
+    m_mode = Mode::Choices;
+    m_choices = choices;
+    m_typed.clear();
+    show();
+    raise();
+    setFocus();
+    refresh();
+}
+
+int KeyChordPopup::digitOf(const QKeyEvent* e)
+{
+    if (e->key() >= Qt::Key_1 && e->key() <= Qt::Key_9)
+        return e->key() - Qt::Key_0;
+#ifdef Q_OS_MACOS
+    static constexpr quint32 kMac[] = {0x12, 0x13, 0x14, 0x15, 0x17, 0x16, 0x1A, 0x1C, 0x19};  // kVK_ANSI_1…9
+    for (int i = 0; i < 9; ++i)
+        if (e->nativeVirtualKey() == kMac[i])
+            return i + 1;
+#else
+    const quint32 code = e->nativeScanCode();  // evdev code + 8, on X11 and Wayland
+    if (code >= 10 && code <= 18)
+        return int(code) - 9;
+#endif
+    return 0;
+}
+
+void KeyChordPopup::pickChoice(int number, bool shift)
+{
+    for (const Choice& c : std::as_const(m_choices.items)) {
+        if (c.number != number)
+            continue;
+        if (!c.unavailable.isEmpty()) {
+            emit message(c.unavailable, true);
+            return;
+        }
+        const auto pick = m_choices.pick;
+        close();
+        if (pick)
+            pick(number, shift);
+        return;
+    }
+}
+
 bool KeyChordPopup::event(QEvent* e)
 {
     // While open, every key belongs to the popup (no window shortcuts).
@@ -136,6 +183,22 @@ void KeyChordPopup::type(const QString& keys)
 void KeyChordPopup::keyPressEvent(QKeyEvent* e)
 {
     const QString text = e->text();
+    if (m_mode == Mode::Choices) {
+        const Qt::KeyboardModifiers mods = e->modifiers() & ~(Qt::KeypadModifier | Qt::ShiftModifier);
+        const bool shift = e->modifiers() & Qt::ShiftModifier;
+        if (e->key() == Qt::Key_Escape) {
+            close();
+        } else if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) && m_choices.enterPicks) {
+            pickChoice(m_choices.enterPicks, shift);
+        } else if (e->key() == Qt::Key_Space && m_choices.space && !mods) {
+            const auto space = m_choices.space;
+            close();
+            space();
+        } else if (const int n = digitOf(e); n && !mods) {
+            pickChoice(n, shift);
+        }
+        return;
+    }
     switch (e->key()) {
     case Qt::Key_Escape:
         close();
@@ -192,6 +255,10 @@ void KeyChordPopup::refresh()
         }
         delete item;
     }
+    if (m_mode == Mode::Choices) {
+        refreshChoices();
+        return;
+    }
     const auto all = FolderHistory::instance().bookmarks();
     if (m_mode == Mode::Jump) {
         m_title->setText(m_typed.isEmpty() ? tr("Bookmarks") : tr("Bookmarks  ·  %1…").arg(m_typed));
@@ -237,6 +304,26 @@ void KeyChordPopup::refresh()
         none->setObjectName(QStringLiteral("dim"));
         none->show();
         m_gridLayout->addWidget(none, 0, 0);
+    }
+    place();
+}
+
+void KeyChordPopup::refreshChoices()
+{
+    m_title->setText(m_choices.title);
+    m_hint->setText(m_choices.hint);
+    int row = 0;
+    for (const Choice& c : std::as_const(m_choices.items)) {
+        auto* cap = new QLabel(QString::number(c.number), m_grid);
+        cap->setObjectName(c.number == m_choices.enterPicks ? QStringLiteral("capTyped") : QStringLiteral("cap"));
+        auto* text = new QLabel(c.text, m_grid);
+        text->setTextFormat(Qt::PlainText);
+        text->setObjectName(c.unavailable.isEmpty() ? QString() : QStringLiteral("dim"));
+        cap->show();
+        text->show();
+        m_gridLayout->addWidget(cap, row, 0, Qt::AlignLeft);
+        m_gridLayout->addWidget(text, row, 1, 1, 5);
+        ++row;
     }
     place();
 }

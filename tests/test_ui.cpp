@@ -3168,14 +3168,8 @@ private slots:
                 Shelves::instance().clear(n);
             m_left->setVimKeys(false);
         });
-        // The popup that's open (the panels have one for locations too).
-        auto shown = [this]() -> FuzzyPopup* {
-            for (FuzzyPopup* f : m_window->findChildren<FuzzyPopup*>())
-                if (f->isVisible())
-                    return f;
-            return nullptr;
-        };
-        FuzzyPopup* popup = nullptr;
+        auto* chords = m_window->findChild<KeyChordPopup*>();
+        QVERIFY(chords);
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         QVERIFY(QDir().mkpath(L("shelf-src")));
@@ -3188,61 +3182,70 @@ private slots:
         moveCursorTo(m_left, "one.txt");
         QTest::keyClick(m_left->view(), Qt::Key_Insert);
         QTest::keyClick(m_left->view(), Qt::Key_Insert);
+        // Ctrl+B shows the shelves by number, like the bookmark keys; the digit puts them there.
         QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier);
-        QTRY_VERIFY((popup = shown()) != nullptr);
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_3);
+        QTRY_VERIFY(chords->isChoosing());
+        QCOMPARE(QApplication::focusWidget(), chords);
+        QTest::keyClick(chords, Qt::Key_3);
         QTRY_COMPARE(Shelves::instance().items(3), QStringList({L("shelf-src/one.txt"), L("shelf-src/two.txt")}));
         QVERIFY(leftModel()->markedNames().isEmpty());  // ready for the next ones
-        QTRY_VERIFY(!shown());
+        QVERIFY(!chords->isVisible());
+        QVERIFY(m_left->view()->hasFocus());
         QTRY_VERIFY(m_window->findChild<QToolButton*>("shelf-3"));
 
-        // The picker lists shelves by number; Enter's pick is the one used last.
+        // Only four shelves: 5 does nothing, Esc closes.
         moveCursorTo(m_left, "zz-pic.jpg");
         QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier);
-        QTRY_VERIFY((popup = shown()) != nullptr);
-        QCOMPARE(popup->currentItem()->key, QString("3"));
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Up);
-        QCOMPARE(popup->currentItem()->key, QString("2"));
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
-        QTRY_VERIFY(!shown());
-        m_left->view()->setFocus();
+        QTRY_VERIFY(chords->isChoosing());
+        QTest::keyClick(chords, Qt::Key_5);
+        QVERIFY(chords->isChoosing());
+        QTest::keyClick(chords, Qt::Key_Escape);
+        QVERIFY(!chords->isVisible());
+        QCOMPARE(Shelves::instance().used(), QList<int>({3}));
 
-        // Modal keys: b then the shelf's number.
+        // Modal keys: b opens the same picker, then the shelf's number.
         m_left->setVimKeys(true);
         moveCursorTo(m_left, "zz-pic.jpg");
         QTest::keyClick(m_left->view(), Qt::Key_B);
-        QTest::keyClick(m_left->view(), Qt::Key_1);
-        QCOMPARE(Shelves::instance().items(1), QStringList({L("shelf-src/zz-pic.jpg")}));
+        QTRY_VERIFY(chords->isChoosing());
+        QTest::keyClick(chords, Qt::Key_1);
+        QTRY_COMPARE(Shelves::instance().items(1), QStringList({L("shelf-src/zz-pic.jpg")}));
         m_left->setVimKeys(false);
 
-        // Copy shelf 3 into another folder.
+        // Copy shelf 3 into another folder: Ctrl+Shift+B, then its digit.
+        // An empty shelf can't be picked; the picker stays.
         QVERIFY(QDir().mkpath(L("shelved")));
         m_left->navigate(L("shelved"));
         QTRY_COMPARE(leftModel()->path(), L("shelved"));
         m_left->view()->setFocus();
-        // Ctrl+Shift+B opens the shelf panel on the last used one (1), with the
-        // keys: 3 switches to shelf 3, Enter copies it here and hands the keys back.
-        auto* panel = m_window->findChild<ShelfPanel*>();
         QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
-        QTRY_VERIFY(panel->isVisible());
-        QVERIFY(!shown());
-        QCOMPARE(panel->shelf(), 1);
-        QTRY_VERIFY(panel->list()->hasFocus());
-        QTest::keyClick(panel->list(), Qt::Key_3);
-        QCOMPARE(panel->shelf(), 3);
-        QCOMPARE(panel->list()->count(), 2);
-        QTest::keyClick(panel->list(), Qt::Key_Return);
-        QTRY_VERIFY(!panel->isVisible());
+        QTRY_VERIFY(chords->isChoosing());
+        QTest::keyClick(chords, Qt::Key_2);
+        QVERIFY(chords->isChoosing());
+        QTest::keyClick(chords, Qt::Key_3);
+        QVERIFY(!chords->isVisible());
         QVERIFY(m_left->view()->hasFocus());
         QTRY_VERIFY(QFile::exists(L("shelved/one.txt")));
         QTRY_VERIFY(QFile::exists(L("shelved/two.txt")));
         QVERIFY(QFile::exists(L("shelf-src/one.txt")));  // copied, not moved
         QCOMPARE(Shelves::instance().items(3).size(), 2);  // still on the shelf
 
+        // Space looks inside: the shelf panel, on the last used shelf (1), with the keys.
+        auto* panel = m_window->findChild<ShelfPanel*>();
+        QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(chords->isChoosing());
+        QTest::keyClick(chords, Qt::Key_Space);
+        QTRY_VERIFY(panel->isVisible());
+        QCOMPARE(panel->shelf(), 1);
+        QTRY_VERIFY(panel->list()->hasFocus());
+        QTest::keyClick(panel->list(), Qt::Key_3);
+        QCOMPARE(panel->shelf(), 3);
+        QTest::keyClick(panel->list(), Qt::Key_Escape);
+        QTRY_VERIFY(!panel->isVisible());
+
         // Look in it: the chip opens the shelf in the corner, where it stays
         // while the panels have the keys. Files dropped on it go on the
         // shelf; Del takes one off (the file stays); Clear empties it.
-        QVERIFY(!panel->isVisible());
         m_window->findChild<QToolButton*>("shelf-3")->click();
         QTRY_VERIFY(panel->isVisible());
         QCOMPARE(panel->list()->count(), 2);
@@ -3268,6 +3271,16 @@ private slots:
         QTRY_VERIFY(Shelves::instance().items(3).isEmpty());
         QTRY_VERIFY(!panel->isVisible());
         QTRY_VERIFY(!m_window->findChild<QToolButton*>("shelf-3"));
+
+        // Shift with the digit moves; the shelf then holds the moved file.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(chords->isChoosing());
+        QTest::keyClick(chords, Qt::Key_1, Qt::ShiftModifier);
+        QTRY_VERIFY(QFile::exists(L("shelved/zz-pic.jpg")));
+        QTRY_VERIFY(!QFile::exists(L("shelf-src/zz-pic.jpg")));
+        QTRY_COMPARE(Shelves::instance().items(1), QStringList({L("shelved/zz-pic.jpg")}));
+        Shelves::instance().clear(1);
 
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());

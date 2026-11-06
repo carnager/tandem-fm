@@ -21,10 +21,41 @@ Shelves& Shelves::instance()
 
 Shelves::Shelves()
 {
+    reload();
+}
+
+void Shelves::reload()
+{
     QSettings s;
+    m_items.clear();
     for (int n = 1; n <= kCount; ++n)
         m_items.append(s.value(key(n)).toStringList());
-    m_last = std::clamp(s.value(QStringLiteral("shelves/last"), 1).toInt(), 1, kCount);
+    int last = s.value(QStringLiteral("shelves/last"), 1).toInt();
+    for (int old = kCount + 1; old <= 9; ++old) {
+        const QStringList items = s.value(key(old)).toStringList();
+        if (!s.contains(key(old)))
+            continue;
+        s.remove(key(old));
+        if (items.isEmpty())
+            continue;
+        int to = kCount;
+        for (int n = 1; n <= kCount; ++n)
+            if (m_items[n - 1].isEmpty()) {
+                to = n;
+                break;
+            }
+        QStringList& onto = m_items[to - 1];
+        for (const QString& p : items)
+            if (!onto.contains(p))
+                onto.append(p);
+        s.setValue(key(to), onto);
+        if (last == old)
+            last = to;
+    }
+    m_last = std::clamp(last, 1, kCount);
+    if (s.value(QStringLiteral("shelves/last"), 1).toInt() != m_last)
+        s.setValue(QStringLiteral("shelves/last"), m_last);
+    emit changed();
 }
 
 QStringList Shelves::items(int shelf) const

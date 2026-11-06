@@ -193,7 +193,7 @@ ShelfPanel::ShelfPanel(QWidget* window) : QFrame(window)
            [this] { Shelves::instance().clear(m_shelf); });
     layout->addLayout(buttons);
     auto* hint = new QLabel(tr("Drag files in or out  ·  Enter copies here, Shift+Enter moves  ·  "
-                               "1–9 another shelf  ·  Del takes off"), this);
+                               "1–%1 another shelf  ·  Del takes off").arg(Shelves::kCount), this);
     hint->setWordWrap(true);
     layout->addWidget(hint);
 
@@ -342,7 +342,7 @@ bool ShelfPanel::eventFilter(QObject* obj, QEvent* e)
     if (obj == m_list && e->type() == QEvent::ShortcutOverride) {
         const int key = static_cast<QKeyEvent*>(e)->key();
         if (key == Qt::Key_Delete || key == Qt::Key_Backspace || key == Qt::Key_Escape ||
-            key == Qt::Key_Return || key == Qt::Key_Enter || (key >= Qt::Key_1 && key <= Qt::Key_9)) {
+            key == Qt::Key_Return || key == Qt::Key_Enter || (key >= Qt::Key_1 && key < Qt::Key_1 + Shelves::kCount)) {
             e->accept();
             return true;
         }
@@ -364,7 +364,7 @@ bool ShelfPanel::eventFilter(QObject* obj, QEvent* e)
             emit copyRequested(shelf, move);
             return true;
         }
-        if (ke->key() >= Qt::Key_1 && ke->key() <= Qt::Key_9 && !(ke->modifiers() & ~Qt::KeypadModifier)) {
+        if (ke->key() >= Qt::Key_1 && ke->key() < Qt::Key_1 + Shelves::kCount && !(ke->modifiers() & ~Qt::KeypadModifier)) {
             const int n = ke->key() - Qt::Key_0;
             if (!Shelves::instance().items(n).isEmpty())
                 showShelf(n, true);

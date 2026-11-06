@@ -2143,6 +2143,29 @@ private slots:
         QVERIFY(s.used().isEmpty());
         QVERIFY(!QSettings().contains("shelves/2"));
         QCOMPARE(changed.count(), 5);
+
+        // There used to be nine: what was on 5–9 moves onto an empty shelf,
+        // then onto the last one, once.
+        {
+            QSettings st;
+            st.setValue("shelves/1", QStringList{"/one"});
+            st.setValue("shelves/3", QStringList{"/three"});
+            st.setValue("shelves/6", QStringList{"/six"});
+            st.setValue("shelves/8", QStringList{"/eight", "/one"});
+            st.setValue("shelves/9", QStringList{"/nine", "/eight"});
+            st.setValue("shelves/last", 9);
+        }
+        s.reload();
+        QCOMPARE(s.items(1), QStringList({"/one"}));
+        QCOMPARE(s.items(2), QStringList({"/six"}));
+        QCOMPARE(s.items(3), QStringList({"/three"}));
+        QCOMPARE(s.items(4), QStringList({"/eight", "/one", "/nine"}));
+        QCOMPARE(s.lastUsed(), 4);
+        QSettings st;
+        QCOMPARE(st.value("shelves/4").toStringList(), s.items(4));
+        for (int old = 5; old <= 9; ++old)
+            QVERIFY(!st.contains(QStringLiteral("shelves/%1").arg(old)));
+        QCOMPARE(st.value("shelves/last").toInt(), 4);
     }
 
     void workspaces()

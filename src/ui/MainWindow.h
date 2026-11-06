@@ -9,6 +9,7 @@
 #include "core/Undo.h"
 #include "ui/FuzzyPopup.h"
 #include "ui/IconCache.h"
+#include "ui/KeyChordPopup.h"
 
 #include <QHash>
 #include <QMainWindow>
@@ -119,6 +120,8 @@ private:
     void putOnShelf(int shelf);  // 0: ask which
     void takeFromShelf(int shelf, bool move);  // 0: ask which
     void shelfPicker();
+    void shelfTakePicker();
+    QList<KeyChordPopup::Choice> shelfChoices() const;  // "Shelf 2  ·  3 items: a.txt, …"
     void openShelf(int shelf);  // or closes it, when it's the one open
     bool refuseInArchive(Panel* p);
     Panel* previewOwner(QWidget* w) const;
@@ -198,7 +201,7 @@ private:
     QAction* m_hiddenAction = nullptr;
     QHash<QString, QAction*> m_actions;
     FuzzyPopup* m_popup = nullptr;
-    class KeyChordPopup* m_chords = nullptr;
+    KeyChordPopup* m_chords = nullptr;
     ViewerWindow* m_quickView = nullptr;   // the preview (left one in "each" mode)
     ViewerWindow* m_quickView2 = nullptr;  // the right panel's own preview in "each" mode
     QTimer* m_quickTimer = nullptr;

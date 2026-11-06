@@ -405,7 +405,9 @@ void MainWindow::createMenus()
     edit->addSeparator();
     QMenu* shelves = edit->addMenu(tr("Shelves"));
     addCommand(shelves, QT_TR_NOOP("Put on a shelf…"), {K(Qt::CTRL | Qt::Key_B)}, [this] { putOnShelf(0); });
-    addCommand(shelves, QT_TR_NOOP("Copy a shelf here…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_B)}, [this] { takeFromShelf(0, false); });
+    // The id from when it only copied: keys people set for it keep working.
+    addCommand(shelves, tr("Copy or move a shelf here…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_B)},
+               [this] { takeFromShelf(0, false); }, QStringLiteral("copy-a-shelf-here"));
     shelves->addSeparator();
     for (int i = 1; i <= Shelves::kCount; ++i)
         addCommand(shelves, tr("Put on shelf %1").arg(i), {}, [this, i] { putOnShelf(i); },
@@ -414,6 +416,9 @@ void MainWindow::createMenus()
     for (int i = 1; i <= Shelves::kCount; ++i)
         addCommand(shelves, tr("Copy shelf %1 here").arg(i), {}, [this, i] { takeFromShelf(i, false); },
                    QStringLiteral("copy-shelf-%1-here").arg(i));
+    for (int i = 1; i <= Shelves::kCount; ++i)
+        addCommand(shelves, tr("Move shelf %1 here").arg(i), {}, [this, i] { takeFromShelf(i, true); },
+                   QStringLiteral("move-shelf-%1-here").arg(i));
 
     QMenu* go = bar->addMenu(tr("&Go"));
     addCommand(go, QT_TR_NOOP("Back"), {K(Qt::ALT | Qt::Key_Left)}, [this] { active()->back(); });
@@ -3821,15 +3826,8 @@ void MainWindow::putOnShelf(int shelf)
 
 void MainWindow::takeFromShelf(int shelf, bool move)
 {
-    if (shelf == 0) {  // which one: the panel shows them, and takes the keys
-        const QList<int> used = Shelves::instance().used();
-        if (used.isEmpty()) {
-            active()->showMessage(
-                tr("The shelves are empty: %1 puts files on one").arg(keyHint(QStringLiteral("put-on-a-shelf"))), true);
-            return;
-        }
-        const int last = Shelves::instance().lastUsed();
-        m_shelfPanel->showShelf(used.contains(last) ? last : used.first(), true);
+    if (shelf == 0) {
+        shelfTakePicker();
         return;
     }
     const QStringList paths = Shelves::instance().items(shelf);
@@ -3848,40 +3846,71 @@ void MainWindow::takeFromShelf(int shelf, bool move)
     }
 }
 
-// Which shelf to put the selection on: a digit picks one, Enter the one used
-// last (selected, not moved to the top).
+QList<KeyChordPopup::Choice> MainWindow::shelfChoices() const
+{
+    const QFontMetrics fm = m_chords->fontMetrics();
+    QList<KeyChordPopup::Choice> out;
+    for (int n = 1; n <= Shelves::kCount; ++n) {
+        const QStringList on = Shelves::instance().items(n);
+        KeyChordPopup::Choice c;
+        c.number = n;
+        if (on.isEmpty()) {
+            c.text = tr("Shelf %1  ·  empty").arg(n);
+        } else {
+            QStringList names;
+            for (qsizetype i = 0; i < on.size() && i < 3; ++i)
+                names << fm.elidedText(baseName(on[i]), Qt::ElideMiddle, 220);
+            if (on.size() > 3)
+                names << QStringLiteral("…");
+            c.text = tr("Shelf %1  ·  %2: %3")
+                         .arg(n)
+                         .arg(plural(tr("%n item(s)", nullptr, int(on.size())), on.size()), names.join(QStringLiteral(", ")));
+        }
+        out.append(c);
+    }
+    return out;
+}
+
+// Which shelf to put the selection on: its digit, or Enter for the one used last.
 void MainWindow::shelfPicker()
 {
     Panel* p = active();
     const QStringList selection = p->selectedPaths();
     if (selection.isEmpty())
         return;
-    QList<PopupItem> items;
-    const int last = Shelves::instance().lastUsed();
-    for (int n = 1; n <= Shelves::kCount; ++n) {
-        const QStringList on = Shelves::instance().items(n);
-        PopupItem it;
-        it.key = QString::number(n);
-        it.title = tr("Shelf %1").arg(n);
-        it.subtitle = on.isEmpty() ? tr("empty") : plural(tr("%n item(s)", nullptr, int(on.size())), on.size());
-        it.hint = QString::number(n);
-        it.icon = IconCache::themed("folder-documents", "folder");
-        it.run = [this, n] { putOnShelf(n); };
-        items.append(it);
+    KeyChordPopup::Choices c;
+    c.title = tr("Put %1 on a shelf").arg(describeItems(selection));
+    c.hint = tr("1–%1: put it there   ·   Enter: shelf %2   ·   Esc").arg(Shelves::kCount).arg(Shelves::instance().lastUsed());
+    c.items = shelfChoices();
+    c.enterPicks = Shelves::instance().lastUsed();
+    c.pick = [this](int n, bool) { putOnShelf(n); };
+    m_chords->openChoices(c);
+}
+
+// Which shelf to bring here: its digit copies, Shift+digit moves; Space looks inside.
+void MainWindow::shelfTakePicker()
+{
+    const QList<int> used = Shelves::instance().used();
+    if (used.isEmpty()) {
+        active()->showMessage(
+            tr("The shelves are empty: %1 puts files on one").arg(keyHint(QStringLiteral("put-on-a-shelf"))), true);
+        return;
     }
-    m_popup->queryItem = nullptr;
-    m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem*) {
-        if (e->key() < Qt::Key_1 || e->key() > Qt::Key_9 || (e->modifiers() & ~Qt::KeypadModifier))
-            return false;
-        const int n = e->key() - Qt::Key_0;
-        QKeyEvent esc(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);  // close the picker first
-        QCoreApplication::sendEvent(QApplication::focusWidget(), &esc);
-        QTimer::singleShot(0, this, [this, n] { putOnShelf(n); });
-        return true;
-    };
-    m_popup->open(tr("Put %1 on a shelf…").arg(describeItems(selection)), items,
-                  tr("1–9 or Enter: put it there   ·   click a shelf at the bottom to look in it"));
-    m_popup->selectRow(last - 1);
+    const int last = Shelves::instance().lastUsed();
+    const int first = used.contains(last) ? last : used.first();
+    KeyChordPopup::Choices c;
+    c.title = tr("Copy or move a shelf here");
+    c.hint = tr("1–%1: copy here   ·   Shift+1–%1: move   ·   Enter: shelf %2   ·   Space: look inside   ·   Esc")
+                 .arg(Shelves::kCount)
+                 .arg(first);
+    c.items = shelfChoices();
+    for (KeyChordPopup::Choice& it : c.items)
+        if (!used.contains(it.number))
+            it.unavailable = tr("Shelf %1 is empty").arg(it.number);
+    c.enterPicks = first;
+    c.pick = [this](int n, bool shift) { takeFromShelf(n, shift); };
+    c.space = [this, first] { m_shelfPanel->showShelf(first, true); };
+    m_chords->openChoices(c);
 }
 
 void MainWindow::openShelf(int shelf)

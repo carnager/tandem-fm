@@ -12,7 +12,7 @@ namespace tandem {
 // What's on one shelf, in the bottom right corner. Stays open while you
 // work elsewhere, so files can be dragged onto it and out of it; closes with
 // its ✕, Esc, or a second click on the shelf's chip. Opened with the keys
-// (focus), it takes them: Enter copies here, Shift+Enter moves, 1–9 switch.
+// (focus), it takes them: Enter copies here, Shift+Enter moves, 1–4 switch.
 class ShelfPanel : public QFrame {
     Q_OBJECT
 public:

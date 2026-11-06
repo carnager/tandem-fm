@@ -960,8 +960,12 @@
         <translation>Nichts markieren</translation>
     </message>
     <message>
-        <source>Put on a shelf (then 1…9); the shelves sit at the bottom</source>
-        <translation>Auf ein Regal legen (dann 1…9); die Regale sitzen unten</translation>
+        <source>Put on a shelf (then 1–4); the shelves sit at the bottom</source>
+        <translation>Auf ein Regal legen (dann 1–4); die Regale sitzen unten</translation>
+    </message>
+    <message>
+        <source>Copy or move a shelf here: 1–4 copies, Shift+1–4 moves, Space looks inside</source>
+        <translation>Ein Regal hierher kopieren oder verschieben: 1–4 kopiert, Shift+1–4 verschiebt, Leertaste schaut hinein</translation>
     </message>
     <message>
         <source>Calculate all folder sizes</source>
@@ -1190,10 +1194,6 @@
     <message>
         <source>Down / up</source>
         <translation>Runter / hoch</translation>
-    </message>
-    <message>
-        <source>Open the shelves: Enter copies here, Shift+Enter moves, 1–9 switch</source>
-        <translation>Regale öffnen: Enter kopiert hierher, Shift+Enter verschiebt, 1–9 wechselt</translation>
     </message>
     <message>
         <source>Out of / into a folder</source>
@@ -2511,16 +2511,16 @@
         <translation>Auf ein Regal legen…</translation>
     </message>
     <message>
-        <source>Copy a shelf here…</source>
-        <translation>Ein Regal hierher kopieren…</translation>
-    </message>
-    <message>
         <source>Put on shelf %1</source>
         <translation>Auf Regal %1 legen</translation>
     </message>
     <message>
         <source>Copy shelf %1 here</source>
         <translation>Regal %1 hierher kopieren</translation>
+    </message>
+    <message>
+        <source>Move shelf %1 here</source>
+        <translation>Regal %1 hierher verschieben</translation>
     </message>
     <message>
         <source>Servers…</source>
@@ -2914,24 +2914,32 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Regal %1 ist leer</translation>
     </message>
     <message>
+        <source>Shelf %1  ·  empty</source>
+        <translation>Regal %1  ·  leer</translation>
+    </message>
+    <message>
+        <source>Shelf %1  ·  %2: %3</source>
+        <translation>Regal %1  ·  %2: %3</translation>
+    </message>
+    <message>
+        <source>Put %1 on a shelf</source>
+        <translation>%1 auf ein Regal legen</translation>
+    </message>
+    <message>
+        <source>1–%1: put it there   ·   Enter: shelf %2   ·   Esc</source>
+        <translation>1–%1: dort ablegen   ·   Enter: Regal %2   ·   Esc</translation>
+    </message>
+    <message>
         <source>The shelves are empty: %1 puts files on one</source>
         <translation>Die Regale sind leer: %1 legt Dateien auf eins</translation>
     </message>
     <message>
-        <source>Shelf %1</source>
-        <translation>Regal %1</translation>
+        <source>Copy or move a shelf here</source>
+        <translation>Ein Regal hierher kopieren oder verschieben</translation>
     </message>
     <message>
-        <source>empty</source>
-        <translation>leer</translation>
-    </message>
-    <message>
-        <source>Put %1 on a shelf…</source>
-        <translation>%1 auf ein Regal legen…</translation>
-    </message>
-    <message>
-        <source>1–9 or Enter: put it there   ·   click a shelf at the bottom to look in it</source>
-        <translation>1–9 oder Enter: dort ablegen   ·   ein Klick auf ein Regal unten schaut hinein</translation>
+        <source>1–%1: copy here   ·   Shift+1–%1: move   ·   Enter: shelf %2   ·   Space: look inside   ·   Esc</source>
+        <translation>1–%1: hierher kopieren   ·   Shift+1–%1: verschieben   ·   Enter: Regal %2   ·   Leertaste: hineinschauen   ·   Esc</translation>
     </message>
     <message>
         <source>Extracting %1 …</source>
@@ -3077,6 +3085,10 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>&amp;Edit</source>
         <translation>&amp;Bearbeiten</translation>
+    </message>
+    <message>
+        <source>Copy or move a shelf here…</source>
+        <translation>Ein Regal hierher kopieren oder verschieben…</translation>
     </message>
     <message>
         <source>Thumbnails</source>
@@ -5263,8 +5275,8 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Alles von diesem Regal nehmen (die Dateien bleiben)</translation>
     </message>
     <message>
-        <source>Drag files in or out  ·  Enter copies here, Shift+Enter moves  ·  1–9 another shelf  ·  Del takes off</source>
-        <translation>Dateien hinein- oder herausziehen  ·  Enter kopiert hierher, Shift+Enter verschiebt  ·  1–9 anderes Regal  ·  Entf nimmt herunter</translation>
+        <source>Drag files in or out  ·  Enter copies here, Shift+Enter moves  ·  1–%1 another shelf  ·  Del takes off</source>
+        <translation>Dateien hinein- oder herausziehen  ·  Enter kopiert hierher, Shift+Enter verschiebt  ·  1–%1 anderes Regal  ·  Entf nimmt herunter</translation>
     </message>
     <message numerus="yes">
         <source>Shelf %1 · %n item(s)</source>
