@@ -19,6 +19,10 @@ mkdir "$package_dir"
 cp -R build/tandem-fm.app "$package_dir/Tandem.app"
 "$qt_prefix/bin/macdeployqt" "$package_dir/Tandem.app" -always-overwrite -no-codesign \
   -libpath="$qt_prefix/lib" -libpath="$(brew --prefix)/lib" > "$package_dir/deployment.log" 2>&1
+# SVG images and thumbnails: macdeployqt adds the qsvg plugin only to apps that
+# link QtSvg; finish_bundle.py then brings in QtSvg for it.
+cp "$("$qt_prefix/bin/qtpaths" --query QT_INSTALL_PLUGINS)/imageformats/libqsvg.dylib" \
+  "$package_dir/Tandem.app/Contents/PlugIns/imageformats/"
 python3 packaging/macos/finish_bundle.py "$package_dir/Tandem.app" "$qt_prefix" "$(brew --prefix)"
 python3 packaging/macos/verify_bundle.py "$package_dir/Tandem.app"
 cp LICENSE "$package_dir/LICENSE"
