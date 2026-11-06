@@ -71,6 +71,7 @@ public:
     const PopupItem* currentItem() const;
     QString query() const;
     void setQuery(const QString& text);
+    void selectRow(int row);  // which row Enter runs, instead of the first
 
     // Extra keys (e.g. Ctrl+P to pin). Return true when handled.
     std::function<bool(QKeyEvent*, const PopupItem*)> keyHandler;

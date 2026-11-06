@@ -289,6 +289,12 @@ void FuzzyPopup::setQuery(const QString& text)
     m_edit->setText(text);  // refilters
 }
 
+void FuzzyPopup::selectRow(int row)
+{
+    if (row >= 0 && row < m_model->rowCount())
+        m_list->setCurrentIndex(m_model->index(row));
+}
+
 void FuzzyPopup::openUnder(QWidget* anchor, const QString& placeholder, const QList<PopupItem>& items,
                            const QString& footer)
 {

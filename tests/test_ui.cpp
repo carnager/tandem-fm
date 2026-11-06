@@ -3157,6 +3157,17 @@ private slots:
         QTRY_VERIFY(!shown());
         QTRY_VERIFY(m_window->findChild<QToolButton*>("shelf-3"));
 
+        // The picker lists shelves by number; Enter's pick is the one used last.
+        moveCursorTo(m_left, "zz-pic.jpg");
+        QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier);
+        QTRY_VERIFY((popup = shown()) != nullptr);
+        QCOMPARE(popup->currentItem()->key, QString("3"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Up);
+        QCOMPARE(popup->currentItem()->key, QString("2"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+        QTRY_VERIFY(!shown());
+        m_left->view()->setFocus();
+
         // Modal keys: b then the shelf's number.
         m_left->setVimKeys(true);
         moveCursorTo(m_left, "zz-pic.jpg");

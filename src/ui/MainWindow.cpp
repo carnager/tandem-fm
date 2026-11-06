@@ -3804,7 +3804,7 @@ void MainWindow::takeFromShelf(int shelf, bool move)
     }
 }
 
-// Which shelf: a digit picks one, Enter the one used last.
+// Which shelf: a digit picks one, Enter the one used last (selected, not moved to the top).
 void MainWindow::shelfPicker(bool take)
 {
     Panel* p = active();
@@ -3817,14 +3817,13 @@ void MainWindow::shelfPicker(bool take)
     }
     QList<PopupItem> items;
     const int last = Shelves::instance().lastUsed();
-    QList<int> order{last};
-    for (int n = 1; n <= Shelves::kCount; ++n)
-        if (n != last)
-            order << n;
-    for (int n : order) {
+    int lastRow = 0;
+    for (int n = 1; n <= Shelves::kCount; ++n) {
         const QStringList on = Shelves::instance().items(n);
         if (take && on.isEmpty())
             continue;
+        if (n == last)
+            lastRow = int(items.size());
         PopupItem it;
         it.key = QString::number(n);
         it.title = tr("Shelf %1").arg(n);
@@ -3864,6 +3863,7 @@ void MainWindow::shelfPicker(bool take)
     else
         m_popup->open(tr("Put %1 on a shelf…").arg(describeItems(selection)), items,
                       tr("1–9 or Enter: put it there   ·   click a shelf at the bottom to look in it"));
+    m_popup->selectRow(lastRow);  // in number order, but Enter still picks the one used last
 }
 
 void MainWindow::openShelf(int shelf)
