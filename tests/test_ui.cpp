@@ -6,6 +6,7 @@
 #include "core/FolderHistory.h"
 #include "ui/DirTab.h"
 #include "ui/KeyButton.h"
+#include "core/Permissions.h"
 #include "ui/ShelfPanel.h"
 #include "core/Shelves.h"
 #include "ui/DialogKeys.h"
@@ -90,6 +91,9 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <unistd.h>
+#include <QHeaderView>
+#include <QStandardItemModel>
 #include <QTimer>
 #include <QDialogButtonBox>
 #include <QVBoxLayout>
@@ -754,6 +758,65 @@ private slots:
         // The extension lives in the name; the columns can come back from the header menu.
         QVERIFY(m_left->view()->isColumnHidden(FileModel::ColExt));
         QVERIFY(m_left->view()->isColumnHidden(FileModel::ColAttr));
+    }
+
+    // Owner, group, octal mode, created, accessed and link target: hidden
+    // until switched on, filled from the listing.
+    void extraColumns()
+    {
+        QVERIFY(QDir().mkpath(L("extra")));
+        writeFile(L("extra/file.txt"), "x");
+        QVERIFY(::chmod(QFile::encodeName(L("extra/file.txt")).constData(), 0640) == 0);
+        QVERIFY(::symlink("file.txt", QFile::encodeName(L("extra/link")).constData()) == 0);
+        auto cleanup = qScopeGuard([this] {
+            QDir(L("extra")).removeRecursively();
+            m_left->setColumnLayout({});
+        });
+        m_left->navigate(L("extra"));
+        QTRY_COMPARE(leftModel()->path(), L("extra"));
+        for (int c = FileModel::ColOwner; c < FileModel::ColCount; ++c)
+            QVERIFY(m_left->view()->isColumnHidden(c));
+
+        FileModel* m = leftModel();
+        const int file = m->rowOf("file.txt");
+        const int link = m->rowOf("link");
+        auto text = [m](int row, int col) { return m->data(m->index(row, col), Qt::DisplayRole).toString(); };
+        QCOMPARE(text(file, FileModel::ColOctal), QString("640"));
+        QCOMPARE(text(link, FileModel::ColLinkTarget), QString("file.txt"));
+        QCOMPARE(text(file, FileModel::ColLinkTarget), QString());
+        QVERIFY(!text(file, FileModel::ColAccessed).isEmpty());
+        // Names are looked up on a worker; until then the cell is empty.
+        text(file, FileModel::ColOwner);
+        QTRY_COMPARE(text(file, FileModel::ColOwner), userName(::getuid()));
+        QTRY_COMPARE(text(file, FileModel::ColGroup), groupName(::getgid()));
+
+        // The layout is kept by name: order, widths, what's hidden.
+        m_left->setColumnLayout({"name", "owner 77", "size 120", "-modified", "nonsense 5"});
+        QHeaderView* h = m_left->view()->header();
+        QCOMPARE(h->logicalIndex(1), int(FileModel::ColOwner));
+        QCOMPARE(h->logicalIndex(2), int(FileModel::ColSize));
+        QVERIFY(!h->isSectionHidden(FileModel::ColOwner));
+        QVERIFY(h->isSectionHidden(FileModel::ColTime));
+        QCOMPARE(h->sectionSize(FileModel::ColSize), 120);
+        const QStringList layout = m_left->columnLayout();
+        QCOMPARE(layout.mid(0, 5), QStringList({"name", "owner 77", "size 120", "-modified", "-ext"}));
+        QVERIFY(layout.contains("-link"));  // not named: where it was, hidden
+        QCOMPARE(layout.size(), int(FileModel::ColCount));
+
+        // Header state from older versions turns into the same kind of layout.
+        QStandardItemModel five(0, 5);
+        QHeaderView old(Qt::Horizontal);
+        old.setModel(&five);
+        old.resizeSection(FileModel::ColSize, 111);
+        old.setSectionHidden(FileModel::ColExt, true);
+        old.moveSection(old.visualIndex(FileModel::ColTime), 1);
+        QCOMPARE(Panel::columnLayoutFromHeaderState(old.saveState()).mid(1),
+                 QStringList({"modified " + QString::number(old.sectionSize(FileModel::ColTime)), "-ext", "size 111",
+                              "attributes " + QString::number(old.sectionSize(FileModel::ColAttr))}));
+        QVERIFY(Panel::columnLayoutFromHeaderState("garbage").isEmpty());
+
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
     }
 
     // The F-key bar says how many go, and where to.

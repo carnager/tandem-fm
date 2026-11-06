@@ -143,11 +143,48 @@ private slots:
                 QVERIFY(e.isLink && !e.brokenLink);
             if (e.name == "broken")
                 QVERIFY(e.isLink && e.brokenLink);
+            // For the extra columns: what links point to, when it was read
+            // and (where the filesystem knows it) created.
+            QCOMPARE(e.linkTarget, e.name == "link" ? QString("a.txt") : e.name == "broken" ? QString("missing") : QString());
+            QVERIFY(e.atime > 0);
+            QVERIFY(e.btime <= QDateTime::currentSecsSinceEpoch());
         }
         ListOptions hidden;
         hidden.showHidden = true;
         QCOMPARE(int(listDirectory(tmp.path(), hidden).entries.size()), 5);
         QCOMPARE(listDirectory(tmp.filePath("nope"), {}).error, ENOENT);
+    }
+
+    // The extra columns sort too; owners by id, so each one's files stay together.
+    void sortExtraColumns()
+    {
+        auto entry = [](const QString& name, uint32_t uid, uint32_t mode, int64_t btime, int64_t atime, const QString& link) {
+            FileEntry e;
+            e.name = name;
+            e.key = makeSortKey(name);
+            e.uid = e.gid = uid;
+            e.mode = mode;
+            e.btime = btime;
+            e.atime = atime;
+            e.linkTarget = link;
+            return e;
+        };
+        std::vector<FileEntry> v = {entry("a", 1000, 0100644, 30, 1, "z"), entry("b", 0, 0100755, 10, 3, "x"),
+                                    entry("c", 1000, 0104755, 20, 2, "y")};
+        auto names = [&v] {
+            QString out;
+            for (const FileEntry& e : v)
+                out += e.name;
+            return out;
+        };
+        const QList<std::pair<SortColumn, QString>> cases = {
+            {SortColumn::Owner, "bac"},  {SortColumn::Group, "bac"},    {SortColumn::Octal, "abc"},
+            {SortColumn::Created, "bca"}, {SortColumn::Accessed, "acb"}, {SortColumn::LinkTarget, "bca"},
+        };
+        for (const auto& [column, order] : cases) {
+            sortEntries(v, {column, false});
+            QCOMPARE(names(), order);
+        }
     }
 
     void copyTree()

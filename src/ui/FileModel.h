@@ -22,7 +22,19 @@ namespace tandem {
 class FileModel : public QAbstractTableModel {
     Q_OBJECT
 public:
-    enum Column { ColName, ColExt, ColSize, ColTime, ColAttr, ColCount };
+    // In the order of SortColumn. New ones go at the end, hidden at first.
+    enum Column {
+        ColName, ColExt, ColSize, ColTime, ColAttr,
+        ColOwner, ColGroup, ColOctal, ColCreated, ColAccessed, ColLinkTarget,
+        ColCount
+    };
+    // Stable names for saving the column layout ("size", "owner"); -1 if unknown.
+    static QString columnId(int column);
+    static int columnOf(const QString& id);
+
+    // What the owner and group columns can show: names from this system's
+    // user list (local folders), the plain ids (servers), or nothing (archives).
+    enum class Owners { Names, Numbers, None };
 
     struct Stats {
         int files = 0, dirs = 0;
@@ -54,6 +66,7 @@ public:
     void setLocalIconPaths(bool on) { m_localIconPaths = on; }
 #endif
     std::optional<int> itemCount(const FileEntry& e) const;  // asks for it when unknown
+    void setOwners(Owners owners) { m_owners = owners; }
 
     // Dates as "12 min ago", "Yesterday 14:20", "3 Nov"; or exact.
     static QString relativeDate(qint64 secs, const QDateTime& now);
@@ -112,6 +125,8 @@ private:
     void partition(std::vector<FileEntry>& all);
 
     void runCounts() const;
+    QString ownerText(uint32_t id, bool group) const;  // asks for the name when unknown
+    void runNames() const;
 
     QString m_path;
     std::vector<FileEntry> m_entries;  // ".." first when not at "/"
@@ -126,6 +141,9 @@ private:
     mutable QHash<QString, int> m_counts;
     mutable QSet<QString> m_countQueue;
     mutable bool m_countScheduled = false;
+    Owners m_owners = Owners::None;
+    mutable QSet<uint32_t> m_userQueue, m_groupQueue;
+    mutable bool m_namesScheduled = false;
 #ifdef Q_OS_MACOS
     bool m_localIconPaths = false;
 #endif

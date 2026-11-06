@@ -8,7 +8,11 @@
 
 namespace tandem {
 
-enum class SortColumn : uint8_t { Name = 0, Ext = 1, Size = 2, Time = 3, Attr = 4 };
+// Saved as numbers: new ones go at the end.
+enum class SortColumn : uint8_t {
+    Name = 0, Ext = 1, Size = 2, Time = 3, Attr = 4,
+    Owner = 5, Group = 6, Octal = 7, Created = 8, Accessed = 9, LinkTarget = 10,
+};
 
 struct SortSpec {
     SortColumn column = SortColumn::Name;

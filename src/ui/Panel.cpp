@@ -27,6 +27,7 @@
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QStandardItemModel>
 #include <QInputDialog>
 #include <QKeyEvent>
 #include <QLabel>
@@ -758,10 +759,12 @@ void Panel::showTab(int index)
     m_view->setModel(t->model());
     applyViewMode();
     delete oldSel;
-    if (m_headerState.isEmpty())
+    if (m_headerState.isEmpty()) {
         applyDefaultColumns();
-    else
+        applyColumnLayout();
+    } else {
         m_view->header()->restoreState(m_headerState);
+    }
     m_view->columnsMadeForZoom();  // saved and default widths are for the current zoom
     m_view->fitColumns();
     {
@@ -829,24 +832,101 @@ void Panel::applyDefaultColumns()
                                fm.horizontalAdvance(FileModel::relativeDate(0, QDateTime::fromSecsSinceEpoch(86400 + 3600 * 23))));
     m_view->setColumnWidth(FileModel::ColTime, dateWidth + 24);
     m_view->setColumnWidth(FileModel::ColAttr, fm.horizontalAdvance(QStringLiteral("drwxr-xr-x")) + 24);
+    const QFontMetrics list(FileView::zoomed(theme().listFont));
+    for (int c : {int(FileModel::ColOwner), int(FileModel::ColGroup)})
+        m_view->setColumnWidth(c, list.horizontalAdvance(QStringLiteral("username")) + 24);
+    m_view->setColumnWidth(FileModel::ColOctal, fm.horizontalAdvance(QStringLiteral("0755")) + 24);
+    m_view->setColumnWidth(FileModel::ColCreated, dateWidth + 24);
+    m_view->setColumnWidth(FileModel::ColAccessed, dateWidth + 24);
+    m_view->setColumnWidth(FileModel::ColLinkTarget, list.horizontalAdvance(QStringLiteral("../some/where/else")) + 24);
     // Extensions show in the name; attributes in the info view. Both can be
-    // switched back on from the column header's menu.
-    h->setSectionHidden(FileModel::ColExt, true);
-    h->setSectionHidden(FileModel::ColAttr, true);
+    // switched back on from the column header's menu, like the ones after them.
+    for (int c = 0; c < FileModel::ColCount; ++c) {
+        h->moveSection(h->visualIndex(c), c);
+        h->setSectionHidden(c, c == FileModel::ColExt || c >= FileModel::ColAttr);
+    }
 }
 
-QByteArray Panel::headerState() const
+namespace {
+
+// One header's columns as layout entries; widths of hidden ones aren't kept.
+QStringList layoutOf(QHeaderView* h, const QList<int>& autoHidden)
 {
-    return m_view->userHeaderState();
+    QStringList out;
+    for (int v = 0; v < h->count(); ++v) {
+        const int c = h->logicalIndex(v);
+        const QString id = FileModel::columnId(c);
+        if (id.isEmpty())
+            continue;
+        const bool narrow = autoHidden.contains(c);  // hidden only while the panel is narrow
+        if (h->isSectionHidden(c) && !narrow) {
+            out << QLatin1Char('-') + id;
+            continue;
+        }
+        if (c == FileModel::ColName) {  // takes what's left
+            out << id;
+            continue;
+        }
+        if (narrow)
+            h->setSectionHidden(c, false);
+        out << id + QLatin1Char(' ') + QString::number(h->sectionSize(c));
+        if (narrow)
+            h->setSectionHidden(c, true);
+    }
+    return out;
 }
 
-void Panel::restoreHeaderState(const QByteArray& state)
+}  // namespace
+
+QStringList Panel::columnLayout() const
+{
+    QHeaderView* h = m_view->header();
+    if (!tab() || h->count() < FileModel::ColCount)
+        return m_columnLayout;
+    return layoutOf(h, m_view->autoHiddenColumns());
+}
+
+void Panel::setColumnLayout(const QStringList& layout)
+{
+    m_columnLayout = layout;
+    m_headerState.clear();
+    if (!tab() || m_view->header()->count() < FileModel::ColCount)
+        return;  // the first tab shown applies it
+    applyDefaultColumns();
+    applyColumnLayout();
+    m_view->columnsMadeForZoom();
+    m_view->fitColumns();
+}
+
+void Panel::applyColumnLayout()
+{
+    QHeaderView* h = m_view->header();
+    int visual = 0;
+    for (const QString& entry : std::as_const(m_columnLayout)) {
+        const bool hidden = entry.startsWith(QLatin1Char('-'));
+        const QStringList parts = entry.mid(hidden ? 1 : 0).split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        const int c = parts.isEmpty() ? -1 : FileModel::columnOf(parts.first());
+        if (c < 0)
+            continue;  // from a newer version
+        h->moveSection(h->visualIndex(c), visual++);
+        bool ok = false;
+        const int width = parts.value(1).toInt(&ok);
+        if (ok && width > 0 && c != FileModel::ColName)
+            m_view->setColumnWidth(c, width);
+        h->setSectionHidden(c, hidden && c != FileModel::ColName);
+    }
+}
+
+QStringList Panel::columnLayoutFromHeaderState(const QByteArray& state)
 {
     if (state.isEmpty())
-        return;
-    m_headerState = state;
-    m_view->header()->restoreState(state);
-    m_view->columnsMadeForZoom();
+        return {};
+    QStandardItemModel model(0, 5);  // Name, Ext, Size, Modified, Attributes
+    QHeaderView h(Qt::Horizontal);
+    h.setModel(&model);
+    if (!h.restoreState(state) || h.count() != 5)
+        return {};
+    return layoutOf(&h, {});
 }
 
 // ------------------------------------------------------------ navigation
@@ -1083,7 +1163,8 @@ void Panel::sortBy(SortColumn column)
     } else {
         s.column = column;
         // Newest / biggest first is what you want for those columns.
-        s.descending = column == SortColumn::Time || column == SortColumn::Size;
+        s.descending = column == SortColumn::Time || column == SortColumn::Size || column == SortColumn::Created ||
+                       column == SortColumn::Accessed;
     }
     setSortSpec(s);
     emit stateChanged();

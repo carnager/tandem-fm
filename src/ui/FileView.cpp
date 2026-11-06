@@ -110,14 +110,16 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
         }
     }
 
-    QFont f = FileView::zoomed((col == FileModel::ColSize || col == FileModel::ColTime) ? t.numberFont : t.listFont);
+    const bool number = col == FileModel::ColSize || col == FileModel::ColTime || col == FileModel::ColOctal ||
+                        col == FileModel::ColCreated || col == FileModel::ColAccessed;
+    QFont f = FileView::zoomed(number ? t.numberFont : t.listFont);
     if (e->isDir && col == FileModel::ColName)
         f.setWeight(QFont::DemiBold);
     if (e->marked)
         f.setWeight(QFont::Bold);
     p->setFont(f);
     // Secondary columns are dimmed so names stand out; marks keep their color.
-    const bool secondary = col == FileModel::ColTime || col == FileModel::ColAttr || col == FileModel::ColSize;
+    const bool secondary = col != FileModel::ColName && col != FileModel::ColExt;
     if (secondary && !e->marked)
         fg = t.dimText;
     p->setPen(fg);
@@ -999,7 +1001,10 @@ void FileView::fitColumns()
         return viewport()->width() - others;
     };
     constexpr int kMinName = 210;
-    for (int col : {int(FileModel::ColAttr), int(FileModel::ColTime)}) {
+    // The extra columns go first, the date last.
+    for (int col : {int(FileModel::ColLinkTarget), int(FileModel::ColAccessed), int(FileModel::ColCreated),
+                    int(FileModel::ColOctal), int(FileModel::ColGroup), int(FileModel::ColOwner),
+                    int(FileModel::ColAttr), int(FileModel::ColTime)}) {
         if (nameRoom() >= kMinName)
             break;
         if (!h->isSectionHidden(col)) {
@@ -1049,6 +1054,8 @@ void FileView::showHeaderMenu(const QPoint& pos)
     QMenu menu(this);
     QHeaderView* h = header();
     for (int c = 1; c < h->count(); ++c) {  // the name column always stays
+        if (c == FileModel::ColOwner)
+            menu.addSeparator();  // the ones after it are for now and then
         QAction* a = menu.addAction(model()->headerData(c, Qt::Horizontal).toString());
         a->setCheckable(true);
         a->setChecked(!h->isSectionHidden(c));

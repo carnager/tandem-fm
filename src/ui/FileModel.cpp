@@ -1,5 +1,6 @@
 #include "ui/FileModel.h"
 
+#include "core/Permissions.h"
 #include "core/Util.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
@@ -129,6 +130,25 @@ QVariant FileModel::data(const QModelIndex& index, int role) const
             return QDateTime::fromSecsSinceEpoch(e->mtime).toString(QStringLiteral("yyyy-MM-dd HH:mm"));
         case ColAttr:
             return e->isParent ? QString() : modeString(e->mode);
+        case ColOwner:
+        case ColGroup:
+            return e->isParent ? QString() : ownerText(index.column() == ColGroup ? e->gid : e->uid, index.column() == ColGroup);
+        case ColOctal:
+            if (e->isParent)
+                return QString();
+            // 755, or 4755 with setuid, setgid or sticky.
+            return QString::number(e->mode & 07777, 8).rightJustified(3, QLatin1Char('0'));
+        case ColCreated:
+        case ColAccessed: {
+            const int64_t t = index.column() == ColCreated ? e->btime : e->atime;
+            if (e->isParent || t == 0)
+                return QString();
+            if (relativeDates())
+                return relativeDate(t, QDateTime::currentDateTime());
+            return QDateTime::fromSecsSinceEpoch(t).toString(QStringLiteral("yyyy-MM-dd HH:mm"));
+        }
+        case ColLinkTarget:
+            return e->linkTarget;
         }
         break;
     case Qt::EditRole:
@@ -148,6 +168,12 @@ QVariant FileModel::data(const QModelIndex& index, int role) const
             return e->name;
         if (index.column() == ColTime && !e->isParent && e->mtime)
             return QLocale().toString(QDateTime::fromSecsSinceEpoch(e->mtime), QLocale::LongFormat);
+        if (index.column() == ColCreated && !e->isParent && e->btime)
+            return QLocale().toString(QDateTime::fromSecsSinceEpoch(e->btime), QLocale::LongFormat);
+        if (index.column() == ColAccessed && !e->isParent && e->atime)
+            return QLocale().toString(QDateTime::fromSecsSinceEpoch(e->atime), QLocale::LongFormat);
+        if (index.column() == ColLinkTarget && !e->linkTarget.isEmpty())
+            return e->linkTarget;
         break;
     }
     return {};
@@ -220,6 +246,85 @@ void FileModel::runCounts() const
     });
 }
 
+// ------------------------------------------------------ owner names
+
+namespace {
+// Names already looked up, for every panel. UI thread only.
+QHash<uint32_t, QString>& knownNames(bool group)
+{
+    static QHash<uint32_t, QString> users, groups;
+    return group ? groups : users;
+}
+}  // namespace
+
+QString FileModel::ownerText(uint32_t id, bool group) const
+{
+    switch (m_owners) {
+    case Owners::None:
+        return QString();
+    case Owners::Numbers:
+        return QString::number(id);
+    case Owners::Names:
+        break;
+    }
+    const QHash<uint32_t, QString>& known = knownNames(group);
+    const auto it = known.constFind(id);
+    if (it != known.cend())
+        return *it;
+    (group ? m_groupQueue : m_userQueue).insert(id);
+    if (!m_namesScheduled) {
+        m_namesScheduled = true;
+        QTimer::singleShot(0, const_cast<FileModel*>(this), [this] { runNames(); });
+    }
+    return QString();
+}
+
+void FileModel::runNames() const
+{
+    m_namesScheduled = false;
+    if (m_userQueue.isEmpty() && m_groupQueue.isEmpty())
+        return;
+    const QList<uint32_t> users(m_userQueue.cbegin(), m_userQueue.cend());
+    const QList<uint32_t> groups(m_groupQueue.cbegin(), m_groupQueue.cend());
+    m_userQueue.clear();
+    m_groupQueue.clear();
+    QPointer<FileModel> self(const_cast<FileModel*>(this));
+    ioPool()->start([self, users, groups] {
+        auto found = std::make_shared<std::pair<QHash<uint32_t, QString>, QHash<uint32_t, QString>>>();
+        for (uint32_t id : users)
+            found->first.insert(id, userName(id));
+        for (uint32_t id : groups)
+            found->second.insert(id, groupName(id));
+        postToUi([self, found] {
+            knownNames(false).insert(found->first);
+            knownNames(true).insert(found->second);
+            if (self && self->rowCount() > 0)
+                emit self->dataChanged(self->index(0, ColOwner), self->index(self->rowCount() - 1, ColGroup));
+        });
+    });
+}
+
+// ------------------------------------------------------- column ids
+
+namespace {
+const char* const kColumnIds[] = {"name", "ext", "size", "modified", "attributes",
+                                  "owner", "group", "octal", "created", "accessed", "link"};
+static_assert(std::size(kColumnIds) == FileModel::ColCount);
+}  // namespace
+
+QString FileModel::columnId(int column)
+{
+    return column >= 0 && column < ColCount ? QString::fromLatin1(kColumnIds[column]) : QString();
+}
+
+int FileModel::columnOf(const QString& id)
+{
+    for (int c = 0; c < ColCount; ++c)
+        if (id == QLatin1String(kColumnIds[c]))
+            return c;
+    return -1;
+}
+
 // -------------------------------------------------------------- dates
 
 namespace {
@@ -269,6 +374,12 @@ QVariant FileModel::headerData(int section, Qt::Orientation orientation, int rol
         case ColSize: return tr("Size");
         case ColTime: return tr("Modified");
         case ColAttr: return tr("Attributes");
+        case ColOwner: return tr("Owner");
+        case ColGroup: return tr("Group");
+        case ColOctal: return tr("Octal");
+        case ColCreated: return tr("Created");
+        case ColAccessed: return tr("Accessed");
+        case ColLinkTarget: return tr("Link target");
         }
     }
     if (role == Qt::TextAlignmentRole)

@@ -20,6 +20,14 @@ namespace tandem {
 
 namespace {
 
+void readLinkTarget(int dirfd, const char* name, FileEntry& e)
+{
+    char buf[4096];
+    const ssize_t n = ::readlinkat(dirfd, name, buf, sizeof buf);
+    if (n > 0)
+        e.linkTarget = QString::fromLocal8Bit(buf, qsizetype(n));
+}
+
 #ifdef __APPLE__
 bool fillEntry(int dirfd, const char* name, FileEntry& e)
 {
@@ -29,11 +37,14 @@ bool fillEntry(int dirfd, const char* name, FileEntry& e)
     e.mode = st.st_mode;
     e.size = st.st_size;
     e.mtime = st.st_mtime;
+    e.btime = st.st_birthtimespec.tv_sec;
+    e.atime = st.st_atime;
     e.iconRevision = int64_t(st.st_ctimespec.tv_sec) * 1000000000 + st.st_ctimespec.tv_nsec;
     e.uid = st.st_uid;
     e.gid = st.st_gid;
     e.isLink = S_ISLNK(st.st_mode);
     if (e.isLink) {
+        readLinkTarget(dirfd, name, e);
         struct stat target;
         if (::fstatat(dirfd, name, &target, 0) == 0) {
             e.isDir = S_ISDIR(target.st_mode);
@@ -49,7 +60,8 @@ bool fillEntry(int dirfd, const char* name, FileEntry& e)
     return true;
 }
 #else
-constexpr unsigned kStatMask = STATX_TYPE | STATX_MODE | STATX_SIZE | STATX_MTIME | STATX_UID | STATX_GID;
+constexpr unsigned kStatMask =
+    STATX_TYPE | STATX_MODE | STATX_SIZE | STATX_MTIME | STATX_UID | STATX_GID | STATX_ATIME | STATX_BTIME;
 
 // AT_STATX_DONT_SYNC: on network filesystems use cached attributes instead of
 // a server round trip per file. Listings stay fast on NFS/SMB.
@@ -61,10 +73,15 @@ bool fillEntry(int dirfd, const char* name, FileEntry& e)
     e.mode = sx.stx_mode;
     e.size = int64_t(sx.stx_size);
     e.mtime = sx.stx_mtime.tv_sec;
+    if (sx.stx_mask & STATX_BTIME)  // not every filesystem knows it
+        e.btime = sx.stx_btime.tv_sec;
+    if (sx.stx_mask & STATX_ATIME)
+        e.atime = sx.stx_atime.tv_sec;
     e.uid = sx.stx_uid;
     e.gid = sx.stx_gid;
     if (S_ISLNK(sx.stx_mode)) {
         e.isLink = true;
+        readLinkTarget(dirfd, name, e);
         struct statx tx;
         if (statx(dirfd, name, AT_STATX_DONT_SYNC, kStatMask, &tx) == 0) {
             e.isDir = S_ISDIR(tx.stx_mode);

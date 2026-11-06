@@ -14,6 +14,8 @@ struct FileEntry {
     std::optional<QCollatorSortKey> key;  // locale-aware natural sort key
     int64_t size = -1;    // -1 = unknown (directories until computed)
     int64_t mtime = 0;    // seconds since epoch
+    int64_t btime = 0;    // created; 0 = unknown (remote, or the filesystem doesn't say)
+    int64_t atime = 0;    // last read; 0 = unknown
     uint32_t mode = 0;    // st_mode
     uint32_t uid = 0;
     uint32_t gid = 0;
@@ -22,6 +24,7 @@ struct FileEntry {
     bool brokenLink = false;
     bool isParent = false;  // the ".." entry
     bool marked = false;
+    QString linkTarget;     // what a symlink points to, as written in it
 #ifdef Q_OS_MACOS
     bool isPackage = false;    // native directory type, resolved on a worker
     bool hasCustomIcon = false;  // FinderInfo, read by the listing worker

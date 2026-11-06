@@ -316,6 +316,9 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
                 sortEntries(result->entries, t->m_model->sortSpec());
             // Item counts of subfolders: only where reading them is cheap.
             t->m_model->setCountable(!result->remote && !result->inArchive && !networkFs, t->m_showHidden);
+            t->m_model->setOwners(result->inArchive ? FileModel::Owners::None
+                                  : result->remote  ? FileModel::Owners::Numbers
+                                                    : FileModel::Owners::Names);
 #ifdef Q_OS_MACOS
             t->m_model->setLocalIconPaths(!result->remote && !result->inArchive && !networkFs);
 #endif
@@ -448,6 +451,7 @@ void DirTab::beginSearch(const SearchSpec& spec)
     m_live = false;
     m_liveNames.clear();
     m_model->setCountable(false, false);  // results are paths below the folder
+    m_model->setOwners(FileModel::Owners::Names);  // search is local only
 #ifdef Q_OS_MACOS
     m_model->setLocalIconPaths(false);
 #endif
