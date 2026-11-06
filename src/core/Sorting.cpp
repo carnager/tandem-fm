@@ -101,6 +101,24 @@ bool entryLess(const FileEntry& a, const FileEntry& b, const SortSpec& spec)
     case SortColumn::Attr:
         c = cmp(a.mode, b.mode);
         break;
+    case SortColumn::Owner:  // by id: keeps each owner's files together
+        c = cmp(a.uid, b.uid);
+        break;
+    case SortColumn::Group:
+        c = cmp(a.gid, b.gid);
+        break;
+    case SortColumn::Octal:
+        c = cmp(a.mode & 07777, b.mode & 07777);
+        break;
+    case SortColumn::Created:
+        c = cmp(a.btime, b.btime);
+        break;
+    case SortColumn::Accessed:
+        c = cmp(a.atime, b.atime);
+        break;
+    case SortColumn::LinkTarget:
+        c = a.linkTarget.compare(b.linkTarget, Qt::CaseInsensitive);
+        break;
     }
     if (c == 0)
         c = compareNames(a, b);

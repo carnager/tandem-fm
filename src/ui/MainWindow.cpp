@@ -3690,8 +3690,11 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         spec.descending = s.value(QStringLiteral("sortDescending"), false).toBool();
         p.panel->setSortSpec(spec);
         p.panel->setShowHidden(hidden);
-        if (rows2)  // layouts saved before the new columns start over once
-            p.panel->restoreHeaderState(s.value(QStringLiteral("header")).toByteArray());
+        // Columns by name; older versions kept Qt's header state, read once.
+        if (s.contains(QStringLiteral("columns")))
+            p.panel->setColumnLayout(s.value(QStringLiteral("columns")).toStringList());
+        else if (rows2)  // layouts from before that start over once
+            p.panel->setColumnLayout(Panel::columnLayoutFromHeaderState(s.value(QStringLiteral("header")).toByteArray()));
         QStringList tabs = s.value(QStringLiteral("tabs")).toStringList();
         int current = s.value(QStringLiteral("currentTab"), 0).toInt();
         QList<int> numbers;  // ("slots" is a Qt macro)
@@ -3764,7 +3767,8 @@ void MainWindow::saveSettings()
         s.setValue(QStringLiteral("tabGrids"), grids);
         s.setValue(QStringLiteral("sortColumn"), int(panel->sortSpec().column));
         s.setValue(QStringLiteral("sortDescending"), panel->sortSpec().descending);
-        s.setValue(QStringLiteral("header"), panel->headerState());
+        s.setValue(QStringLiteral("columns"), panel->columnLayout());
+        s.remove(QStringLiteral("header"));  // older versions
         s.endGroup();
     }
 }

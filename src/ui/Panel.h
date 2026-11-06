@@ -118,8 +118,12 @@ public:
     QFrame* selectionBar() const { return m_selectionBar; }
     // A copy, move or extraction into the shown folder, as it happens (nullptr: none).
     void showTransfer(class Job* job, const QString& text);
-    QByteArray headerState() const;
-    void restoreHeaderState(const QByteArray& state);
+    // The columns in their order, by name: "size 92" (its width), "-owner"
+    // (hidden). Saved like this, columns added later don't upset it.
+    QStringList columnLayout() const;
+    void setColumnLayout(const QStringList& layout);
+    // The same from the header state older versions saved (five columns).
+    static QStringList columnLayoutFromHeaderState(const QByteArray& state);
 
 signals:
     void activated(Panel* panel);
@@ -155,6 +159,7 @@ private:
     void updateStatus();
     void updateActiveStyle();
     void applyDefaultColumns();
+    void applyColumnLayout();  // m_columnLayout, over the defaults
     void startQuickSearch(const QString& text);
     void quickSearchFind(int direction, bool includeCurrent);
     void endQuickSearch();
@@ -212,7 +217,8 @@ private:
     QTimer m_messageTimer;
     QString m_message;
     bool m_messageError = false;
-    QByteArray m_headerState;
+    QByteArray m_headerState;  // while switching tabs
+    QStringList m_columnLayout;  // the saved one, until a tab shows
     QStringList m_override;
     QString m_lastSearch;
     QString m_pathBeforeReset;

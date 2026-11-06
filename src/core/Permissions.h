@@ -15,6 +15,11 @@ namespace tandem {
 // users and groups, and for folders the defaults new items inherit) and
 // filesystem flags (chattr). Blocking: call from workers.
 
+// The name for a user or group id, or the number when there is none. Can
+// ask the network (LDAP): call from workers.
+QString userName(uint32_t uid);
+QString groupName(uint32_t gid);
+
 enum Perm : uint32_t { PermRead = 4, PermWrite = 2, PermExec = 1 };
 
 struct AclEntry {

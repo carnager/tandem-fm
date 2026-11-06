@@ -58,6 +58,7 @@ public:
     void setArrowFolders(bool on) { m_arrowFolders = on; }  // Left/Right leave and enter folders
     // Header state as the user configured it (ignores columns hidden for width).
     QByteArray userHeaderState();
+    QList<int> autoHiddenColumns() const { return m_autoHidden; }
     void fitColumns();
     void setCurrentRow(int row, bool center = false);
     // Thumbnails in a grid instead of the detailed list.

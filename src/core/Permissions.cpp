@@ -26,8 +26,6 @@
 
 namespace tandem {
 
-namespace {
-
 QString userName(uint32_t uid)
 {
     struct passwd pw, *res = nullptr;
@@ -45,6 +43,8 @@ QString groupName(uint32_t gid)
         return QString::fromLocal8Bit(res->gr_name);
     return QString::number(gid);
 }
+
+namespace {
 
 #ifdef TANDEM_HAVE_ACL
 uint32_t permsOf(acl_entry_t e)

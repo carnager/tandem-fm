@@ -1949,6 +1949,30 @@
         <source>Attributes</source>
         <translation>Attribute</translation>
     </message>
+    <message>
+        <source>Owner</source>
+        <translation>Eigentümer</translation>
+    </message>
+    <message>
+        <source>Group</source>
+        <translation>Gruppe</translation>
+    </message>
+    <message>
+        <source>Octal</source>
+        <translation>Oktal</translation>
+    </message>
+    <message>
+        <source>Created</source>
+        <translation>Erstellt</translation>
+    </message>
+    <message>
+        <source>Accessed</source>
+        <translation>Zugriff</translation>
+    </message>
+    <message>
+        <source>Link target</source>
+        <translation>Verknüpfungsziel</translation>
+    </message>
 </context>
 <context>
     <name>tandem::FileView</name>
