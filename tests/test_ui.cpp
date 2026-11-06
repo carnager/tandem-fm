@@ -77,6 +77,7 @@
 #include <QListWidget>
 #include <QKeySequenceEdit>
 #include <QTreeWidget>
+#include <QHeaderView>
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QMenu>
@@ -364,6 +365,35 @@ private slots:
         writeFile(own, "{\"name\": \"My Nord\", \"dark\": true, \"colors\": {\"accent\": \"#00ff00\"}}");
         QTRY_COMPARE(theme().name, QString("My Nord"));  // picked up by watching the folder
         QVERIFY(label.styleSheet().contains("rgba(0,255,0"));
+    }
+
+    // The name column fills the rest, so its edge has no Qt handle: dragging
+    // it resizes the column right of it; the name column keeps its minimum.
+    void nameColumnEdgeDrags()
+    {
+        QHeaderView* h = m_left->view()->header();
+        const QByteArray before = h->saveState();
+        auto cleanup = qScopeGuard([&] { h->restoreState(before); });
+        auto drag = [&](int dx) {
+            const int x = h->sectionViewportPosition(FileModel::ColName) + h->sectionSize(FileModel::ColName);
+            const int y = h->height() / 2;
+            QTest::mousePress(h->viewport(), Qt::LeftButton, {}, QPoint(x, y));
+            QMouseEvent move(QEvent::MouseMove, QPointF(x + dx, y), h->viewport()->mapToGlobal(QPointF(x + dx, y)),
+                             Qt::NoButton, Qt::LeftButton, {});
+            QApplication::sendEvent(h->viewport(), &move);
+            QTest::mouseRelease(h->viewport(), Qt::LeftButton, {}, QPoint(x + dx, y));
+        };
+        int next = -1;
+        for (int v = h->visualIndex(FileModel::ColName) + 1; v < h->count() && next < 0; ++v)
+            if (!h->isSectionHidden(h->logicalIndex(v)))
+                next = h->logicalIndex(v);
+        QVERIFY(next >= 0);
+        const int name = h->sectionSize(FileModel::ColName), width = h->sectionSize(next);
+        drag(-60);
+        QCOMPARE(h->sectionSize(next), width + 60);
+        QCOMPARE(h->sectionSize(FileModel::ColName), name - 60);
+        drag(-2000);
+        QCOMPARE(h->sectionSize(FileModel::ColName), 210);
     }
 
     // A plugin: switched on in Settings, it becomes a command; its answer marks a file.

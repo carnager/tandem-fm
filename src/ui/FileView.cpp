@@ -20,6 +20,7 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QScrollBar>
+#include <QStyle>
 #include <QTimer>
 
 namespace tandem {
@@ -355,6 +356,7 @@ FileView::FileView(QWidget* parent) : QTreeView(parent)
     h->setMinimumSectionSize(30);
     h->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(h, &QHeaderView::customContextMenuRequested, this, &FileView::showHeaderMenu);
+    h->viewport()->installEventFilter(this);  // the name column's edge (see nameEdgeEvent)
     setThemeStyle(h, QStringLiteral(
         "QHeaderView { background: @base; border: none; border-bottom: 1px solid @border; }"
         "QHeaderView::section { background: @base; color: @dimText; border: none; padding: 5px 6px 6px 6px; }"
@@ -984,6 +986,10 @@ void FileView::currentChanged(const QModelIndex& current, const QModelIndex& pre
         emit cursorMoved();
 }
 
+namespace {
+constexpr int kMinName = 210;  // narrower, and fitColumns hides columns
+}
+
 // Narrow panel (e.g. with the preview column open): hide Attributes, then
 // Modified, so names stay readable; bring them back when there is room.
 void FileView::fitColumns()
@@ -998,7 +1004,6 @@ void FileView::fitColumns()
                 others += h->sectionSize(c);
         return viewport()->width() - others;
     };
-    constexpr int kMinName = 210;
     for (int col : {int(FileModel::ColAttr), int(FileModel::ColTime)}) {
         if (nameRoom() >= kMinName)
             break;
@@ -1031,6 +1036,82 @@ void FileView::resizeEvent(QResizeEvent* e)
 {
     QTreeView::resizeEvent(e);
     fitColumns();
+}
+
+int FileView::nameEdgeNeighbour(int x) const
+{
+    const QHeaderView* h = header();
+    const int name = FileModel::ColName;
+    const int grip = style()->pixelMetric(QStyle::PM_HeaderGripMargin, nullptr, h);
+    if (std::abs(x - (h->sectionViewportPosition(name) + h->sectionSize(name))) > grip)
+        return -1;
+    for (int v = h->visualIndex(name) + 1; v < h->count(); ++v) {
+        const int c = h->logicalIndex(v);
+        if (!h->isSectionHidden(c))
+            return c;
+    }
+    return -1;
+}
+
+// The name column takes the room the others leave, so Qt gives its edge no
+// handle. Dragging that edge resizes the column right of it instead: the line
+// between them moves the same way.
+bool FileView::nameEdgeEvent(QMouseEvent* e)
+{
+    QHeaderView* h = header();
+    const int x = qRound(e->position().x());
+    switch (e->type()) {
+    case QEvent::MouseButtonPress:
+        if (e->button() != Qt::LeftButton || (m_edgeColumn = nameEdgeNeighbour(x)) < 0)
+            return false;
+        m_edgeStartX = x;
+        m_edgeStartWidth = h->sectionSize(m_edgeColumn);
+        return true;
+    case QEvent::MouseMove:
+        if (m_edgeColumn >= 0) {
+            const int most = m_edgeStartWidth + h->sectionSize(FileModel::ColName) - kMinName;
+            h->resizeSection(m_edgeColumn, std::clamp(m_edgeStartWidth - (x - m_edgeStartX), h->minimumSectionSize(),
+                                                      std::max(most, h->minimumSectionSize())));
+            return true;
+        }
+        if (e->buttons() == Qt::NoButton && nameEdgeNeighbour(x) >= 0) {
+            h->viewport()->setCursor(Qt::SplitHCursor);
+            m_edgeCursor = true;
+            return true;  // QHeaderView would take the cursor back
+        }
+        if (m_edgeCursor) {  // QHeaderView only unsets cursors it set itself
+            h->viewport()->unsetCursor();
+            m_edgeCursor = false;
+        }
+        return false;
+    case QEvent::MouseButtonRelease:
+        if (m_edgeColumn < 0)
+            return false;
+        m_edgeColumn = -1;
+        return true;
+    case QEvent::MouseButtonDblClick:
+        return nameEdgeNeighbour(x) >= 0;  // not a sort click
+    default:
+        return false;
+    }
+}
+
+bool FileView::eventFilter(QObject* obj, QEvent* e)
+{
+    if (obj == header()->viewport()) {
+        switch (e->type()) {
+        case QEvent::MouseButtonPress:
+        case QEvent::MouseMove:
+        case QEvent::MouseButtonRelease:
+        case QEvent::MouseButtonDblClick:
+            if (nameEdgeEvent(static_cast<QMouseEvent*>(e)))
+                return true;
+            break;
+        default:
+            break;
+        }
+    }
+    return QTreeView::eventFilter(obj, e);
 }
 
 void FileView::contextMenuEvent(QContextMenuEvent* e)
