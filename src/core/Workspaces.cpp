@@ -63,19 +63,25 @@ QList<Workspace> Workspaces::all()
 {
     QSettings s;
     QList<Workspace> out;
-    const int n = s.beginReadArray(kGroup);
-    for (int i = 0; i < n; ++i) {
-        s.setArrayIndex(i);
+    // Every [workspaces.N] table counts. Qt's array "size" isn't needed, so a
+    // workspace written by hand without it isn't silently skipped.
+    s.beginGroup(kGroup);
+    for (const QString& group : s.childGroups()) {
+        bool number = false;
+        if (group.toInt(&number) <= 0 || !number)
+            continue;
+        s.beginGroup(group);
         Workspace w;
         w.id = s.value(QStringLiteral("id")).toInt();
         w.name = s.value(QStringLiteral("name")).toString();
         w.rightActive = s.value(QStringLiteral("active")).toString() == QLatin1String("right");
         w.left = readTabs(s, QStringLiteral("left"));
         w.right = readTabs(s, QStringLiteral("right"));
+        s.endGroup();
         if (w.id > 0 && !w.name.isEmpty())
             out.append(w);
     }
-    s.endArray();
+    s.endGroup();
     std::sort(out.begin(), out.end(), [](const Workspace& a, const Workspace& b) {
         return QString::localeAwareCompare(a.name, b.name) < 0;
     });

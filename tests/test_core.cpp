@@ -2198,6 +2198,26 @@ private slots:
         QVERIFY(!QSettings().contains("startup/open"));
     }
 
+    // A workspace written by hand needs no [workspaces] size.
+    void workspacesWrittenByHand()
+    {
+        QTemporaryDir tmp;
+        useConfigDir(tmp.path());
+        auto restore = qScopeGuard([] { useConfigDir(QString()); });
+        const QString file = QSettings().fileName();
+        QVERIFY(QDir().mkpath(QFileInfo(file).path()));
+        {
+            QFile f(file);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("[workspaces.1]\nid = 1\nname = \"Photos\"\n\n[workspaces.1.left]\ntabs = [\"/p\"]\n\n"
+                    "[workspaces.2]\nid = 2\nname = \"Code\"\n");
+        }
+        const QList<Workspace> all = Workspaces::all();
+        QCOMPARE(all.size(), 2);
+        QCOMPARE(all[1].name, QString("Photos"));
+        QCOMPARE(all[1].left.paths, QStringList({"/p"}));
+    }
+
     // Settings as TOML: typed values, edits change single lines, comments stay,
     // window state goes to its own file, and a broken hand edit is never overwritten.
     void tomlSettings()
