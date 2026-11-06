@@ -31,24 +31,29 @@ EditNamesSession::~EditNamesSession()
 
 // GUI editors whose command hands the file to a running window and returns
 // at once, unless told to wait: this session would end before any edit.
-static void addWaitFlag(QStringList& argv)
+// Returns whether argv starts one of them.
+static bool addWaitFlag(QStringList& argv)
 {
     static const QHash<QString, QStringList> flags = {
         {QStringLiteral("code"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
+        {QStringLiteral("code-oss"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
         {QStringLiteral("code-insiders"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
         {QStringLiteral("codium"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
+        {QStringLiteral("vscodium"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
         {QStringLiteral("cursor"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
         {QStringLiteral("subl"), {QStringLiteral("-w"), QStringLiteral("--wait")}},
         {QStringLiteral("zed"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
+        {QStringLiteral("zeditor"), {QStringLiteral("--wait"), QStringLiteral("-w")}},
         {QStringLiteral("mate"), {QStringLiteral("-w"), QStringLiteral("--wait")}},
     };
     if (argv.isEmpty())
-        return;
+        return false;
     const auto known = flags.constFind(QFileInfo(argv.first()).fileName());
     if (known == flags.cend())
-        return;
+        return false;
     if (std::none_of(known->cbegin(), known->cend(), [&](const QString& f) { return argv.contains(f); }))
         argv.insert(1, known->first());
+    return true;
 }
 
 QStringList EditNamesSession::editorCommand(const QString& file, QString* error)
@@ -66,6 +71,10 @@ QStringList EditNamesSession::editorCommand(const QString& file, QString* error)
     if (editor.isEmpty())
         editor = qEnvironmentVariable("EDITOR");
     if (!editor.isEmpty()) {
+        // A GUI editor in $EDITOR opens its own window: no terminal around it.
+        QStringList argv = QProcess::splitCommand(editor);
+        if (addWaitFlag(argv))
+            return argv << file;
         QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
         if (terminal.isEmpty())
             terminal = DesktopApps::instance().defaultTerminal();
@@ -73,8 +82,6 @@ QStringList EditNamesSession::editorCommand(const QString& file, QString* error)
             *error = QObject::tr("No terminal found for $EDITOR. Set tools/terminal or tools/nameEditor.");
             return {};
         }
-        QStringList argv = QProcess::splitCommand(editor);
-        addWaitFlag(argv);
         return DesktopApps::terminalCommand(terminal, argv << file);
     }
     if (!QStandardPaths::findExecutable(QStringLiteral("kate")).isEmpty())

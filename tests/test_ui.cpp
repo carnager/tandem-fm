@@ -1504,6 +1504,24 @@ private slots:
         QCOMPARE(argv("zed"), QStringList({"zed", "--wait", "/t/names.txt"}));
         QCOMPARE(argv("kate -b"), QStringList({"kate", "-b", "/t/names.txt"}));  // not one of them
         QCOMPARE(argv("vim"), QStringList({"vim", "/t/names.txt"}));
+        // Names Arch packages use.
+        QCOMPARE(argv("zeditor"), QStringList({"zeditor", "--wait", "/t/names.txt"}));
+        QCOMPARE(argv("code-oss"), QStringList({"code-oss", "--wait", "/t/names.txt"}));
+        QCOMPARE(argv("vscodium"), QStringList({"vscodium", "--wait", "/t/names.txt"}));
+
+        // A GUI editor in $VISUAL runs without a terminal around it.
+        QSettings().remove("tools/nameEditor");
+        const QByteArray oldVisual = qgetenv("VISUAL");
+        const bool hadVisual = qEnvironmentVariableIsSet("VISUAL");
+        auto restoreVisual = qScopeGuard([&] {
+            if (hadVisual)
+                qputenv("VISUAL", oldVisual);
+            else
+                qunsetenv("VISUAL");
+        });
+        qputenv("VISUAL", "code");
+        QCOMPARE(EditNamesSession::editorCommand("/t/names.txt", &error),
+                 QStringList({"code", "--wait", "/t/names.txt"}));
     }
 
     void renameInTextEditor()
