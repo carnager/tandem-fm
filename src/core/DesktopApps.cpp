@@ -300,7 +300,35 @@ bool DesktopApps::setDefault(const QString& mime, const QString& appId, QString*
 QString DesktopApps::defaultTerminal() const
 {
     QMutexLocker lock(&m_mutex);
+#ifdef Q_OS_MACOS
+    if (m_terminal.isEmpty())
+        return QStringLiteral("Terminal");
+#endif
     return m_terminal;
+}
+
+QString DesktopApps::macTerminalApp(const QString& terminal)
+{
+#ifdef Q_OS_MACOS
+    const QStringList words = QProcess::splitCommand(terminal);
+    if (words.size() != 1)
+        return {};
+    const QString name = words.first();
+    if (name.endsWith(QLatin1String(".app")) && QFileInfo(name).isAbsolute())
+        return QFileInfo(name).isDir() ? name : QString();
+    if (name.contains(QLatin1Char('/')) || !QStandardPaths::findExecutable(name).isEmpty())
+        return {};
+    const QString bundle = name.endsWith(QLatin1String(".app")) ? name : name + QStringLiteral(".app");
+    for (const QString& dir : {QStringLiteral("/Applications"), QStringLiteral("/Applications/Utilities"),
+                               QStringLiteral("/System/Applications"), QStringLiteral("/System/Applications/Utilities"),
+                               QDir::homePath() + QStringLiteral("/Applications")}) {
+        if (QFileInfo(dir + QLatin1Char('/') + bundle).isDir())
+            return dir + QLatin1Char('/') + bundle;
+    }
+#else
+    Q_UNUSED(terminal)
+#endif
+    return {};
 }
 
 QList<QStringList> DesktopApps::commandLines(const QString& exec, const QStringList& paths)
@@ -349,6 +377,28 @@ QList<QStringList> DesktopApps::commandLines(const QString& exec, const QStringL
 
 QStringList DesktopApps::terminalCommand(const QString& terminal, const QStringList& command)
 {
+#ifdef Q_OS_MACOS
+    if (const QString app = macTerminalApp(terminal); !app.isEmpty()) {
+        // An app can't be given a command, but iTerm and Terminal run a
+        // .command file. It cds here, runs the command and marks its end
+        // (also when the window is closed), which this script waits for.
+        static const QString script = QStringLiteral(R"sh(app=$1; shift
+dir=$(mktemp -d "${TMPDIR:-/tmp}/tandem-terminal.XXXXXX") || exit 1
+q() { printf "'"; printf '%s' "$1" | sed "s/'/'\"'\"'/g"; printf "' "; }
+{
+  echo '#!/bin/sh'
+  echo "trap 'touch \"$dir/done\"' EXIT HUP INT TERM"
+  printf 'cd '; q "$PWD"; echo '|| exit 1'
+  for a; do q "$a"; done
+  echo
+} > "$dir/run.command" && chmod +x "$dir/run.command" || exit 1
+open -a "$app" "$dir/run.command" || { rm -rf "$dir"; exit 1; }
+while [ ! -e "$dir/done" ]; do sleep 0.2; done
+rm -rf "$dir")sh");
+        return QStringList{QStringLiteral("/bin/sh"), QStringLiteral("-c"), script, QStringLiteral("tandem-terminal"), app} +
+               command;
+    }
+#endif
     QStringList base = QProcess::splitCommand(terminal);
     if (base.isEmpty())
         return command;

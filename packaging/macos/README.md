@@ -33,6 +33,11 @@ notarized, so the first start needs a right click → Open.
 - The trash window opens the Trash in Finder; deleting to the trash and undo
   work as on Linux.
 - "Open terminal here" opens Terminal.app unless another terminal is set.
+  Settings › Tools › Terminal takes an app name such as `iTerm` (or a path
+  to a `.app`) as well as a command line such as `kitty`. An app opens on the
+  folder, and commands run with Ctrl+Enter or `$EDITOR` go into a `.command`
+  file the app runs; Tandem waits until it ends. Terminal and iTerm run such
+  files; other apps may not.
 - Not available: desktop notifications, the system keyring for SFTP passwords,
   ACL and file flag editing, "Open with" app lists (opening files with their
   default app works).

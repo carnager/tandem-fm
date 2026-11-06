@@ -3433,8 +3433,8 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Ein Terminal auf dem Server: ssh benutzen (Tandem öffnet dort noch keins)</translation>
     </message>
     <message>
-        <source>Could not open Terminal</source>
-        <translation>Terminal konnte nicht geöffnet werden</translation>
+        <source>Could not open %1</source>
+        <translation>%1 konnte nicht geöffnet werden</translation>
     </message>
     <message>
         <source>Create</source>

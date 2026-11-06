@@ -47,7 +47,12 @@ public:
     // argv that runs `command` inside `terminal`, using that terminal's own
     // convention (kitty/foot take the command directly, wezterm needs
     // "start --", gnome-terminal "--wait --", most others "-e").
+    // On macOS, an app such as "iTerm" or "Terminal" works too: the command
+    // goes into a .command script the app runs, and argv waits for it to end.
     static QStringList terminalCommand(const QString& terminal, const QStringList& command);
+    // macOS: the .app bundle a terminal setting names ("iTerm", "Terminal",
+    // "/Applications/Ghostty.app") when it isn't a program on PATH; else empty.
+    static QString macTerminalApp(const QString& terminal);
     // Builds argv lists for launching; one entry per process to start.
     static QList<QStringList> commandLines(const QString& exec, const QStringList& paths);
 

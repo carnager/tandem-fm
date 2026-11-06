@@ -3360,10 +3360,12 @@ void MainWindow::openTerminal(const QString& dir)
     if (active()->inArchive() && where.startsWith(active()->archivePath()))
         where = parentPath(active()->archivePath());  // the folder holding the archive
 #ifdef Q_OS_MACOS
-    if (QSettings().value(QStringLiteral("tools/terminal")).toString().isEmpty()) {
-        if (!launchDetached(QStringLiteral("/usr/bin/open"),
-                                     {QStringLiteral("-a"), QStringLiteral("Terminal"), where}))
-            active()->showMessage(tr("Could not open Terminal"), true);
+    // An app ("iTerm"; Terminal when nothing is set) opens on the folder.
+    const QString setting = QSettings().value(QStringLiteral("tools/terminal")).toString();
+    if (const QString app = DesktopApps::macTerminalApp(setting.isEmpty() ? QStringLiteral("Terminal") : setting);
+        !app.isEmpty()) {
+        if (!launchDetached(QStringLiteral("/usr/bin/open"), {QStringLiteral("-a"), app, where}))
+            active()->showMessage(tr("Could not open %1").arg(QFileInfo(app).completeBaseName()), true);
         return;
     }
 #endif

@@ -1,4 +1,6 @@
 #include "ui/SettingsDialog.h"
+
+#include "core/DesktopApps.h"
 #include "ui/OpenUrl.h"
 
 #include "ui/Keymap.h"
@@ -197,7 +199,7 @@ QComboBox* programBox(QWidget* parent, const QString& key, const QStringList& ca
     box->addItem(automatic, QString());
     for (const QString& c : candidates) {
         const QString program = c.section(QLatin1Char(' '), 0, 0);
-        if (!QStandardPaths::findExecutable(program).isEmpty())
+        if (!QStandardPaths::findExecutable(program).isEmpty() || !DesktopApps::macTerminalApp(c).isEmpty())
             box->addItem(c, c);
     }
     const QString current = QSettings().value(key).toString();
@@ -768,9 +770,15 @@ QWidget* SettingsDialog::toolsPage()
                 "e.g. \"kitty nvim\"."));
     page.add(tr("Terminal (Ctrl+Alt+T)"),
              programBox(this, QStringLiteral("tools/terminal"),
+#ifdef Q_OS_MACOS
+                        // Apps that open on a folder and run commands from a .command file;
+                        // a terminal's command line (kitty, wezterm) can be typed in too.
+                        {QStringLiteral("Terminal"), QStringLiteral("iTerm")},
+#else
                         {QStringLiteral("kitty"), QStringLiteral("alacritty"), QStringLiteral("foot"), QStringLiteral("wezterm"),
                          QStringLiteral("ghostty"), QStringLiteral("konsole"), QStringLiteral("gnome-terminal"),
                          QStringLiteral("xfce4-terminal"), QStringLiteral("tilix"), QStringLiteral("xterm")},
+#endif
                         tr("Found automatically")),
              tr("Also used for commands run with Ctrl+Enter and for $EDITOR."));
     page.add(tr("Comparing two files"),

@@ -412,6 +412,47 @@ private slots:
                  QStringList({"kitty", "--class", "x", "nvim", "/tmp/f"}));
     }
 
+    // macOS: an app ("iTerm", "Terminal") is a terminal too. The command goes
+    // into a .command file the app runs; here a stand-in `open` runs it.
+    void macTerminalApps()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("macOS only");
+#else
+        QCOMPARE(DesktopApps::macTerminalApp("Terminal"), QString("/System/Applications/Utilities/Terminal.app"));
+        QCOMPARE(DesktopApps::macTerminalApp("/System/Applications/Utilities/Terminal.app"),
+                 QString("/System/Applications/Utilities/Terminal.app"));
+        QVERIFY(DesktopApps::macTerminalApp("sh").isEmpty());  // a program: used as before
+        QVERIFY(DesktopApps::macTerminalApp("Terminal -x").isEmpty());
+        QVERIFY(DesktopApps::macTerminalApp("NoSuchTerminalApp").isEmpty());
+        QCOMPARE(DesktopApps::terminalCommand("sh", {"true"}), QStringList({"sh", "-e", "true"}));
+
+        QTemporaryDir temp;
+        const QString bin = temp.filePath("bin"), work = temp.filePath("it's here");
+        QVERIFY(QDir().mkpath(bin) && QDir().mkpath(work));
+        // open -a APP FILE: check the app, then run the file the way the app would.
+        writeFile(bin + "/open", "#!/bin/sh\n[ \"$2\" = /System/Applications/Utilities/Terminal.app ] || exit 9\n"
+                                 "(sleep 0.3; cd /; \"$3\") &\n");
+        QFile::setPermissions(bin + "/open", QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+        QStringList argv = DesktopApps::terminalCommand(
+            "Terminal", {"sh", "-c", "pwd > out; printf '%s|' \"$@\" >> out", "x", "a b", "it's", "$HOME"});
+        QProcess p;
+        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+        env.insert("PATH", bin + ":" + env.value("PATH"));
+        p.setProcessEnvironment(env);
+        p.setWorkingDirectory(work);
+        p.start(argv.takeFirst(), argv);
+        QVERIFY(p.waitForFinished(10000));
+        QCOMPARE(p.exitCode(), 0);
+        // It waited for the command: its output is there, the script is gone.
+        QFile out(work + "/out");
+        QVERIFY(out.open(QIODevice::ReadOnly));
+        QCOMPARE(QString::fromUtf8(out.readAll()),
+                 QDir(work).canonicalPath() + "\na b|it's|$HOME|");
+        QVERIFY(QDir(QDir::tempPath()).entryList({"tandem-terminal.*"}, QDir::Dirs).isEmpty());
+#endif
+    }
+
     void defaultAppFromMimeappsList()
     {
         QTemporaryDir tmp;
