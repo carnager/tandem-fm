@@ -124,6 +124,9 @@ if(APPLE)
   set_property(TARGET tandem_ui PROPERTY OBJCXX_STANDARD 20)
   target_sources(tandem_ui PRIVATE src/ui/MacFileIcons.h src/ui/MacFileIcons.cpp src/ui/MacFileIconProvider.mm)
   set_source_files_properties(src/ui/MacFileIconProvider.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  # "Open with" lists the apps Launch Services offers, as Finder does.
+  target_sources(tandem_ui PRIVATE src/ui/MacOpenWith.h src/ui/MacOpenWith.mm)
+  set_source_files_properties(src/ui/MacOpenWith.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   # SMB shares are mounted through NetFS, like Finder does.
   target_sources(tandem_ui PRIVATE src/ui/MacSmb.h src/ui/MacSmb.cpp)
   set_source_files_properties(src/ui/MacSmb.cpp PROPERTIES COMPILE_OPTIONS "-fblocks")

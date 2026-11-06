@@ -28,6 +28,7 @@ class QTimer;
 namespace tandem {
 
 class JobManager;
+struct MacApp;
 class ViewerWindow;
 class JobsPanel;
 class Panel;
@@ -84,6 +85,9 @@ private:
     void showShortcuts();
     void showContextMenu(Panel* panel, const QPoint& pos, bool onItem);
     void addOpenWithMenu(QMenu* menu, const QStringList& paths);
+#ifdef Q_OS_MACOS
+    void openWithMacApp(const MacApp& app, const QStringList& paths);
+#endif
     void openWithPicker();
     void fillBookmarksMenu(QMenu* menu);
     void setupKeymap();

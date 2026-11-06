@@ -3361,6 +3361,10 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>%1 konnte nicht gestartet werden</translation>
     </message>
     <message>
+        <source>Could not start %1: %2</source>
+        <translation>%1 konnte nicht gestartet werden: %2</translation>
+    </message>
+    <message>
         <source>No registered applications</source>
         <translation>Keine registrierten Anwendungen</translation>
     </message>

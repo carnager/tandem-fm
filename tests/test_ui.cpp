@@ -2491,6 +2491,45 @@ private slots:
         QTest::keyClick(edit, Qt::Key_Escape);
         QTRY_VERIFY(!visiblePopup());
 
+        // Plugin actions for these files are offered too, and only those.
+        const QString dir = pluginsFolder() + "/open-with-actions";
+        QVERIFY(QDir().mkpath(dir));
+        auto cleanup = qScopeGuard([&] {
+            QDir(dir).removeRecursively();
+            QSettings().remove("plugins/open-with-actions");
+            leftModel()->markAll(false);
+        });
+        writeFile(dir + "/plugin.json",
+                  "{\"name\": \"Open with actions\", \"actions\": ["
+                  "{\"title\": \"Text action\", \"types\": [\"*.txt\"], \"run\": [\"sh\", \"-c\", "
+                  "\"echo '{\\\"select\\\": [\\\"file1.txt\\\"]}'\"]},"
+                  "{\"title\": \"PDF action\", \"types\": [\"*.pdf\"], \"run\": \"true\"}]}");
+        for (const Plugin& plugin : discoverPlugins())
+            if (plugin.id == "open-with-actions")
+                setPluginEnabled(plugin, true);
+        {
+            SettingsDialog settings(m_window.get());
+            for (auto* b : settings.findChildren<QPushButton*>())
+                if (b->text() == "Reload")
+                    b->click();
+        }
+        QTRY_VERIFY(std::any_of(m_window->actions().cbegin(), m_window->actions().cend(), [](QAction* a) {
+            return a->property("commandId").toString() == "plugin-open-with-actions-text-action";
+        }));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_Return, Qt::ShiftModifier);
+        QTRY_VERIFY((popup = visiblePopup()));
+        edit = qobject_cast<QLineEdit*>(QApplication::focusWidget());
+        QVERIFY(edit);
+        QTest::keyClicks(edit, "PDF action");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->title.startsWith("Run"));
+        edit->clear();
+        QTest::keyClicks(edit, "Text action");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->title == "Text action");
+        QCOMPARE(popup->currentItem()->subtitle, QString("Open with actions"));
+        QTest::keyClick(edit, Qt::Key_Return);
+        QTRY_VERIFY(leftModel()->markedNames().contains("file1.txt"));
+
         m_left->setVimKeys(true);
         auto off = qScopeGuard([this] { m_left->setVimKeys(false); });
         m_left->view()->setFocus();

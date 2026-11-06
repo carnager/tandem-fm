@@ -5,6 +5,9 @@ run on the selected files or the shown folder. The programs can be anything:
 shell scripts, Python, a tool you already have. Each action becomes a Tandem
 command: it appears in the context menu, under Tools › Plugins, in the
 command palette (Ctrl+Shift+P) and on the Keys page, where it can get a key.
+Actions for the selected files are also offered in **Open with** (Shift+Enter),
+after the applications: with `"types": ["*.pdf"]`, an action such as "Open in
+my PDF tool" sits next to the apps for PDF files.
 
 ## Where plugins live
 
