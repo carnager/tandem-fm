@@ -1649,6 +1649,7 @@ private slots:
         QVERIFY(popup);
 
         // Palette: run "Show hidden files" by typing a few letters.
+        QSettings().remove("palette/recent");
         QAction* hidden = nullptr;
         for (QAction* a : m_window->actions())
             if (a->text() == QObject::tr("Show hidden files"))
@@ -1664,6 +1665,33 @@ private slots:
         QCOMPARE(hidden->isChecked(), !before);
         hidden->trigger();  // back to how it was
         QTRY_COMPARE(hidden->isChecked(), before);
+
+        // Used lately: on top of the empty palette, and first among similar
+        // matches while typing.
+        auto* model = qobject_cast<PopupModel*>(popup->findChild<QListView*>()->model());
+        QVERIFY(model);
+        auto openPalette = [&] {
+            m_left->view()->setFocus();
+            QTest::keyClick(m_left->view(), Qt::Key_P, Qt::ControlModifier | Qt::ShiftModifier);
+            QTRY_VERIFY(popup->isVisible());
+        };
+        openPalette();
+        QVERIFY(popup->currentItem()->title.startsWith(QObject::tr("Show hidden files")));
+        QCOMPARE(model->header(0), QObject::tr("Recently used"));
+        QTest::keyClicks(QApplication::focusWidget(), "zoom");
+        QTRY_COMPARE(popup->currentItem()->title, QObject::tr("Zoom in"));  // by name
+        QTest::keyClicks(QApplication::focusWidget(), " out");
+        QTRY_COMPARE(popup->currentItem()->title, QObject::tr("Zoom out"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_VERIFY(!popup->isVisible());
+        m_left->zoomBy(0);
+        openPalette();
+        QCOMPARE(popup->currentItem()->title, QObject::tr("Zoom out"));
+        QTest::keyClicks(QApplication::focusWidget(), "zoom");
+        QTRY_COMPARE(popup->currentItem()->title, QObject::tr("Zoom out"));  // used lately
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+        QTRY_VERIFY(!popup->isVisible());
+        QSettings().remove("palette/recent");
 
         // Jump: visited folders are offered; Enter goes there. Ctrl+J in the
         // palette switches to it, keeping what was typed.

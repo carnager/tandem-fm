@@ -2903,6 +2903,10 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>  (aus)</translation>
     </message>
     <message>
+        <source>Recently used</source>
+        <translation>Zuletzt benutzt</translation>
+    </message>
+    <message>
         <source>Enter: run or open</source>
         <translation>Enter: ausführen oder öffnen</translation>
     </message>
