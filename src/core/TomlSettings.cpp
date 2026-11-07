@@ -249,7 +249,7 @@ bool isStateKey(const QString& key)
         QStringLiteral("view/previewWidth"),   QStringLiteral("view/rows2"),
         QStringLiteral("network/recent"),      QStringLiteral("commands/history"),
         QStringLiteral("checksums/algo"),      QStringLiteral("links/kind"),
-        QStringLiteral("window/splitter"),
+        QStringLiteral("window/splitter"),     QStringLiteral("palette/recent"),
     };
     static const QStringList groups = {
         QStringLiteral("left/"), QStringLiteral("right/"), QStringLiteral("plugins/"),

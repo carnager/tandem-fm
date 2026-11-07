@@ -1842,9 +1842,27 @@ QWidget* MainWindow::createTopBar(QWidget* parent)
 
 // One search for everything: commands, the folders you go to, the files
 // in the shown folder. As a drop-down under the field when it's there.
+// Commands run from the palette, most recent first (state.toml).
+static constexpr int kRecentCommands = 20;
+static constexpr int kRecentShown = 5;  // on top of the empty palette
+
+static void rememberCommand(const QString& id)
+{
+    if (id.isEmpty())
+        return;
+    QSettings settings;
+    QStringList recent = settings.value(QStringLiteral("palette/recent")).toStringList();
+    recent.removeAll(id);
+    recent.prepend(id);
+    if (recent.size() > kRecentCommands)
+        recent.resize(kRecentCommands);
+    settings.setValue(QStringLiteral("palette/recent"), recent);
+}
+
 void MainWindow::commandPalette()
 {
     QList<PopupItem> items;
+    const QStringList recent = QSettings().value(QStringLiteral("palette/recent")).toStringList();
     for (QAction* a : actions()) {
         if (a->text().isEmpty() || !a->isEnabled() || a->menu())
             continue;
@@ -1861,18 +1879,31 @@ void MainWindow::commandPalette()
         it.subtitle = a->property("category").toString();
         it.hint = hint;
         it.icon = a->icon();
+        it.key = a->property("commandId").toString();
+        // Used lately: a nudge while typing, enough to win among similar
+        // matches (Zoom in / Zoom out) but not against a clearly better one.
+        if (const int at = int(recent.indexOf(it.key)); at >= 0 && !it.key.isEmpty())
+            it.bonus = 2 * (kRecentCommands - at);
         QPointer<QAction> action(a);
-        it.run = [action] {
+        it.run = [action, id = it.key] {
+            rememberCommand(id);
             if (action)
                 action->trigger();
         };
         items.append(it);
     }
-    std::sort(items.begin(), items.end(), [](const PopupItem& a, const PopupItem& b) {
+    // The last few used on top, then all of them by name.
+    auto rank = [&](const PopupItem& it) {
+        const int at = it.key.isEmpty() ? -1 : int(recent.indexOf(it.key));
+        return at >= 0 && at < kRecentShown ? at : kRecentShown;
+    };
+    std::sort(items.begin(), items.end(), [&](const PopupItem& a, const PopupItem& b) {
+        if (rank(a) != rank(b))
+            return rank(a) < rank(b);
         return QString::compare(a.title, b.title, Qt::CaseInsensitive) < 0;
     });
     for (PopupItem& it : items)
-        it.section = tr("Commands");
+        it.section = rank(it) < kRecentShown ? tr("Recently used") : tr("Commands");
     for (PopupItem it : folderItems()) {
         it.section = tr("Folders");
         items.append(it);
