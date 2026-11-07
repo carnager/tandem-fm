@@ -2755,6 +2755,120 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // F3 as a quick view: follows the panel (keys and clicks), N / P move the
+    // panel's cursor, "same type only" keeps to pictures.
+    void viewerFollowsPanel()
+    {
+        QVERIFY(QDir().mkpath(L("follow/sub")));
+        QImage img(16, 16, QImage::Format_RGB32);
+        img.fill(Qt::red);
+        QVERIFY(img.save(L("follow/a.jpg"), "JPG"));
+        writeFile(L("follow/b.txt"), "bee");
+        QVERIFY(img.save(L("follow/c.png"), "PNG"));
+        writeFile(L("follow/d.txt"), "dee");
+        m_left->navigate(L("follow"));
+        QTRY_COMPARE(leftModel()->path(), L("follow"));
+        QTRY_VERIFY(!m_left->tab()->isLoading());
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "a.jpg");
+        QTest::keyClick(m_left->view(), Qt::Key_F3);
+        auto viewers = [&] {
+            QList<ViewerWindow*> out;
+            for (ViewerWindow* w : m_window->findChildren<ViewerWindow*>())
+                if (w->isWindow())
+                    out.append(w);
+            return out;
+        };
+        QTRY_COMPARE(viewers().size(), 1);
+        ViewerWindow* v = viewers().first();
+        v->setSameKindOnly(false);
+        QTRY_COMPARE(v->currentPath(), L("follow/a.jpg"));
+
+        // The cursor moves in Tandem: the viewer shows that file.
+        moveCursorTo(m_left, "b.txt");
+        QTRY_COMPARE(v->currentPath(), L("follow/b.txt"));
+        QTRY_COMPARE(v->textEdit()->toPlainText(), QString("bee"));
+        // A click on a file, too; a folder keeps the last file.
+        FileView* view = m_left->view();
+        const QRect rect = view->visualRect(leftModel()->index(leftModel()->rowOf("c.png"), 0));
+        QTest::mouseClick(view->viewport(), Qt::LeftButton, {}, rect.center());
+        QTRY_COMPARE(v->currentPath(), L("follow/c.png"));
+        moveCursorTo(m_left, "sub");
+        QTest::qWait(300);
+        QCOMPARE(v->currentPath(), L("follow/c.png"));
+
+        // N / P step from the panel's cursor and move it.
+        moveCursorTo(m_left, "c.png");
+        v->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(v));
+        QTest::keyClick(v, Qt::Key_N);
+        QTRY_COMPARE(v->currentPath(), L("follow/d.txt"));
+        QCOMPARE(m_left->currentPath(), L("follow/d.txt"));
+        QTest::keyClick(v, Qt::Key_P);
+        QTRY_COMPARE(v->currentPath(), L("follow/c.png"));
+        QCOMPARE(m_left->currentPath(), L("follow/c.png"));
+
+        // The panel's keys work in the viewer: ↓ / ↑ (also with a text file
+        // focused), and j / k with modal keys.
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Down);
+        QTRY_COMPARE(v->currentPath(), L("follow/d.txt"));
+        QTRY_COMPARE(v->textEdit()->toPlainText(), QString("dee"));
+        QVERIFY(v->isAncestorOf(QApplication::focusWidget()));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Up);
+        QTRY_COMPARE(m_left->currentPath(), L("follow/c.png"));
+        QTRY_COMPARE(v->currentPath(), L("follow/c.png"));
+        m_left->view()->setVimKeys(true);
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_J);
+        QTRY_COMPARE(v->currentPath(), L("follow/d.txt"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_K);
+        QTRY_COMPARE(v->currentPath(), L("follow/c.png"));
+        m_left->view()->setVimKeys(false);
+
+        // Same type only: from c.png back to a.jpg, past b.txt; nothing after c.png.
+        QTest::keyClick(v, Qt::Key_T);
+        QVERIFY(v->sameKindOnly());
+        QTest::keyClick(v, Qt::Key_P);
+        QTRY_COMPARE(v->currentPath(), L("follow/a.jpg"));
+        QCOMPARE(m_left->currentPath(), L("follow/a.jpg"));
+        QTest::keyClick(v, Qt::Key_N);
+        QTRY_COMPARE(v->currentPath(), L("follow/c.png"));
+        QTest::keyClick(v, Qt::Key_N);
+        QTest::qWait(200);
+        QCOMPARE(v->currentPath(), L("follow/c.png"));
+        QCOMPARE(ViewerWindow::kindOf("x.webp"), QString("image"));
+        QCOMPARE(ViewerWindow::kindOf("x.pdf"), QString("application/pdf"));
+
+        // Typing in the find bar is typing, not stepping.
+        moveCursorTo(m_left, "b.txt");
+        QTRY_COMPARE(v->currentPath(), L("follow/b.txt"));
+        QTest::keyClick(v, Qt::Key_F7);
+        QLineEdit* find = v->findChild<QLineEdit*>();
+        QTRY_VERIFY(find && find->hasFocus());
+        QTest::keyClicks(find, "a b");
+        QTest::keyClick(find, Qt::Key_Backspace);
+        QCOMPARE(find->text(), QString("a "));
+        QCOMPARE(v->currentPath(), L("follow/b.txt"));
+        v->setSameKindOnly(false);
+
+        // F3 again reuses the window.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "d.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_F3);
+        QTRY_COMPARE(v->currentPath(), L("follow/d.txt"));
+        QCOMPARE(viewers().size(), 1);
+        v->close();
+        QTRY_COMPARE(viewers().size(), 0);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_left->view()->setFocus();
+    }
+
     void quickView()
     {
         QVERIFY(QDir().mkpath(L("qv")));

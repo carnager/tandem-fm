@@ -13,6 +13,7 @@
 
 #include <QHash>
 #include <QMainWindow>
+#include <QPointer>
 #include <QUrl>
 
 #include <functional>
@@ -205,6 +206,12 @@ private:
     ViewerWindow* m_quickView = nullptr;   // the preview (left one in "each" mode)
     ViewerWindow* m_quickView2 = nullptr;  // the right panel's own preview in "each" mode
     QTimer* m_quickTimer = nullptr;
+    // F3's window, linked to the panel it came from: shows that panel's cursor.
+    QPointer<ViewerWindow> m_viewer;
+    QPointer<Panel> m_viewerPanel;
+    bool stepViewer(int direction, bool sameKind);
+    void followInViewer();
+    bool movesViewerPanel(const QKeyEvent* e) const;
     double m_panelRatio = 0.5;  // left panel's share of the two panels
     QList<IconTheme> m_iconThemes;
     bool m_iconThemesLoaded = false;

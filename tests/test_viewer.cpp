@@ -4,6 +4,7 @@
 #include "ui/Theme.h"
 #include "ui/viewer/ByteViews.h"
 #include "ui/viewer/ImageView.h"
+#include "ui/viewer/MediaControls.h"
 #include "ui/viewer/ViewerWindow.h"
 
 #include <QApplication>
@@ -20,6 +21,7 @@
 #include <QImage>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QSettings>
 #include <QSignalSpy>
 #include <QTextBlock>
 #include <QTextLayout>
@@ -252,6 +254,42 @@ private slots:
         auto a = open({P("tone.mp3")});
         QCOMPARE(a->kind(), PreviewKind::Audio);
         QTRY_VERIFY_WITH_TIMEOUT(a->richInfo().contains("Tandem — Tone"), 15000);
+    }
+
+    // Videos and music play in the viewer, but only when asked to (or with autoplay).
+    void playback()
+    {
+        if (!MediaControls::available())
+            QSKIP("built without Qt Multimedia");
+        if (!QFile::exists(P("clip.mp4")))
+            QSKIP("needs ffmpeg for the test video");
+        QSettings().setValue("viewer/autoplay", false);
+        auto v = open({P("clip.mp4"), P("hello.cpp")});
+        MediaControls* media = v->mediaControls();
+        QTRY_VERIFY(media->isVisible());
+        QCOMPARE(media->source(), P("clip.mp4"));
+        QVERIFY(!media->hasPlayer());  // nothing plays (or loads) by itself
+        QTest::keyClick(v.get(), Qt::Key_M);  // tests stay quiet
+        QSignalSpy frames(media, &MediaControls::frame);
+        QTest::keyClick(v.get(), Qt::Key_Space);
+        QVERIFY(media->hasPlayer());
+        QTRY_VERIFY_WITH_TIMEOUT(!frames.isEmpty(), 15000);
+        QTRY_COMPARE(v->imageView()->image().size(), QSize(320, 240));
+        QTest::keyClick(v.get(), Qt::Key_Space);
+        QTRY_VERIFY(!media->isPlaying());
+
+        // The next file stops it; a text file has no player bar.
+        QTest::keyClick(v.get(), Qt::Key_N);
+        QTRY_COMPARE(v->currentPath(), P("hello.cpp"));
+        QVERIFY(!media->hasPlayer());
+        QVERIFY(!media->isVisible());
+
+        // With autoplay on, it starts by itself.
+        QSettings().setValue("viewer/autoplay", true);
+        auto w = open({P("clip.mp4")});
+        QTRY_VERIFY_WITH_TIMEOUT(w->mediaControls()->hasPlayer(), 15000);
+        QSettings().setValue("viewer/autoplay", false);
+        w->mediaControls()->toggleMute();  // back to sound on
     }
 
     void fontSample()

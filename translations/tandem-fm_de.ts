@@ -3565,6 +3565,25 @@ F3 lädt es herunter und öffnet es</translation>
     </message>
 </context>
 <context>
+    <name>tandem::MediaControls</name>
+    <message>
+        <source>Play / pause (Space)</source>
+        <translation>Abspielen / anhalten (Leertaste)</translation>
+    </message>
+    <message>
+        <source>Position (← / → jump 5 seconds)</source>
+        <translation>Position (← / →: 5 Sekunden springen)</translation>
+    </message>
+    <message>
+        <source>Sound on / off (M)</source>
+        <translation>Ton an / aus (M)</translation>
+    </message>
+    <message>
+        <source>Cannot play this file</source>
+        <translation>Diese Datei lässt sich nicht abspielen</translation>
+    </message>
+</context>
+<context>
     <name>tandem::MultiRenameDialog</name>
     <message>
         <source>Match case</source>
@@ -5014,6 +5033,14 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Oberflächengröße</translation>
     </message>
     <message>
+        <source>Play videos and music right away</source>
+        <translation>Videos und Musik sofort abspielen</translation>
+    </message>
+    <message>
+        <source>Otherwise they start with Space or the play button, in the viewer and the preview.</source>
+        <translation>Sonst starten sie mit der Leertaste oder dem Abspielknopf, im Betrachter und in der Vorschau.</translation>
+    </message>
+    <message>
         <source>Dates</source>
         <translation>Datum</translation>
     </message>
@@ -5709,6 +5736,22 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Suchen (Enter / F3: weiter, Shift+F3: zurück, Esc: schließen)</translation>
     </message>
     <message>
+        <source>Same type only</source>
+        <translation>Nur gleicher Typ</translation>
+    </message>
+    <message>
+        <source>N / P skip files of other types: pictures stay with pictures (T)</source>
+        <translation>N / P überspringen Dateien anderen Typs: Bilder bleiben bei Bildern (T)</translation>
+    </message>
+    <message>
+        <source>No more files of this type</source>
+        <translation>Keine weiteren Dateien dieses Typs</translation>
+    </message>
+    <message>
+        <source>No more files</source>
+        <translation>Keine weiteren Dateien</translation>
+    </message>
+    <message>
         <source>Loading…</source>
         <translation>Wird geladen…</translation>
     </message>
@@ -5773,8 +5816,20 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Offset %1</translation>
     </message>
     <message>
-        <source>        N / P: next / previous file   1 / 3 / 4: text / hex / image   F7: find</source>
-        <translation>        N / P: nächste / vorherige Datei   1 / 3 / 4: Text / Hex / Bild   F7: suchen</translation>
+        <source>        Space: play / pause   ← / →: 5 seconds   M: sound   %1: next / previous file   T: same type only</source>
+        <translation>        Leertaste: abspielen / anhalten   ← / →: 5 Sekunden   M: Ton   %1: nächste / vorige Datei   T: nur gleicher Typ</translation>
+    </message>
+    <message>
+        <source>        %1: next / previous file   T: same type only   1 / 3 / 4: text / hex / image   F7: find</source>
+        <translation>        %1: nächste / vorige Datei   T: nur gleicher Typ   1 / 3 / 4: Text / Hex / Bild   F7: suchen</translation>
+    </message>
+    <message>
+        <source>↑ / ↓, N / P</source>
+        <translation>↑ / ↓, N / P</translation>
+    </message>
+    <message>
+        <source>N / P</source>
+        <translation>N / P</translation>
     </message>
     <message>
         <source>wrapped</source>

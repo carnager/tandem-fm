@@ -94,7 +94,7 @@ tandem-fm ~/Projects ~/Downloads
 | Enter / Backspace | Open the current item / go to the parent folder |
 | Insert / Space | Mark or unmark an item |
 | Shift+↑/↓/PgUp/PgDn/Home/End | Mark (or unmark) the files the cursor passes over |
-| F3 / F4 | View / edit |
+| F3 / F4 | View / edit; the viewer follows the cursor, ↑ / ↓ (j / k) and N / P step through the folder, T keeps to the same type, Space plays videos and music |
 | F5 / F6 | Copy / move to the other panel |
 | F7 / F8 | New folder / move to trash |
 | F2, Shift+F6 | Rename |
@@ -176,6 +176,7 @@ found at build time:
 | libsecret | Server passwords in the desktop keyring |
 | libacl | POSIX ACL editing on Linux |
 | KSyntaxHighlighting for Qt 6 | Syntax highlighting in the viewer |
+| Qt Multimedia (with its FFmpeg backend at runtime) | Playing videos and music in the viewer and preview |
 | Qt Linguist tools | Compiled translations and translation updates |
 
 At runtime, `fd` speeds up filename search, `rg` handles content search,

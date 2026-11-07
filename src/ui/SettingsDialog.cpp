@@ -8,6 +8,7 @@
 #include "ui/FileModel.h"
 #include "ui/FileView.h"
 #include "ui/IconCache.h"
+#include "ui/viewer/MediaControls.h"
 #include "ui/MainWindow.h"
 #include "ui/Panel.h"
 #include "ui/Theme.h"
@@ -459,6 +460,14 @@ QWidget* SettingsDialog::appearancePage()
              segments(this, {{QStringLiteral("each"), tr("Below each panel")}, {QStringLiteral("bottom"), tr("Below both")},
                              {QStringLiteral("right"), tr("On the right")}},
                       m_window->previewMode(), [this](const QString& code) { m_window->setPreviewPosition(code); }));
+    if (MediaControls::available()) {
+        auto* autoplay = new QCheckBox(tr("Play videos and music right away"), this);
+        autoplay->setObjectName(QStringLiteral("autoplay"));
+        autoplay->setChecked(MediaControls::autoplay());
+        connect(autoplay, &QCheckBox::toggled, this,
+                [](bool on) { QSettings().setValue(QStringLiteral("viewer/autoplay"), on); });
+        page.add(QString(), autoplay, tr("Otherwise they start with Space or the play button, in the viewer and the preview."));
+    }
 
     auto toggle = [this](const QString& text, QAction* action) {
         auto* box = new QCheckBox(text, this);

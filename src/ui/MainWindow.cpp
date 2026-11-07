@@ -69,6 +69,8 @@
 #include <QFileSystemWatcher>
 #include <QHBoxLayout>
 #include <QInputDialog>
+#include <QKeyEvent>
+#include <QLineEdit>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
@@ -207,7 +209,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
             other()->view()->setFocus();
         });
         connect(p, &Panel::cursorChanged, this, [this](Panel* panel) {
-            if (m_quickView && (m_quickView2 || panel == active()))
+            if ((m_quickView && (m_quickView2 || panel == active())) || (m_viewer && panel == m_viewerPanel))
                 m_quickTimer->start();
         });
         connect(p, &Panel::openFileRequested, this, [this, p](const QString& path) { openFrom(p, path); });
@@ -1036,7 +1038,37 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* e)
 {
     if (e->type() == QEvent::MouseButtonPress && obj->isWidgetType() && (m_quickView || m_quickView2))
         returnFocusFromPreview(static_cast<QWidget*>(obj));
+    // In the F3 viewer, the panel's up / down keys move through the files,
+    // as if the panel had the keys. The find bar keeps its typing.
+    if ((e->type() == QEvent::KeyPress || e->type() == QEvent::ShortcutOverride) && m_viewer && m_viewerPanel &&
+        obj->isWidgetType()) {
+        auto* w = static_cast<QWidget*>(obj);
+        auto* ke = static_cast<QKeyEvent*>(e);
+        if ((w == m_viewer || m_viewer->isAncestorOf(w)) && !qobject_cast<QLineEdit*>(w) && movesViewerPanel(ke)) {
+            if (e->type() == QEvent::ShortcutOverride) {
+                e->accept();  // not the viewer's own j / k
+                return true;
+            }
+            QKeyEvent copy(QEvent::KeyPress, ke->key(), ke->modifiers(), ke->text(), ke->isAutoRepeat());
+            QCoreApplication::sendEvent(m_viewerPanel->view(), &copy);
+            return true;
+        }
+    }
     return QMainWindow::eventFilter(obj, e);
+}
+
+bool MainWindow::movesViewerPanel(const QKeyEvent* e) const
+{
+    const Qt::KeyboardModifiers mods = e->modifiers() & ~Qt::KeypadModifier;
+    if (!mods && (e->key() == Qt::Key_Up || e->key() == Qt::Key_Down))
+        return true;
+    if (!m_viewerPanel->view()->vimKeys())
+        return false;
+    const QString token = Keymap::tokenFor(e);
+    for (const Keymap::Binding& b : Keymap::instance().modalBindings())
+        if (b.sequence == QStringList{token} && (b.action == QLatin1String("down") || b.action == QLatin1String("up")))
+            return true;
+    return false;
 }
 
 // --------------------------------------------------------------- commands
@@ -1341,20 +1373,53 @@ void MainWindow::viewCurrent()
         });
         return;
     }
-    // The viewer can step through all files of the folder with N / P.
-    QStringList files;
-    int index = 0;
-    const FileModel* m = p->tab()->model();
-    for (int r = 0; r < m->count(); ++r) {
-        const FileEntry* f = m->entry(r);
-        if (f->isDir)
-            continue;
-        if (f == e)
-            index = int(files.size());
-        files.append(m->filePath(r));
+    // A quick view: one window that follows this panel's cursor, also when
+    // clicking around in Tandem; N / P move the cursor. F3 again reuses it.
+    m_viewerPanel = p;
+    if (m_viewer) {
+        if (m_viewer->currentPath() != p->currentPath())
+            m_viewer->showFile(p->currentPath());
+        m_viewer->raise();
+        m_viewer->activateWindow();
+        return;
     }
-    auto* viewer = new ViewerWindow(files, index, this);
-    viewer->show();
+    m_viewer = new ViewerWindow({p->currentPath()}, 0, this);
+    m_viewer->setStepHandler([this](int direction, bool sameKind) { return stepViewer(direction, sameKind); });
+    m_viewer->show();
+}
+
+// The linked viewer's N / P: the next file in the panel, from its cursor.
+bool MainWindow::stepViewer(int direction, bool sameKind)
+{
+    Panel* p = m_viewerPanel;
+    if (!m_viewer || !p || !p->tab() || p->inArchive() || p->isRemote())
+        return false;
+    const FileModel* m = p->tab()->model();
+    const QString kind = sameKind ? ViewerWindow::kindOf(m_viewer->currentPath()) : QString();
+    for (int r = p->view()->currentRow() + direction; r >= 0 && r < m->count(); r += direction) {
+        const FileEntry* f = m->entry(r);
+        if (!f || f->isDir || f->isParent || (sameKind && ViewerWindow::kindOf(f->name) != kind))
+            continue;
+        p->view()->setCurrentRow(r);
+        m_viewer->showFile(m->filePath(r));  // now, not after the cursor's delay
+        return true;
+    }
+    return false;
+}
+
+// The linked viewer shows the file under its panel's cursor; on a folder it
+// keeps the last file.
+void MainWindow::followInViewer()
+{
+    Panel* p = m_viewerPanel;
+    if (!m_viewer || !p || p->inArchive() || p->isRemote())
+        return;
+    const FileEntry* e = p->currentEntry();
+    if (!e || e->isDir || e->isParent)
+        return;
+    const QString path = p->currentPath();
+    if (m_viewer->currentPath() != path)
+        m_viewer->showFile(path);
 }
 
 void MainWindow::editCurrent()
@@ -1643,6 +1708,7 @@ QList<ViewerAction> MainWindow::previewActions(Panel* p, const FileEntry& e)
 
 void MainWindow::updateQuickView()
 {
+    followInViewer();
     if (m_quickView2) {  // each panel previews its own cursor
         updatePreviewFor(m_quickView, m_left);
         updatePreviewFor(m_quickView2, m_right);
