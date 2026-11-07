@@ -2170,16 +2170,14 @@ private slots:
         QCOMPARE(s.used(), QList<int>({2}));
         QCOMPARE(s.lastUsed(), 2);
         QCOMPARE(QSettings().value("shelves/2").toStringList(), s.items(2));
-        s.replace(2, {"/b/y"}, {"/d/y"});
-        QCOMPARE(s.items(2), QStringList({"/a/x", "/d/y", "/c/z"}));
         s.remove(2, {"/a/x"});
-        QCOMPARE(s.items(2), QStringList({"/d/y", "/c/z"}));
+        QCOMPARE(s.items(2), QStringList({"/b/y", "/c/z"}));
         QCOMPARE(s.add(0, {"/q"}), 0);  // no shelf 0
         QCOMPARE(s.add(10, {"/q"}), 0);
         s.clear(2);
         QVERIFY(s.used().isEmpty());
         QVERIFY(!QSettings().contains("shelves/2"));
-        QCOMPARE(changed.count(), 5);
+        QCOMPARE(changed.count(), 4);
 
         // There used to be nine: what was on 5–9 moves onto an empty shelf,
         // then onto the last one, once.

@@ -3291,7 +3291,10 @@ private slots:
         QTRY_VERIFY(QFile::exists(L("shelved/one.txt")));
         QTRY_VERIFY(QFile::exists(L("shelved/two.txt")));
         QVERIFY(QFile::exists(L("shelf-src/one.txt")));  // copied, not moved
-        QCOMPARE(Shelves::instance().items(3).size(), 2);  // still on the shelf
+        QVERIFY(Shelves::instance().items(3).isEmpty());  // like a clipboard: pasted, gone
+        QTRY_VERIFY(!m_window->findChild<QToolButton*>("shelf-3"));
+        Shelves::instance().add(3, {L("shelf-src/one.txt"), L("shelf-src/two.txt")});
+        Shelves::instance().add(1, {});  // shelf 1 stays the one used last
 
         // Space looks inside: the shelf panel, on the last used shelf (1), with the keys.
         auto* panel = m_window->findChild<ShelfPanel*>();
@@ -3335,15 +3338,14 @@ private slots:
         QTRY_VERIFY(!panel->isVisible());
         QTRY_VERIFY(!m_window->findChild<QToolButton*>("shelf-3"));
 
-        // Shift with the digit moves; the shelf then holds the moved file.
+        // Shift with the digit moves; that empties the shelf too.
         m_left->view()->setFocus();
         QTest::keyClick(m_left->view(), Qt::Key_B, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY(chords->isChoosing());
         QTest::keyClick(chords, Qt::Key_1, Qt::ShiftModifier);
         QTRY_VERIFY(QFile::exists(L("shelved/zz-pic.jpg")));
         QTRY_VERIFY(!QFile::exists(L("shelf-src/zz-pic.jpg")));
-        QTRY_COMPARE(Shelves::instance().items(1), QStringList({L("shelved/zz-pic.jpg")}));
-        Shelves::instance().clear(1);
+        QVERIFY(Shelves::instance().items(1).isEmpty());
 
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());

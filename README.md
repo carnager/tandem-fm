@@ -103,7 +103,7 @@ tandem-fm ~/Projects ~/Downloads
 | Ctrl+F | Filter the current folder |
 | Alt+F7 | Search a local folder tree by name or file contents; results open in a new tab |
 | Ctrl+Shift+F | Filter as you type through all subfolders, in a new tab; results work like any folder |
-| Ctrl+B / Ctrl+Shift+B | Put the selection on shelf 1–4 / bring a shelf here: 1–4 copies, Shift+1–4 moves, Space looks inside (or click one at the bottom) |
+| Ctrl+B / Ctrl+Shift+B | Put the selection on shelf 1–4 / bring a shelf here, which empties it: 1–4 copies, Shift+1–4 moves, Space looks inside (or click one at the bottom) |
 | Ctrl+J | Jump to a visited folder |
 | Alt+W | Open a workspace, or save the open tabs as one |
 | Ctrl+Shift+P | Open the command palette |

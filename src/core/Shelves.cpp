@@ -112,20 +112,6 @@ void Shelves::remove(int shelf, const QStringList& paths)
         store(shelf, items);
 }
 
-void Shelves::replace(int shelf, const QStringList& from, const QStringList& to)
-{
-    if (shelf < 1 || shelf > kCount)
-        return;
-    QStringList items = m_items[shelf - 1];
-    for (int i = 0; i < from.size() && i < to.size(); ++i) {
-        const qsizetype at = items.indexOf(from[i]);
-        if (at >= 0)
-            items[at] = to[i];
-    }
-    if (items != m_items[shelf - 1])
-        store(shelf, items);
-}
-
 void Shelves::clear(int shelf)
 {
     if (shelf >= 1 && shelf <= kCount && !m_items[shelf - 1].isEmpty())

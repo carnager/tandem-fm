@@ -3840,14 +3840,8 @@ void MainWindow::takeFromShelf(int shelf, bool move)
         p->showMessage(tr("Shelf %1 is empty").arg(shelf), true);
         return;
     }
-    const QString dir = p->path();
-    putInto(paths, dir, move);
-    if (move) {  // they're here now
-        QStringList moved;
-        for (const QString& from : paths)
-            moved << joinPath(dir, baseName(from));
-        Shelves::instance().replace(shelf, paths, moved);
-    }
+    putInto(paths, p->path(), move);
+    Shelves::instance().remove(shelf, paths);  // like a clipboard: used up once pasted
 }
 
 QList<KeyChordPopup::Choice> MainWindow::shelfChoices() const
