@@ -23,7 +23,8 @@ and folders.*
 
 - **Get around quickly.** Tabs in each panel, clickable paths, quick search,
   filtering as you type, bookmarks on letter keys, and fuzzy search through
-  your visited folders. Save the tabs of both panels as a workspace and get
+  your visited folders. Pin a tab to keep it in its folder and across
+  workspaces. Save the tabs of both panels as a workspace and get
   them back with Alt+W. A command palette puts the rest within reach.
 - **Keep working during transfers.** Copy, move and delete in the background,
   with progress, pause, cancel and queues per drive. Undo supported local

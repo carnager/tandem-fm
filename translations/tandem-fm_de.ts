@@ -2555,6 +2555,10 @@
         <translation>&amp;Lesezeichen</translation>
     </message>
     <message>
+        <source>Pin or unpin tab</source>
+        <translation>Tab anheften oder lösen</translation>
+    </message>
+    <message>
         <source>Workspaces…</source>
         <translation>Arbeitsbereiche…</translation>
     </message>
@@ -3970,6 +3974,38 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>words or *.ext — Alt+S with subfolders, Esc clears, Enter/↓ back to the list</source>
         <translation>Wörter oder *.ext – Alt+S mit Unterordnern, Esc leert, Enter/↓ zurück zur Liste</translation>
+    </message>
+    <message>
+        <source>This tab is pinned: unpin it to close it</source>
+        <translation>Dieser Tab ist angeheftet: zum Schließen erst lösen</translation>
+    </message>
+    <message>
+        <source>Pinned: %1</source>
+        <translation>Angeheftet: %1</translation>
+    </message>
+    <message>
+        <source>Search results can&apos;t be pinned</source>
+        <translation>Suchergebnisse lassen sich nicht anheften</translation>
+    </message>
+    <message>
+        <source>Tab pinned: folders open from it in a new tab</source>
+        <translation>Tab angeheftet: Ordner daraus öffnen sich in einem neuen Tab</translation>
+    </message>
+    <message>
+        <source>Tab unpinned</source>
+        <translation>Tab gelöst</translation>
+    </message>
+    <message>
+        <source>Unpin tab</source>
+        <translation>Tab lösen</translation>
+    </message>
+    <message>
+        <source>Pin tab</source>
+        <translation>Tab anheften</translation>
+    </message>
+    <message>
+        <source>Close tab</source>
+        <translation>Tab schließen</translation>
     </message>
     <message>
         <source>Searching %1 for “%2” …  %3 found   (Esc stops)</source>

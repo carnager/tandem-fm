@@ -463,6 +463,7 @@ void MainWindow::createMenus()
         active()->addTab(p);
     });
     addCommand(tabs, QT_TR_NOOP("Close tab"), {K(Qt::CTRL | Qt::Key_W)}, [this] { active()->closeCurrentTab(); });
+    addCommand(tabs, QT_TR_NOOP("Pin or unpin tab"), {}, [this] { active()->togglePinTab(); });
     tabs->addSeparator();
     addCommand(tabs, QT_TR_NOOP("Next tab"), {K(Qt::CTRL | Qt::Key_Tab)}, [this] { active()->cycleTab(1); });
     addCommand(tabs, QT_TR_NOOP("Previous tab"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab), K(Qt::CTRL | Qt::Key_Backtab)},
@@ -3611,11 +3612,23 @@ void MainWindow::makeFile(const QString& given)
 Workspace MainWindow::currentWorkspace() const
 {
     Workspace w;
+    // Pinned tabs stay through every workspace, so they aren't part of one.
     for (auto [panel, tabs] : {std::pair{m_left, &w.left}, std::pair{m_right, &w.right}}) {
-        tabs->paths = panel->tabPaths();
-        tabs->numbers = panel->tabSlots();
-        tabs->grids = panel->tabGrids();
-        tabs->current = panel->currentTabIndex();
+        const QStringList paths = panel->tabPaths();
+        const QList<int> numbers = panel->tabSlots();
+        const QList<bool> grids = panel->tabGrids();
+        const QList<bool> pins = panel->tabPins();
+        const int current = panel->currentTabIndex();
+        tabs->current = 0;
+        for (int i = 0; i < paths.size(); ++i) {
+            if (pins.value(i))
+                continue;
+            if (i == current)
+                tabs->current = int(tabs->paths.size());
+            tabs->paths.append(paths[i]);
+            tabs->numbers.append(numbers.value(i));
+            tabs->grids.append(grids.value(i));
+        }
     }
     w.rightActive = m_active == m_right;
     return w;
@@ -3805,6 +3818,21 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         QList<bool> grids;
         for (const QVariant& v : s.value(QStringLiteral("tabGrids")).toList())
             grids.append(v.toBool());
+        QList<bool> pins;
+        for (const QVariant& v : s.value(QStringLiteral("tabPins")).toList())
+            pins.append(v.toBool());
+        // Pinned tabs stay, whatever else the start opens.
+        QStringList pinnedTabs;
+        QList<int> pinnedNumbers;
+        QList<bool> pinnedGrids;
+        for (int i = 0; i < tabs.size(); ++i) {
+            if (pins.value(i)) {
+                pinnedTabs.append(tabs[i]);
+                pinnedNumbers.append(numbers.value(i));
+                pinnedGrids.append(grids.value(i));
+            }
+        }
+        const QStringList savedTabs = tabs;
         if (startWorkspace) {
             const PanelTabs& t = p.argIndex == 0 ? startWorkspace->left : startWorkspace->right;
             tabs = t.paths;
@@ -3820,8 +3848,17 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         if (p.argIndex < startPaths.size()) {
             tabs = {expandUserPath(QDir::current().absoluteFilePath(startPaths[p.argIndex]))};
             current = 0;
+            numbers.clear();
+            grids.clear();
         }
-        p.panel->restoreTabs(tabs, current, numbers, grids);
+        if (tabs == savedTabs) {
+            p.panel->restoreTabs(tabs, current, numbers, grids, pins);
+        } else if (pinnedTabs.isEmpty()) {
+            p.panel->restoreTabs(tabs, current, numbers, grids);
+        } else {
+            p.panel->restoreTabs(pinnedTabs, 0, pinnedNumbers, pinnedGrids, QList<bool>(pinnedTabs.size(), true));
+            p.panel->replaceTabs(tabs, current, numbers, grids);  // a free number where a pinned tab has one
+        }
         s.endGroup();
     }
     Panel* act = s.value(QStringLiteral("window/active")).toString() == QLatin1String("right") ? m_right : m_left;
@@ -3867,6 +3904,10 @@ void MainWindow::saveSettings()
         for (bool g : panel->tabGrids())
             grids.append(g);
         s.setValue(QStringLiteral("tabGrids"), grids);
+        QVariantList pins;
+        for (bool pinned : panel->tabPins())
+            pins.append(pinned);
+        s.setValue(QStringLiteral("tabPins"), pins);
         s.setValue(QStringLiteral("sortColumn"), int(panel->sortSpec().column));
         s.setValue(QStringLiteral("sortDescending"), panel->sortSpec().descending);
         s.setValue(QStringLiteral("columns"), panel->columnLayout());
