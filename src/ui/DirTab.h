@@ -37,6 +37,8 @@ public:
     bool showHidden() const { return m_showHidden; }
     bool canGoBack() const { return !m_back.isEmpty(); }
     bool canGoForward() const { return !m_forward.isEmpty(); }
+    QString backPath() const { return m_back.isEmpty() ? QString() : m_back.last(); }
+    QString forwardPath() const { return m_forward.isEmpty() ? QString() : m_forward.last(); }
     bool isWatched() const { return m_watch >= 0; }
     // Inside an archive: path() is archivePath() + "/" + the folder inside it.
     bool inArchive() const { return m_inArchive; }
@@ -97,6 +99,9 @@ public:
     bool gridView = false;  // thumbnails instead of the list; stays while moving around
     int savedScroll = 0;
     int slot = 0;  // the tab's fixed number (Alt+slot); tabs are ordered by it
+    // Stays in its folder: what it opens goes to a new tab. Pinned tabs come
+    // first, can't be closed by accident, and stay when a workspace opens.
+    bool pinned = false;
     // Opened for search results: leaving them closes it, back to cameFrom.
     // Opening a folder from the results makes it an ordinary tab.
     bool madeForSearch = false;

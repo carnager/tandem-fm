@@ -142,6 +142,10 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_tabBar->setMovable(false);  // order is the tab numbers
     m_tabBar->setFocusPolicy(Qt::NoFocus);
     m_tabBar->setElideMode(Qt::ElideMiddle);
+    m_tabBar->setIconSize(QSize(12, 12));  // the pin of a pinned tab
+    m_tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_tabBar, &QWidget::customContextMenuRequested, this, &Panel::showTabMenu);
+    connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, &Panel::updateTabTitles);  // the pin's colour
     setThemeStyle(m_tabBar, QStringLiteral(
         "QTabBar { background: transparent; }"
         "QTabBar::tab { background: transparent; color: @dimText; padding: 4px 12px; margin: 6px 2px 0 2px;"
@@ -609,7 +613,15 @@ int Panel::lowestFreeSlot() const
     }
 }
 
-DirTab* Panel::addTab(const QString& path, bool activate, int slot)
+// Pinned tabs first, then by number.
+static bool tabBefore(const DirTab* a, const DirTab* b)
+{
+    if (a->pinned != b->pinned)
+        return a->pinned;
+    return a->slot < b->slot;
+}
+
+DirTab* Panel::addTab(const QString& path, bool activate, int slot, const QString& focus)
 {
     if (slot <= 0)
         slot = lowestFreeSlot();
@@ -627,8 +639,8 @@ DirTab* Panel::addTab(const QString& path, bool activate, int slot)
     t->model()->setSortSpec(m_sort);
     bindTab(t);
     int index = 0;
-    while (index < int(m_tabs.size()) && m_tabs[size_t(index)]->slot < slot)
-        ++index;  // always in number order
+    while (index < int(m_tabs.size()) && tabBefore(m_tabs[size_t(index)], t))
+        ++index;  // always in order
     m_tabs.insert(m_tabs.begin() + index, t);
     {
         QSignalBlocker block(m_tabBar);
@@ -636,7 +648,7 @@ DirTab* Panel::addTab(const QString& path, bool activate, int slot)
         if (m_current >= index)
             m_current++;
     }
-    t->navigate(path);
+    t->navigate(path, focus);
     updateTabTitles();  // after navigate: the title comes from the path being loaded
     if (activate || m_current < 0)
         showTab(index);
@@ -644,12 +656,16 @@ DirTab* Panel::addTab(const QString& path, bool activate, int slot)
     return t;
 }
 
-void Panel::closeCurrentTab()
+void Panel::closeCurrentTab(bool force)
 {
     if (m_tabs.size() <= 1 || m_current < 0)
         return;
     const int index = m_current;
     DirTab* t = m_tabs[size_t(index)];
+    if (t->pinned && !force) {
+        showMessage(tr("This tab is pinned: unpin it to close it"));
+        return;
+    }
     t->setCursorProvider(nullptr);
     m_tabs.erase(m_tabs.begin() + index);
     m_current = -1;
@@ -676,14 +692,80 @@ QList<int> Panel::tabSlots() const
     return out;
 }
 
+// A pushpin in the accent colour: drawn, so every icon theme has it.
+static QIcon pinIcon(qreal dpr)
+{
+    QPixmap pm(QSize(12, 12) * dpr);
+    pm.setDevicePixelRatio(dpr);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.translate(6, 6);
+    p.rotate(35);
+    p.translate(-6, -6);
+    const QColor c = theme().accent;
+    p.setPen(Qt::NoPen);
+    p.setBrush(c);
+    p.drawRoundedRect(QRectF(3.5, 0.5, 5, 1.6), 0.6, 0.6);  // cap
+    p.drawRect(QRectF(4.5, 2, 3, 4));                      // body
+    p.drawRoundedRect(QRectF(2.5, 5.8, 7, 1.6), 0.6, 0.6);  // collar
+    p.setPen(QPen(c, 1.2, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(QPointF(6, 7.4), QPointF(6, 11.4));          // needle
+    p.end();
+    return QIcon(pm);
+}
+
 // "1  src", "2  Downloads": the number is the Alt+number shortcut (like yazi).
 void Panel::updateTabTitles()
 {
+    const QIcon pin = pinIcon(m_tabBar->devicePixelRatioF());
     for (int i = 0; i < int(m_tabs.size()); ++i) {
         const DirTab* t = m_tabs[size_t(i)];
         m_tabBar->setTabText(i, QStringLiteral("%1  %2").arg(t->slot).arg(t->title()));
-        m_tabBar->setTabToolTip(i, m_tabs[size_t(i)]->path());
+        m_tabBar->setTabIcon(i, t->pinned ? pin : QIcon());
+        m_tabBar->setTabToolTip(i, t->pinned ? tr("Pinned: %1").arg(t->path()) : t->path());
     }
+}
+
+void Panel::sortTabs()
+{
+    DirTab* current = tab();
+    std::stable_sort(m_tabs.begin(), m_tabs.end(), tabBefore);
+    m_current = tabIndexOf(current);
+    {
+        QSignalBlocker block(m_tabBar);
+        m_tabBar->setCurrentIndex(m_current);
+    }
+    updateTabTitles();
+}
+
+void Panel::togglePinTab()
+{
+    DirTab* t = tab();
+    if (!t)
+        return;
+    if (t->isSearch() && !t->pinned) {
+        showMessage(tr("Search results can't be pinned"), true);
+        return;
+    }
+    t->pinned = !t->pinned;
+    sortTabs();
+    showMessage(t->pinned ? tr("Tab pinned: folders open from it in a new tab") : tr("Tab unpinned"));
+    emit stateChanged();
+}
+
+void Panel::showTabMenu(const QPoint& pos)
+{
+    const int i = m_tabBar->tabAt(pos);
+    if (i < 0)
+        return;
+    showTab(i);
+    DirTab* t = tab();
+    QMenu menu(this);
+    menu.addAction(t->pinned ? tr("Unpin tab") : tr("Pin tab"), this, &Panel::togglePinTab);
+    QAction* close = menu.addAction(tr("Close tab"), this, [this] { closeCurrentTab(true); });
+    close->setEnabled(m_tabs.size() > 1);
+    menu.exec(m_tabBar->mapToGlobal(pos));
 }
 
 void Panel::cycleTab(int step)
@@ -710,14 +792,34 @@ QList<bool> Panel::tabGrids() const
     return out;
 }
 
-void Panel::restoreTabs(const QStringList& paths, int current, const QList<int>& numbers, const QList<bool>& grids)
+QList<bool> Panel::tabPins() const
 {
-    for (int i = 0; i < paths.size(); ++i)
-        if (DirTab* t = addTab(paths[i], false, numbers.value(i, 0)))
+    QList<bool> out;
+    for (DirTab* t : keptTabs())
+        out.append(t->pinned);
+    return out;
+}
+
+void Panel::restoreTabs(const QStringList& paths, int current, const QList<int>& numbers, const QList<bool>& grids,
+                        const QList<bool>& pins)
+{
+    std::vector<DirTab*> added;
+    for (int i = 0; i < paths.size(); ++i) {
+        int slot = numbers.value(i, 0);
+        for (DirTab* t : m_tabs)
+            if (t->slot == slot && t->pinned)
+                slot = 0;  // a kept pinned tab has that number: take a free one
+        if (DirTab* t = addTab(paths[i], false, slot)) {
             t->gridView = grids.value(i, false);
+            t->pinned = pins.value(i, false);
+            added.push_back(t);
+        }
+    }
     if (m_tabs.empty())
-        addTab(QDir::homePath(), true);
-    showTab(std::clamp(current, 0, int(m_tabs.size()) - 1));
+        added.push_back(addTab(QDir::homePath(), true));
+    sortTabs();
+    DirTab* show = !added.empty() ? added[size_t(std::clamp(current, 0, int(added.size()) - 1))] : m_tabs.front();
+    showTab(tabIndexOf(show));
     applyViewMode();  // the first tab was shown before its mode was known
 }
 
@@ -725,12 +827,15 @@ void Panel::replaceTabs(const QStringList& paths, int current, const QList<int>&
 {
     endQuickSearch();
     std::vector<DirTab*> old;
-    old.swap(m_tabs);
+    for (DirTab* t : m_tabs)
+        if (!t->pinned)
+            old.push_back(t);
+    std::erase_if(m_tabs, [](DirTab* t) { return !t->pinned; });
     m_current = -1;
     {
         QSignalBlocker block(m_tabBar);
-        while (m_tabBar->count())
-            m_tabBar->removeTab(0);
+        while (m_tabBar->count() > int(m_tabs.size()))
+            m_tabBar->removeTab(m_tabBar->count() - 1);  // pinned tabs are the first ones
     }
     restoreTabs(paths, current, numbers, grids);
     for (DirTab* t : old) {  // after: the view shows a new tab's model now
@@ -983,9 +1088,18 @@ bool Panel::selectionHasFolder() const
     return e && e->isDir && !e->isParent;
 }
 
+// A pinned tab stays where it is: somewhere else opens in a new tab.
+static bool staysPinned(const DirTab* t)
+{
+    return t && t->pinned && !t->isSearch();
+}
+
 void Panel::navigate(const QString& p, const QString& focus)
 {
-    if (DirTab* t = tab())
+    DirTab* t = tab();
+    if (staysPinned(t) && p != t->path())
+        addTab(p, true, 0, focus);
+    else if (t)
         t->navigate(p, focus);
 }
 
@@ -1051,16 +1165,25 @@ QString Panel::innerPath(const QString& p) const
 
 void Panel::goUp()
 {
-    if (DirTab* t = tab(); t && t->isSearch())
+    DirTab* t = tab();
+    if (t && t->isSearch()) {
         leaveResults();
-    else if (t)
+    } else if (staysPinned(t)) {
+        const QString p = t->path();
+        if (p != QLatin1String("/") && !p.isEmpty())
+            navigate(parentPath(p), baseName(p));
+    } else if (t) {
         t->goUp();
+    }
 }
 
 void Panel::back()
 {
-    if (DirTab* t = tab(); t && t->isSearch())
+    DirTab* t = tab();
+    if (t && t->isSearch())
         leaveResults();
+    else if (staysPinned(t) && t->canGoBack())
+        navigate(t->backPath());
     else if (t)
         t->back();
 }
@@ -1114,7 +1237,10 @@ int Panel::currentTabIndex() const
 
 void Panel::forward()
 {
-    if (DirTab* t = tab())
+    DirTab* t = tab();
+    if (staysPinned(t) && t->canGoForward())
+        navigate(t->forwardPath());
+    else if (t)
         t->forward();
 }
 

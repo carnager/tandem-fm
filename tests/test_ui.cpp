@@ -1228,6 +1228,90 @@ private slots:
         QTRY_COMPARE(m_left->tabPaths(), QStringList({L()}));
     }
 
+    // A pinned tab stays in its folder: what it opens goes to a new tab. It
+    // comes first, Ctrl+W leaves it, and workspaces neither save nor replace it.
+    void pinnedTabs()
+    {
+        auto restore = qScopeGuard([this] {
+            const QList<int> numbers = m_left->tabSlots();
+            const QList<bool> pins = m_left->tabPins();
+            for (int i = 0; i < numbers.size(); ++i)
+                if (pins.value(i)) {
+                    m_left->selectSlot(numbers[i]);
+                    m_left->togglePinTab();
+                }
+            for (const Workspace& w : Workspaces::all())
+                Workspaces::remove(w.id);
+            m_left->replaceTabs({L()}, 0);
+            QTRY_COMPARE(leftModel()->path(), L());
+            m_left->view()->setFocus();
+        });
+        m_left->replaceTabs({L()}, 0);
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_left->view()->setFocus();
+        QTRY_VERIFY(m_left->isActive());
+        m_left->togglePinTab();
+        auto* bar = m_left->findChild<QTabBar*>();
+        QCOMPARE(m_left->tabPins(), QList<bool>({true}));
+        QVERIFY(!bar->tabIcon(0).isNull());
+
+        // Entering a folder opens it in a new tab.
+        moveCursorTo(m_left, "sub");
+        QTest::keyClick(m_left->view(), Qt::Key_Return);
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L(), L("sub")}));
+        QTRY_COMPARE(m_left->path(), L("sub"));
+        QCOMPARE(m_left->tabPins(), QList<bool>({true, false}));
+
+        // Ctrl+W leaves it; going up from it opens a tab too.
+        QTest::keyClick(m_left->view(), Qt::Key_1, Qt::AltModifier);
+        QTRY_COMPARE(m_left->path(), L());
+        QTest::keyClick(m_left->view(), Qt::Key_W, Qt::ControlModifier);
+        QCOMPARE(m_left->tabPaths(), QStringList({L(), L("sub")}));
+        m_left->goUp();
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L(), L("sub"), parentPath(L())}));
+        QTRY_COMPARE(m_left->currentName(), baseName(L()));
+
+        // Pinning moves a tab to the front; its number stays.
+        m_left->togglePinTab();  // tab 3
+        QCOMPARE(m_left->tabSlots(), QList<int>({1, 3, 2}));
+        QCOMPARE(bar->tabText(1).left(1), QString("3"));
+        m_left->togglePinTab();
+        QCOMPARE(m_left->tabSlots(), QList<int>({1, 2, 3}));
+        QTest::keyClick(m_left->view(), Qt::Key_W, Qt::ControlModifier);
+        QTRY_COMPARE(m_left->tabSlots(), QList<int>({1, 2}));
+
+        // Saved as a workspace without it; opening one keeps it.
+        m_left->selectSlot(2);
+        auto visiblePopup = [this] {
+            for (auto* p : m_window->findChildren<FuzzyPopup*>())
+                if (p->isVisible())
+                    return p;
+            return static_cast<FuzzyPopup*>(nullptr);
+        };
+        QTest::keyClick(m_left->view(), Qt::Key_W, Qt::AltModifier);
+        FuzzyPopup* popup = nullptr;
+        QTRY_VERIFY((popup = visiblePopup()));
+        QTest::keyClicks(QApplication::focusWidget(), "Pinless");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->title.contains("Pinless"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        QTRY_VERIFY(Workspaces::byName("Pinless"));
+        QCOMPARE(Workspaces::byName("Pinless")->left.paths, QStringList({L("sub")}));
+        QCOMPARE(Workspaces::byName("Pinless")->left.current, 0);
+        m_left->replaceTabs({R()}, 0, {1});  // number 1 is the pinned tab's
+        QCOMPARE(m_left->tabPaths(), QStringList({L(), R()}));
+        QCOMPARE(m_left->tabPins(), QList<bool>({true, false}));
+        QCOMPARE(m_left->tabSlots(), QList<int>({1, 2}));
+        QTRY_COMPARE(m_left->path(), R());
+
+        // Restored pinned, in front.
+        Panel p;
+        p.restoreTabs({L(), R()}, 1, {2, 1}, {}, {false, true});
+        QCOMPARE(p.tabPaths(), QStringList({R(), L()}));
+        QCOMPARE(p.tabPins(), QList<bool>({true, false}));
+        QCOMPARE(p.currentTabIndex(), 0);
+        QTRY_COMPARE(p.path(), R());
+    }
+
     void restoredTabsKeepOrder()
     {
         Panel p;

@@ -65,17 +65,20 @@ public:
 
     // Tabs have fixed numbers (like yazi): slot 0 takes the lowest free one.
     // Asking for a slot that exists just switches to it.
-    DirTab* addTab(const QString& path, bool activate = true, int slot = 0);
-    void closeCurrentTab();
+    DirTab* addTab(const QString& path, bool activate = true, int slot = 0, const QString& focus = {});
+    // A pinned tab stays unless force (its own menu's "Close tab").
+    void closeCurrentTab(bool force = false);
+    void togglePinTab();
     void cycleTab(int step);
     void selectSlot(int slot);  // Alt+1…9: go to tab N, creating it here if needed
     QStringList tabPaths() const;
     QList<bool> tabGrids() const;  // which tabs show thumbnails
+    QList<bool> tabPins() const;   // which are pinned
     QList<int> tabSlots() const;
     int currentTabIndex() const;  // these four leave out tabs of search results
     void restoreTabs(const QStringList& paths, int current, const QList<int>& numbers = {},
-                     const QList<bool>& grids = {});
-    // Closes every tab and opens these instead (a workspace).
+                     const QList<bool>& grids = {}, const QList<bool>& pins = {});
+    // Closes every tab but the pinned ones and opens these instead (a workspace).
     void replaceTabs(const QStringList& paths, int current, const QList<int>& numbers = {},
                      const QList<bool>& grids = {});
 
@@ -166,6 +169,8 @@ private:
     void positionSearch();
     int tabIndexOf(DirTab* t) const;
     void updateTabTitles();
+    void sortTabs();  // pinned first, then by number
+    void showTabMenu(const QPoint& pos);
     int lowestFreeSlot() const;
 
     std::vector<DirTab*> m_tabs;
