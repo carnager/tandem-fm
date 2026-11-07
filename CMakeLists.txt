@@ -114,6 +114,7 @@ add_library(tandem_ui STATIC
   src/ui/viewer/BlockCache.h src/ui/viewer/BlockCache.cpp
   src/ui/viewer/ByteViews.h src/ui/viewer/ByteViews.cpp
   src/ui/viewer/ImageView.h src/ui/viewer/ImageView.cpp
+  src/ui/viewer/MediaControls.h
   src/ui/viewer/ViewerWindow.h src/ui/viewer/ViewerWindow.cpp
   src/ui/viewer/Previewers.h src/ui/viewer/Previewers.cpp
   src/ui/viewer/FileInfo.h src/ui/viewer/FileInfo.cpp
@@ -207,6 +208,16 @@ if(KF6SyntaxHighlighting_FOUND)
   message(STATUS "Viewer syntax highlighting: enabled")
 else()
   message(STATUS "Viewer syntax highlighting: disabled (KF6SyntaxHighlighting not found)")
+endif()
+# Optional: playing videos and music in the viewer (Qt Multimedia).
+find_package(Qt6 QUIET COMPONENTS Multimedia)
+if(Qt6Multimedia_FOUND)
+  target_sources(tandem_ui PRIVATE src/ui/viewer/MediaControls.cpp)
+  target_link_libraries(tandem_ui PRIVATE Qt6::Multimedia)
+  message(STATUS "Video and audio playback: enabled")
+else()
+  target_sources(tandem_ui PRIVATE src/ui/viewer/MediaControls_none.cpp)
+  message(STATUS "Video and audio playback: disabled (Qt Multimedia not found)")
 endif()
 target_compile_options(tandem_ui PRIVATE -Wall -Wextra)
 # Shipped themes, as the same JSON files users write (:/themes/<id>.json).

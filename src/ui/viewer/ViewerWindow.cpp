@@ -16,6 +16,7 @@
 #include "ui/viewer/FileInfo.h"
 #include "ui/viewer/ByteViews.h"
 #include "ui/viewer/ImageView.h"
+#include "ui/viewer/MediaControls.h"
 
 #include <QCloseEvent>
 #include <QCoreApplication>
@@ -295,7 +296,11 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     m_info->setContentsMargins(12, 8, 12, 8);
     m_info->setTextInteractionFlags(Qt::TextSelectableByMouse);
     setThemeStyle(m_info, QStringLiteral("color: @text; background: @header; border-top: 1px solid @border;"));
+    m_media = new MediaControls(m_mediaPage);
+    m_media->hide();
+    connect(m_media, &MediaControls::frame, m_image, &ImageView::setFrame);
     ml->addWidget(m_image, 1);
+    ml->addWidget(m_media);
     ml->addWidget(m_info);
     m_doc = new DocBrowser(m_stack);
     m_doc->setFrameShape(QFrame::NoFrame);
@@ -426,6 +431,15 @@ ViewerWindow::ViewerWindow(const QStringList& files, int index, QWidget* parent,
     sr->setContentsMargins(0, 0, embedded ? 14 : 10, 0);
     sr->setSpacing(6);
     sr->addWidget(m_status, 1);
+    if (!embedded) {
+        m_sameKindButton = new QCheckBox(tr("Same type only"), this);
+        m_sameKindButton->setToolTip(tr("N / P skip files of other types: pictures stay with pictures (T)"));
+        m_sameKindButton->setFocusPolicy(Qt::NoFocus);
+        m_sameKindButton->setChecked(QSettings().value(QStringLiteral("viewer/sameKind"), false).toBool());
+        connect(m_sameKindButton, &QCheckBox::toggled, this,
+                [](bool on) { QSettings().setValue(QStringLiteral("viewer/sameKind"), on); });
+        sr->addWidget(m_sameKindButton, 0, Qt::AlignVCenter);
+    }
     sr->addWidget(m_wrapButton, 0, Qt::AlignVCenter);
     layout->addWidget(statusRow);
 #ifdef TANDEM_HAVE_KSYNTAXHIGHLIGHTING
@@ -475,6 +489,7 @@ ViewerWindow::~ViewerWindow()
 
 void ViewerWindow::closeEvent(QCloseEvent* e)
 {
+    m_media->clear();  // the sound stops with the window
     if (!m_embedded)
         QSettings().setValue(QStringLiteral("viewer/geometry"), saveGeometry());
     QWidget::closeEvent(e);
@@ -542,8 +557,13 @@ void ViewerWindow::setupShortcuts()
         }
     });
     add(Qt::Key_Q, [this] { close(); });
-    add(Qt::Key_N, [this] { openIndex(m_index + 1); });
-    add(Qt::Key_P, [this] { openIndex(m_index - 1); });
+    add(Qt::Key_N, [this] { step(1); });
+    add(Qt::Key_P, [this] { step(-1); });
+    add(Qt::Key_Space, [this] {
+        if (mediaActive())
+            m_media->togglePlay();
+    });
+    add(Qt::Key_T, [this] { m_sameKindButton->toggle(); });
     add(Qt::Key_1, [this] { setMode(Mode::Text); });
     add(Qt::Key_3, [this] { setMode(Mode::Hex); });
     add(Qt::Key_4, [this] { setMode(Mode::Image); });
@@ -557,6 +577,16 @@ void ViewerWindow::setupShortcuts()
     add(Qt::Key_Equal, [this] { zoom(1); });
     add(Qt::Key_Minus, [this] { zoom(-1); });
     add(Qt::Key_0, [this] { zoom(0); });
+    for (const auto& [key, fn] : std::initializer_list<std::pair<QKeySequence, std::function<void()>>>{
+             {Qt::Key_Left, [this] { m_media->seekBy(-5000); }},
+             {Qt::Key_Right, [this] { m_media->seekBy(5000); }},
+             {Qt::Key_M, [this] { m_media->toggleMute(); }}}) {
+        auto* sc = new QShortcut(key, this);
+        sc->setContext(Qt::WindowShortcut);
+        sc->setEnabled(false);
+        connect(sc, &QShortcut::activated, this, fn);
+        m_mediaKeys.append(sc);
+    }
     if (QSettings().value(QStringLiteral("input/vimKeys"), false).toBool()) {
         auto sendKey = [this](Qt::Key key, Qt::KeyboardModifiers mods = Qt::NoModifier) {
             QWidget* w = m_stack->currentWidget();
@@ -569,6 +599,81 @@ void ViewerWindow::setupShortcuts()
         add(QKeySequence(Qt::Key_G, Qt::Key_G), [sendKey] { sendKey(Qt::Key_Home, Qt::ControlModifier); });
         add(Qt::Key_Slash, [this] { showSearch(); });
     }
+}
+
+void ViewerWindow::step(int direction)
+{
+    const bool same = sameKindOnly();
+    if (m_step) {
+        if (!m_step(direction, same))
+            flashStatus(same ? tr("No more files of this type") : tr("No more files"));
+        return;
+    }
+    const QString kind = same ? kindOf(m_path) : QString();
+    for (int i = m_index + direction; i >= 0 && i < m_files.size(); i += direction) {
+        if (!same || kindOf(m_files[i]) == kind) {
+            openIndex(i);
+            return;
+        }
+    }
+    flashStatus(same ? tr("No more files of this type") : tr("No more files"));
+}
+
+bool ViewerWindow::mediaActive() const
+{
+    return m_mode == Mode::Image && !m_media->source().isEmpty();
+}
+
+void ViewerWindow::updateMediaKeys()
+{
+    const bool on = mediaActive();
+    for (QShortcut* sc : std::as_const(m_mediaKeys))
+        sc->setEnabled(on);
+}
+
+void ViewerWindow::setStepHandler(StepHandler handler)
+{
+    m_step = std::move(handler);
+    updateSameKindButton();
+}
+
+bool ViewerWindow::sameKindOnly() const
+{
+    return m_sameKindButton && m_sameKindButton->isChecked();
+}
+
+void ViewerWindow::setSameKindOnly(bool on)
+{
+    if (m_sameKindButton)
+        m_sameKindButton->setChecked(on);
+}
+
+QString ViewerWindow::kindOf(const QString& fileName)
+{
+    static const QMimeDatabase db;
+    const QString mime = db.mimeTypeForFile(fileName, QMimeDatabase::MatchExtension).name();
+    const QString top = mime.section(QLatin1Char('/'), 0, 0);
+    if (top == QLatin1String("image") || top == QLatin1String("video") || top == QLatin1String("audio"))
+        return top;
+    return mime;
+}
+
+// Only worth showing when there is somewhere to step to.
+void ViewerWindow::updateSameKindButton()
+{
+    if (m_sameKindButton)
+        m_sameKindButton->setVisible(m_step || m_files.size() > 1);
+}
+
+// A short note in the status line ("No more files"); the usual text returns.
+void ViewerWindow::flashStatus(const QString& text)
+{
+    m_status->setText(text);
+    const quint64 gen = m_gen;
+    QTimer::singleShot(2000, this, [this, gen] {
+        if (gen == m_gen)
+            updateStatus();
+    });
 }
 
 void ViewerWindow::showFile(const QString& path)
@@ -596,6 +701,9 @@ void ViewerWindow::showNote(const QString& text)
     m_path.clear();
     m_loading = false;
     m_mode = Mode::None;
+    m_media->clear();
+    m_media->hide();
+    updateMediaKeys();
     m_big->setCache(nullptr);
     m_hex->setCache(nullptr);
     delete m_cache;
@@ -624,6 +732,7 @@ void ViewerWindow::openIndex(int index)
         return;
     m_index = index;
     m_path = m_files[index];
+    updateSameKindButton();
     ++m_gen;
     if (m_searchCancel)
         m_searchCancel->store(true);
@@ -640,6 +749,8 @@ void ViewerWindow::openIndex(int index)
     m_highlighter = nullptr;
     m_text->clear();
     m_image->setImage({});
+    m_media->clear();
+    m_media->hide();
     m_big->setCache(nullptr);
     m_hex->setCache(nullptr);
     delete m_cache;
@@ -727,6 +838,9 @@ void ViewerWindow::setMode(Mode mode)
     }
     m_mode = mode;
     updateModeButtons();
+    if (mode != Mode::Image)
+        m_media->pause();
+    updateMediaKeys();
     switch (mode) {
     case Mode::Text:
         if (m_size > kSmallText) {
@@ -1114,8 +1228,15 @@ void ViewerWindow::showRich(const RichPreview& r)
         m_info->setVisible(!r.info.isEmpty() && !(m_embedded && m_kind == PreviewKind::Image));
         if (r.image.isNull() && !r.info.isEmpty() && m_kind != PreviewKind::Image)
             m_image->setImage({});  // audio without cover: just the details
+        if ((m_kind == PreviewKind::Video || m_kind == PreviewKind::Audio) && MediaControls::available()) {
+            m_media->setSource(m_path);
+            m_media->show();
+            if (MediaControls::autoplay() && !m_media->hasPlayer())
+                m_media->togglePlay();
+        }
         break;
     }
+    updateMediaKeys();
     if (m_mode == Mode::Image) {
         m_stack->setCurrentWidget(page);
         updateSheet();
@@ -1231,9 +1352,13 @@ void ViewerWindow::updateStatus()
     case Mode::None:
         break;
     }
-    m_status->setText(parts.join(QStringLiteral("   ·   ")) +
-                      (m_embedded ? QString()
-                                  : tr("        N / P: next / previous file   1 / 3 / 4: text / hex / image   F7: find")));
+    QString keys;
+    if (!m_embedded)
+        // Linked to a panel, its ↑ / ↓ move through the files too.
+        keys = (mediaActive() ? tr("        Space: play / pause   ← / →: 5 seconds   M: sound   %1: next / previous file   T: same type only")
+                              : tr("        %1: next / previous file   T: same type only   1 / 3 / 4: text / hex / image   F7: find"))
+                   .arg(m_step ? tr("↑ / ↓, N / P") : tr("N / P"));
+    m_status->setText(parts.join(QStringLiteral("   ·   ")) + keys);
 }
 
 void ViewerWindow::setFolderTotal(const QString& path, qint64 bytes)

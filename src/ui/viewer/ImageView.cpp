@@ -22,9 +22,27 @@ void ImageView::setImage(const QImage& image)
 {
     m_image = image;
     m_scaled = QPixmap();  // a new picture of the same size must not reuse the old one
+    m_live = false;
     m_fit = true;
     m_zoom = 1.0;
     relayout();
+}
+
+void ImageView::setFrame(const QImage& frame)
+{
+    const bool resized = frame.size() != m_image.size() || !m_live;
+    m_image = frame;
+    m_scaled = QPixmap();
+    m_live = true;
+    if (resized)
+        relayout();
+    else
+        viewport()->update();
+}
+
+QSize ImageView::shownSize() const
+{
+    return m_image.isNull() ? QSize() : (QSizeF(m_image.size()) * scale()).toSize();
 }
 
 double ImageView::scale() const
@@ -55,8 +73,8 @@ void ImageView::zoom(int steps)
 void ImageView::relayout()
 {
     const double s = scale();
-    const QSize size = m_image.isNull() ? QSize() : (QSizeF(m_image.size()) * s).toSize();
-    if (!m_image.isNull() && m_scaled.size() != size)
+    const QSize size = shownSize();
+    if (!m_live && !m_image.isNull() && m_scaled.size() != size)
         m_scaled = QPixmap::fromImage(m_image.scaled(size, Qt::KeepAspectRatio,
                                                      s < 1.0 ? Qt::SmoothTransformation : Qt::FastTransformation));
     horizontalScrollBar()->setRange(0, qMax(0, size.width() - viewport()->width()));
@@ -78,13 +96,13 @@ void ImageView::paintEvent(QPaintEvent*)
     const Theme& t = theme();
     QPainter p(viewport());
     p.fillRect(viewport()->rect(), m_background.isValid() ? m_background : t.window);
-    if (m_scaled.isNull())
+    if (m_live ? m_image.isNull() : m_scaled.isNull())
         return;
-    const QSize s = m_scaled.size();
+    const QSize s = m_live ? shownSize() : m_scaled.size();
     const int x = s.width() < viewport()->width() ? (viewport()->width() - s.width()) / 2 : -horizontalScrollBar()->value();
     const int y = s.height() < viewport()->height() ? (viewport()->height() - s.height()) / 2 : -verticalScrollBar()->value();
     const QRect target(QPoint(x, y), s);
-    if (m_image.hasAlphaChannel()) {
+    if (!m_live && m_image.hasAlphaChannel()) {
         // Checkerboard so transparency is visible.
         const int c = 8;
         const QColor a = t.base, b = t.altBase.lighter(t.dark ? 140 : 96);
@@ -95,7 +113,12 @@ void ImageView::paintEvent(QPaintEvent*)
                 p.fillRect(xx, yy, c, c, (((xx - target.left()) / c + (yy - target.top()) / c) % 2) ? a : b);
         p.restore();
     }
-    p.drawPixmap(target.topLeft(), m_scaled);
+    if (m_live) {
+        p.setRenderHint(QPainter::SmoothPixmapTransform);
+        p.drawImage(target, m_image);
+    } else {
+        p.drawPixmap(target.topLeft(), m_scaled);
+    }
 }
 
 void ImageView::wheelEvent(QWheelEvent* e)

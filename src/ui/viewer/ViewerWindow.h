@@ -15,6 +15,7 @@ class QCheckBox;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
+class QShortcut;
 class QStackedWidget;
 class QTextBrowser;
 class QToolButton;
@@ -38,6 +39,7 @@ struct ViewerAction {
 };
 
 class ImageView;
+class MediaControls;
 class TextScrollView;
 
 // F3 lister. Text (highlighted when small), any-size text, hex, images.
@@ -55,6 +57,17 @@ public:
     ~ViewerWindow() override;
 
     void openIndex(int index);
+    // N / P: the next or previous file, of the same type only if that is on.
+    void step(int direction);
+    // F3 as a quick view: N / P ask the owner to move its cursor instead of
+    // stepping through the list. Returns false when no file is left that way.
+    using StepHandler = std::function<bool(int direction, bool sameKind)>;
+    void setStepHandler(StepHandler handler);
+    bool sameKindOnly() const;
+    void setSameKindOnly(bool on);
+    // What "same type" compares: "image", "video", "audio", else the exact
+    // type ("application/pdf"). From the name only, no disk access.
+    static QString kindOf(const QString& fileName);
     void setMode(Mode mode);
     Mode mode() const { return m_mode; }
     QString currentPath() const { return m_path; }
@@ -81,6 +94,7 @@ public:
     TextScrollView* largeTextView() const { return m_big; }
     HexView* hexView() const { return m_hex; }
     ImageView* imageView() const { return m_image; }
+    MediaControls* mediaControls() const { return m_media; }
 
     static constexpr qint64 kSmallText = 2 * 1024 * 1024;  // editor widget up to this size
     static constexpr qint64 kHighlightMax = 1024 * 1024;    // syntax highlighting up to this size
@@ -113,6 +127,10 @@ private:
     void find(bool backward);
     void findInBytes(bool backward);
     void zoom(int steps);
+    void flashStatus(const QString& text);
+    bool mediaActive() const;  // a video or song is shown, with its player bar
+    void updateMediaKeys();
+    void updateSameKindButton();
 
     bool m_embedded = false;
     QPair<QString, qint64> m_folderTotal;
@@ -140,6 +158,8 @@ private:
     TextScrollView* m_big;
     HexView* m_hex;
     ImageView* m_image;
+    MediaControls* m_media;
+    QList<QShortcut*> m_mediaKeys;  // ← → M: only while a video or song is shown
     QWidget* m_mediaPage;
     QLabel* m_info;
     QTextBrowser* m_doc;
@@ -175,6 +195,8 @@ private:
     QToolButton* m_hexButton;
     QToolButton* m_imageButton;
     QCheckBox* m_wrapButton;
+    QCheckBox* m_sameKindButton = nullptr;
+    StepHandler m_step;
     QWidget* m_searchBar;
     QLineEdit* m_searchEdit;
     QLabel* m_searchInfo;

@@ -13,6 +13,8 @@ class ImageView : public QAbstractScrollArea {
 public:
     explicit ImageView(QWidget* parent = nullptr);
     void setImage(const QImage& image);
+    // A video frame: keeps the zoom and is drawn as it is, without a scaled copy.
+    void setFrame(const QImage& frame);
     const QImage& image() const { return m_image; }
     void zoom(int steps);  // 0 = back to fit
     void setBackground(const QColor& c) { m_background = c; viewport()->update(); }
@@ -32,11 +34,13 @@ protected:
 
 private:
     void relayout();
+    QSize shownSize() const;
 
     QImage m_image;
     QPixmap m_scaled;
     double m_zoom = 1.0;
     bool m_fit = true;
+    bool m_live = false;  // video frames: scaled while painting
     QPoint m_dragFrom;
     QColor m_background;
     int m_padding = 0;

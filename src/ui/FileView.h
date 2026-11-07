@@ -36,6 +36,7 @@ public:
     bool isActive() const { return m_active; }
     int currentRow() const { return currentIndex().row(); }
     void setVimKeys(bool on) { m_vim = on; if (!on) setVisual(0); }
+    bool vimKeys() const { return m_vim; }
     // Visual mode (modal keys): 1 marks, -1 unmarks the range the cursor
     // moves over; 0 ends it, keeping the marks.
     void setVisual(int mode);

@@ -18,8 +18,6 @@ public:
     // Adds what isn't there yet, at the end. Returns how many were new.
     int add(int shelf, const QStringList& paths);
     void remove(int shelf, const QStringList& paths);
-    // After a move: the same items, now at their new paths.
-    void replace(int shelf, const QStringList& from, const QStringList& to);
     void clear(int shelf);
     int lastUsed() const { return m_last; }  // where Enter puts things
     // Reads them from the settings again. Items on shelves 5–9 (there used
