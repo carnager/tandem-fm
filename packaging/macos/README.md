@@ -17,6 +17,10 @@ The script builds, runs the tests, bundles Qt and the libraries into
 `dist/macos-<date>/Tandem.app`, signs it ad hoc and zips it. The app is not
 notarized, so the first start needs a right click → Open.
 
+The app icon, `tandem-fm.icns`, is made from the icons in `data/` by
+`python3 packaging/macos/make_icns.py` (Pillow and rsvg-convert; runs on Linux
+too). Run it again after changing the icon.
+
 ## What differs from Linux
 
 - Folder changes come from kqueue. It sees files appear and disappear, but not
