@@ -32,6 +32,7 @@
 #include "ui/PermissionsDialog.h"
 #include "ui/ServersDialog.h"
 #include "ui/SettingsDialog.h"
+#include "ui/AboutDialog.h"
 #include "ui/ShortcutsDialog.h"
 #include "ui/TrashDialog.h"
 #include "ui/Panel.h"
@@ -588,6 +589,11 @@ void MainWindow::createMenus()
     QMenu* help = bar->addMenu(tr("&Help"));
     addCommand(help, QT_TR_NOOP("Command palette…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_P)}, [this] { commandPalette(); });
     addCommand(help, QT_TR_NOOP("Keyboard shortcuts"), {K(Qt::Key_F1)}, [this] { showShortcuts(); });
+    help->addSeparator();
+    addCommand(help, QT_TR_NOOP("About Tandem"), {}, [this] {
+        AboutDialog dlg(this);
+        dlg.exec();
+    });
     setupKeymap();
 }
 

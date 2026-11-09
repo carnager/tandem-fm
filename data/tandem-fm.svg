@@ -1,24 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <title>Tandem — two folders, two directions</title>
-  <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#303b52"/>
-      <stop offset="1" stop-color="#192235"/>
-    </linearGradient>
-    <linearGradient id="blue" x1="0" y1="0" x2="0.7" y2="1">
-      <stop stop-color="#8bb8ff"/>
-      <stop offset="1" stop-color="#4f87f1"/>
-    </linearGradient>
-    <linearGradient id="amber" x1="1" y1="0" x2="0.2" y2="1">
-      <stop stop-color="#ffd18a"/>
-      <stop offset="1" stop-color="#f5a342"/>
-    </linearGradient>
-  </defs>
-  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#tile)"/>
-  <path d="M54 56H82Q89 56 94 63L104 76H120V188Q120 200 108 200H54Q40 200 40 186V70Q40 56 54 56Z" fill="url(#blue)"/>
-  <path d="M202 56H174Q167 56 162 63L152 76H136V188Q136 200 148 200H202Q216 200 216 186V70Q216 56 202 56Z" fill="url(#amber)"/>
-  <g fill="none" stroke="#fff9ef" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M81 116H175L159 100"/>
-    <path d="M175 156H81L97 172"/>
-  </g>
+  <path d="M34 22Q70 44 100 48L156 48Q186 44 222 22Q234 50 232 84L232 186Q232 232 186 232L70 232Q24 232 24 186L24 84Q22 50 34 22Z" fill="#3a3f4b"/>
+  <rect x="46" y="80" width="76" height="104" rx="26" fill="#5b8cff"/>
+  <rect x="134" y="80" width="76" height="104" rx="26" fill="#f4a64b"/>
+  <circle cx="100" cy="128" r="17" fill="#16181c"/>
+  <circle cx="188" cy="128" r="17" fill="#16181c"/>
+  <circle cx="106" cy="121" r="5.5" fill="#ffffff"/>
+  <circle cx="194" cy="121" r="5.5" fill="#ffffff"/>
+  <path d="M115 174L141 174L128 198Z" fill="#e6e8ec" stroke="#3a3f4b" stroke-width="5" stroke-linejoin="round"/>
 </svg>

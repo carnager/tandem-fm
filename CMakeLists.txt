@@ -100,6 +100,7 @@ add_library(tandem_ui STATIC
   src/ui/CommandBar.h src/ui/CommandBar.cpp
   src/ui/SyncDialog.h src/ui/SyncDialog.cpp
   src/ui/PermissionsDialog.h src/ui/PermissionsDialog.cpp
+  src/ui/AboutDialog.h src/ui/AboutDialog.cpp
   src/ui/ShortcutsDialog.h src/ui/ShortcutsDialog.cpp
   src/ui/SettingsDialog.h src/ui/SettingsDialog.cpp
   src/ui/TrashDialog.h src/ui/TrashDialog.cpp
@@ -241,8 +242,10 @@ if(APPLE)
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in")
 endif()
 target_link_libraries(tandem-fm PRIVATE tandem_ui)
-# The app icon, inside the binary too (for running from the build folder).
-qt_add_resources(tandem-fm "icons" PREFIX "/icons" BASE data FILES data/tandem-fm.svg)
+# The app icon, inside the binary too (for running from the build folder),
+# and the mascot for the About dialog.
+qt_add_resources(tandem_ui "icons" PREFIX "/icons" BASE data FILES data/tandem-fm.svg)
+qt_add_resources(tandem_ui "brand" PREFIX "/brand" BASE data FILES data/tandem-owl.jpg)
 
 # Translations (needs qt6-tools): `cmake --build build --target update_translations`
 # refreshes translations/*.ts from the sources; the .qm files are compiled into
@@ -302,8 +305,9 @@ else()
   install(TARGETS tandem-fm RUNTIME DESTINATION bin)
   install(FILES tandem-fm.desktop DESTINATION share/applications)
   install(FILES data/tandem-fm.svg DESTINATION share/icons/hicolor/scalable/apps)
-  foreach(size 32 48 256)
+  foreach(size 16 24 32 48 64 128 256 512)
     install(FILES data/icons/${size}x${size}/tandem-fm.png DESTINATION share/icons/hicolor/${size}x${size}/apps)
   endforeach()
+  install(FILES data/icons/symbolic/tandem-fm-symbolic.svg DESTINATION share/icons/hicolor/symbolic/apps)
   install(FILES LICENSE DESTINATION share/licenses/tandem-fm)
 endif()

@@ -41,6 +41,7 @@
 #include "ui/SettingsDialog.h"
 #include "ui/ServersDialog.h"
 #include "core/Servers.h"
+#include "ui/AboutDialog.h"
 #include "ui/ShortcutsDialog.h"
 #include "ui/TrashDialog.h"
 #include "ui/Panel.h"
@@ -2768,6 +2769,31 @@ private slots:
         QVERIFY(dlg.visibleEntries() >= 1);
         dlg.filterEdit()->setText("zzzz");
         QCOMPARE(dlg.visibleEntries(), 0);
+    }
+
+    // Help > About Tandem: the mascot, the version, the project's page.
+    void aboutDialog()
+    {
+        bool listed = false;
+        for (auto* a : m_window->findChildren<QAction*>())
+            listed = listed || a->text() == QStringLiteral("About Tandem");
+        QVERIFY(listed);
+        const QString oldVersion = QApplication::applicationVersion();
+        QApplication::setApplicationVersion(QStringLiteral("9.8.7"));
+        AboutDialog dlg(m_window.get());
+        QApplication::setApplicationVersion(oldVersion);
+        dlg.show();
+        auto* mascot = dlg.findChild<QLabel*>(QStringLiteral("mascot"));
+        QVERIFY(mascot);
+        QVERIFY(!mascot->pixmap().isNull());
+        QVERIFY(mascot->pixmap().width() > 100);
+        bool version = false, link = false;
+        for (auto* l : dlg.findChildren<QLabel*>()) {
+            version = version || l->text().contains(QStringLiteral("9.8.7"));
+            link = link || l->text().contains(QStringLiteral("github.com/carnager/tandem-fm"));
+        }
+        QVERIFY(version);
+        QVERIFY(link);
     }
 
     // The keyboard always ends up back in a file list, and Esc closes things.

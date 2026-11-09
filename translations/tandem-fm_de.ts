@@ -1273,6 +1273,29 @@
     </message>
 </context>
 <context>
+    <name>tandem::AboutDialog</name>
+    <message>
+        <source>About Tandem</source>
+        <translation>Über Tandem</translation>
+    </message>
+    <message>
+        <source>Two-panel file manager</source>
+        <translation>Zweifenster-Dateimanager</translation>
+    </message>
+    <message>
+        <source>Version %1</source>
+        <translation>Version %1</translation>
+    </message>
+    <message>
+        <source>Free software under the GNU General Public License, version 3 or later.</source>
+        <translation>Freie Software unter der GNU General Public License, Version 3 oder neuer.</translation>
+    </message>
+    <message>
+        <source>Built with Qt %1</source>
+        <translation>Erstellt mit Qt %1</translation>
+    </message>
+</context>
+<context>
     <name>tandem::ArchiveUpdateJob</name>
     <message>
         <source>Update %1</source>
@@ -2621,6 +2644,10 @@
     <message>
         <source>Keyboard shortcuts</source>
         <translation>Tastenkürzel</translation>
+    </message>
+    <message>
+        <source>About Tandem</source>
+        <translation>Über Tandem</translation>
     </message>
     <message>
         <source>%1: no such command</source>
