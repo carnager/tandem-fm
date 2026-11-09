@@ -1,5 +1,7 @@
 # <img src="data/tandem-fm.svg" alt="Tandem logo" width="64" height="64" align="absmiddle"> Tandem
 
+<img src="data/tandem-owl.jpg" alt="Tandem's mascot: an owl with one blue and one orange eye, like the two panels." width="150" align="right">
+
 **A two-panel file manager for Linux, built for the keyboard.**
 
 Keep your source in one panel and your destination in the other. Browse with
@@ -10,14 +12,9 @@ background file operations and built-in SFTP and SMB.
 [Install](#install) · [Keyboard basics](#keyboard-basics) ·
 [Build from source](#build-from-source) · [Contribute](CONTRIBUTING.md)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/overview-light.png">
-  <img src="docs/screenshots/overview-dark.png" alt="Tandem showing an example project and release folder side by side, with tabs and Markdown previews." width="1440">
-</picture>
+![Tandem with wallpapers in the left panel, the Tandem source folder in the right, and a preview of the selected image on the right.](docs/screenshots/overview.png)
 
-*Two file panels, with previews below them. All screenshots use example files
-and folders.*
+*Two file panels, with a preview of the selected file beside them.*
 
 ## What you can do
 
