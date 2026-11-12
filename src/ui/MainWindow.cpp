@@ -395,6 +395,7 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("paste")] = addCommand(edit, QT_TR_NOOP("Paste"), {K(Qt::CTRL | Qt::Key_V)}, [this] { paste(); });
     m_actions[QStringLiteral("copyPath")] = addCommand(edit, QT_TR_NOOP("Copy full paths as text"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_C)},
                [this] { copyPathsAsText(); });
+    m_actions[QStringLiteral("copyName")] = addCommand(edit, QT_TR_NOOP("Copy names as text"), {}, [this] { copyNamesAsText(); });
     edit->addSeparator();
     m_actions[QStringLiteral("markAll")] = addCommand(edit, QT_TR_NOOP("Mark all"), {K(Qt::CTRL | Qt::Key_A)}, [this] { active()->markAll(true); });
     m_actions[QStringLiteral("unmarkAll")] = addCommand(edit, QT_TR_NOOP("Unmark all"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_A)}, [this] { active()->markAll(false); });
@@ -1530,6 +1531,19 @@ void MainWindow::copyPathsAsText()
         return;
     QApplication::clipboard()->setText(paths.join(QLatin1Char('\n')));
     active()->showMessage(plural(tr("Copied %n path(s)", nullptr, int(paths.size())), int(paths.size())));
+}
+
+void MainWindow::copyNamesAsText()
+{
+    const QStringList paths = active()->selectedPaths();
+    if (paths.isEmpty())
+        return;
+    QStringList names;
+    names.reserve(paths.size());
+    for (const QString& p : paths)
+        names << baseName(p);
+    QApplication::clipboard()->setText(names.join(QLatin1Char('\n')));
+    active()->showMessage(plural(tr("Copied %n name(s)", nullptr, int(names.size())), int(names.size())));
 }
 
 void MainWindow::paste()
@@ -3009,6 +3023,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         act("copy")->setText(tr("Extract to other panel…"));
         menu.addAction(act("copy"));
         menu.addAction(act("copyPath"));
+        menu.addAction(act("copyName"));
         menu.exec(pos);
         act("copy")->setText(tr("Copy…"));
         return;
@@ -3066,6 +3081,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     menu.addAction(act("link"));
     menu.addAction(act("checksums"));
     menu.addAction(act("copyPath"));
+    menu.addAction(act("copyName"));
     addPluginItems(&menu, panel, true);
     menu.addSeparator();
     if (e && e->isDir)

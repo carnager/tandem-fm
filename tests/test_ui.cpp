@@ -1359,6 +1359,20 @@ private slots:
         leftModel()->markAll(false);
     }
 
+    void contextMenuCopiesNamesWithoutPaths()
+    {
+        chooseFromNextMenu(QObject::tr("Copy names as text"));
+        rightClick(m_left->view(), leftModel()->rowOf("photo.jpg"));
+        QCOMPARE(QApplication::clipboard()->text(), QString("photo.jpg"));
+
+        leftModel()->setMarked(leftModel()->rowOf("file1.txt"), true);
+        leftModel()->setMarked(leftModel()->rowOf("file10.txt"), true);
+        chooseFromNextMenu(QObject::tr("Copy names as text"));
+        rightClick(m_left->view(), leftModel()->rowOf("file1.txt"));
+        QCOMPARE(QApplication::clipboard()->text(), QString("file1.txt\nfile10.txt"));
+        leftModel()->markAll(false);
+    }
+
     void contextMenuNewFileOnEmptyArea()
     {
         answerNextDialog([](QWidget* w) {

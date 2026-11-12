@@ -2546,6 +2546,10 @@
         <translation>In offenen Tab, Lesezeichen oder Ordner verschieben…</translation>
     </message>
     <message>
+        <source>Copy names as text</source>
+        <translation>Namen als Text kopieren</translation>
+    </message>
+    <message>
         <source>Filter with subfolders…</source>
         <translation>Mit Unterordnern filtern…</translation>
     </message>
@@ -2879,6 +2883,13 @@
         <translation>
             <numerusform>%n Pfad kopiert</numerusform>
             <numerusform>%n Pfade kopiert</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Copied %n name(s)</source>
+        <translation>
+            <numerusform>%n Name kopiert</numerusform>
+            <numerusform>%n Namen kopiert</numerusform>
         </translation>
     </message>
     <message>
