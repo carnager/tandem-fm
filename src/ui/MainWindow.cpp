@@ -396,6 +396,7 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("copyPath")] = addCommand(edit, QT_TR_NOOP("Copy full paths as text"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_C)},
                [this] { copyPathsAsText(); });
     m_actions[QStringLiteral("copyFolderPath")] = addCommand(edit, QT_TR_NOOP("Copy folder path"), {}, [this] { copyFolderPath(); });
+    m_actions[QStringLiteral("copyName")] = addCommand(edit, QT_TR_NOOP("Copy names as text"), {}, [this] { copyNamesAsText(); });
     edit->addSeparator();
     m_actions[QStringLiteral("markAll")] = addCommand(edit, QT_TR_NOOP("Mark all"), {K(Qt::CTRL | Qt::Key_A)}, [this] { active()->markAll(true); });
     m_actions[QStringLiteral("unmarkAll")] = addCommand(edit, QT_TR_NOOP("Unmark all"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_A)}, [this] { active()->markAll(false); });
@@ -1538,6 +1539,17 @@ void MainWindow::copyFolderPath()
     const QString path = active()->path();
     QApplication::clipboard()->setText(path);
     active()->showMessage(tr("Copied %1").arg(path));
+}
+
+void MainWindow::copyNamesAsText()
+{
+    QStringList names = active()->selectedPaths();
+    if (names.isEmpty())
+        return;
+    for (QString& name : names)
+        name = QFileInfo(name).fileName();
+    QApplication::clipboard()->setText(names.join(QLatin1Char('\n')));
+    active()->showMessage(plural(tr("Copied %n name(s)", nullptr, int(names.size())), int(names.size())));
 }
 
 void MainWindow::paste()
@@ -3018,6 +3030,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         act("copy")->setText(tr("Extract to other panel…"));
         menu.addAction(act("copy"));
         menu.addAction(act("copyPath"));
+        menu.addAction(act("copyName"));
         menu.exec(pos);
         act("copy")->setText(tr("Copy…"));
         return;
@@ -3075,6 +3088,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     menu.addAction(act("link"));
     menu.addAction(act("checksums"));
     menu.addAction(act("copyPath"));
+    menu.addAction(act("copyName"));
     addPluginItems(&menu, panel, true);
     menu.addSeparator();
     if (e && e->isDir)

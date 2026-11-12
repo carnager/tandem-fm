@@ -82,6 +82,7 @@ private:
     void copyToClipboard(bool cut);
     void copyPathsAsText();
     void copyFolderPath();  // the shown folder, as text
+    void copyNamesAsText();  // just the names, one per line
     void paste();
     void swapPanels();
     void openInPanel(Panel* target);
