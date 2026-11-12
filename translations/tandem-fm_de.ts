@@ -2550,6 +2550,14 @@
         <translation>Namen als Text kopieren</translation>
     </message>
     <message>
+        <source>Copy names without extension as text</source>
+        <translation>Namen ohne Endung als Text kopieren</translation>
+    </message>
+    <message>
+        <source>Copy folder path as text</source>
+        <translation>Ordnerpfad als Text kopieren</translation>
+    </message>
+    <message>
         <source>Filter with subfolders…</source>
         <translation>Mit Unterordnern filtern…</translation>
     </message>
@@ -2891,6 +2899,10 @@
             <numerusform>%n Name kopiert</numerusform>
             <numerusform>%n Namen kopiert</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>Copy as text</source>
+        <translation>Als Text kopieren</translation>
     </message>
     <message>
         <source>Files from a server can&apos;t be pasted into an archive yet. Copy them to a local folder first.</source>

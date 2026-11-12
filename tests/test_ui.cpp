@@ -70,6 +70,7 @@
 #include <QTabBar>
 #include <QToolButton>
 #include <QSaveFile>
+#include <QSet>
 #include <QSettings>
 #include <QImage>
 #include <QImageReader>
@@ -1371,6 +1372,29 @@ private slots:
         rightClick(m_left->view(), leftModel()->rowOf("file1.txt"));
         QCOMPARE(QApplication::clipboard()->text(), QString("file1.txt\nfile10.txt"));
         leftModel()->markAll(false);
+    }
+
+    void contextMenuCopiesNamesWithoutExtension()
+    {
+        // A folder keeps its whole name: "v1.2" has no extension.
+        QVERIFY(QDir().mkdir(L("v1.2")));
+        QTRY_VERIFY(leftModel()->rowOf("v1.2") >= 0);
+        leftModel()->setMarked(leftModel()->rowOf("photo.jpg"), true);
+        leftModel()->setMarked(leftModel()->rowOf("v1.2"), true);
+        chooseFromNextMenu(QObject::tr("Copy names without extension as text"));
+        rightClick(m_left->view(), leftModel()->rowOf("photo.jpg"));
+        const QStringList got = QApplication::clipboard()->text().split('\n');
+        QCOMPARE(QSet<QString>(got.begin(), got.end()), QSet<QString>({"photo", "v1.2"}));
+        leftModel()->markAll(false);
+        QVERIFY(QDir().rmdir(L("v1.2")));
+        QTRY_COMPARE(leftModel()->rowOf("v1.2"), -1);
+    }
+
+    void contextMenuCopiesFolderPath()
+    {
+        chooseFromNextMenu(QObject::tr("Copy folder path as text"));
+        rightClick(m_left->view(), leftModel()->rowOf("photo.jpg"));
+        QCOMPARE(QApplication::clipboard()->text(), leftModel()->path());
     }
 
     void contextMenuNewFileOnEmptyArea()
