@@ -209,6 +209,13 @@
         </translation>
     </message>
     <message numerus="yes">
+        <source>Copied %n name(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>Links to %n item(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>

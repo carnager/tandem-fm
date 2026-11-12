@@ -9,6 +9,7 @@
 #include "core/DirLister.h"
 #include "core/Shelves.h"
 #include "core/MultiRename.h"
+#include "core/Sorting.h"
 #include "core/Util.h"
 #include "ui/DirTab.h"
 #include "ui/Dialogs.h"
@@ -83,6 +84,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QScrollArea>
+#include <QSet>
 #include <QSettings>
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -395,6 +397,10 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("paste")] = addCommand(edit, QT_TR_NOOP("Paste"), {K(Qt::CTRL | Qt::Key_V)}, [this] { paste(); });
     m_actions[QStringLiteral("copyPath")] = addCommand(edit, QT_TR_NOOP("Copy full paths as text"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_C)},
                [this] { copyPathsAsText(); });
+    m_actions[QStringLiteral("copyName")] = addCommand(edit, QT_TR_NOOP("Copy names as text"), {}, [this] { copyNamesAsText(false); });
+    m_actions[QStringLiteral("copyStem")] = addCommand(edit, QT_TR_NOOP("Copy names without extension as text"), {},
+                                                       [this] { copyNamesAsText(true); });
+    m_actions[QStringLiteral("copyFolder")] = addCommand(edit, QT_TR_NOOP("Copy folder path as text"), {}, [this] { copyFolderPath(); });
     edit->addSeparator();
     m_actions[QStringLiteral("markAll")] = addCommand(edit, QT_TR_NOOP("Mark all"), {K(Qt::CTRL | Qt::Key_A)}, [this] { active()->markAll(true); });
     m_actions[QStringLiteral("unmarkAll")] = addCommand(edit, QT_TR_NOOP("Unmark all"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_A)}, [this] { active()->markAll(false); });
@@ -1530,6 +1536,44 @@ void MainWindow::copyPathsAsText()
         return;
     QApplication::clipboard()->setText(paths.join(QLatin1Char('\n')));
     active()->showMessage(plural(tr("Copied %n path(s)", nullptr, int(paths.size())), int(paths.size())));
+}
+
+void MainWindow::copyNamesAsText(bool withoutExtension)
+{
+    const QStringList paths = active()->selectedPaths();
+    if (paths.isEmpty())
+        return;
+    // Folders keep their whole name: "v1.2" has no extension.
+    QSet<QString> folders;
+    if (const FileModel* model = withoutExtension && active()->tab() ? active()->tab()->model() : nullptr)
+        for (int row = 0, n = model->rowCount(); row < n; ++row)
+            if (const FileEntry* e = model->entry(row); e && e->isDir)
+                folders.insert(e->name);
+    QStringList names;
+    names.reserve(paths.size());
+    for (const QString& p : paths) {
+        const QString name = baseName(p);
+        const QStringView ext = withoutExtension && !folders.contains(name) ? extensionOf(name) : QStringView();
+        names << (ext.isEmpty() ? name : name.left(name.size() - ext.size() - 1));
+    }
+    QApplication::clipboard()->setText(names.join(QLatin1Char('\n')));
+    active()->showMessage(plural(tr("Copied %n name(s)", nullptr, int(names.size())), int(names.size())));
+}
+
+void MainWindow::addCopyAsTextMenu(QMenu* menu)
+{
+    QMenu* sub = menu->addMenu(IconCache::themed("edit-copy"), tr("Copy as text"));
+    for (const char* id : {"copyPath", "copyName", "copyStem", "copyFolder"})
+        sub->addAction(m_actions.value(QLatin1String(id)));
+}
+
+void MainWindow::copyFolderPath()
+{
+    const QString dir = active()->path();
+    if (dir.isEmpty())
+        return;
+    QApplication::clipboard()->setText(dir);
+    active()->showMessage(tr("Copied %1").arg(dir));
 }
 
 void MainWindow::paste()
@@ -2977,6 +3021,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         menu.addAction(act("paste"));
         menu.addSeparator();
         menu.addAction(act("terminal"));
+        menu.addAction(act("copyFolder"));
         menu.addSeparator();
         QMenu* sort = menu.addMenu(tr("Sort by"));
         for (const char* id : {"sortName", "sortExt", "sortDate", "sortSize"})
@@ -3008,7 +3053,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         menu.addSeparator();
         act("copy")->setText(tr("Extract to other panel…"));
         menu.addAction(act("copy"));
-        menu.addAction(act("copyPath"));
+        addCopyAsTextMenu(&menu);
         menu.exec(pos);
         act("copy")->setText(tr("Copy…"));
         return;
@@ -3065,7 +3110,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
     menu.addAction(act("permissions"));
     menu.addAction(act("link"));
     menu.addAction(act("checksums"));
-    menu.addAction(act("copyPath"));
+    addCopyAsTextMenu(&menu);
     addPluginItems(&menu, panel, true);
     menu.addSeparator();
     if (e && e->isDir)

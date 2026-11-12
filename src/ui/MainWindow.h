@@ -81,6 +81,9 @@ private:
     void handleDrop(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
     void copyToClipboard(bool cut);
     void copyPathsAsText();
+    void copyNamesAsText(bool withoutExtension);
+    void copyFolderPath();
+    void addCopyAsTextMenu(QMenu* menu);
     void paste();
     void swapPanels();
     void openInPanel(Panel* target);
