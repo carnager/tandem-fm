@@ -1359,6 +1359,16 @@ private slots:
         leftModel()->markAll(false);
     }
 
+    void copyFolderPathFromEmptyArea()
+    {
+        QApplication::clipboard()->clear();
+        chooseFromNextMenu(QObject::tr("Copy folder path"));
+        const QPoint empty(20, m_left->view()->viewport()->height() - 5);
+        QContextMenuEvent ev(QContextMenuEvent::Mouse, empty, m_left->view()->viewport()->mapToGlobal(empty));
+        QApplication::sendEvent(m_left->view()->viewport(), &ev);
+        QCOMPARE(QApplication::clipboard()->text(), leftModel()->path());  // the folder, not the file under the cursor
+    }
+
     void contextMenuNewFileOnEmptyArea()
     {
         answerNextDialog([](QWidget* w) {

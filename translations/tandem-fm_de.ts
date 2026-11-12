@@ -2318,6 +2318,10 @@
         <translation>Vollständige Pfade als Text kopieren</translation>
     </message>
     <message>
+        <source>Copy folder path</source>
+        <translation>Ordnerpfad kopieren</translation>
+    </message>
+    <message>
         <source>Pack…</source>
         <translation>Packen…</translation>
     </message>

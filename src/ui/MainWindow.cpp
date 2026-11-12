@@ -395,6 +395,7 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("paste")] = addCommand(edit, QT_TR_NOOP("Paste"), {K(Qt::CTRL | Qt::Key_V)}, [this] { paste(); });
     m_actions[QStringLiteral("copyPath")] = addCommand(edit, QT_TR_NOOP("Copy full paths as text"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_C)},
                [this] { copyPathsAsText(); });
+    m_actions[QStringLiteral("copyFolderPath")] = addCommand(edit, QT_TR_NOOP("Copy folder path"), {}, [this] { copyFolderPath(); });
     edit->addSeparator();
     m_actions[QStringLiteral("markAll")] = addCommand(edit, QT_TR_NOOP("Mark all"), {K(Qt::CTRL | Qt::Key_A)}, [this] { active()->markAll(true); });
     m_actions[QStringLiteral("unmarkAll")] = addCommand(edit, QT_TR_NOOP("Unmark all"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_A)}, [this] { active()->markAll(false); });
@@ -1530,6 +1531,13 @@ void MainWindow::copyPathsAsText()
         return;
     QApplication::clipboard()->setText(paths.join(QLatin1Char('\n')));
     active()->showMessage(plural(tr("Copied %n path(s)", nullptr, int(paths.size())), int(paths.size())));
+}
+
+void MainWindow::copyFolderPath()
+{
+    const QString path = active()->path();
+    QApplication::clipboard()->setText(path);
+    active()->showMessage(tr("Copied %1").arg(path));
 }
 
 void MainWindow::paste()
@@ -2975,6 +2983,7 @@ void MainWindow::showContextMenu(Panel* panel, const QPoint& pos, bool onItem)
         menu.addSeparator();
         act("paste")->setEnabled(canPaste);
         menu.addAction(act("paste"));
+        menu.addAction(act("copyFolderPath"));
         menu.addSeparator();
         menu.addAction(act("terminal"));
         menu.addSeparator();
