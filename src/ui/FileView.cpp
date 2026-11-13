@@ -20,6 +20,9 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QScrollBar>
+#ifdef Q_OS_MACOS
+#include <QSettings>
+#endif
 #include <QTimer>
 
 namespace tandem {
@@ -883,9 +886,9 @@ void FileView::dragMoveEvent(QDragMoveEvent* e)
         m_dropRow = row;
         viewport()->update();
     }
-    if (e->modifiers() & Qt::ShiftModifier)
+    if ((e->modifiers() & Qt::ShiftModifier) && (e->possibleActions() & Qt::MoveAction))
         e->setDropAction(Qt::MoveAction);
-    else if (e->modifiers() & Qt::ControlModifier)
+    else if ((e->modifiers() & Qt::ControlModifier) && (e->possibleActions() & Qt::CopyAction))
         e->setDropAction(Qt::CopyAction);
     else
         e->setDropAction(e->proposedAction());
@@ -966,9 +969,9 @@ void FileView::dropEvent(QDropEvent* e)
         return;
     }
     Qt::DropAction action = e->proposedAction();
-    if (e->modifiers() & Qt::ShiftModifier)
+    if ((e->modifiers() & Qt::ShiftModifier) && (e->possibleActions() & Qt::MoveAction))
         action = Qt::MoveAction;
-    else if (e->modifiers() & Qt::ControlModifier)
+    else if ((e->modifiers() & Qt::ControlModifier) && (e->possibleActions() & Qt::CopyAction))
         action = Qt::CopyAction;
     e->setDropAction(action);
     e->accept();
@@ -1085,7 +1088,13 @@ void FileView::startFileDrag()
     const FileEntry* e = fileModel() ? fileModel()->entry(currentRow()) : nullptr;
     if (e)
         drag->setPixmap(model()->index(currentRow(), 0).data(Qt::DecorationRole).value<QIcon>().pixmap(32));
-    drag->exec(Qt::CopyAction | Qt::MoveAction | Qt::LinkAction, Qt::CopyAction);
+    Qt::DropActions actions = Qt::CopyAction | Qt::MoveAction | Qt::LinkAction;
+#ifdef Q_OS_MACOS
+    // A copy default alone still lets Finder negotiate a move on the same volume.
+    if (QSettings().value(QStringLiteral("files/copyOnlyDrag"), false).toBool())
+        actions = Qt::CopyAction;
+#endif
+    drag->exec(actions, Qt::CopyAction);
 }
 
 }  // namespace tandem

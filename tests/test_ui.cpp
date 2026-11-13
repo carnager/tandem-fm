@@ -59,6 +59,7 @@
 #include <QFontDatabase>
 #include <QMenuBar>
 #include <QMimeData>
+#include <QDrag>
 #include <QScrollBar>
 #include <QStyle>
 
@@ -1128,6 +1129,99 @@ private slots:
         QTest::keyClick(m_left->view(), Qt::Key_F7);
         QTRY_VERIFY(QFileInfo(L("made/nested")).isDir());
         QTRY_COMPARE(m_left->currentName(), QString("made"));  // cursor jumps to the new folder
+    }
+
+    // Inspect the real drag without letting it reach the desktop (offscreen).
+    void outgoingDragActions_data()
+    {
+        QTest::addColumn<bool>("grid");
+        QTest::addColumn<bool>("copyOnly");
+        QTest::newRow("list-default") << false << false;
+        QTest::newRow("list-copy") << false << true;
+        QTest::newRow("grid-default") << true << false;
+        QTest::newRow("grid-copy") << true << true;
+    }
+
+    void outgoingDragActions()
+    {
+        QFETCH(bool, grid);
+        QFETCH(bool, copyOnly);
+        const QString key = QStringLiteral("files/copyOnlyDrag");
+        auto cleanup = qScopeGuard([key] { QSettings().remove(key); });
+        QSettings().remove(key);
+        SettingsDialog settings(m_window.get());
+        auto* box = settings.findChild<QCheckBox*>("copyOnlyDrag");
+#ifdef Q_OS_MACOS
+        QVERIFY(box);
+        QVERIFY(!box->isChecked());
+        box->setChecked(copyOnly);
+        QCOMPARE(QSettings().value(key, false).toBool(), copyOnly);
+        SettingsDialog reopened(m_window.get());
+        QCOMPARE(reopened.findChild<QCheckBox*>("copyOnlyDrag")->isChecked(), copyOnly);
+#else
+        QVERIFY(!box);
+        QSettings().setValue(key, copyOnly);  // a synced Mac preference has no effect here
+#endif
+        FileModel model;
+        FileEntry entry;
+        entry.name = "drag.txt";
+        model.setListing(L(), {entry});
+        FileView view;
+        view.setModel(&model);
+        connect(&view, &FileView::dragPathsRequested, &view,
+                [this](QStringList& paths) { paths = {L("drag.txt")}; });
+        view.resize(600, 400);
+        view.setThumbnails(grid);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        const int row = model.rowOf("drag.txt");
+        QVERIFY(row >= 0);
+        QWidget* source = grid ? static_cast<QWidget*>(view.thumbGrid()) : view.viewport();
+        const QPoint from = grid ? view.thumbGrid()->cellRect(row).center()
+                                 : view.visualRect(model.index(row, 0)).center();
+        QTest::mousePress(source, Qt::LeftButton, Qt::NoModifier, from);
+        const QPoint to = from + QPoint(QApplication::startDragDistance() + 10, 0);
+        QMouseEvent move(QEvent::MouseMove, to, source->mapToGlobal(to), Qt::NoButton,
+                         Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(source, &move);
+        auto* drag = view.findChild<QDrag*>();
+        QVERIFY(drag);
+        Qt::DropActions expected = Qt::CopyAction | Qt::MoveAction | Qt::LinkAction;
+#ifdef Q_OS_MACOS
+        if (copyOnly)
+            expected = Qt::CopyAction;
+#endif
+        QCOMPARE(drag->supportedActions(), expected);
+        QCOMPARE(drag->defaultAction(), Qt::CopyAction);
+        QCOMPARE(drag->mimeData()->urls(), QList<QUrl>{QUrl::fromLocalFile(L("drag.txt"))});
+    }
+
+    void copyOnlyDropIgnoresMoveModifier()
+    {
+        FileModel model;
+        model.setListing(R(), {});
+        FileView view;
+        view.setModel(&model);
+        view.resize(600, 400);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        QMimeData data;
+        data.setUrls({QUrl::fromLocalFile(L("file1.txt"))});
+        QSignalSpy dropped(&view, &FileView::dropRequested);
+        const QPoint pos(20, 100);
+        QDragEnterEvent enter(pos, Qt::CopyAction, &data, Qt::LeftButton, Qt::ShiftModifier);
+        QApplication::sendEvent(view.viewport(), &enter);
+        QVERIFY(enter.isAccepted());
+        QDragMoveEvent move(pos, Qt::CopyAction, &data, Qt::LeftButton, Qt::ShiftModifier);
+        QApplication::sendEvent(view.viewport(), &move);
+        QVERIFY(move.isAccepted());
+        QCOMPARE(move.dropAction(), Qt::CopyAction);
+        QDropEvent drop(pos, Qt::CopyAction, &data, Qt::LeftButton, Qt::ShiftModifier);
+        QApplication::sendEvent(view.viewport(), &drop);
+        QVERIFY(drop.isAccepted());
+        QCOMPARE(drop.dropAction(), Qt::CopyAction);
+        QCOMPARE(dropped.count(), 1);
+        QCOMPARE(dropped.first().at(2).value<Qt::DropAction>(), Qt::CopyAction);
     }
 
     void renameInPlace()
