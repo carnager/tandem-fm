@@ -5167,6 +5167,18 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Buchstaben sind Befehle, wie in vim und yazi: j k h l zum Bewegen, v für den visuellen Modus, y x p zum Kopieren, Ausschneiden und Einfügen, d in den Papierkorb, r zum Umbenennen, a zum Anlegen, t q für Tabs, / zum Suchen, : für die Palette. F1 zeigt alle. Tippen startet nicht mehr die Schnellsuche.</translation>
     </message>
     <message>
+        <source>Copy files when dragging</source>
+        <translation>Dateien beim Ziehen kopieren</translation>
+    </message>
+    <message>
+        <source>Drag and drop</source>
+        <translation>Ziehen und Ablegen</translation>
+    </message>
+    <message>
+        <source>Dragging from either panel copies files instead of moving them, even when modifier keys are held.</source>
+        <translation>Beim Ziehen aus einem Panel werden Dateien kopiert statt verschoben, auch wenn du Zusatztasten gedrückt hältst.</translation>
+    </message>
+    <message>
         <source>Notifications</source>
         <translation>Benachrichtigungen</translation>
     </message>
