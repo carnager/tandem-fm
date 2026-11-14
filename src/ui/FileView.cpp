@@ -321,6 +321,12 @@ void FileDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewI
 FileView::FileView(QWidget* parent) : QTreeView(parent)
 {
     setItemDelegate(new FileDelegate(this));
+    connect(&Keymap::instance(), &Keymap::changed, this, [this] {
+        if (!m_pending.isEmpty()) {
+            m_pending.clear();
+            emit hintRequested(QString());
+        }
+    });
     connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, [this] {
         zoomChanged();  // a new font or interface size: rows of another height
     });

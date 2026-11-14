@@ -42,6 +42,10 @@ private:
     void fillKeys();
     void keySelected();
     void assignKeys(const QKeySequence& seq);
+    void assignModalKeys();
+    void keySlotSelected();
+    QStringList selectedBindings() const;
+    QString selectedKeyId() const;
 
     MainWindow* m_window;
     QListWidget* m_nav;
@@ -49,6 +53,10 @@ private:
     QTreeWidget* m_keys = nullptr;
     QLineEdit* m_keyFilter = nullptr;
     QKeySequenceEdit* m_keyEdit = nullptr;
+    QComboBox* m_keyMode = nullptr;
+    QComboBox* m_keySlot = nullptr;
+    QStackedWidget* m_keyEditors = nullptr;
+    QLineEdit* m_modalEdit = nullptr;
     QLabel* m_keyNote = nullptr;
     QPushButton* m_keyClear = nullptr;
     QPushButton* m_keyReset = nullptr;

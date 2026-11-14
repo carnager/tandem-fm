@@ -806,24 +806,45 @@ QWidget* SettingsDialog::keysPage()
     m_keyFilter = new QLineEdit(w);
     m_keyFilter->setPlaceholderText(tr("Find a command or a key"));
     m_keyFilter->setClearButtonEnabled(true);
+    m_keyMode = new QComboBox(w);
+    m_keyMode->setObjectName(QStringLiteral("keyBindingMode"));
+    m_keyMode->addItems({tr("Standard shortcuts"), tr("Modal keys (vim, yazi)")});
+    v->addWidget(m_keyMode);
     v->addWidget(m_keyFilter);
     m_keys = new QTreeWidget(w);
-    m_keys->setColumnCount(2);
-    m_keys->setHeaderLabels({tr("Command"), tr("Keys")});
+    m_keys->setColumnCount(3);
+    m_keys->setHeaderLabels({tr("Command"), tr("Key"), tr("Alternate keys")});
     m_keys->setRootIsDecorated(false);
     m_keys->setUniformRowHeights(true);
     m_keys->setAlternatingRowColors(true);
     m_keys->header()->setSectionResizeMode(0, QHeaderView::Stretch);
-    m_keys->header()->resizeSection(1, 200);
+    m_keys->header()->resizeSection(1, 140);
+    m_keys->header()->resizeSection(2, 180);
     v->addWidget(m_keys, 1);
 
     auto* editRow = new QHBoxLayout;
-    editRow->addWidget(new QLabel(tr("Press the new keys:"), w));
+    m_keySlot = new QComboBox(w);
+    m_keySlot->setObjectName(QStringLiteral("keyBindingSlot"));
+    editRow->addWidget(m_keySlot);
+    m_keyEditors = new QStackedWidget(w);
     m_keyEdit = new QKeySequenceEdit(w);
     m_keyEdit->setMaximumSequenceLength(1);
     m_keyEdit->setClearButtonEnabled(false);
-    editRow->addWidget(m_keyEdit, 1);
-    m_keyClear = new QPushButton(tr("No key"), w);
+    m_keyEditors->addWidget(m_keyEdit);
+    auto* modalRow = new QWidget(w);
+    auto* modalLayout = new QHBoxLayout(modalRow);
+    modalLayout->setContentsMargins(0, 0, 0, 0);
+    m_modalEdit = new QLineEdit(modalRow);
+    m_modalEdit->setObjectName(QStringLiteral("modalBindingEdit"));
+    m_modalEdit->setPlaceholderText(tr("A key or a chain, for example: g w s"));
+    modalLayout->addWidget(m_modalEdit, 1);
+    auto* applyModal = new QPushButton(tr("Apply"), modalRow);
+    applyModal->setObjectName(QStringLiteral("applyModalBinding"));
+    applyModal->setAutoDefault(false);
+    modalLayout->addWidget(applyModal);
+    m_keyEditors->addWidget(modalRow);
+    editRow->addWidget(m_keyEditors, 1);
+    m_keyClear = new QPushButton(tr("Remove binding"), w);
     m_keyReset = new QPushButton(tr("Default"), w);
     for (QPushButton* b : {m_keyClear, m_keyReset})
         b->setAutoDefault(false);
@@ -840,14 +861,42 @@ QWidget* SettingsDialog::keysPage()
     v->addLayout(bottom);
 
     fillKeys();
+    connect(&Keymap::instance(), &Keymap::saved, this, [this](bool ok) {
+        if (!ok)
+            m_keyNote->setText(Keymap::instance().error());
+    });
+    connect(m_keyMode, &QComboBox::currentIndexChanged, this, [this](int mode) {
+        m_keyEditors->setCurrentIndex(mode);
+        m_keyNote->setText(mode ? tr("Use spaces for a chain. Press Enter or Apply to save it.")
+                               : tr("Choose a binding to change, or add an alternate key."));
+        fillKeys();
+    });
+    connect(m_keySlot, &QComboBox::currentIndexChanged, this, &SettingsDialog::keySlotSelected);
+    connect(applyModal, &QPushButton::clicked, this, &SettingsDialog::assignModalKeys);
+    connect(m_modalEdit, &QLineEdit::returnPressed, this, &SettingsDialog::assignModalKeys);
     connect(m_keyFilter, &QLineEdit::textChanged, this, &SettingsDialog::fillKeys);
     connect(m_keys, &QTreeWidget::currentItemChanged, this, &SettingsDialog::keySelected);
     connect(m_keyEdit, &QKeySequenceEdit::keySequenceChanged, this, [this](const QKeySequence& seq) {
         if (!m_loadingKey && !seq.isEmpty())
             assignKeys(seq);
     });
-    connect(m_keyClear, &QPushButton::clicked, this, [this] { assignKeys({}); });
+    connect(m_keyClear, &QPushButton::clicked, this, [this] {
+        if (m_keyMode->currentIndex()) {
+            m_modalEdit->clear();
+            assignModalKeys();
+        } else {
+            assignKeys({});
+        }
+    });
     connect(m_keyReset, &QPushButton::clicked, this, [this] {
+        if (m_keyMode->currentIndex()) {
+            const QString id = selectedKeyId();
+            if (!id.isEmpty()) {
+                Keymap::instance().setModalKeys(id, std::nullopt);
+                fillKeys();
+            }
+            return;
+        }
         QTreeWidgetItem* it = m_keys->currentItem();
         auto* a = it ? it->data(0, Qt::UserRole).value<QAction*>() : nullptr;
         if (!a)
@@ -857,6 +906,12 @@ QWidget* SettingsDialog::keysPage()
         fillKeys();
     });
     connect(resetAll, &QPushButton::clicked, this, [this] {
+        if (m_keyMode->currentIndex()) {
+            Keymap::instance().resetModalKeys();
+            fillKeys();
+            m_keyNote->setText(tr("All modal keys are back to their defaults."));
+            return;
+        }
         for (QAction* a : m_window->actions()) {
             if (a->property("commandId").toString().isEmpty())
                 continue;
@@ -869,42 +924,137 @@ QWidget* SettingsDialog::keysPage()
     return w;
 }
 
+QString SettingsDialog::selectedKeyId() const
+{
+    const auto* item = m_keys->currentItem();
+    return item ? item->data(0, Qt::UserRole + 1).toString() : QString();
+}
+
+QStringList SettingsDialog::selectedBindings() const
+{
+    const QString id = selectedKeyId();
+    QStringList result;
+    if (m_keyMode->currentIndex()) {
+        for (const auto& b : Keymap::instance().modalBindings())
+            if (b.action == id)
+                result << b.sequence.join(QLatin1Char(' '));
+    } else if (auto* item = m_keys->currentItem()) {
+        if (auto* a = item->data(0, Qt::UserRole).value<QAction*>())
+            for (const auto& key : a->shortcuts())
+                result << key.toString(QKeySequence::PortableText);
+    }
+    return result;
+}
+
 void SettingsDialog::fillKeys()
 {
-    QAction* selected = m_keys->currentItem() ? m_keys->currentItem()->data(0, Qt::UserRole).value<QAction*>() : nullptr;
-    const QString q = m_keyFilter->text().trimmed();
+    const QString selected = selectedKeyId();
+    const int slot = m_keySlot->currentIndex();
+    const QString query = m_keyFilter->text().trimmed();
+    const bool modal = m_keyMode->currentIndex();
     m_keys->clear();
     QTreeWidgetItem* reselect = nullptr;
-    for (QAction* a : m_window->actions()) {
-        if (a->property("commandId").toString().isEmpty())
-            continue;
-        const QString name = QStringLiteral("%1 › %2").arg(a->property("category").toString(), a->text().remove(QLatin1Char('&')));
-        const QString keys = keysText(a->shortcuts());
-        if (!q.isEmpty() && !name.contains(q, Qt::CaseInsensitive) && !keys.contains(q, Qt::CaseInsensitive))
-            continue;
-        auto* it = new QTreeWidgetItem(m_keys, {name, keys});
-        it->setData(0, Qt::UserRole, QVariant::fromValue(a));
-        if (a->shortcuts() != defaultKeys(a)) {  // changed: in the accent colour
-            it->setForeground(1, theme().accent);
-            it->setToolTip(1, tr("Default: %1").arg(keysText(defaultKeys(a)).isEmpty() ? tr("none") : keysText(defaultKeys(a))));
+    auto add = [&](const QString& id, const QString& title, QAction* a, const QStringList& keys, bool changed) {
+        QStringList display = keys;
+        if (!modal) {
+            display.clear();
+            for (const auto& key : keys)
+                display << QKeySequence::fromString(key, QKeySequence::PortableText).toString(QKeySequence::NativeText);
         }
-        if (a == selected)
-            reselect = it;
+        if (!query.isEmpty() && !title.contains(query, Qt::CaseInsensitive) &&
+            !display.join(QLatin1Char(' ')).contains(query, Qt::CaseInsensitive))
+            return;
+        auto* item = new QTreeWidgetItem(m_keys, {title, display.value(0), display.mid(1).join(QStringLiteral(", "))});
+        item->setData(0, Qt::UserRole, QVariant::fromValue(a));
+        item->setData(0, Qt::UserRole + 1, id);
+        if (changed) {
+            QString defaults;
+            if (modal) {
+                for (const auto& [action, sequence] : Keymap::modalDefaults())
+                    if (action == id)
+                        defaults = sequence;
+            } else if (a) {
+                defaults = keysText(defaultKeys(a));
+            }
+            for (int column : {1, 2}) {
+                item->setForeground(column, theme().accent);
+                item->setToolTip(column, tr("Default: %1").arg(defaults.isEmpty() ? tr("none") : defaults));
+            }
+        }
+        if (id == selected)
+            reselect = item;
+    };
+    auto modalKeys = [](const QString& id) {
+        QStringList keys;
+        for (const auto& b : Keymap::instance().modalBindings())
+            if (b.action == id)
+                keys << b.sequence.join(QLatin1Char(' '));
+        return keys;
+    };
+    for (QAction* a : m_window->actions()) {
+        const QString id = a->property("commandId").toString();
+        if (id.isEmpty() || (modal && Keymap::builtinActions().contains(id)))
+            continue;
+        QStringList keys;
+        for (const auto& key : a->shortcuts())
+            keys << key.toString(QKeySequence::PortableText);
+        add(id, QStringLiteral("%1 › %2").arg(a->property("category").toString(), a->text().remove(QLatin1Char('&'))), a,
+            modal ? modalKeys(id) : keys,
+            modal ? Keymap::instance().modalKeys(id).has_value() : a->shortcuts() != defaultKeys(a));
+    }
+    if (modal) {
+        const std::pair<const char*, const char*> builtins[] = {
+            {"down", QT_TR_NOOP("Move down")}, {"up", QT_TR_NOOP("Move up")},
+            {"parent", QT_TR_NOOP("Parent folder")}, {"open", QT_TR_NOOP("Open")},
+            {"top", QT_TR_NOOP("First item")}, {"bottom", QT_TR_NOOP("Last item")},
+            {"half-page-down", QT_TR_NOOP("Half a page down")}, {"half-page-up", QT_TR_NOOP("Half a page up")},
+            {"visual", QT_TR_NOOP("Visual selection")}, {"visual-unmark", QT_TR_NOOP("Visual unmarking")},
+            {"find", QT_TR_NOOP("Find")}, {"find-next", QT_TR_NOOP("Next match")},
+            {"find-previous", QT_TR_NOOP("Previous match")}, {"palette", QT_TR_NOOP("Command palette")},
+            {"command-line", QT_TR_NOOP("Command line")}, {"bookmark-jump", QT_TR_NOOP("Jump to bookmark")},
+            {"bookmark-set", QT_TR_NOOP("Set bookmark")}, {"bookmark-prefix", QT_TR_NOOP("Bookmark prefix")},
+            {"create", QT_TR_NOOP("Create a file or folder")}, {"jobs", QT_TR_NOOP("Show jobs")},
+            {"preview-up", QT_TR_NOOP("Scroll preview up")}, {"preview-down", QT_TR_NOOP("Scroll preview down")},
+        };
+        for (const auto& [id, title] : builtins)
+            add(QLatin1String(id), tr("Modal › %1").arg(tr(title)), nullptr, modalKeys(QLatin1String(id)),
+                Keymap::instance().modalKeys(QLatin1String(id)).has_value());
     }
     if (reselect)
         m_keys->setCurrentItem(reselect);
     keySelected();
+    if (reselect && slot >= 0)
+        m_keySlot->setCurrentIndex(qMin(slot, m_keySlot->count() - 1));
 }
 
 void SettingsDialog::keySelected()
 {
-    QTreeWidgetItem* it = m_keys->currentItem();
-    auto* a = it ? it->data(0, Qt::UserRole).value<QAction*>() : nullptr;
     m_loadingKey = true;
-    m_keyEdit->setKeySequence(a && !a->shortcuts().isEmpty() ? a->shortcuts().first() : QKeySequence());
+    m_keySlot->clear();
+    const QStringList keys = selectedBindings();
+    for (int index = 0; index < qMax(1, int(keys.size())); ++index)
+        m_keySlot->addItem(index ? tr("Alternate %1").arg(index) : tr("Primary key"), index);
+    if (!keys.isEmpty())
+        m_keySlot->addItem(tr("Add alternate…"), keys.size());
+    const bool selected = !selectedKeyId().isEmpty();
+    for (QWidget* widget : {static_cast<QWidget*>(m_keyEditors), static_cast<QWidget*>(m_keySlot),
+                           static_cast<QWidget*>(m_keyClear), static_cast<QWidget*>(m_keyReset)})
+        widget->setEnabled(selected);
     m_loadingKey = false;
-    for (QWidget* w : {static_cast<QWidget*>(m_keyEdit), static_cast<QWidget*>(m_keyClear), static_cast<QWidget*>(m_keyReset)})
-        w->setEnabled(a != nullptr);
+    keySlotSelected();
+}
+
+void SettingsDialog::keySlotSelected()
+{
+    if (m_loadingKey)
+        return;
+    const QString key = selectedBindings().value(m_keySlot->currentData().toInt());
+    m_loadingKey = true;
+    if (m_keyMode->currentIndex())
+        m_modalEdit->setText(key);
+    else
+        m_keyEdit->setKeySequence(QKeySequence::fromString(key, QKeySequence::PortableText));
+    m_loadingKey = false;
 }
 
 void SettingsDialog::assignKeys(const QKeySequence& seq)
@@ -928,12 +1078,103 @@ void SettingsDialog::assignKeys(const QKeySequence& seq)
                             keys.isEmpty() ? tr("no key") : keysText(keys));
         }
     }
-    a->setShortcuts(seq.isEmpty() ? QList<QKeySequence>{} : QList<QKeySequence>{seq});
+    QList<QKeySequence> keys = a->shortcuts();
+    const int slot = m_keySlot->currentData().toInt();
+    if (seq.isEmpty()) {
+        if (slot < keys.size())
+            keys.removeAt(slot);
+    } else if (slot < keys.size()) {
+        keys[slot] = seq;
+    } else {
+        keys << seq;
+    }
+    QList<QKeySequence> unique;
+    for (const auto& key : std::as_const(keys))
+        if (!unique.contains(key))
+            unique << key;
+    a->setShortcuts(unique);
     saveKeyBinding(a);
-    m_keyNote->setText(note.isEmpty() ? (seq.isEmpty() ? tr("“%1” has no key now.").arg(a->text().remove(QLatin1Char('&')))
-                                                       : tr("“%1” is now %2.").arg(a->text().remove(QLatin1Char('&')),
-                                                                                 seq.toString(QKeySequence::NativeText)))
-                                      : note);
+    m_keyNote->setText(note.isEmpty() ? tr("Bindings for “%1”: %2").arg(a->text().remove(QLatin1Char('&')),
+                                       unique.isEmpty() ? tr("none") : keysText(unique)) : note);
+    fillKeys();
+}
+
+void SettingsDialog::assignModalKeys()
+{
+    const QString id = selectedKeyId();
+    if (id.isEmpty())
+        return;
+    QStringList tokens;
+    const QString input = m_modalEdit->text().trimmed();
+    for (const QString& text : input.split(QLatin1Char(' '), Qt::SkipEmptyParts)) {
+        const QString token = Keymap::normalizeToken(text);
+        const auto key = QKeySequence::fromString(token, QKeySequence::PortableText);
+        if (!(token.size() == 1 && token.at(0).isPrint()) &&
+            (key.isEmpty() || key.count() != 1 || key[0].key() == Qt::Key_unknown)) {
+            m_keyNote->setText(tr("“%1” is not a key name.").arg(text));
+            return;
+        }
+        const QSet<QString> reserved = {QStringLiteral("Tab"), QStringLiteral("Backtab"), QStringLiteral("Shift+Tab"),
+            QStringLiteral("Return"), QStringLiteral("Enter"), QStringLiteral("Backspace"), QStringLiteral("Esc"),
+            QStringLiteral("Space"), QStringLiteral("Left"), QStringLiteral("Right"), QStringLiteral("Up"),
+            QStringLiteral("Down"), QStringLiteral("Home"), QStringLiteral("End"), QStringLiteral("PgUp"),
+            QStringLiteral("PgDown"), QStringLiteral("Ins"), QStringLiteral("Shift+F10")};
+        if (reserved.contains(token) || (token.startsWith(QLatin1String("Shift+")) && reserved.contains(token.mid(6)))) {
+            m_keyNote->setText(tr("%1 keeps its navigation function. Use a letter or a modified key.").arg(token));
+            return;
+        }
+        tokens << token;
+    }
+    const QString sequence = tokens.join(QLatin1Char(' '));
+    const auto bindings = Keymap::instance().modalBindings();
+    for (const auto& b : bindings) {
+        if (b.action == id || tokens.isEmpty())
+            continue;
+        const bool existingPrefix = tokens.mid(0, b.sequence.size()) == b.sequence;
+        const bool newPrefix = b.sequence.mid(0, tokens.size()) == tokens;
+        if (b.action == QLatin1String("bookmark-prefix") && existingPrefix && b.sequence != tokens)
+            continue;  // g w s can share the bookmark prefix g
+        if (id == QLatin1String("bookmark-prefix") && newPrefix && b.sequence != tokens)
+            continue;
+        if ((existingPrefix || newPrefix) &&
+            (b.sequence != tokens || b.action == QLatin1String("bookmark-prefix") || id == QLatin1String("bookmark-prefix"))) {
+            m_keyNote->setText(tr("This chain overlaps “%1”. Change that binding first.")
+                                  .arg(Keymap::actionTitle ? Keymap::actionTitle(b.action) : b.action));
+            return;
+        }
+    }
+    // Preserve unrelated alternatives when moving an explicitly assigned chain.
+    QStringList movedFrom;
+    for (const auto& b : bindings) {
+        if (b.action == id || b.sequence != tokens || tokens.isEmpty())
+            continue;
+        QString title = Keymap::actionTitle ? Keymap::actionTitle(b.action) : b.action;
+        for (int row = 0; row < m_keys->topLevelItemCount(); ++row) {
+            const auto* item = m_keys->topLevelItem(row);
+            if (item->data(0, Qt::UserRole + 1).toString() == b.action)
+                title = item->text(0);
+        }
+        movedFrom << title;
+        if (auto other = Keymap::instance().modalKeys(b.action)) {
+            other->removeAll(sequence);
+            Keymap::instance().setModalKeys(b.action, *other);
+        }
+    }
+    QStringList keys = selectedBindings();
+    const int slot = m_keySlot->currentData().toInt();
+    if (sequence.isEmpty()) {
+        if (slot < keys.size())
+            keys.removeAt(slot);
+    } else if (slot < keys.size()) {
+        keys[slot] = sequence;
+    } else {
+        keys << sequence;
+    }
+    keys.removeDuplicates();
+    Keymap::instance().setModalKeys(id, keys);
+    m_keyNote->setText(movedFrom.isEmpty() ? tr("Modal bindings updated.")
+                      : tr("This binding was moved from %1. Other bindings were kept.")
+                            .arg(movedFrom.join(QStringLiteral(", "))));
     fillKeys();
 }
 

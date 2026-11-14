@@ -62,6 +62,10 @@ public:
     const QList<Binding>& modalBindings() const { return m_modal; }
     static const QList<std::pair<QString, QString>>& modalDefaults();  // action -> keys
     static const QStringList& builtinActions();
+    std::optional<QStringList> modalKeys(const QString& id) const;
+    void setModalKeys(const QString& id, const std::optional<QStringList>& keys);
+    void resetModalKeys();
+    bool isSaving() const { return m_writing; }
 
     // The key as a token for matching: "j", "G", "Ctrl+D", "Space".
     static QString tokenFor(const QKeyEvent* e);
@@ -71,19 +75,25 @@ public:
 
 signals:
     void changed();
+    void saved(bool ok);
 
 private:
     Keymap();
     void watch();
     void rebuildModal(const QHash<QString, QStringList>& overrides);
     void writeFileText(const QString& text);
+    void writeNext();
     void importOld(const QVariantMap& keys);
 
     QHash<QString, QStringList> m_commandKeys;
+    QHash<QString, QStringList> m_modalKeys;
     QList<Binding> m_modal;
     QList<Command> m_commands;
     QString m_error;
     QVariantMap m_pendingImport;
+    QString m_diskText;
+    std::optional<QString> m_pendingWrite;
+    bool m_writing = false;
     QString m_written;  // the text last loaded or written, so the watcher skips no-change events
     QFileSystemWatcher* m_watcher = nullptr;
     QTimer* m_reload = nullptr;

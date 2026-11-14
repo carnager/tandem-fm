@@ -25,6 +25,26 @@ sort-by-size = ", s"
 down = ["j", "Down"]
 ```
 
+In **Settings → Keys**, choose **Standard shortcuts** or **Modal keys (vim,
+yazi)**. Each row shows its primary binding and alternatives. Select a
+binding below the table to replace or remove it, or choose **Add alternate…**
+to keep the existing keys and add another. **Default** restores all bindings
+of the selected command; **Reset all keys** resets the selected mode.
+
+For modal bindings, enter a single key or a space-separated chain such as
+`g w s`, then press Enter or Apply. This includes normal commands, plugins
+and workspaces as well as modal navigation and selection actions. Modal
+bindings run in the file panels while modal mode is on; they do not replace
+text entry in editors or search fields. Navigation keys keep their ordinary
+functions. Exact conflicts are reassigned while keeping unrelated alternate
+bindings; ambiguous command prefixes are rejected. The bookmark prefix can
+still share the start of longer chains, such as `g g` and `g w s`.
+
+Both editors keep using the existing `[keys]` and `[modal]` sections, including
+comments. Edits apply immediately, are saved in the background, and are
+drained on normal quit. An external edit that hasn't been loaded yet is
+preserved rather than overwritten.
+
 The paths above follow your XDG configuration directories.
 
 Window size, columns and open tabs are Tandem's own business and live in

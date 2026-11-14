@@ -3990,6 +3990,29 @@ void MainWindow::closeEvent(QCloseEvent* e)
         QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
     if (m_jobs->runningCount() > 0)
         std::quick_exit(0);
+    Keymap& keys = Keymap::instance();
+    if (keys.isSaving()) {
+        e->ignore();
+        if (!m_waitingKeys) {
+            m_waitingKeys = true;
+            m_keySaveConnection = connect(&keys, &Keymap::saved, this, [this](bool ok) {
+                m_waitingKeys = false;
+                disconnect(m_keySaveConnection);
+                if (ok)
+                    close();
+                else
+                    active()->showMessage(Keymap::instance().error(), true);
+            });
+            QTimer::singleShot(5000, this, [this] {
+                if (!m_waitingKeys)
+                    return;
+                m_waitingKeys = false;
+                disconnect(m_keySaveConnection);
+                active()->showMessage(tr("Key bindings are still being saved. Try quitting again."), true);
+            });
+        }
+        return;
+    }
     e->accept();
 }
 
