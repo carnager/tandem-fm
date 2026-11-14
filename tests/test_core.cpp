@@ -2127,6 +2127,81 @@ private slots:
         QVERIFY2(l.error == 0, qPrintable(l.errorText + " / " + server.log()));
     }
 
+    // ProxyJump in the ssh config: the jump host gets the same options and
+    // questions as any server, and errors name it.
+    void sftpJumpHost()
+    {
+        registerBuiltinBackends();
+        if (!hasBackend("sftp"))
+            QSKIP("built without libssh");
+        SshServer hop, target;
+        if (!hop.start() || !target.start())  // the variables now point at target's files
+            QSKIP("could not start a test sshd");
+        QVERIFY(hop.authorize(target));
+        const QByteArray timeout = qgetenv("TANDEM_SSH_TIMEOUT");
+        auto restore = qScopeGuard([timeout] {
+            qputenv("TANDEM_SSH_TIMEOUT", timeout);
+            setAuthHandler({});
+        });
+        QTemporaryDir tmp;
+        const QString config = qEnvironmentVariable("TANDEM_SSH_CONFIG");
+        writeFile(config, QStringLiteral("Host desk\n  HostName 127.0.0.1\n  Port %1\n  ProxyJump hop\n"
+                                         "Host hop\n  HostName 127.0.0.1\n  Port %2\n"
+                                         "Host far\n  HostName 127.0.0.1\n  Port %1\n  ProxyJump deadhop\n"
+                                         "Host deadhop\n  HostName 127.0.0.1\n  Port 1\n"
+                                         "Host slow\n  HostName 127.0.0.1\n  Port %1\n  ProxyJump slowhop\n"
+                                         "Host slowhop\n  HostName 127.1\n  Port %2\n")
+                                  .arg(target.port())
+                                  .arg(hop.port())
+                                  .toUtf8());
+        QStringList questions;
+        std::mutex questionsMutex;
+        std::function<std::optional<QString>(const AuthQuestion&)> answer = [](const AuthQuestion& q) -> std::optional<QString> {
+            if (q.kind == AuthQuestion::Kind::HostKey)
+                return QString("yes");
+            return std::nullopt;
+        };
+        setAuthHandler([&](const AuthQuestion& q) {
+            {
+                std::lock_guard<std::mutex> lock(questionsMutex);
+                questions << q.location + " " + q.message;
+            }
+            return answer(q);
+        });
+        ListOptions opt;
+
+        // Both host keys are asked, the jump host's as such.
+        ListResult l = listLocation("sftp://desk" + tmp.path(), opt);
+        QVERIFY2(l.error == 0, qPrintable(l.errorText + " / " + hop.log() + target.log()));
+        QCOMPARE(questions.size(), 2);
+        QVERIFY2(questions.filter("jump host").size() == 1, qPrintable(questions.join('\n')));
+        QVERIFY(questions.filter("jump host").first().startsWith("sftp://hop "));
+
+        // A jump host that is down is named in the error.
+        l = listLocation("sftp://far/", opt);
+        QVERIFY(l.error != 0);
+        QVERIFY2(l.errorText.contains("jump host deadhop"), qPrintable(l.errorText));
+
+        // Saying no to the jump host's key stops there.
+        questions.clear();
+        answer = [](const AuthQuestion&) -> std::optional<QString> { return std::nullopt; };
+        l = listLocation("sftp://slow/", opt);
+        QVERIFY2(l.error == ECANCELED, qPrintable(l.errorText));
+        QCOMPARE(questions.size(), 1);
+
+        // An answer that takes longer than the connection waits: it's
+        // remembered and the connection tried again, without asking twice.
+        questions.clear();
+        qputenv("TANDEM_SSH_TIMEOUT", "1");
+        answer = [](const AuthQuestion& q) -> std::optional<QString> {
+            QThread::msleep(2500);
+            return q.kind == AuthQuestion::Kind::HostKey ? std::optional<QString>("yes") : std::nullopt;
+        };
+        l = listLocation("sftp://slow" + tmp.path(), opt);
+        QVERIFY2(l.error == 0, qPrintable(l.errorText));
+        QCOMPARE(questions.size(), 1);
+    }
+
     // --config-dir: settings and folder history in one chosen folder, as TOML.
     void configDir()
     {

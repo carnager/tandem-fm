@@ -582,12 +582,24 @@
         <translation>Kein Host in %1</translation>
     </message>
     <message>
+        <source>Couldn&apos;t connect to the jump host %1</source>
+        <translation>Keine Verbindung zum Jump-Host %1</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t reach %1 through the jump host %2: %3</source>
+        <translation>%1 ist über den Jump-Host %2 nicht erreichbar: %3</translation>
+    </message>
+    <message>
         <source>The server has no SFTP: %1</source>
         <translation>Der Server bietet kein SFTP: %1</translation>
     </message>
     <message>
         <source>The host key of %1 has CHANGED (now %2 %3). This can mean someone is intercepting the connection. If the server was reinstalled, remove its old key from ~/.ssh/known_hosts.</source>
         <translation>Der Host-Schlüssel von %1 hat sich GEÄNDERT (jetzt %2 %3). Das kann heißen, dass jemand die Verbindung abfängt. Wurde der Server neu installiert, den alten Schlüssel aus ~/.ssh/known_hosts entfernen.</translation>
+    </message>
+    <message>
+        <source>First connection to the jump host %1. Is this its key?</source>
+        <translation>Erste Verbindung zum Jump-Host %1. Ist das sein Schlüssel?</translation>
     </message>
     <message>
         <source>First connection to %1. Is this its key?</source>

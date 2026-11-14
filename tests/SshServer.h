@@ -107,6 +107,14 @@ public:
     }
     QString log() { return QString::fromLocal8Bit(m_proc.readAll()); }
     int port() const { return m_port; }
+    QString dir() const { return m_dir.path(); }
+    // Lets in the client key of another test server too (read per login).
+    bool authorize(const SshServer& other)
+    {
+        QFile from(other.dir() + "/client_key.pub");
+        QFile to(dir() + "/authorized_keys");
+        return from.open(QIODevice::ReadOnly) && to.open(QIODevice::Append) && to.write(from.readAll()) > 0;
+    }
 
 private:
     static int freePort()

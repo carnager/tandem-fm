@@ -87,9 +87,12 @@ struct Conn {
     bool statvfs = false;
     struct ssh_callbacks_struct callbacks {};
     QString location;  // for passphrase questions
+    bool hop = false;  // a jump host: libssh owns the session
 
     ~Conn()
     {
+        if (hop)
+            return;
         if (sftp)
             sftp_free(sftp);
         if (ssh) {
@@ -165,10 +168,43 @@ private:
     bool m_counted = true;
 };
 
+// Jump hosts (ProxyJump): libssh logs into each hop on a thread of its own
+// and calls back for the options, the host key and the login, so hops get
+// the same questions, key files and remembered passwords as servers. A
+// HopLink is one connection attempt as its hops see it.
+struct HopLink : std::enable_shared_from_this<HopLink> {
+    struct ssh_jump_callbacks_struct callbacks {};
+    std::mutex mutex;
+    std::condition_variable done;
+    QString hop;             // the hop it got to last, for messages
+    bool connected = false;  // that hop answered
+    bool busy = false;       // a hop is logging in, maybe waiting for an answer
+    bool asked = false;      // a hop asked the user something
+    int err = 0;
+    QString error;  // why a hop failed
+};
+
+// The hop this libssh thread logs into. It holds the attempt, so the
+// attempt outlives a connection that gave up while a hop was still asking.
+struct HopThread {
+    std::shared_ptr<HopLink> link;
+    std::unique_ptr<Conn> conn;
+};
+thread_local HopThread t_hop;
+
+void markAsked()
+{
+    if (t_hop.link) {
+        std::lock_guard<std::mutex> lock(t_hop.link->mutex);
+        t_hop.link->asked = true;
+    }
+}
+
 int passphraseCallback(const char* prompt, char* buf, size_t len, int, int, void* userdata)
 {
     static std::mutex asking;  // key logins run in parallel: one question at a time
     std::lock_guard<std::mutex> lock(asking);
+    markAsked();
     auto* conn = static_cast<Conn*>(userdata);
     AuthQuestion q;
     q.kind = AuthQuestion::Kind::Passphrase;
@@ -208,7 +244,11 @@ QString fingerprintOf(ssh_session s, QString* type)
 
 class SftpBackend : public Backend {
 public:
-    SftpBackend() { ssh_init(); }
+    SftpBackend()
+    {
+        ssh_init();
+        s_self = this;
+    }
 
     // ------------------------------------------------------------ connections
 
@@ -267,6 +307,174 @@ public:
 
     std::unique_ptr<Conn> connect(const QString& location, Server* server, int& err, QString* errText)
     {
+        // A question on a jump host can take longer than the connection
+        // waits for it. Once it's answered (and remembered), try again.
+        for (int attempt = 0;; ++attempt) {
+            auto link = std::make_shared<HopLink>();
+            auto c = connectOnce(location, server, link, err, errText);
+            if (c || attempt > 0)
+                return c;
+            std::unique_lock<std::mutex> lock(link->mutex);
+            if (!link->asked)
+                return c;
+            link->done.wait(lock, [&] { return !link->busy; });
+            if (!link->error.isEmpty()) {  // cancelled, or the hop said no
+                err = link->err;
+                if (errText)
+                    *errText = link->error;
+                return c;
+            }
+        }
+    }
+
+    // Options every session gets, jump hosts too: the test overrides, a key
+    // file saved with the server, the timeout and the passphrase question.
+    static void commonOptions(Conn* c, const QString& location)
+    {
+        if (const QByteArray kh = qgetenv("TANDEM_SSH_KNOWN_HOSTS"); !kh.isEmpty())
+            ssh_options_set(c->ssh, SSH_OPTIONS_KNOWNHOSTS, kh.constData());
+        if (const QByteArray id = qgetenv("TANDEM_SSH_IDENTITY"); !id.isEmpty())
+            ssh_options_set(c->ssh, SSH_OPTIONS_ADD_IDENTITY, id.constData());
+        // A key file saved with the server is tried before the others.
+        if (const auto saved = ServerList::instance().find(location); saved && !saved->keyFile.isEmpty()) {
+            QString key = saved->keyFile;
+            if (key == QLatin1String("~") || key.startsWith(QLatin1String("~/")))
+                key = QDir::homePath() + key.mid(1);
+            const QByteArray id = QFile::encodeName(key);
+            ssh_options_set(c->ssh, SSH_OPTIONS_IDENTITY, id.constData());
+        }
+        const int seconds = qEnvironmentVariableIntValue("TANDEM_SSH_TIMEOUT");
+        const long timeout = seconds > 0 ? seconds : 15;
+        ssh_options_set(c->ssh, SSH_OPTIONS_TIMEOUT, &timeout);
+        ssh_callbacks_init(&c->callbacks);
+        c->callbacks.auth_function = passphraseCallback;
+        c->callbacks.userdata = c;
+        ssh_set_callbacks(c->ssh, &c->callbacks);
+    }
+
+    static void parseSshConfig(ssh_session s)
+    {
+        const QByteArray config = qgetenv("TANDEM_SSH_CONFIG");
+        ssh_options_parse_config(s, config.isEmpty() ? nullptr : config.constData());
+    }
+
+    // --------------------------------------------------------- jump hosts
+    // These run on libssh's thread for the hop.
+
+    static inline SftpBackend* s_self = nullptr;
+
+    // Marks a hop as logging in while it lives; fail() keeps why it didn't.
+    class HopStep {
+    public:
+        HopStep(HopLink* link, bool asks) : m_link(link)
+        {
+            std::lock_guard<std::mutex> lock(m_link->mutex);
+            m_link->busy = true;
+            m_link->asked |= asks;
+        }
+        ~HopStep()
+        {
+            {
+                std::lock_guard<std::mutex> lock(m_link->mutex);
+                m_link->busy = false;
+            }
+            m_link->done.notify_all();
+        }
+        void fail(int err, const QString& text)
+        {
+            std::lock_guard<std::mutex> lock(m_link->mutex);
+            m_link->err = err;
+            m_link->error = text;
+        }
+
+    private:
+        HopLink* m_link;
+    };
+
+    static int hopBeforeConnection(ssh_session hop, void* userdata)
+    {
+        auto* link = static_cast<HopLink*>(userdata);
+        t_hop.link = link->shared_from_this();
+        // libssh set what the ProxyJump names (host, maybe user and port);
+        // the hop's own ~/.ssh/config entry fills in the rest.
+        char* host = nullptr;
+        char* user = nullptr;
+        unsigned int port = 22;
+        ssh_options_get(hop, SSH_OPTIONS_HOST, &host);
+        ssh_options_get(hop, SSH_OPTIONS_USER, &user);
+        ssh_options_get_port(hop, &port);
+        QUrl url;
+        url.setScheme(QStringLiteral("sftp"));
+        url.setHost(QString::fromUtf8(host));
+        if (user)
+            url.setUserName(QString::fromUtf8(user));
+        if (port != 22)
+            url.setPort(int(port));
+        ssh_string_free_char(host);
+        ssh_string_free_char(user);
+
+        auto c = std::make_unique<Conn>();
+        c->ssh = hop;
+        c->hop = true;
+        c->location = locationAuthority(url.toString() + QLatin1Char('/'));
+        {
+            std::lock_guard<std::mutex> lock(link->mutex);
+            link->hop = url.toString(QUrl::RemoveScheme).mid(2);  // "vps", "me@vps:2222"
+            link->connected = false;
+        }
+        parseSshConfig(hop);
+        commonOptions(c.get(), c->location);
+        // A hop behind this one is handled the same way.
+        ssh_options_set(hop, SSH_OPTIONS_PROXYJUMP_CB_LIST_APPEND, &link->callbacks);
+        t_hop.conn = std::move(c);
+        return SSH_OK;
+    }
+
+    static int hopVerifyHost(ssh_session, void* userdata)
+    {
+        auto* link = static_cast<HopLink*>(userdata);
+        Conn* c = t_hop.conn.get();
+        {
+            std::lock_guard<std::mutex> lock(link->mutex);
+            link->connected = true;
+        }
+        if (ssh_session_is_known_server(c->ssh) == SSH_KNOWN_HOSTS_OK)
+            return SSH_OK;
+        HopStep step(link, true);
+        Server* server = s_self->serverFor(c->location);
+        std::lock_guard<std::mutex> login(server->loginMutex);  // parallel lanes: ask once
+        QString text;
+        if (const int e = s_self->verifyHost(c, &text); e != 0) {
+            step.fail(e, text);
+            return SSH_ERROR;
+        }
+        return SSH_OK;
+    }
+
+    static int hopAuthenticate(ssh_session, void* userdata)
+    {
+        auto* link = static_cast<HopLink*>(userdata);
+        Conn* c = t_hop.conn.get();
+        int methods = 0;
+        {
+            HopStep step(link, false);  // a key passphrase may still be asked
+            if (s_self->loginWithoutQuestions(c, &methods))
+                return SSH_AUTH_SUCCESS;
+        }
+        HopStep step(link, true);
+        Server* server = s_self->serverFor(c->location);
+        std::lock_guard<std::mutex> login(server->loginMutex);
+        QString text;
+        if (const int e = s_self->authenticate(c, server, methods, &text); e != 0) {
+            step.fail(e, text);
+            return SSH_ERROR;
+        }
+        return SSH_AUTH_SUCCESS;
+    }
+
+    std::unique_ptr<Conn> connectOnce(const QString& location, Server* server, const std::shared_ptr<HopLink>& link, int& err,
+                                      QString* errText)
+    {
         auto fail = [&](int e, const QString& text) {
             err = e;
             if (errText)
@@ -283,8 +491,7 @@ public:
         ssh_options_set(c->ssh, SSH_OPTIONS_HOST, host.constData());
         // ~/.ssh/config first (Host aliases, User, Port, IdentityFile,
         // ProxyJump), then what the location says explicitly.
-        const QByteArray config = qgetenv("TANDEM_SSH_CONFIG");
-        ssh_options_parse_config(c->ssh, config.isEmpty() ? nullptr : config.constData());
+        parseSshConfig(c->ssh);
         if (!t.user.isEmpty()) {
             const QByteArray user = t.user.toUtf8();
             ssh_options_set(c->ssh, SSH_OPTIONS_USER, user.constData());
@@ -293,27 +500,24 @@ public:
             const unsigned int port = unsigned(t.port);
             ssh_options_set(c->ssh, SSH_OPTIONS_PORT, &port);
         }
-        if (const QByteArray kh = qgetenv("TANDEM_SSH_KNOWN_HOSTS"); !kh.isEmpty())
-            ssh_options_set(c->ssh, SSH_OPTIONS_KNOWNHOSTS, kh.constData());
-        if (const QByteArray id = qgetenv("TANDEM_SSH_IDENTITY"); !id.isEmpty())
-            ssh_options_set(c->ssh, SSH_OPTIONS_ADD_IDENTITY, id.constData());
-        // A key file saved with the server is tried before the others.
-        if (const auto saved = ServerList::instance().find(location); saved && !saved->keyFile.isEmpty()) {
-            QString key = saved->keyFile;
-            if (key == QLatin1String("~") || key.startsWith(QLatin1String("~/")))
-                key = QDir::homePath() + key.mid(1);
-            const QByteArray id = QFile::encodeName(key);
-            ssh_options_set(c->ssh, SSH_OPTIONS_IDENTITY, id.constData());
-        }
-        const long timeout = 15;
-        ssh_options_set(c->ssh, SSH_OPTIONS_TIMEOUT, &timeout);
-        ssh_callbacks_init(&c->callbacks);
-        c->callbacks.auth_function = passphraseCallback;
-        c->callbacks.userdata = c.get();
-        ssh_set_callbacks(c->ssh, &c->callbacks);
+        commonOptions(c.get(), location);
+        link->callbacks.userdata = link.get();
+        link->callbacks.before_connection = hopBeforeConnection;
+        link->callbacks.verify_knownhost = hopVerifyHost;
+        link->callbacks.authenticate = hopAuthenticate;
+        ssh_options_set(c->ssh, SSH_OPTIONS_PROXYJUMP_CB_LIST_APPEND, &link->callbacks);  // unused without ProxyJump
 
-        if (ssh_connect(c->ssh) != SSH_OK)
-            return fail(EHOSTUNREACH, QString::fromUtf8(ssh_get_error(c->ssh)));
+        if (ssh_connect(c->ssh) != SSH_OK) {
+            const QString why = QString::fromUtf8(ssh_get_error(c->ssh));
+            std::lock_guard<std::mutex> lock(link->mutex);
+            if (link->hop.isEmpty())
+                return fail(EHOSTUNREACH, why);
+            if (!link->error.isEmpty())
+                return fail(link->err, link->error);
+            if (!link->connected)
+                return fail(EHOSTUNREACH, QObject::tr("Couldn't connect to the jump host %1").arg(link->hop));
+            return fail(EHOSTUNREACH, QObject::tr("Couldn't reach %1 through the jump host %2: %3").arg(c->location, link->hop, why));
+        }
 
         // Known host and key login need no questions: those run in parallel
         // (extra lanes log in at the same time). Questions are asked by one
@@ -373,7 +577,8 @@ public:
             q.location = c->location;
             q.secret = false;
             const QString fp = fingerprintOf(c->ssh, &type);
-            q.message = QObject::tr("First connection to %1. Is this its key?").arg(c->location);
+            q.message = c->hop ? QObject::tr("First connection to the jump host %1. Is this its key?").arg(c->location)
+                               : QObject::tr("First connection to %1. Is this its key?").arg(c->location);
             q.detail = QStringLiteral("%1  %2").arg(type, fp);
             if (!askAuth(q)) {
                 if (errText)
