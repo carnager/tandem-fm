@@ -145,6 +145,7 @@ private:
     int m_zoomOfColumns = 100;  // the zoom the column widths were made for
     QList<int> m_autoHidden;  // columns hidden because the panel is narrow
     int m_extWidth = 0;       // the longest extension's width; 0: not measured yet
+    QList<QMetaObject::Connection> m_modelConnections;  // to the shown folder's model
     ThumbGrid* m_grid = nullptr;
 };
 

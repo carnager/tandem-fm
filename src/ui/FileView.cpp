@@ -212,18 +212,22 @@ void FileView::zoomChanged()
 void FileView::setModel(QAbstractItemModel* model)
 {
     setVisual(0);
-    if (QAbstractItemModel* old = this->model())
-        disconnect(old, &QAbstractItemModel::modelAboutToBeReset, this, nullptr);
+    // Only the shown folder's changes count here: another tab's refresh
+    // must not touch this list.
+    for (const QMetaObject::Connection& c : std::as_const(m_modelConnections))
+        disconnect(c);
+    m_modelConnections.clear();
     QTreeView::setModel(model);
+    m_extWidth = 0;  // another tab's folder: its own extensions (measured by the next fitColumns)
     // A new listing: another folder ends visual mode, a refresh of this one keeps it.
     if (model) {
-        connect(model, &QAbstractItemModel::modelReset, this, [this] {
+        m_modelConnections << connect(model, &QAbstractItemModel::modelReset, this, [this] {
             if (m_visual)
                 applyVisual();
             m_extWidth = 0;
             fitColumns();
         });
-        connect(model, &QAbstractItemModel::rowsInserted, this, [this](const QModelIndex&, int first, int last) {
+        m_modelConnections << connect(model, &QAbstractItemModel::rowsInserted, this, [this](const QModelIndex&, int first, int last) {
             if (m_extWidth > 0 && !isColumnHidden(FileModel::ColExt)) {
                 measureExt(first, last);
                 setColumnWidth(FileModel::ColExt, m_extWidth);

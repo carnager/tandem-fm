@@ -317,10 +317,11 @@ private slots:
     void extColumnFitsExtensions()
     {
         QHeaderView* h = m_left->view()->header();
+        const QStringList layout = m_left->columnLayout();
         h->setSectionHidden(FileModel::ColExt, false);
         auto cleanup = qScopeGuard([&] {
             QFile::remove(L("notes.markdown"));
-            h->setSectionHidden(FileModel::ColExt, true);
+            m_left->setColumnLayout(layout);  // also what tab switches kept
         });
         m_left->view()->fitColumns();
         const int narrow = h->sectionSize(FileModel::ColExt);
@@ -332,6 +333,20 @@ private slots:
         QTRY_VERIFY(leftModel()->rowOf("notes.markdown") < 0);
         m_left->refresh();
         QTRY_COMPARE(h->sectionSize(FileModel::ColExt), narrow);
+
+        // Each tab its own: a long extension in another tab doesn't widen this one.
+        writeFile(L("sub/notes.markdown"), "md");
+        auto removeNote = qScopeGuard([&] { QFile::remove(L("sub/notes.markdown")); });
+        m_left->addTab(L("sub"));
+        QTRY_COMPARE(m_left->path(), L("sub"));
+        QTRY_VERIFY(h->sectionSize(FileModel::ColExt) > narrow);
+        m_left->selectSlot(1);
+        QTRY_COMPARE(m_left->path(), L());
+        QTRY_COMPARE(h->sectionSize(FileModel::ColExt), narrow);
+        m_left->selectSlot(2);
+        QTRY_COMPARE(m_left->path(), L("sub"));
+        m_left->closeCurrentTab();
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L()}));
     }
 
     void enterAndLeaveFolder()
