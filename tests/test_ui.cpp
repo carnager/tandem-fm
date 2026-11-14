@@ -1904,6 +1904,22 @@ private slots:
         QTRY_VERIFY(!popup->isVisible());
         QSettings().remove("palette/recent");
 
+        // Visited folders aren't in the palette (Ctrl+J and Ctrl+D have them);
+        // Ctrl+D there goes on to the bookmarks.
+        m_left->navigate(L("sub/deep"));
+        QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_P, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "deep");
+        QTRY_VERIFY(!popup->currentItem() || popup->currentItem()->key != L("sub/deep"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_COMPARE(popup->findChild<QLineEdit*>()->placeholderText(), QObject::tr("Type a bookmark's key"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+        QTRY_VERIFY(!popup->isVisible());
+
         // Jump: visited folders are offered; Enter goes there. Ctrl+J in the
         // palette switches to it, keeping what was typed.
         m_left->navigate(L("sub/deep"));
@@ -3674,6 +3690,8 @@ private slots:
         for (const auto& b : h.bookmarks())
             if (b.path != L("sub/deep"))
                 used << b.key;
+        QVERIFY(Keymap::instance().keysAfterBookmarkPrefix().contains("g"));  // g g: top
+        used << Keymap::instance().keysAfterBookmarkPrefix();
         const QString suggested = FolderHistory::suggestKeys(L("sub/deep"), used).value(0);
         QVERIFY(!suggested.isEmpty());
         QTest::keyClick(chords, Qt::Key_Tab);
@@ -3690,10 +3708,18 @@ private slots:
         QTest::keyClick(chords, Qt::Key_Return);
         QTRY_COMPARE(h.pathForKey("zz"), L("sub/deep"));
 
-        // Modal: ' opens the list, then the key.
+        // Vim: g + key.
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
         m_left->setVimKeys(true);
+        m_left->view()->setFocus();
+        QTest::keyClicks(m_left->view(), "gz");
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "z");
+        QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+        // …and ' opens the list first, then the key.
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
         m_left->view()->setFocus();
         QTest::keyClicks(m_left->view(), "'");
         QTRY_VERIFY(popup->isVisible());

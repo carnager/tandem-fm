@@ -58,7 +58,8 @@ const QString kModalHeader = QStringLiteral(
     "# Besides the commands above: down, up, parent, open, top, bottom,\n"
     "# half-page-down, half-page-up, visual, visual-unmark, find, find-next,\n"
     "# find-previous, palette, command-line, bookmark-jump, bookmark-set,\n"
-    "# create (a name ending in / makes a folder), jobs, preview-up, preview-down.\n");
+    "# create (a name ending in / makes a folder), jobs, preview-up, preview-down.\n"
+    "# bookmark-prefix: after it, a key bound to nothing goes to that bookmark (g h: home).\n");
 
 }  // namespace
 
@@ -95,7 +96,7 @@ const QStringList& Keymap::builtinActions()
         QStringLiteral("half-page-down"), QStringLiteral("half-page-up"),  QStringLiteral("visual"),
         QStringLiteral("visual-unmark"), QStringLiteral("find"),           QStringLiteral("find-next"),
         QStringLiteral("find-previous"), QStringLiteral("palette"),        QStringLiteral("command-line"),
-        QStringLiteral("bookmark-jump"), QStringLiteral("bookmark-set"),
+        QStringLiteral("bookmark-jump"), QStringLiteral("bookmark-set"),   QStringLiteral("bookmark-prefix"),
         // Handled by the window, without a menu entry of their own:
         QStringLiteral("create"),        QStringLiteral("jobs"),           QStringLiteral("preview-up"),
         QStringLiteral("preview-down"),
@@ -124,6 +125,7 @@ const QList<std::pair<QString, QString>>& Keymap::modalDefaults()
         {QStringLiteral("command-line"), QStringLiteral("!")},
         {QStringLiteral("bookmark-jump"), QStringLiteral("'")},
         {QStringLiteral("bookmark-set"), QStringLiteral("m")},
+        {QStringLiteral("bookmark-prefix"), QStringLiteral("g")},
         {QStringLiteral("copy-to-clipboard"), QStringLiteral("y")},
         {QStringLiteral("cut-to-clipboard"), QStringLiteral("x")},
         {QStringLiteral("paste"), QStringLiteral("p")},
@@ -328,6 +330,21 @@ void Keymap::setCommandKeys(const QString& id, const std::optional<QStringList>&
         m_commandKeys.insert(id, *keys);
     else
         m_commandKeys.remove(id);
+}
+
+QStringList Keymap::keysAfterBookmarkPrefix() const
+{
+    QStringList prefix, out;
+    for (const Binding& b : m_modal)
+        if (b.action == QLatin1String("bookmark-prefix"))
+            prefix = b.sequence;
+    if (prefix.isEmpty())
+        return {};
+    for (const Binding& b : m_modal)
+        if (b.action != QLatin1String("bookmark-prefix") && b.sequence.size() > prefix.size() &&
+            b.sequence.mid(0, prefix.size()) == prefix && b.sequence.at(prefix.size()).size() == 1)
+            out << b.sequence.at(prefix.size());
+    return out;
 }
 
 std::optional<QStringList> Keymap::modalKeys(const QString& id) const

@@ -4,6 +4,7 @@
 #include "core/Util.h"
 #include "ui/CardList.h"
 #include "ui/IconCache.h"
+#include "ui/Keymap.h"
 #include "ui/Theme.h"
 
 #include <QDir>
@@ -127,7 +128,7 @@ BookmarksEditor::BookmarksEditor(QWidget* parent) : QWidget(parent)
     folderLayout->addWidget(m_folder, 1);
     folderLayout->addWidget(browse);
     fields->addRow(tr("Folder"), folderRow);
-    auto* how = new QLabel(tr("Ctrl+D and the key go there; with modal keys, ' and the key. "
+    auto* how = new QLabel(tr("Ctrl+D and the key go there; with modal keys, ' or g and the key. "
                               "Drag bookmarks in the list to change their order."), m_form);
     how->setWordWrap(true);
     setThemeStyle(how, QStringLiteral("color: @dimText;"));
@@ -250,7 +251,9 @@ void BookmarksEditor::updateKeyNote()
     }
     setThemeStyle(m_keyNote, problem && !key.isEmpty() ? QStringLiteral("color: @error;") : QStringLiteral("color: @dimText;"));
     if (problem) {
-        const QStringList free = FolderHistory::suggestKeys(current->data(kPathRole).toString(), used);
+        // Not after g where g g is a command: modal g + key couldn't reach it.
+        const QStringList free = FolderHistory::suggestKeys(current->data(kPathRole).toString(),
+                                                            used + Keymap::instance().keysAfterBookmarkPrefix());
         if (!free.isEmpty()) {
             auto* label = new QLabel(tr("Free:"), m_suggestions);
             setThemeStyle(label, QStringLiteral("color: @dimText; padding-left: 6px;"));

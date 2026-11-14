@@ -62,6 +62,9 @@ public:
     const QList<Binding>& modalBindings() const { return m_modal; }
     static const QList<std::pair<QString, QString>>& modalDefaults();  // action -> keys
     static const QStringList& builtinActions();
+    // First keys a bookmark can't start with: after the bookmark prefix they
+    // continue a modal chain instead (g g: top). Empty without the prefix.
+    QStringList keysAfterBookmarkPrefix() const;
     // [modal]: what the file sets for an action; setting nullopt goes back to the default.
     std::optional<QStringList> modalKeys(const QString& id) const;
     void setModalKeys(const QString& id, const std::optional<QStringList>& keys);
