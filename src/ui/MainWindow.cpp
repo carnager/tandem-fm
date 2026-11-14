@@ -1903,7 +1903,7 @@ QWidget* MainWindow::createTopBar(QWidget* parent)
     l->addWidget(name);
     l->addStretch(1);
     m_searchField = new QPushButton(IconCache::themed("edit-find", "system-search"),
-                                    tr("Go to a folder, find a file, run a command"), bar);
+                                    tr("Find a file or run a command"), bar);
     m_searchField->setObjectName(QStringLiteral("searchField"));
     m_searchField->setFocusPolicy(Qt::NoFocus);
     m_searchField->setCursor(Qt::IBeamCursor);
@@ -1987,10 +1987,8 @@ void MainWindow::commandPalette()
     });
     for (PopupItem& it : items)
         it.section = rank(it) < kRecentShown ? tr("Recently used") : tr("Commands");
-    for (PopupItem it : folderItems()) {
-        it.section = tr("Folders");
-        items.append(it);
-    }
+    // Folders have their own lists (Ctrl+J, Ctrl+D): here they crowded out
+    // the commands, the often visited ones most of all.
     Panel* p = active();
     if (DirTab* t = p->tab(); t && !t->isSearch()) {
         const QString dir = p->path();
@@ -2012,15 +2010,23 @@ void MainWindow::commandPalette()
             items.append(it);
         }
     }
-    // The jump key (Ctrl+J) narrows to folders, keeping what was typed. The
-    // list's own Ctrl+J (down) would take it otherwise.
+    // The jump key (Ctrl+J) goes on to the folders, keeping what was typed;
+    // the bookmarks key (Ctrl+D) to the bookmarks. The list's own Ctrl+J
+    // (down) would take it otherwise.
     m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem*) {
-        bool jump = false;
-        for (QAction* a : actions())
-            if (a->property("commandId").toString() == QLatin1String("jump-to-folder-search"))
-                for (const QKeySequence& k : a->shortcuts())
-                    jump |= k.count() == 1 && k[0] == e->keyCombination();
-        if (!jump)
+        auto is = [&](const char* id) {
+            for (QAction* a : actions())
+                if (a->property("commandId").toString() == QLatin1String(id))
+                    for (const QKeySequence& k : a->shortcuts())
+                        if (k.count() == 1 && k[0] == e->keyCombination())
+                            return true;
+            return false;
+        };
+        if (is("bookmarks-key-chains")) {
+            QTimer::singleShot(0, this, [this] { openBookmarks(); });
+            return true;
+        }
+        if (!is("jump-to-folder-search"))
             return false;
         const QString query = m_popup->query();
         QTimer::singleShot(0, this, [this, query] {  // not from inside the handler it replaces
@@ -2030,10 +2036,12 @@ void MainWindow::commandPalette()
         return true;
     };
     m_popup->queryItem = nullptr;
-    const QString placeholder = tr("Go to a folder, find a file, run a command");
+    const QString placeholder = tr("Find a file or run a command");
     const QString jumpKey = keyHint(QStringLiteral("jump-to-folder-search"), false);
-    const QString footer = jumpKey.isEmpty() ? tr("Enter: run or open")
-                                             : tr("Enter: run or open   ·   %1: folders only").arg(jumpKey);
+    const QString marksKey = keyHint(QStringLiteral("bookmarks-key-chains"), false);
+    const QString footer = jumpKey.isEmpty() || marksKey.isEmpty()
+                               ? tr("Enter: run or open")
+                               : tr("Enter: run or open   ·   %1: visited folders   ·   %2: bookmarks").arg(jumpKey, marksKey);
     if (m_searchField && m_searchField->isVisible())
         m_popup->openUnder(m_searchField, placeholder, items, footer);
     else

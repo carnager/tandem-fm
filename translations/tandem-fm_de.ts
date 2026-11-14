@@ -3134,10 +3134,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Menü</translation>
     </message>
     <message>
-        <source>Go to a folder, find a file, run a command</source>
-        <translation>Zu einem Ordner, eine Datei finden, einen Befehl ausführen</translation>
-    </message>
-    <message>
         <source>Settings (Ctrl+,)</source>
         <translation>Einstellungen (Strg+,)</translation>
     </message>
@@ -3156,10 +3152,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Enter: run or open</source>
         <translation>Enter: ausführen oder öffnen</translation>
-    </message>
-    <message>
-        <source>Enter: run or open   ·   %1: folders only</source>
-        <translation>Enter: ausführen oder öffnen   ·   %1: nur Ordner</translation>
     </message>
     <message>
         <source>Jump to a folder: type parts of its path</source>
@@ -3215,6 +3207,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Extracting %1 …</source>
         <translation>%1 wird entpackt …</translation>
+    </message>
+    <message>
+        <source>Find a file or run a command</source>
+        <translation>Eine Datei finden oder einen Befehl ausführen</translation>
+    </message>
+    <message>
+        <source>Enter: run or open   ·   %1: visited folders   ·   %2: bookmarks</source>
+        <translation>Enter: ausführen oder öffnen   ·   %1: besuchte Ordner   ·   %2: Lesezeichen</translation>
     </message>
     <message>
         <source>Enter: go   ·   Shift+Del: forget   ·   %1: bookmarks</source>
@@ -3392,10 +3392,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Commands</source>
         <translation>Befehle</translation>
-    </message>
-    <message>
-        <source>Folders</source>
-        <translation>Ordner</translation>
     </message>
     <message>
         <source>Files in %1</source>
