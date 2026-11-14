@@ -3586,15 +3586,50 @@ private slots:
         QTest::keyClick(chords, Qt::Key_Escape);
         QTRY_VERIFY(!chords->isVisible());
 
-        // A space first: search by name, keys or not.
+        // The switch shows Key; Tab makes it Search, by name, keys or not.
         m_left->view()->setFocus();
         QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
         QTRY_VERIFY(popup->isVisible());
-        QTest::keyClicks(QApplication::focusWidget(), " deep");
+        QToolButton* mode = popup->findChild<QToolButton*>("mode");
+        QVERIFY(mode && mode->isVisible());
+        QCOMPARE(mode->text(), QString("Key"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab);
+        QCOMPARE(mode->text(), QString("Search"));
+        QTest::keyClicks(QApplication::focusWidget(), "c");  // a key, but searching: no jump
+        QVERIFY(popup->isVisible());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Backspace);
+        QTest::keyClicks(QApplication::focusWidget(), "deep");
         QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("sub/deep"));
         QVERIFY(popup->isVisible());  // no jump while searching
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+
+        // Letters no key starts with search by themselves; the switch says so.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "rig");
+        QCOMPARE(mode->text(), QString("Search"));
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == R());
+
+        // Shift+Enter: the other panel; Ctrl+Enter: a new tab.
+        const QString rightBefore = rightModel()->path();
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return, Qt::ShiftModifier);
+        QTRY_VERIFY(!popup->isVisible());
+        QTRY_COMPARE(rightModel()->path(), R());
+        QCOMPARE(leftModel()->path(), L("sub/deep"));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab);
+        QTest::keyClicks(QApplication::focusWidget(), "right");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == R());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return, Qt::ControlModifier);
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L("sub/deep"), R()}));
+        m_left->closeCurrentTab();
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L("sub/deep")}));
+        m_right->navigate(rightBefore);
+        QTRY_COMPARE(rightModel()->path(), rightBefore);
 
         // Tab takes the free key the hint offers.
         m_left->view()->setFocus();

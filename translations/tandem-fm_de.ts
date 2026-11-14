@@ -2225,6 +2225,25 @@
     </message>
 </context>
 <context>
+    <name>tandem::FuzzyPopup</name>
+    <message>
+        <source>Tab switches between keys and searching by name</source>
+        <translation>Tab wechselt zwischen Tasten und der Suche nach Namen</translation>
+    </message>
+    <message>
+        <source>Key</source>
+        <translation>Taste</translation>
+    </message>
+    <message>
+        <source>Search</source>
+        <translation>Suche</translation>
+    </message>
+    <message>
+        <source>Search by name or path</source>
+        <translation>Nach Name oder Pfad suchen</translation>
+    </message>
+</context>
+<context>
     <name>tandem::HexView</name>
     <message>
         <source>Loading…</source>
@@ -3147,10 +3166,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Zu einem Ordner springen: Teile des Pfads eingeben</translation>
     </message>
     <message>
-        <source>Type a bookmark&apos;s key, or a space and its name</source>
-        <translation>Taste eines Lesezeichens, oder Leerzeichen und sein Name</translation>
-    </message>
-    <message>
         <source>Enter: save   ·   %1 opens one</source>
         <translation>Enter: speichern   ·   %1 öffnet einen</translation>
     </message>
@@ -3204,10 +3219,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Enter: go   ·   Shift+Del: forget   ·   %1: bookmarks</source>
         <translation>Enter: öffnen   ·   Umschalt+Entf: vergessen   ·   %1: Lesezeichen</translation>
-    </message>
-    <message>
-        <source>Enter: go   ·   Space: search by name   ·   %1: bookmark this folder</source>
-        <translation>Enter: öffnen   ·   Space: nach Namen suchen   ·   %1: Lesezeichen für diesen Ordner</translation>
     </message>
     <message>
         <source>Cannot extract: %1</source>
@@ -3389,6 +3400,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Files in %1</source>
         <translation>Dateien in %1</translation>
+    </message>
+    <message>
+        <source>Type a bookmark&apos;s key</source>
+        <translation>Taste eines Lesezeichens eingeben</translation>
+    </message>
+    <message>
+        <source>Enter: go   ·   Shift+Enter: other panel   ·   Ctrl+Enter: new tab   ·   Tab: search   ·   %1: add this folder</source>
+        <translation>Enter: öffnen   ·   Umschalt+Enter: anderes Panel   ·   Strg+Enter: neuer Tab   ·   Tab: suchen   ·   %1: diesen Ordner hinzufügen</translation>
     </message>
     <message>
         <source>The folder changed while editing; nothing renamed</source>

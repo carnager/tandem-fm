@@ -2096,8 +2096,21 @@ void MainWindow::openBookmarks()
         items << it;
     }
     m_popup->queryItem = nullptr;
-    // The popup keeps Ctrl+keys from the window; the one the hint names goes through.
-    m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem*) {
+    m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
+        // Shift+Enter: in the other panel; Ctrl+Enter: in a new tab.
+        if (it && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) &&
+            (e->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier))) {
+            const QString path = it->key;
+            const bool newTab = e->modifiers() & Qt::ControlModifier;
+            m_popup->hide();
+            Panel* other = active() == m_left ? m_right : m_left;
+            if (newTab)
+                active()->addTab(path);
+            else
+                other->navigate(path);
+            return true;
+        }
+        // The popup keeps Ctrl+keys from the window; the one the hint names goes through.
         const QKeySequence pressed(e->keyCombination());
         for (QAction* a : actions()) {
             const QString id = a->property("commandId").toString();
@@ -2109,8 +2122,8 @@ void MainWindow::openBookmarks()
         }
         return false;
     };
-    m_popup->open(tr("Type a bookmark's key, or a space and its name"), items,
-                  tr("Enter: go   ·   Space: search by name   ·   %1: bookmark this folder")
+    m_popup->open(tr("Type a bookmark's key"), items,
+                  tr("Enter: go   ·   Shift+Enter: other panel   ·   Ctrl+Enter: new tab   ·   Tab: search   ·   %1: add this folder")
                       .arg(keyHint(QStringLiteral("bookmark-this-folder"), false)));
 }
 
