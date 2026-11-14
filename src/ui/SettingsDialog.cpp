@@ -542,6 +542,15 @@ QWidget* SettingsDialog::behaviourPage()
              tr("Letters are commands, as in vim and yazi: j k h l to move, v for visual mode, y x p to copy, cut "
                 "and paste, d to trash, r to rename, a to create, t q for tabs, / to search, : for the palette. "
                 "F1 lists them all. Typing no longer starts the quick search."));
+#ifdef Q_OS_MACOS
+    auto* copyDrag = new QCheckBox(tr("Copy files when dragging"), this);
+    copyDrag->setObjectName(QStringLiteral("copyOnlyDrag"));
+    copyDrag->setChecked(QSettings().value(QStringLiteral("files/copyOnlyDrag"), false).toBool());
+    connect(copyDrag, &QCheckBox::toggled, this,
+            [](bool on) { QSettings().setValue(QStringLiteral("files/copyOnlyDrag"), on); });
+    page.add(tr("Drag and drop"), copyDrag,
+             tr("Dragging from either panel copies files instead of moving them, even when modifier keys are held."));
+#endif
     page.add(tr("Notifications"),
              toggle(tr("Notify when long operations finish"), m_window->m_actions.value(QStringLiteral("notifications"))),
              tr("A desktop notification when a copy or move that took a while is done and Tandem isn't in front."));
