@@ -3667,7 +3667,8 @@ private slots:
         for (QLabel* label : chords->findChildren<QLabel*>()) {
             if (!label->isVisible())
                 continue;
-            QVERIFY2(label->height() >= label->sizeHint().height(), qPrintable(label->text()));
+            const int needed = label->hasHeightForWidth() ? label->heightForWidth(label->width()) : label->sizeHint().height();
+            QVERIFY2(label->height() >= needed, qPrintable(label->text()));
             QVERIFY(chords->rect().contains(label->mapTo(chords, label->rect().bottomRight())));
         }
         QTest::keyClick(chords, Qt::Key_Escape);

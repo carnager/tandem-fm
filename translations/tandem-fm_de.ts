@@ -2377,24 +2377,24 @@
         <translation>Lesezeichen für %1 entfernt</translation>
     </message>
     <message>
-        <source>Bookmark key for %1:  %2</source>
-        <translation>Lesezeichen-Taste für %1:  %2</translation>
+        <source>Bookmark key for %1</source>
+        <translation>Lesezeichen-Taste für %1</translation>
+    </message>
+    <message>
+        <source>Type a key</source>
+        <translation>Taste eingeben</translation>
+    </message>
+    <message>
+        <source>“%1” moves here from %2   ·   %3Enter: save   ·   Esc</source>
+        <translation>„%1“ wechselt von %2 hierher   ·   %3Enter: speichern   ·   Esc</translation>
     </message>
     <message>
         <source>free: %1   ·   Tab: %2   ·   </source>
         <translation>frei: %1   ·   Tab: %2   ·   </translation>
     </message>
     <message>
-        <source>“%1” is used by %2 and will move here   ·   %3Enter: save   ·   Esc</source>
-        <translation>„%1“ gehört zu %2 und wechselt hierher   ·   %3Enter: speichern   ·   Esc</translation>
-    </message>
-    <message>
         <source>Type a key or chain (e.g. cp)   ·   %1Enter: save   ·   Delete: remove   ·   Esc</source>
         <translation>Taste oder Tastenfolge eingeben (z. B. cp)   ·   %1Enter: speichern   ·   Delete: entfernen   ·   Esc</translation>
-    </message>
-    <message>
-        <source>No bookmarks yet. Ctrl+Shift+D bookmarks the current folder.</source>
-        <translation>Noch keine Lesezeichen. Ctrl+Shift+D setzt ein Lesezeichen für den aktuellen Ordner.</translation>
     </message>
 </context>
 <context>

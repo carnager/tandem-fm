@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/FuzzyPopup.h"
+
 #include <QFrame>
 #include <QPointer>
 
@@ -7,14 +9,14 @@
 
 class QGridLayout;
 class QLabel;
+class QListView;
 
 namespace tandem {
 
-// yazi-style which-key panel for bookmarks. Jump mode: type a key chain
-// ("h", "cp"); the list narrows and the jump happens as soon as the chain is
-// unique. Assign mode: type a chain for the given folder, Enter to save,
-// Delete to remove the bookmark. Choices mode: a few numbered things
-// (shelves), picked with their digit, Shift+digit or Enter.
+// Assign mode (Ctrl+Shift+D): type a key or chain for a folder, laid out
+// like the Ctrl+D list; Enter saves, Tab takes a free key, Delete removes the
+// bookmark. Choices mode: a few numbered things (shelves), picked with their
+// digit, Shift+digit or Enter.
 class KeyChordPopup : public QFrame {
     Q_OBJECT
 public:
@@ -65,6 +67,10 @@ private:
     QStringList m_free;  // keys the folder could have, best first (Tab takes one)
     QPointer<QWidget> m_returnFocus;
     QLabel* m_title;
+    QLabel* m_field;      // Assign: the key typed so far, drawn like the palette's input
+    QListView* m_list;  // Assign: the bookmarks whose keys it touches, as Ctrl+D shows them
+    PopupModel* m_model;
+    QList<PopupItem> m_rows;
     QWidget* m_grid;
     QGridLayout* m_gridLayout;
     QLabel* m_hint;
