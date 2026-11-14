@@ -3466,6 +3466,9 @@ private slots:
         QTRY_VERIFY(!chords->isVisible());
         popup = openWith("sub");
         QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == "bookmark:" + L("sub"));
+        QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_Escape);
+        popup = openWith(baseName(L()) + " sub");  // a part of the path finds it too
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == "bookmark:" + L("sub"));
         QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_Delete);
         QVERIFY(!h.isPinned(L("sub")));
         QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_Escape);
