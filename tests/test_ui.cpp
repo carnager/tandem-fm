@@ -3690,6 +3690,8 @@ private slots:
         for (const auto& b : h.bookmarks())
             if (b.path != L("sub/deep"))
                 used << b.key;
+        QVERIFY(Keymap::instance().keysAfterBookmarkPrefix().contains("g"));  // g g: top
+        used << Keymap::instance().keysAfterBookmarkPrefix();
         const QString suggested = FolderHistory::suggestKeys(L("sub/deep"), used).value(0);
         QVERIFY(!suggested.isEmpty());
         QTest::keyClick(chords, Qt::Key_Tab);
@@ -3706,10 +3708,18 @@ private slots:
         QTest::keyClick(chords, Qt::Key_Return);
         QTRY_COMPARE(h.pathForKey("zz"), L("sub/deep"));
 
-        // Modal: ' opens the list, then the key.
+        // Vim: g + key.
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
         m_left->setVimKeys(true);
+        m_left->view()->setFocus();
+        QTest::keyClicks(m_left->view(), "gz");
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "z");
+        QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+        // …and ' opens the list first, then the key.
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
         m_left->view()->setFocus();
         QTest::keyClicks(m_left->view(), "'");
         QTRY_VERIFY(popup->isVisible());

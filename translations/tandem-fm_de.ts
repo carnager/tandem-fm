@@ -928,6 +928,10 @@
         <translation>Lesezeichen setzen</translation>
     </message>
     <message>
+        <source>Bookmark prefix (then the bookmark&apos;s key)</source>
+        <translation>Lesezeichen-Präfix (danach die Taste des Lesezeichens)</translation>
+    </message>
+    <message>
         <source>Create a file or folder</source>
         <translation>Datei oder Ordner anlegen</translation>
     </message>
@@ -1500,8 +1504,8 @@
         <translation>Auswählen…</translation>
     </message>
     <message>
-        <source>Ctrl+D and the key go there; with modal keys, &apos; and the key. Drag bookmarks in the list to change their order.</source>
-        <translation>Strg+D und die Taste führen dorthin, mit modalen Tasten &apos; und die Taste. Zieh Lesezeichen in der Liste, um ihre Reihenfolge zu ändern.</translation>
+        <source>Ctrl+D and the key go there; with modal keys, &apos; or g and the key. Drag bookmarks in the list to change their order.</source>
+        <translation>Strg+D und die Taste führen dorthin, mit modalen Tasten &apos; oder g und die Taste. Zieh Lesezeichen in der Liste, um ihre Reihenfolge zu ändern.</translation>
     </message>
     <message>
         <source>New bookmark</source>
@@ -2177,6 +2181,10 @@
 </context>
 <context>
     <name>tandem::FileView</name>
+    <message>
+        <source>any other key: that bookmark</source>
+        <translation>jede andere Taste: dieses Lesezeichen</translation>
+    </message>
     <message numerus="yes">
         <source>%n item(s)</source>
         <translation>

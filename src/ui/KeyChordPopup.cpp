@@ -3,6 +3,7 @@
 #include "core/FolderHistory.h"
 #include "core/Util.h"
 #include "ui/IconCache.h"
+#include "ui/Keymap.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
@@ -251,7 +252,7 @@ void KeyChordPopup::refresh()
         for (const auto& b : all)
             if (b.path != m_assignPath)
                 used << b.key;
-        m_free = FolderHistory::suggestKeys(m_assignPath, used);
+        m_free = FolderHistory::suggestKeys(m_assignPath, used + Keymap::instance().keysAfterBookmarkPrefix());
         const QString free = m_free.isEmpty() ? QString()
                                               : tr("free: %1   ·   Tab: %2   ·   ").arg(m_free.join(QStringLiteral(", ")), m_free.first());
         m_hint->setText(!owner.isEmpty() && owner != m_assignPath
