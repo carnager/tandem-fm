@@ -83,8 +83,9 @@ void KeyChordPopup::close()
     hide();
 }
 
-void KeyChordPopup::openAssign(const QString& path)
+void KeyChordPopup::openAssign(const QString& path, QWidget* anchor)
 {
+    m_anchor = anchor && anchor->isVisible() ? anchor : nullptr;
     if (!isVisible())
         m_returnFocus = QApplication::focusWidget();
     m_mode = Mode::Assign;
@@ -308,6 +309,15 @@ void KeyChordPopup::place()
         for (int r = 0; r < qMin(11, m_model->rowCount()); ++r)
             listHeight += m_list->itemDelegate()->sizeHint(opt, m_model->index(r)).height();
         m_list->setFixedHeight(listHeight + 4);
+        if (m_anchor) {  // under the star, its right edge at the star's
+            const int width = qMin(520, w->width() - 20);
+            setFixedWidth(width);
+            layout()->activate();
+            adjustSize();
+            const QPoint at = m_anchor->mapTo(w, QPoint(m_anchor->width(), m_anchor->height() + 4));
+            move(qBound(10, at.x() - width, w->width() - width - 10), at.y());
+            return;
+        }
         const int width = qMin(680, w->width() - 40);
         setFixedWidth(width);
         layout()->activate();

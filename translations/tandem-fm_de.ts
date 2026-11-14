@@ -4219,6 +4219,10 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Neuer Tab</translation>
     </message>
     <message>
+        <source>Bookmarked. Click the star again to give it a key.</source>
+        <translation>Als Lesezeichen gespeichert. Klick den Stern noch einmal, um ihm eine Taste zu geben.</translation>
+    </message>
+    <message>
         <source>words or *.ext — Alt+S with subfolders, Esc clears, Enter/↓ back to the list</source>
         <translation>Wörter oder *.ext – Alt+S mit Unterordnern, Esc leert, Enter/↓ zurück zur Liste</translation>
     </message>
@@ -4253,6 +4257,18 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Close tab</source>
         <translation>Tab schließen</translation>
+    </message>
+    <message>
+        <source>Bookmark this folder</source>
+        <translation>Lesezeichen für diesen Ordner</translation>
+    </message>
+    <message>
+        <source>Bookmarked: click to give it a key, or remove it</source>
+        <translation>Lesezeichen: klicken, um ihm eine Taste zu geben oder es zu entfernen</translation>
+    </message>
+    <message>
+        <source>Bookmarked as “%1”: click to change the key, or remove it</source>
+        <translation>Lesezeichen „%1“: klicken, um die Taste zu ändern oder es zu entfernen</translation>
     </message>
     <message>
         <source>Searching %1 for “%2” …  %3 found   (Esc stops)</source>

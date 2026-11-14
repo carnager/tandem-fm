@@ -54,6 +54,8 @@ void FolderHistory::setStoragePath(const QString& path)
     m_entries.clear();
     m_pinned.clear();
     m_keys.clear();
+    lock.unlock();
+    emit bookmarksChanged();
 }
 
 QStringList FolderHistory::suggestKeys(const QString& path, const QStringList& used, int count)
@@ -172,6 +174,8 @@ void FolderHistory::load()
         if (!m_keys.contains(it.key()) && pathForKeyLocked(it.value()).isEmpty())
             m_keys.insert(it.key(), it.value());
     m_loaded.store(true);
+    lock.unlock();
+    emit bookmarksChanged();
 }
 
 void FolderHistory::saveNow()
@@ -265,6 +269,7 @@ void FolderHistory::setPinned(const QString& path, bool pinned)
         else
             m_keys.remove(path);
     }
+    emit bookmarksChanged();
     scheduleSave();
 }
 
@@ -291,6 +296,7 @@ void FolderHistory::setBookmark(const QString& path, const QString& key)
         if (!m_pinned.contains(path))
             m_pinned.append(path);
     }
+    emit bookmarksChanged();
     scheduleSave();
 }
 
@@ -315,6 +321,7 @@ void FolderHistory::setBookmarks(const QList<Bookmark>& pins)
                 m_keys.insert(b.path, b.key);
         }
     }
+    emit bookmarksChanged();
     scheduleSave();
 }
 

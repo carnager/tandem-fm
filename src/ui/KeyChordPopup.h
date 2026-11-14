@@ -35,7 +35,7 @@ public:
         std::function<void()> space;  // optional
     };
 
-    void openAssign(const QString& path);
+    void openAssign(const QString& path, QWidget* anchor = nullptr);  // under the anchor (a panel's star)
     void openChoices(const Choices& choices);
     bool isChoosing() const { return isVisible() && m_mode == Mode::Choices; }
 
@@ -66,6 +66,7 @@ private:
     QString m_assignPath;
     QStringList m_free;  // keys the folder could have, best first (Tab takes one)
     QPointer<QWidget> m_returnFocus;
+    QPointer<QWidget> m_anchor;
     QLabel* m_title;
     QLabel* m_field;      // Assign: the key typed so far, drawn like the palette's input
     QListView* m_list;  // Assign: the bookmarks whose keys it touches, as Ctrl+D shows them

@@ -3538,6 +3538,39 @@ private slots:
                  QList<FolderHistory::Bookmark>({{"r", R()}, {"a", L("sub/deep")}, {"s", L("sub")}}));
     }
 
+    // The star by the path: ☆ bookmarks the folder, ★ (with its key) opens
+    // the key popup under it; Ctrl+Shift+D opens the same.
+    void starBookmarks()
+    {
+        FolderHistory& h = FolderHistory::instance();
+        QTRY_VERIFY(h.isLoaded());
+        auto cleanup = qScopeGuard([&] { h.setPinned(L(), false); });
+        h.setPinned(L(), false);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        auto* star = qobject_cast<QToolButton*>(m_left->starButton());
+        QVERIFY(star && star->isVisible());
+        QTRY_COMPARE(star->text(), QString("☆"));
+        star->click();
+        QVERIFY(h.isPinned(L()));
+        QTRY_COMPARE(star->text(), QString("★"));
+        auto* chords = m_window->findChild<KeyChordPopup*>();
+        star->click();
+        QTRY_VERIFY(chords->isVisible());
+        const QPoint below = star->mapTo(m_window.get(), QPoint(0, star->height()));
+        QVERIFY(chords->y() >= below.y());  // under the star, not somewhere else
+        QTest::keyClicks(chords, "lx");
+        QTest::keyClick(chords, Qt::Key_Return);
+        QTRY_COMPARE(star->text(), QString("★ lx"));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(chords->isVisible());
+        QVERIFY(chords->y() >= below.y());
+        QTest::keyClick(chords, Qt::Key_Delete);  // remove it
+        QTRY_COMPARE(star->text(), QString("☆"));
+        QVERIFY(!h.isPinned(L()));
+    }
+
     void bookmarkChords()
     {
         FolderHistory& h = FolderHistory::instance();

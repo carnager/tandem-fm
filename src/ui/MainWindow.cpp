@@ -230,7 +230,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::commandIdRequested, this, &MainWindow::runCommandId);
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
         connect(p, &Panel::bookmarkJumpRequested, this, [this] { openBookmarks(); });
-        connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
+        connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path(), active()->starButton()); });
         connect(p, &Panel::bookmarkEditRequested, this, [this](const QString& path) { m_chords->openAssign(path); });
         connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
         connect(p, &Panel::trashRequested, this, &MainWindow::showTrash);
@@ -463,7 +463,7 @@ void MainWindow::createMenus()
     // mouse; the keys show where shortcuts go. Filled each time it opens.
     QMenu* marks = bar->addMenu(tr("&Bookmarks"));
     addCommand(marks, QT_TR_NOOP("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
-               [this] { m_chords->openAssign(active()->path()); });
+               [this] { m_chords->openAssign(active()->path(), active()->starButton()); });
     addCommand(marks, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { openBookmarks(); });
     addCommand(marks, QT_TR_NOOP("Edit bookmarks…"), {}, [this] { showServers({}, true); });
     marks->addSeparator();
