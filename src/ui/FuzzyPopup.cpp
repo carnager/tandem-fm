@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListView>
+#include <QMenu>
 #include <QPainter>
 #include <QTextLayout>
 #include <QVBoxLayout>
@@ -255,6 +256,23 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
     connect(m_list, &QListView::clicked, this, [this](const QModelIndex& i) {
         m_list->setCurrentIndex(i);
         activate();
+    });
+    m_list->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_list, &QListView::customContextMenuRequested, this, [this](const QPoint& pos) {
+        const QModelIndex i = m_list->indexAt(pos);
+        const PopupItem* it = m_model->item(i.row());
+        if (!it || it->menu.isEmpty())
+            return;
+        m_list->setCurrentIndex(i);
+        QMenu menu(this);
+        for (const auto& [text, run] : it->menu)
+            connect(menu.addAction(text), &QAction::triggered, this, [this, run] {
+                close();
+                run();
+            });
+        menu.exec(m_list->viewport()->mapToGlobal(pos));
+        if (isVisible())
+            m_edit->setFocus();
     });
     hide();
     window->installEventFilter(this);

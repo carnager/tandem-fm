@@ -77,6 +77,7 @@
 #include <QCheckBox>
 #include <QScopeGuard>
 #include <QSignalSpy>
+#include <QListView>
 #include <QListWidget>
 #include <QKeySequenceEdit>
 #include <QTreeWidget>
@@ -2494,6 +2495,27 @@ private slots:
         QTRY_COMPARE(shown, QString("Qwertz share"));
         QTRY_VERIFY(!QApplication::activeModalWidget());
         QCOMPARE(list.servers().size(), 2);  // nothing added
+
+        // The same with the mouse: right-click, Edit….
+        popup = openLocations();
+        QTest::keyClicks(popup->findChild<QLineEdit*>(), "qwertz");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key.startsWith("saved:"));
+        shown.clear();
+        answerNextDialog([&shown](QWidget* w) {
+            if (auto* d = qobject_cast<ServersDialog*>(w))
+                shown = d->list()->currentItem() ? d->list()->currentItem()->text() : QString("?");
+            QMetaObject::invokeMethod(w, "reject", Qt::QueuedConnection);
+        });
+        {
+            auto* view = popup->findChild<QListView*>();
+            const QPoint at = view->visualRect(view->currentIndex()).center();
+            chooseFromNextMenu("Edit…");
+            QContextMenuEvent menuEvent(QContextMenuEvent::Mouse, at, view->viewport()->mapToGlobal(at));
+            QApplication::sendEvent(view->viewport(), &menuEvent);
+        }
+        QTRY_COMPARE(shown, QString("Qwertz share"));
+        QTRY_VERIFY(!QApplication::activeModalWidget());
+        QVERIFY(!popup->isVisible());
 
         // The servers window is offered in the Servers section itself.
         popup = openLocations();
