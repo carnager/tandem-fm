@@ -230,6 +230,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
         connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
         connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
+        connect(p, &Panel::bookmarkEditRequested, this, [this](const QString& path) { m_chords->openAssign(path); });
         connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
         connect(p, &Panel::trashRequested, this, &MainWindow::showTrash);
         connect(p, &Panel::serversRequested, this, &MainWindow::showServers);
