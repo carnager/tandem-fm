@@ -7,7 +7,6 @@
 #include <QDir>
 #include <QGraphicsDropShadowEffect>
 #include <QGridLayout>
-#include <QHash>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QVBoxLayout>
@@ -62,40 +61,13 @@ void KeyChordPopup::close()
     hide();
 }
 
-void KeyChordPopup::openJump(const QString& initialKeys)
-{
-    if (!isVisible())
-        m_returnFocus = QApplication::focusWidget();
-    m_mode = Mode::Jump;
-    m_typed.clear();
-    show();
-    raise();
-    setFocus();
-    refresh();
-    if (!initialKeys.isEmpty())
-        type(initialKeys);
-}
-
 void KeyChordPopup::openAssign(const QString& path)
 {
     if (!isVisible())
         m_returnFocus = QApplication::focusWidget();
     m_mode = Mode::Assign;
-    m_assignFromEdit = false;
     m_assignPath = path;
     m_typed = FolderHistory::instance().bookmarkKey(path);
-    show();
-    raise();
-    setFocus();
-    refresh();
-}
-
-void KeyChordPopup::openEdit()
-{
-    if (!isVisible())
-        m_returnFocus = QApplication::focusWidget();
-    m_mode = Mode::Edit;
-    m_typed.clear();
     show();
     raise();
     setFocus();
@@ -156,14 +128,6 @@ bool KeyChordPopup::event(QEvent* e)
         e->accept();
         return true;
     }
-    // Tab switches between jumping and editing, instead of moving the focus.
-    if (e->type() == QEvent::KeyPress && static_cast<QKeyEvent*>(e)->key() == Qt::Key_Tab &&
-        (m_mode == Mode::Jump || m_mode == Mode::Edit)) {
-        m_mode = m_mode == Mode::Jump ? Mode::Edit : Mode::Jump;
-        m_typed.clear();
-        refresh();
-        return true;
-    }
     return QFrame::event(e);
 }
 
@@ -176,29 +140,6 @@ void KeyChordPopup::focusOutEvent(QFocusEvent* e)
 void KeyChordPopup::type(const QString& keys)
 {
     m_typed += keys;
-    if (m_mode == Mode::Assign) {
-        refresh();
-        return;
-    }
-    const auto all = FolderHistory::instance().bookmarks();
-    QList<FolderHistory::Bookmark> matches;
-    for (const auto& b : all)
-        if (b.key.startsWith(m_typed))
-            matches.append(b);
-    if (matches.isEmpty()) {
-        emit message(tr("No bookmark “%1”").arg(m_typed), true);
-        m_typed.chop(keys.size());
-        refresh();
-        return;
-    }
-    // Unique and complete: go. (A chain that is also the start of a longer
-    // one waits; Enter takes the exact one.)
-    if (matches.size() == 1 && matches.first().key == m_typed) {
-        const QString path = matches.first().path;
-        close();
-        emit jumpRequested(path);
-        return;
-    }
     refresh();
 }
 
@@ -221,108 +162,32 @@ void KeyChordPopup::keyPressEvent(QKeyEvent* e)
         }
         return;
     }
-    if (m_mode == Mode::Edit) {
-        editKey(e);
-        return;
-    }
-    // Changing a key from the list: Enter, Delete and Esc go back to it.
-    auto done = [this] {
-        if (!m_assignFromEdit) {
-            close();
-            return;
-        }
-        m_mode = Mode::Edit;
-        m_typed.clear();
-        refresh();
-    };
     switch (e->key()) {
     case Qt::Key_Escape:
-        if (m_mode == Mode::Assign)
-            done();
-        else
-            close();
+        close();
         return;
     case Qt::Key_Backspace:
-        if (m_typed.isEmpty() && m_mode == Mode::Jump) {
-            close();
-            return;
-        }
         m_typed.chop(1);
         refresh();
         return;
     case Qt::Key_Return:
     case Qt::Key_Enter:
-        if (m_mode == Mode::Assign) {
-            FolderHistory::instance().setBookmark(m_assignPath, m_typed);
-            emit message(m_typed.isEmpty() ? tr("Pinned %1").arg(m_assignPath)
-                                           : tr("Bookmarked %1 as “%2”").arg(m_assignPath, m_typed),
-                         false);
-            done();
-        } else if (const QString p = FolderHistory::instance().pathForKey(m_typed); !p.isEmpty()) {
-            close();
-            emit jumpRequested(p);
-        }
+        FolderHistory::instance().setBookmark(m_assignPath, m_typed);
+        emit message(m_typed.isEmpty() ? tr("Pinned %1").arg(m_assignPath)
+                                       : tr("Bookmarked %1 as “%2”").arg(m_assignPath, m_typed),
+                     false);
+        close();
         return;
     case Qt::Key_Delete:
-        if (m_mode == Mode::Assign) {
-            FolderHistory::instance().setPinned(m_assignPath, false);
-            emit message(tr("Removed bookmark for %1").arg(m_assignPath), false);
-            done();
-            return;
-        }
-        break;
-    case Qt::Key_Space:
-        if (m_mode == Mode::Jump) {
-            close();
-            emit fuzzyRequested();
-            return;
-        }
-        break;
+        FolderHistory::instance().setPinned(m_assignPath, false);
+        emit message(tr("Removed bookmark for %1").arg(m_assignPath), false);
+        close();
+        return;
     default:
         break;
     }
     if (!text.isEmpty() && text.at(0).isPrint() && text != QLatin1String(" "))
         type(text);
-}
-
-void KeyChordPopup::editKey(QKeyEvent* e)
-{
-    const int columns = 3;  // as shown
-    const int last = int(m_editPaths.size()) - 1;
-    int row = m_editRow;
-    switch (e->key()) {
-    case Qt::Key_Escape:
-        close();
-        return;
-    case Qt::Key_Left: row -= 1; break;
-    case Qt::Key_Right: row += 1; break;
-    case Qt::Key_Up: row -= columns; break;
-    case Qt::Key_Down: row += columns; break;
-    case Qt::Key_Return:
-    case Qt::Key_Enter:
-        if (last >= 0) {
-            m_mode = Mode::Assign;
-            m_assignFromEdit = true;
-            m_assignPath = m_editPaths.at(m_editRow);
-            m_typed = FolderHistory::instance().bookmarkKey(m_assignPath);
-            refresh();
-        }
-        return;
-    case Qt::Key_Delete:
-        if (last >= 0) {
-            const QString path = m_editPaths.at(m_editRow);
-            FolderHistory::instance().setPinned(path, false);
-            emit message(tr("Removed bookmark for %1").arg(path), false);
-            refresh();
-        }
-        return;
-    default:
-        return;
-    }
-    if (row >= 0 && row <= last) {
-        m_editRow = row;
-        refresh();
-    }
 }
 
 void KeyChordPopup::refresh()
@@ -338,15 +203,8 @@ void KeyChordPopup::refresh()
         refreshChoices();
         return;
     }
-    if (m_mode == Mode::Edit) {
-        refreshEdit();
-        return;
-    }
     const auto all = FolderHistory::instance().bookmarks();
-    if (m_mode == Mode::Jump) {
-        m_title->setText(m_typed.isEmpty() ? tr("Bookmarks") : tr("Bookmarks  ·  %1…").arg(m_typed));
-        m_hint->setText(tr("Type a key   ·   Tab: edit   ·   Space: search all folders   ·   Ctrl+Shift+D: bookmark this folder   ·   Esc"));
-    } else {
+    {
         const QString owner = m_typed.isEmpty() ? QString() : FolderHistory::instance().pathForKey(m_typed);
         m_title->setText(tr("Bookmark key for %1:  %2").arg(m_assignPath, m_typed.isEmpty() ? QStringLiteral("_")
                                                                                                       : m_typed));
@@ -356,21 +214,18 @@ void KeyChordPopup::refresh()
     }
     int row = 0, col = 0;
     const int columns = 3;
+    const int width = qMin(860, parentWidget()->width() - 40);  // as place() makes it
+    const int room = qMax(80, (width - 32) / columns - 70);     // a column, less its key
     for (const auto& b : all) {
-        const bool match = m_mode == Mode::Assign || b.key.startsWith(m_typed);
-        if (!match)
-            continue;
-        auto* cap = new QLabel(m_grid);
-        if (m_mode == Mode::Jump && !m_typed.isEmpty()) {
-            // Typed part highlighted, the rest still to press.
-            cap->setTextFormat(Qt::RichText);
-            cap->setText(QStringLiteral("<span style='opacity:0.5'>%1</span><b>%2</b>")
-                             .arg(m_typed.toHtmlEscaped(), b.key.mid(m_typed.size()).toHtmlEscaped()));
-        } else {
-            cap->setText(b.key);
-        }
+        auto* cap = new QLabel(b.key, m_grid);
         cap->setObjectName(QStringLiteral("cap"));
-        auto* path = new QLabel(b.path, m_grid);
+        // Home as ~, the middle shortened: the folder's name stays visible.
+        QString shown = b.path;
+        if (shown.startsWith(QDir::homePath() + QLatin1Char('/')))
+            shown = QLatin1Char('~') + shown.mid(QDir::homePath().size());
+        auto* path = new QLabel(m_grid);
+        path->setText(path->fontMetrics().elidedText(shown, Qt::ElideMiddle, room));
+        path->setToolTip(b.path);
         path->setObjectName(b.path == m_assignPath ? QString() : QStringLiteral("dim"));
         path->setTextFormat(Qt::PlainText);
         cap->show();
@@ -383,42 +238,6 @@ void KeyChordPopup::refresh()
         }
     }
     if (all.isEmpty()) {
-        auto* none = new QLabel(tr("No bookmarks yet. Ctrl+Shift+D bookmarks the current folder."), m_grid);
-        none->setObjectName(QStringLiteral("dim"));
-        none->show();
-        m_gridLayout->addWidget(none, 0, 0);
-    }
-    place();
-}
-
-void KeyChordPopup::refreshEdit()
-{
-    m_editPaths.clear();
-    QHash<QString, QString> keys;
-    for (const FolderHistory::Item& item : FolderHistory::instance().items()) {
-        if (!item.pinned)
-            break;  // pinned ones come first
-        m_editPaths << item.path;
-        keys.insert(item.path, item.key);
-    }
-    m_editRow = qBound(0, m_editRow, qMax(0, int(m_editPaths.size()) - 1));
-    m_title->setText(tr("Edit bookmarks"));
-    m_hint->setText(tr("Arrows: choose   ·   Enter: change the key   ·   Delete: remove   ·   Tab: back   ·   Esc"));
-    const int columns = 3;
-    for (int i = 0; i < m_editPaths.size(); ++i) {
-        const QString& path = m_editPaths.at(i);
-        const QString key = keys.value(path);
-        auto* cap = new QLabel(key.isEmpty() ? QStringLiteral("–") : key, m_grid);
-        cap->setObjectName(i == m_editRow ? QStringLiteral("capTyped") : QStringLiteral("cap"));
-        auto* label = new QLabel(path, m_grid);
-        label->setTextFormat(Qt::PlainText);
-        label->setObjectName(i == m_editRow ? QString() : QStringLiteral("dim"));
-        cap->show();
-        label->show();
-        m_gridLayout->addWidget(cap, i / columns, i % columns * 2, Qt::AlignLeft);
-        m_gridLayout->addWidget(label, i / columns, i % columns * 2 + 1);
-    }
-    if (m_editPaths.isEmpty()) {
         auto* none = new QLabel(tr("No bookmarks yet. Ctrl+Shift+D bookmarks the current folder."), m_grid);
         none->setObjectName(QStringLiteral("dim"));
         none->show();

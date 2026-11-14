@@ -1955,6 +1955,8 @@ QList<PopupItem> Panel::locationItems()
                              {tr("Change key…"), [this, p = b.path] { emit bookmarkEditRequested(p); }},
                              {tr("Remove bookmark"), [p = b.path] { FolderHistory::instance().setPinned(p, false); }}};
     }
+    add(tr("Bookmarks"), IconCache::themed("bookmarks-organize", "folder"), tr("Edit bookmarks…"),
+        tr("keys, folders and their order, all at once"), {}, [this] { emit bookmarksWindowRequested(); });
 
     for (const MountPoint& m : listMounts()) {
         if (m.path == QLatin1String("/") || isSystemMount(m))

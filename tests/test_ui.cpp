@@ -40,6 +40,7 @@
 #include "ui/PermissionsDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/ServersDialog.h"
+#include "ui/BookmarksEditor.h"
 #include "core/Servers.h"
 #include "ui/AboutDialog.h"
 #include "ui/ShortcutsDialog.h"
@@ -3489,45 +3490,35 @@ private slots:
 #endif
     }
 
-    // Tab in the bookmarks popup: all bookmarks, keys changed and removed there.
-    void bookmarkEdit()
+    // Locations › Bookmarks: keys, folders and order edited as a table, saved at once.
+    void bookmarksWindow()
     {
         FolderHistory& h = FolderHistory::instance();
         QTRY_VERIFY(h.isLoaded());
-        h.setPinned(L("sub"), true);  // no key
-        h.setBookmark(R(), "e");
-        auto cleanup = qScopeGuard([&] {
-            h.setPinned(L("sub"), false);
-            h.setPinned(R(), false);
-        });
-        auto* chords = m_window->findChild<KeyChordPopup*>();
-        m_window->activateWindow();
-        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
-        m_left->view()->setFocus();
-        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
-        QTRY_VERIFY(chords->isVisible());
-        QTest::keyClick(chords, Qt::Key_Tab);
-        QTest::keyClicks(chords, "e");  // editing: letters don't jump
-        QVERIFY(chords->isVisible());
-        QCOMPARE(leftModel()->path(), L());
-        int index = 0;
-        for (const auto& item : h.items())
-            if (item.pinned && item.path != L("sub"))
-                ++index;
-            else if (item.path == L("sub"))
-                break;
-        for (int i = 0; i < index; ++i)
-            QTest::keyClick(chords, Qt::Key_Right);
-        QTest::keyClick(chords, Qt::Key_Return);  // a key for the one without
-        QTest::keyClicks(chords, "x");
-        QTest::keyClick(chords, Qt::Key_Return);
-        QCOMPARE(h.pathForKey("x"), L("sub"));
-        QVERIFY(chords->isVisible());  // back in the list
-        QTest::keyClick(chords, Qt::Key_Delete);
-        QVERIFY(!h.isPinned(L("sub")));
-        QVERIFY(h.isPinned(R()));
-        QTest::keyClick(chords, Qt::Key_Escape);
-        QTRY_VERIFY(!chords->isVisible());
+        const auto before = h.pinnedBookmarks();
+        auto restore = qScopeGuard([&] { h.setBookmarks(before); });
+        h.setBookmarks({{"a", L()}, {"", L("sub")}});
+        ServersDialog dlg(m_window.get());
+        dlg.showBookmarks(true);
+        dlg.bookmarks()->setCurrentFolder(R());
+        QTreeWidget* table = dlg.bookmarks()->table();
+        QCOMPARE(table->topLevelItemCount(), 2);
+        QCOMPARE(table->topLevelItem(1)->text(1), L("sub"));
+        table->topLevelItem(1)->setText(0, "s");           // a key for the one without
+        table->topLevelItem(0)->setText(1, L("sub/deep"));  // another folder
+        for (auto* b : dlg.findChildren<QPushButton*>())
+            if (b->text().remove('&') == "Add this folder")
+                b->click();
+        QCOMPARE(table->topLevelItemCount(), 3);
+        table->closePersistentEditor(table->topLevelItem(2), 0);
+        table->topLevelItem(2)->setText(0, "s");  // used twice: not saved
+        QVERIFY(!dlg.save());
+        QCOMPARE(h.pinnedBookmarks(), QList<FolderHistory::Bookmark>({{"a", L()}, {"", L("sub")}}));
+        table->topLevelItem(2)->setText(0, "r");
+        table->insertTopLevelItem(0, table->takeTopLevelItem(2));  // reordered, as by dragging
+        QVERIFY(dlg.save());
+        QCOMPARE(h.pinnedBookmarks(),
+                 QList<FolderHistory::Bookmark>({{"r", R()}, {"a", L("sub/deep")}, {"s", L("sub")}}));
     }
 
     void bookmarkChords()
@@ -3537,32 +3528,51 @@ private slots:
         h.setBookmark(L("sub"), "cp");
         h.setBookmark(L("sub/deep"), "cd");
         h.setBookmark(R(), "c");  // also a prefix of the two above
+        auto* popup = m_window->findChild<FuzzyPopup*>();
         auto* chords = m_window->findChild<KeyChordPopup*>();
-        QVERIFY(chords);
+        QVERIFY(popup && chords);
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_left->view()->setFocus();
+        auto rows = [&] {
+            QStringList keys;
+            auto* view = popup->findChild<QListView*>();
+            for (int r = 0; r < view->model()->rowCount(); ++r) {
+                view->setCurrentIndex(view->model()->index(r, 0));
+                keys << popup->currentItem()->chord;
+            }
+            view->setCurrentIndex(view->model()->index(0, 0));
+            return keys;
+        };
 
-        // A chain: "c" waits (cp, cd and c exist), "p" jumps.
+        // A chain: "c" waits and shows the three, the exact one first; "p" jumps.
         QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
-        QTRY_VERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "c");
-        QVERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "p");
-        QTRY_VERIFY(!chords->isVisible());
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "c");
+        QCOMPARE(rows(), QStringList({"c", "cp", "cd"}));
+        QTest::keyClicks(QApplication::focusWidget(), "p");
+        QTRY_VERIFY(!popup->isVisible());
         QTRY_COMPARE(leftModel()->path(), L("sub"));
 
         // Enter takes the exact key even though longer ones start with it.
         m_left->view()->setFocus();
         QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
-        QTRY_VERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "c");
-        QTest::keyClick(chords, Qt::Key_Return);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "c");
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), R());
 
-        // Assign a new chain to the current folder.
-        m_left->navigate(L("sub/deep"));
+        // A space first: search by name, keys or not.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), " deep");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("sub/deep"));
+        QVERIFY(popup->isVisible());  // no jump while searching
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+
+        // Assign a new chain to the current folder.
         m_left->view()->setFocus();
         QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY(chords->isVisible());
@@ -3578,8 +3588,8 @@ private slots:
         m_left->setVimKeys(true);
         m_left->view()->setFocus();
         QTest::keyClicks(m_left->view(), "gz");
-        QTRY_VERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "z");
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "z");
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
         m_left->setVimKeys(false);
 
@@ -3589,13 +3599,12 @@ private slots:
         QTRY_VERIFY(m_right->isActive());
         const QString leftBefore = leftModel()->path();
         QTest::keyClick(m_right->view(), Qt::Key_D, Qt::ControlModifier);
-        QTRY_VERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "q");
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "q");
         QTRY_COMPARE(rightModel()->path(), L("sub"));
         QCOMPARE(leftModel()->path(), leftBefore);
         QVERIFY(m_right->isActive());
         // …and the same for the fuzzy jump.
-        auto* popup = m_window->findChild<FuzzyPopup*>();
         QTest::keyClick(m_right->view(), Qt::Key_J, Qt::ControlModifier);
         QTRY_VERIFY(popup->isVisible());
         QTest::keyClicks(QApplication::focusWidget(), "sub dee");
@@ -3608,11 +3617,11 @@ private slots:
         QTRY_COMPARE(rightModel()->path(), R());
         m_left->view()->setFocus();
 
-        // Regression: with more bookmarks than fit one row, every row gets
-        // its full height (rows were squeezed and the text cut off).
+        // Regression: with more bookmarks than fit one row, every row of the
+        // assign grid gets its full height (rows were squeezed, text cut off).
         h.setBookmark(L("sub"), "a");
         h.setBookmark(L(), "b");
-        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY(chords->isVisible());
         QApplication::processEvents();
         for (QLabel* label : chords->findChildren<QLabel*>()) {

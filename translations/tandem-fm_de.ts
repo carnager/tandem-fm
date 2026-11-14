@@ -1466,6 +1466,41 @@
     </message>
 </context>
 <context>
+    <name>tandem::BookmarksEditor</name>
+    <message>
+        <source>Key</source>
+        <translation>Taste</translation>
+    </message>
+    <message>
+        <source>Folder</source>
+        <translation>Ordner</translation>
+    </message>
+    <message>
+        <source>&amp;Add this folder</source>
+        <translation>Diesen Ordner &amp;hinzufügen</translation>
+    </message>
+    <message>
+        <source>&amp;Remove</source>
+        <translation>&amp;Entfernen</translation>
+    </message>
+    <message>
+        <source>A bookmark needs a folder.</source>
+        <translation>Ein Lesezeichen braucht einen Ordner.</translation>
+    </message>
+    <message>
+        <source>Keys have no spaces: “%1”.</source>
+        <translation>Tasten enthalten keine Leerzeichen: „%1“.</translation>
+    </message>
+    <message>
+        <source>The key “%1” is used twice.</source>
+        <translation>Die Taste „%1“ ist doppelt vergeben.</translation>
+    </message>
+    <message>
+        <source>%1 is bookmarked twice.</source>
+        <translation>%1 ist doppelt als Lesezeichen gespeichert.</translation>
+    </message>
+</context>
+<context>
     <name>tandem::ChecksumDialog</name>
     <message>
         <source>Check checksums</source>
@@ -2282,10 +2317,6 @@
 <context>
     <name>tandem::KeyChordPopup</name>
     <message>
-        <source>No bookmark “%1”</source>
-        <translation>Kein Lesezeichen „%1“</translation>
-    </message>
-    <message>
         <source>Pinned %1</source>
         <translation>%1 angeheftet</translation>
     </message>
@@ -2296,26 +2327,6 @@
     <message>
         <source>Removed bookmark for %1</source>
         <translation>Lesezeichen für %1 entfernt</translation>
-    </message>
-    <message>
-        <source>Bookmarks</source>
-        <translation>Lesezeichen</translation>
-    </message>
-    <message>
-        <source>Bookmarks  ·  %1…</source>
-        <translation>Lesezeichen  ·  %1…</translation>
-    </message>
-    <message>
-        <source>Type a key   ·   Tab: edit   ·   Space: search all folders   ·   Ctrl+Shift+D: bookmark this folder   ·   Esc</source>
-        <translation>Taste drücken   ·   Tab: bearbeiten   ·   Space: alle Ordner durchsuchen   ·   Ctrl+Shift+D: Lesezeichen für diesen Ordner   ·   Esc</translation>
-    </message>
-    <message>
-        <source>Edit bookmarks</source>
-        <translation>Lesezeichen bearbeiten</translation>
-    </message>
-    <message>
-        <source>Arrows: choose   ·   Enter: change the key   ·   Delete: remove   ·   Tab: back   ·   Esc</source>
-        <translation>Pfeiltasten: auswählen   ·   Enter: Taste ändern   ·   Delete: entfernen   ·   Tab: zurück   ·   Esc</translation>
     </message>
     <message>
         <source>Bookmark key for %1:  %2</source>
@@ -3086,6 +3097,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Jump to a folder: type parts of its path</source>
         <translation>Zu einem Ordner springen: Teile des Pfads eingeben</translation>
+    </message>
+    <message>
+        <source>Type a bookmark&apos;s key, or a space and its name</source>
+        <translation>Taste eines Lesezeichens, oder Leerzeichen und sein Name</translation>
+    </message>
+    <message>
+        <source>Enter: go   ·   Space: search by name   ·   %1: all folders   ·   %2: bookmark this folder</source>
+        <translation>Enter: hin   ·   Space: nach Namen suchen   ·   %1: alle Ordner   ·   %2: Lesezeichen für diesen Ordner</translation>
     </message>
     <message>
         <source>Enter: save   ·   %1 opens one</source>
@@ -4261,6 +4280,14 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Lesezeichen entfernen</translation>
     </message>
     <message>
+        <source>Edit bookmarks…</source>
+        <translation>Lesezeichen bearbeiten…</translation>
+    </message>
+    <message>
+        <source>keys, folders and their order, all at once</source>
+        <translation>Tasten, Ordner und Reihenfolge, alle auf einmal</translation>
+    </message>
+    <message>
         <source>Del ⏏</source>
         <translation>Entf ⏏</translation>
     </message>
@@ -4966,6 +4993,14 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>empty: the home folder</source>
         <translation>leer: der Persönliche Ordner</translation>
+    </message>
+    <message>
+        <source>Locations</source>
+        <translation>Orte</translation>
+    </message>
+    <message>
+        <source>Bookmarks</source>
+        <translation>Lesezeichen</translation>
     </message>
     <message>
         <source>No servers yet. Add one, or import hosts from your SSH config.</source>

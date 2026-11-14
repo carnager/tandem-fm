@@ -3,6 +3,7 @@
 #include "core/Backend.h"
 #include "core/Keyring.h"
 #include "core/Util.h"
+#include "ui/BookmarksEditor.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
 
@@ -18,6 +19,8 @@
 #include <QListWidget>
 #include <QPainter>
 #include <QPushButton>
+#include <QStackedWidget>
+#include <QTreeWidget>
 #include <QStyledItemDelegate>
 #include <QToolButton>
 #include <QUrl>
@@ -128,8 +131,8 @@ void storePassword(const SavedServer& s, const QString& password)
 
 ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(parent)
 {
-    setWindowTitle(tr("Servers"));
-    resize(820, 520);
+    setWindowTitle(tr("Locations"));
+    resize(1000, 640);
     setThemeStyle(this, QStringLiteral(
         "QListWidget#servers { background: transparent; border: none; outline: none; }"
         "QPushButton#flat { background: transparent; border: none; color: @dimText; padding: 5px 8px;"
@@ -146,15 +149,38 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
     outer->setContentsMargins(16, 16, 16, 12);
     outer->setSpacing(12);
 
+    // Bookmarks | Servers, like the type switch in the form.
+    auto* tabRow = new QHBoxLayout;
+    tabRow->setSpacing(0);
+    for (const auto& [index, label] : {std::pair{0, tr("Servers")}, std::pair{1, tr("Bookmarks")}}) {
+        auto* b = new QToolButton(this);
+        b->setObjectName(QStringLiteral("segment"));
+        b->setProperty("edge", index == 0 ? QStringLiteral("first") : QStringLiteral("last"));
+        b->setText(label);
+        b->setCheckable(true);
+        b->setCursor(Qt::PointingHandCursor);
+        connect(b, &QToolButton::clicked, this, [this, index] { showBookmarks(index == 1); });
+        m_tabs << b;
+        tabRow->addWidget(b);
+    }
+    tabRow->addStretch(1);
+    outer->addLayout(tabRow);
+
     m_error = new QLabel(this);
     m_error->setWordWrap(true);
     setThemeStyle(m_error, QStringLiteral("color: @error;"));
     m_error->hide();
     outer->addWidget(m_error);
 
-    auto* columns = new QHBoxLayout;
+    m_pages = new QStackedWidget(this);
+    outer->addWidget(m_pages, 1);
+    auto* serversPage = new QWidget(m_pages);
+    auto* columns = new QHBoxLayout(serversPage);
+    columns->setContentsMargins(0, 0, 0, 0);
     columns->setSpacing(18);
-    outer->addLayout(columns, 1);
+    m_pages->addWidget(serversPage);
+    m_bookmarks = new BookmarksEditor(m_pages);
+    m_pages->addWidget(m_bookmarks);
 
     // Left: the servers, as a sidebar.
     auto* left = new QVBoxLayout;
@@ -286,11 +312,12 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
 
     // Bottom: where passwords go, then the buttons.
     auto* bottom = new QHBoxLayout;
-    auto* where = new QLabel(keyringAvailable() ? tr("Passwords are kept in the desktop keyring.")
+    auto* where = m_where = new QLabel(keyringAvailable() ? tr("Passwords are kept in the desktop keyring.")
                                                 : tr("No keyring here: passwords are asked when connecting."),
                              this);
     setThemeStyle(where, QStringLiteral("color: @dimText;"));
     bottom->addWidget(where, 1);
+    bottom->addStretch();  // the buttons stay on the right while the note is hidden
     auto* cancel = new QPushButton(tr("Cancel"), this);
     m_save = new QPushButton(tr("&Save"), this);
     m_connect = new QPushButton(tr("Save and &connect"), this);
@@ -299,6 +326,10 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
         bottom->addWidget(b);
     outer->addLayout(bottom);
 
+    connect(m_bookmarks->table(), &QTreeWidget::itemChanged, this, [this] {
+        if (!m_serversBroken)
+            m_error->hide();  // the problem it showed may be fixed now
+    });
     connect(m_list, &QListWidget::currentRowChanged, this, &ServersDialog::showServer);
     connect(m_list, &QListWidget::itemDoubleClicked, this, &ServersDialog::connectCurrent);
     connect(add, &QPushButton::clicked, this, [this] {
@@ -343,7 +374,7 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
         // Saving here would replace what the hand edit says.
         m_error->setText(tr("%1. Fix it in an editor; Tandem won't overwrite it.").arg(saved.error()));
         m_error->show();
-        m_save->setEnabled(false);
+        m_serversBroken = true;
         m_connect->setEnabled(false);
     }
     for (const SavedServer& s : saved.servers())
@@ -359,6 +390,18 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
         m_list->setCurrentRow(0);
     }
     showServer(m_list->currentRow());
+    showBookmarks(false);
+}
+
+void ServersDialog::showBookmarks(bool on)
+{
+    m_pages->setCurrentIndex(on ? 1 : 0);
+    m_tabs[0]->setChecked(!on);
+    m_tabs[1]->setChecked(on);
+    m_connect->setVisible(!on);
+    m_where->setVisible(!on);
+    if (!m_serversBroken)
+        m_error->hide();
 }
 
 void ServersDialog::addServer(const SavedServer& s)
@@ -403,7 +446,7 @@ void ServersDialog::showServer(int row)
     m_address->setVisible(has);
     m_empty->setVisible(!has);
     m_remove->setEnabled(has);
-    m_connect->setEnabled(has && m_save->isEnabled());
+    m_connect->setEnabled(has && !m_serversBroken);
     const SavedServer s = has ? m_servers[row] : SavedServer();
     m_loading = true;
     m_name->setText(s.name);
@@ -452,10 +495,21 @@ void ServersDialog::formChanged()
 
 bool ServersDialog::save()
 {
+    if (const QString problem = m_bookmarks->check(); !problem.isEmpty()) {
+        showBookmarks(true);
+        m_error->setText(problem);
+        m_error->show();
+        return false;
+    }
+    if (m_serversBroken) {  // only the bookmarks
+        m_bookmarks->save();
+        return true;
+    }
     QList<SavedServer> list;
     for (int i = 0; i < m_servers.size(); ++i) {
         SavedServer s = m_servers[i];
         if (s.host.isEmpty()) {
+            showBookmarks(false);
             m_list->setCurrentRow(i);
             m_error->setText(tr("A server needs a host."));
             m_error->show();
@@ -475,6 +529,7 @@ bool ServersDialog::save()
     for (int i = 0; i < list.size(); ++i)
         if (!m_passwords[i].isEmpty())
             passwords.append({list[i], m_passwords[i]});
+    m_bookmarks->save();
     if (!passwords.isEmpty())
         ioPool()->start([passwords] {
             for (const auto& [s, password] : passwords)

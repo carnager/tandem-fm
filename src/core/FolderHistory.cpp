@@ -248,6 +248,30 @@ void FolderHistory::setBookmark(const QString& path, const QString& key)
     scheduleSave();
 }
 
+QList<FolderHistory::Bookmark> FolderHistory::pinnedBookmarks() const
+{
+    QMutexLocker lock(&m_mutex);
+    QList<Bookmark> out;
+    for (const QString& path : m_pinned)
+        out.append({m_keys.value(path), path});
+    return out;
+}
+
+void FolderHistory::setBookmarks(const QList<Bookmark>& pins)
+{
+    {
+        QMutexLocker lock(&m_mutex);
+        m_pinned.clear();
+        m_keys.clear();
+        for (const Bookmark& b : pins) {
+            m_pinned.append(b.path);
+            if (!b.key.isEmpty())
+                m_keys.insert(b.path, b.key);
+        }
+    }
+    scheduleSave();
+}
+
 QString FolderHistory::bookmarkKey(const QString& path) const
 {
     QMutexLocker lock(&m_mutex);

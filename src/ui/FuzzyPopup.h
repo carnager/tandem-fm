@@ -27,6 +27,9 @@ struct PopupItem {
     QString key;                 // caller's id (e.g. a path)
     QString section;             // a header above the first item of each section (unfiltered lists)
     QList<std::pair<QString, std::function<void()>>> menu;  // right-click: what else it can do
+    // Keys that run it right away (bookmarks: "cp"). While what's typed starts
+    // a key, only those rows show; a space first searches by name instead.
+    QString chord;
     std::function<void()> run;
 };
 

@@ -13,6 +13,7 @@
 #include <QMenu>
 #include <QPainter>
 #include <QTextLayout>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -343,6 +344,33 @@ void FuzzyPopup::refilter()
 {
     const QString q = m_edit->text().trimmed();
     m_shown = m_items;
+    // Typing keys: the rows whose keys start with it, the exact one first
+    // (Enter takes it); a complete key no other one continues runs at once.
+    const QString typedKeys = m_edit->text();
+    if (!typedKeys.isEmpty() && !typedKeys.startsWith(QLatin1Char(' '))) {
+        QList<PopupModel::Row> keyed;
+        int exact = -1;
+        for (int i = 0; i < m_shown.size(); ++i) {
+            if (m_shown[i].chord.isEmpty() || !m_shown[i].chord.startsWith(typedKeys))
+                continue;
+            if (m_shown[i].chord == typedKeys)
+                exact = int(keyed.size());
+            keyed.append({i, {}, {}});
+        }
+        if (!keyed.isEmpty()) {
+            if (exact > 0)
+                keyed.move(exact, 0);
+            m_model->set(&m_shown, keyed);
+            m_list->setCurrentIndex(m_model->index(0));
+            place();
+            if (keyed.size() == 1 && exact >= 0)
+                QTimer::singleShot(0, this, [this] {
+                    if (isVisible())
+                        activate();
+                });
+            return;
+        }
+    }
     std::optional<PopupItem> typed = queryItem && !q.isEmpty() ? queryItem(q) : std::nullopt;
     QList<PopupModel::Row> rows;
     QList<int> scores;

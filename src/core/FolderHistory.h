@@ -24,6 +24,7 @@ public:
     struct Bookmark {
         QString key;
         QString path;
+        bool operator==(const Bookmark&) const = default;
     };
 
     static FolderHistory& instance();
@@ -42,6 +43,8 @@ public:
     QString bookmarkKey(const QString& path) const;
     QString pathForKey(const QString& key) const;
     QList<Bookmark> bookmarks() const;  // with keys, sorted by key
+    QList<Bookmark> pinnedBookmarks() const;  // all pins in their order, keys may be empty
+    void setBookmarks(const QList<Bookmark>& pins);  // replaces all pins, their order and keys
     QList<Item> items() const;  // pinned first (in pin order), then by frecency
 
     static double frecency(double count, qint64 lastVisit, qint64 now);

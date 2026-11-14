@@ -32,6 +32,7 @@
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
 #include "ui/ServersDialog.h"
+#include "ui/BookmarksEditor.h"
 #include "ui/SettingsDialog.h"
 #include "ui/AboutDialog.h"
 #include "ui/ShortcutsDialog.h"
@@ -228,12 +229,13 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::zoomRequested, this, &MainWindow::setZoom);
         connect(p, &Panel::commandIdRequested, this, &MainWindow::runCommandId);
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
-        connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
+        connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { openBookmarks(keys); });
         connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
         connect(p, &Panel::bookmarkEditRequested, this, [this](const QString& path) { m_chords->openAssign(path); });
         connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
         connect(p, &Panel::trashRequested, this, &MainWindow::showTrash);
-        connect(p, &Panel::serversRequested, this, &MainWindow::showServers);
+        connect(p, &Panel::serversRequested, this, [this](const QString& uri) { showServers(uri); });
+        connect(p, &Panel::bookmarksWindowRequested, this, [this] { showServers({}, true); });
         connect(p, &Panel::archiveRenameRequested, this, [this, p](const QString& from, const QString& to) {
             ArchiveChanges c;
             c.rename.append({p->innerPath(from), p->innerPath(to)});
@@ -277,8 +279,6 @@ MainWindow::MainWindow(const QStringList& startPaths)
     m_commandBar = new CommandBar(this);
     connect(m_commandBar, &CommandBar::runRequested, this, &MainWindow::runCommand);
     m_chords = new KeyChordPopup(this);
-    connect(m_chords, &KeyChordPopup::jumpRequested, this, [this](const QString& p) { active()->navigate(p); });
-    connect(m_chords, &KeyChordPopup::fuzzyRequested, this, &MainWindow::jumpToFolder);
     connect(m_chords, &KeyChordPopup::message, this,
             [this](const QString& text, bool error) { active()->showMessage(text, error); });
     m_quickTimer = new QTimer(this);
@@ -464,8 +464,8 @@ void MainWindow::createMenus()
     QMenu* marks = bar->addMenu(tr("&Bookmarks"));
     addCommand(marks, QT_TR_NOOP("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
                [this] { m_chords->openAssign(active()->path()); });
-    addCommand(marks, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { m_chords->openJump(); });
-    addCommand(marks, QT_TR_NOOP("Edit bookmarks…"), {}, [this] { m_chords->openEdit(); });
+    addCommand(marks, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { openBookmarks(); });
+    addCommand(marks, QT_TR_NOOP("Edit bookmarks…"), {}, [this] { showServers({}, true); });
     marks->addSeparator();
     connect(marks, &QMenu::aboutToShow, this, [this, marks] { fillBookmarksMenu(marks); });
 
@@ -730,9 +730,11 @@ void MainWindow::findDuplicates()
 }
 
 // Saved servers: edit them, or connect the active panel to one.
-void MainWindow::showServers(const QString& uri)
+void MainWindow::showServers(const QString& uri, bool bookmarks)
 {
     ServersDialog dlg(this, uri);
+    dlg.bookmarks()->setCurrentFolder(active()->path());
+    dlg.showBookmarks(bookmarks);
     QPointer<Panel> target(active());
     dlg.onConnect = [target](const QString& uri) {
         if (target)
@@ -2082,6 +2084,32 @@ void MainWindow::jumpToFolder()
     m_popup->open(tr("Jump to a folder: type parts of its path"), folderItems(),
                   tr("Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   %1: bookmark keys")
                       .arg(keyHint(QStringLiteral("bookmarks-key-chains"), false)));
+}
+
+// Bookmarks like the palette: keys jump at once, a space first searches by name.
+void MainWindow::openBookmarks(const QString& keys)
+{
+    QList<PopupItem> items;
+    for (const FolderHistory::Bookmark& b : FolderHistory::instance().pinnedBookmarks()) {
+        PopupItem it;
+        it.icon = IconCache::themed(b.path.contains(QLatin1String("://")) ? "folder-remote" : "folder", "folder");
+        it.title = baseName(b.path).isEmpty() ? b.path : baseName(b.path);
+        it.subtitle = it.title == b.path ? QString() : b.path;
+        it.matchSubtitle = !it.subtitle.isEmpty();  // the whole path, not only its name
+        it.hint = b.key;
+        it.chord = b.key;
+        it.key = b.path;
+        it.run = [this, path = b.path] { active()->navigate(path); };
+        items << it;
+    }
+    m_popup->queryItem = nullptr;
+    m_popup->keyHandler = nullptr;
+    m_popup->open(tr("Type a bookmark's key, or a space and its name"), items,
+                  tr("Enter: go   ·   Space: search by name   ·   %1: all folders   ·   %2: bookmark this folder")
+                      .arg(keyHint(QStringLiteral("jump-to-folder-search"), false),
+                           keyHint(QStringLiteral("bookmark-this-folder"), false)));
+    if (!keys.isEmpty())
+        m_popup->setQuery(keys);
 }
 
 // ------------------------------------------------------------ icon themes
