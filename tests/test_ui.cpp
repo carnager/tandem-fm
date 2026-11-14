@@ -3410,6 +3410,47 @@ private slots:
         QTRY_COMPARE(rightModel()->path(), R());
     }
 
+    // Tab in the bookmarks popup: all bookmarks, keys changed and removed there.
+    void bookmarkEdit()
+    {
+        FolderHistory& h = FolderHistory::instance();
+        QTRY_VERIFY(h.isLoaded());
+        h.setPinned(L("sub"), true);  // no key
+        h.setBookmark(R(), "e");
+        auto cleanup = qScopeGuard([&] {
+            h.setPinned(L("sub"), false);
+            h.setPinned(R(), false);
+        });
+        auto* chords = m_window->findChild<KeyChordPopup*>();
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(chords->isVisible());
+        QTest::keyClick(chords, Qt::Key_Tab);
+        QTest::keyClicks(chords, "e");  // editing: letters don't jump
+        QVERIFY(chords->isVisible());
+        QCOMPARE(leftModel()->path(), L());
+        int index = 0;
+        for (const auto& item : h.items())
+            if (item.pinned && item.path != L("sub"))
+                ++index;
+            else if (item.path == L("sub"))
+                break;
+        for (int i = 0; i < index; ++i)
+            QTest::keyClick(chords, Qt::Key_Right);
+        QTest::keyClick(chords, Qt::Key_Return);  // a key for the one without
+        QTest::keyClicks(chords, "x");
+        QTest::keyClick(chords, Qt::Key_Return);
+        QCOMPARE(h.pathForKey("x"), L("sub"));
+        QVERIFY(chords->isVisible());  // back in the list
+        QTest::keyClick(chords, Qt::Key_Delete);
+        QVERIFY(!h.isPinned(L("sub")));
+        QVERIFY(h.isPinned(R()));
+        QTest::keyClick(chords, Qt::Key_Escape);
+        QTRY_VERIFY(!chords->isVisible());
+    }
+
     void bookmarkChords()
     {
         FolderHistory& h = FolderHistory::instance();
