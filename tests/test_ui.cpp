@@ -256,6 +256,93 @@ private slots:
         QCOMPARE(names, QStringList({"..", "sub", "file1.txt", "file2.txt", "file10.txt", "photo.jpg"}));
     }
 
+    void equalPanelWidths_data()
+    {
+        QTest::addColumn<QString>("previewMode");
+        QTest::newRow("no-preview") << QString();
+        QTest::newRow("preview-each") << QString("each");
+        QTest::newRow("preview-bottom") << QString("bottom");
+        QTest::newRow("preview-right") << QString("right");
+    }
+
+    void equalPanelWidths()
+    {
+        QFETCH(QString, previewMode);
+        auto* split = qobject_cast<QSplitter*>(m_left->parentWidget()->parentWidget());
+        QVERIFY(split && split->orientation() == Qt::Horizontal);
+        auto command = [&](const QString& id) -> QAction* {
+            for (auto* action : m_window->actions())
+                if (action->property("commandId").toString() == id)
+                    return action;
+            return nullptr;
+        };
+        QAction* equal = command("equal-panel-widths");
+        QAction* preview = command("preview");
+        QVERIFY(equal && preview);
+        QVERIFY(equal->shortcuts().isEmpty());  // users choose a key in Settings
+        const QSize originalSize = m_window->size();
+        const QList<int> originalSplit = split->sizes();
+        QVariantMap originalPreview;
+        for (const QString& key : {QString("view/previewPosition"), QString("view/previewWidth"),
+                                   QString("view/previewHeight"), QString("view/previewHeightEach")})
+            originalPreview.insert(key, QSettings().value(key));
+        auto restore = qScopeGuard([&] {
+            if (m_window->findChild<ViewerWindow*>("quickView")) {
+                preview->trigger();
+                QTRY_VERIFY(!m_window->findChild<ViewerWindow*>("quickView"));
+            }
+            for (auto it = originalPreview.cbegin(); it != originalPreview.cend(); ++it)
+                if (it.value().isValid())
+                    QSettings().setValue(it.key(), it.value());
+                else
+                    QSettings().remove(it.key());
+            equal->setShortcuts({});
+            equal->trigger();  // restore the fixture's original cached 1:1 ratio
+            m_window->resize(originalSize);
+            split->setSizes(originalSplit);
+        });
+        m_window->resize(1500, 900);
+        m_left->view()->setCurrentRow(0);  // the preview need not read a file
+        if (!previewMode.isEmpty()) {
+            m_window->setPreviewPosition(previewMode);
+            preview->trigger();
+            QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView"));
+        }
+        QList<int> sizes = split->sizes();
+        const int total = sizes[0] + sizes[1];
+        sizes[0] = total / 3;
+        sizes[1] = total - sizes[0];
+        split->setSizes(sizes);
+        // The normal drag signal also updates the cached panel ratio.
+        QMetaObject::invokeMethod(split, "splitterMoved", Q_ARG(int, split->sizes()[0]), Q_ARG(int, 1));
+        QVERIFY(qAbs(split->sizes()[0] - split->sizes()[1]) > 5);
+        const int previewWidth = split->sizes().value(2);
+        const QString cursor = m_left->currentName();
+        equal->trigger();
+        QVERIFY(qAbs(split->sizes()[0] - split->sizes()[1]) <= 1);
+        if (previewMode == "right")
+            QCOMPARE(split->sizes().value(2), previewWidth);
+        QCOMPARE(m_left->currentName(), cursor);
+        if (previewMode == "right") {
+            preview->trigger();
+            QTRY_VERIFY(!m_window->findChild<ViewerWindow*>("quickView"));
+            preview->trigger();
+            QTRY_VERIFY(m_window->findChild<ViewerWindow*>("quickView"));
+            QVERIFY(qAbs(split->sizes()[0] - split->sizes()[1]) <= 1);
+        }
+        // addCommand registers the action for the palette and custom keys.
+        sizes = split->sizes();
+        sizes[0] -= 25;
+        sizes[1] += 25;
+        split->setSizes(sizes);
+        equal->setShortcut(QKeySequence("Ctrl+Alt+0"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_0, Qt::ControlModifier | Qt::AltModifier);
+        QVERIFY(qAbs(split->sizes()[0] - split->sizes()[1]) <= 1);
+    }
+
     void enterAndLeaveFolder()
     {
         moveCursorTo(m_left, "sub");
