@@ -5378,10 +5378,6 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Standard</translation>
     </message>
     <message>
-        <source>Pick a command, then press its new keys.</source>
-        <translation>Befehl wählen, dann die neuen Tasten drücken.</translation>
-    </message>
-    <message>
         <source>Reset all keys</source>
         <translation>Alle Tasten zurücksetzen</translation>
     </message>

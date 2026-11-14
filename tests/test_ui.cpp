@@ -2835,6 +2835,10 @@ private slots:
         QCOMPARE(rename->shortcut(), QKeySequence("Ctrl+Alt+R"));
         pick("sort-by-name");
         slot->setCurrentIndex(slot->count() - 1);  // add an alternate
+        dialog.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&dialog));
+        QVERIFY(QMetaObject::invokeMethod(slot, "activated", Q_ARG(int, slot->currentIndex())));
+        QTRY_VERIFY(dialog.keyEdit()->hasFocus() || dialog.keyEdit()->isAncestorOf(QApplication::focusWidget()));
         dialog.keyEdit()->setKeySequence(QKeySequence("Ctrl+Alt+F12"));
         QCOMPARE(sort->shortcuts().first(), originalSort.first());
         QVERIFY(sort->shortcuts().contains(QKeySequence("Ctrl+Alt+F12")));

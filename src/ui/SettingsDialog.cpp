@@ -851,7 +851,7 @@ QWidget* SettingsDialog::keysPage()
     editRow->addWidget(m_keyClear);
     editRow->addWidget(m_keyReset);
     v->addLayout(editRow);
-    m_keyNote = hint(tr("Pick a command, then press its new keys."), w);
+    m_keyNote = hint(tr("Choose a binding to change, or add an alternate key."), w);
     v->addWidget(m_keyNote);
     auto* resetAll = new QPushButton(tr("Reset all keys"), w);
     resetAll->setAutoDefault(false);
@@ -872,6 +872,14 @@ QWidget* SettingsDialog::keysPage()
         fillKeys();
     });
     connect(m_keySlot, &QComboBox::currentIndexChanged, this, &SettingsDialog::keySlotSelected);
+    connect(m_keySlot, &QComboBox::activated, this, [this] {
+        QTimer::singleShot(0, this, [this] {
+            if (m_keyMode->currentIndex())
+                m_modalEdit->setFocus();
+            else
+                m_keyEdit->setFocus();
+        });
+    });
     connect(applyModal, &QPushButton::clicked, this, &SettingsDialog::assignModalKeys);
     connect(m_modalEdit, &QLineEdit::returnPressed, this, &SettingsDialog::assignModalKeys);
     connect(m_keyFilter, &QLineEdit::textChanged, this, &SettingsDialog::fillKeys);
