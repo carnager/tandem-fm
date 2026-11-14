@@ -32,6 +32,7 @@
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
 #include "ui/ServersDialog.h"
+#include "ui/BookmarksEditor.h"
 #include "ui/SettingsDialog.h"
 #include "ui/AboutDialog.h"
 #include "ui/ShortcutsDialog.h"
@@ -228,12 +229,13 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::zoomRequested, this, &MainWindow::setZoom);
         connect(p, &Panel::commandIdRequested, this, &MainWindow::runCommandId);
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
-        connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
-        connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
+        connect(p, &Panel::bookmarkJumpRequested, this, [this] { openBookmarks(); });
+        connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path(), active()->starButton()); });
         connect(p, &Panel::bookmarkEditRequested, this, [this](const QString& path) { m_chords->openAssign(path); });
         connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
         connect(p, &Panel::trashRequested, this, &MainWindow::showTrash);
-        connect(p, &Panel::serversRequested, this, &MainWindow::showServers);
+        connect(p, &Panel::serversRequested, this, [this](const QString& uri) { showServers(uri); });
+        connect(p, &Panel::bookmarksWindowRequested, this, [this] { showServers({}, true); });
         connect(p, &Panel::archiveRenameRequested, this, [this, p](const QString& from, const QString& to) {
             ArchiveChanges c;
             c.rename.append({p->innerPath(from), p->innerPath(to)});
@@ -277,8 +279,6 @@ MainWindow::MainWindow(const QStringList& startPaths)
     m_commandBar = new CommandBar(this);
     connect(m_commandBar, &CommandBar::runRequested, this, &MainWindow::runCommand);
     m_chords = new KeyChordPopup(this);
-    connect(m_chords, &KeyChordPopup::jumpRequested, this, [this](const QString& p) { active()->navigate(p); });
-    connect(m_chords, &KeyChordPopup::fuzzyRequested, this, &MainWindow::jumpToFolder);
     connect(m_chords, &KeyChordPopup::message, this,
             [this](const QString& text, bool error) { active()->showMessage(text, error); });
     m_quickTimer = new QTimer(this);
@@ -463,9 +463,9 @@ void MainWindow::createMenus()
     // mouse; the keys show where shortcuts go. Filled each time it opens.
     QMenu* marks = bar->addMenu(tr("&Bookmarks"));
     addCommand(marks, QT_TR_NOOP("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
-               [this] { m_chords->openAssign(active()->path()); });
-    addCommand(marks, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { m_chords->openJump(); });
-    addCommand(marks, QT_TR_NOOP("Edit bookmarks…"), {}, [this] { m_chords->openEdit(); });
+               [this] { m_chords->openAssign(active()->path(), active()->starButton()); });
+    addCommand(marks, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { openBookmarks(); });
+    addCommand(marks, QT_TR_NOOP("Edit bookmarks…"), {}, [this] { showServers({}, true); });
     marks->addSeparator();
     connect(marks, &QMenu::aboutToShow, this, [this, marks] { fillBookmarksMenu(marks); });
 
@@ -730,9 +730,11 @@ void MainWindow::findDuplicates()
 }
 
 // Saved servers: edit them, or connect the active panel to one.
-void MainWindow::showServers(const QString& uri)
+void MainWindow::showServers(const QString& uri, bool bookmarks)
 {
     ServersDialog dlg(this, uri);
+    dlg.bookmarks()->setCurrentFolder(active()->path());
+    dlg.showBookmarks(bookmarks);
     QPointer<Panel> target(active());
     dlg.onConnect = [target](const QString& uri) {
         if (target)
@@ -2040,9 +2042,7 @@ void MainWindow::commandPalette()
 
 QList<PopupItem> MainWindow::folderItems() const
 {
-    static const QIcon pin = IconCache::themed("pin", "emblem-favorite");
     static const QIcon folder = IconCache::themed("folder");
-    const QString home = QDir::homePath();
     QList<PopupItem> items;
     for (const FolderHistory::Item& f : FolderHistory::instance().items()) {
         PopupItem it;
@@ -2050,10 +2050,10 @@ QList<PopupItem> MainWindow::folderItems() const
         it.title = f.path == QLatin1String("/") ? f.path : baseName(f.path);
         it.subtitle = f.path;
         it.matchSubtitle = true;
-        it.icon = f.pinned ? pin : folder;
-        // Pins on top; otherwise frecency nudges the fuzzy ranking (zoxide-like).
-        it.bonus = f.pinned ? 1000 : int(12 * std::log2(1 + f.frecency));
-        it.hint = !f.key.isEmpty() ? f.key : (f.pinned ? tr("pinned") : QString());
+        it.icon = folder;
+        // How well it matches comes first; frecency nudges (zoxide-like), and
+        // being a bookmark a little more. Bookmarks have Ctrl+D of their own.
+        it.bonus = int(12 * std::log2(1 + f.frecency)) + (f.pinned ? 24 : 0);
         const QString path = f.path;
         it.run = [this, path] { active()->navigate(path); };
         items.append(it);
@@ -2067,11 +2067,6 @@ void MainWindow::jumpToFolder()
     m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
         if (!it)
             return false;
-        if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_P) {
-            FolderHistory::instance().setPinned(it->key, !FolderHistory::instance().isPinned(it->key));
-            m_popup->setItems(folderItems());
-            return true;
-        }
         if ((e->modifiers() & Qt::ShiftModifier) && e->key() == Qt::Key_Delete) {
             FolderHistory::instance().forget(it->key);
             m_popup->setItems(folderItems());
@@ -2080,8 +2075,56 @@ void MainWindow::jumpToFolder()
         return false;
     };
     m_popup->open(tr("Jump to a folder: type parts of its path"), folderItems(),
-                  tr("Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   %1: bookmark keys")
+                  tr("Enter: go   ·   Shift+Del: forget   ·   %1: bookmarks")
                       .arg(keyHint(QStringLiteral("bookmarks-key-chains"), false)));
+}
+
+// Bookmarks like the palette: keys jump at once, a space first searches by name.
+void MainWindow::openBookmarks()
+{
+    QList<PopupItem> items;
+    for (const FolderHistory::Bookmark& b : FolderHistory::instance().pinnedBookmarks()) {
+        PopupItem it;
+        it.icon = IconCache::themed(b.path.contains(QLatin1String("://")) ? "folder-remote" : "folder", "folder");
+        it.title = baseName(b.path).isEmpty() ? b.path : baseName(b.path);
+        it.subtitle = it.title == b.path ? QString() : b.path;
+        it.matchSubtitle = !it.subtitle.isEmpty();  // the whole path, not only its name
+        it.hint = b.key;
+        it.chord = b.key;
+        it.key = b.path;
+        it.run = [this, path = b.path] { active()->navigate(path); };
+        items << it;
+    }
+    m_popup->queryItem = nullptr;
+    m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
+        // Shift+Enter: in the other panel; Ctrl+Enter: in a new tab.
+        if (it && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) &&
+            (e->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier))) {
+            const QString path = it->key;
+            const bool newTab = e->modifiers() & Qt::ControlModifier;
+            m_popup->hide();
+            Panel* other = active() == m_left ? m_right : m_left;
+            if (newTab)
+                active()->addTab(path);
+            else
+                other->navigate(path);
+            return true;
+        }
+        // The popup keeps Ctrl+keys from the window; the one the hint names goes through.
+        const QKeySequence pressed(e->keyCombination());
+        for (QAction* a : actions()) {
+            const QString id = a->property("commandId").toString();
+            if (id == QLatin1String("bookmark-this-folder") && a->shortcuts().contains(pressed)) {
+                m_popup->hide();
+                a->trigger();
+                return true;
+            }
+        }
+        return false;
+    };
+    m_popup->open(tr("Type a bookmark's key"), items,
+                  tr("Enter: go   ·   Shift+Enter: other panel   ·   Ctrl+Enter: new tab   ·   Tab: search   ·   %1: add this folder")
+                      .arg(keyHint(QStringLiteral("bookmark-this-folder"), false)));
 }
 
 // ------------------------------------------------------------ icon themes

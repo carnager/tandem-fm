@@ -40,6 +40,8 @@
 #include "ui/PermissionsDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/ServersDialog.h"
+#include "ui/BookmarksEditor.h"
+#include "ui/CardList.h"
 #include "core/Servers.h"
 #include "ui/AboutDialog.h"
 #include "ui/ShortcutsDialog.h"
@@ -1918,11 +1920,8 @@ private slots:
         QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key.startsWith(L("sub")));
         QTest::keyClicks(QApplication::focusWidget(), " dee");
         QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("sub/deep"));
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_P, Qt::ControlModifier);  // pin it
-        QVERIFY(FolderHistory::instance().isPinned(L("sub/deep")));
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
-        FolderHistory::instance().setPinned(L("sub/deep"), false);
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
     }
@@ -3489,45 +3488,87 @@ private slots:
 #endif
     }
 
-    // Tab in the bookmarks popup: all bookmarks, keys changed and removed there.
-    void bookmarkEdit()
+    // Locations › Bookmarks: a list like the servers, the selected one in a
+    // form; keys, folders and order saved together, nothing on a clash.
+    void bookmarksWindow()
     {
         FolderHistory& h = FolderHistory::instance();
         QTRY_VERIFY(h.isLoaded());
-        h.setPinned(L("sub"), true);  // no key
-        h.setBookmark(R(), "e");
-        auto cleanup = qScopeGuard([&] {
-            h.setPinned(L("sub"), false);
-            h.setPinned(R(), false);
-        });
-        auto* chords = m_window->findChild<KeyChordPopup*>();
+        const auto before = h.pinnedBookmarks();
+        auto restore = qScopeGuard([&] { h.setBookmarks(before); });
+        h.setBookmarks({{"a", L()}, {"", L("sub")}});
+        ServersDialog dlg(m_window.get());
+        dlg.showBookmarks(true);
+        BookmarksEditor* ed = dlg.bookmarks();
+        ed->setCurrentFolder(R());
+        QListWidget* list = ed->list();
+        QCOMPARE(list->count(), 2);
+        QCOMPARE(list->item(1)->data(Qt::UserRole).toString(), L("sub"));
+        list->setCurrentRow(1);
+        ed->keyEdit()->setText("s");  // a key for the one without
+        QCOMPARE(list->item(1)->data(kCardBadgeRole).toString(), QString("s"));
+        list->setCurrentRow(0);
+        QCOMPARE(ed->keyEdit()->text(), QString("a"));
+        ed->folderEdit()->setText(L("sub/deep"));  // another folder
+        QCOMPARE(list->item(0)->text(), QString("deep"));
+        for (auto* b : dlg.findChildren<QPushButton*>())
+            if (b->text().remove('&') == "Add this folder")
+                b->click();
+        QCOMPARE(list->count(), 3);
+        QCOMPARE(ed->folderEdit()->text(), R());
+        ed->keyEdit()->setText("s");  // used twice: said so, free ones offered
+        auto* note = dlg.findChild<QLabel*>("keyNote");
+        QVERIFY(note->text().contains("sub"));
+        QPushButton* free = nullptr;
+        for (auto* b : note->parentWidget()->findChildren<QPushButton*>())
+            if (!b->isHidden())
+                free = b;
+        QVERIFY(free);
+        const QString suggested = free->text();
+        free->click();
+        QCOMPARE(ed->keyEdit()->text(), suggested);
+        QVERIFY(note->text().startsWith("Free"));
+        ed->keyEdit()->setText("s");  // used twice: not saved
+        QVERIFY(!dlg.save());
+        QCOMPARE(h.pinnedBookmarks(), QList<FolderHistory::Bookmark>({{"a", L()}, {"", L("sub")}}));
+        ed->keyEdit()->setText("r");
+        list->insertItem(0, list->takeItem(2));  // reordered, as by dragging
+        QVERIFY(dlg.save());
+        QCOMPARE(h.pinnedBookmarks(),
+                 QList<FolderHistory::Bookmark>({{"r", R()}, {"a", L("sub/deep")}, {"s", L("sub")}}));
+    }
+
+    // The star by the path: ☆ bookmarks the folder, ★ (with its key) opens
+    // the key popup under it; Ctrl+Shift+D opens the same.
+    void starBookmarks()
+    {
+        FolderHistory& h = FolderHistory::instance();
+        QTRY_VERIFY(h.isLoaded());
+        auto cleanup = qScopeGuard([&] { h.setPinned(L(), false); });
+        h.setPinned(L(), false);
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
-        m_left->view()->setFocus();
-        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        auto* star = qobject_cast<QToolButton*>(m_left->starButton());
+        QVERIFY(star && star->isVisible());
+        QTRY_COMPARE(star->text(), QString("☆"));
+        star->click();
+        QVERIFY(h.isPinned(L()));
+        QTRY_COMPARE(star->text(), QString("★"));
+        auto* chords = m_window->findChild<KeyChordPopup*>();
+        star->click();
         QTRY_VERIFY(chords->isVisible());
-        QTest::keyClick(chords, Qt::Key_Tab);
-        QTest::keyClicks(chords, "e");  // editing: letters don't jump
-        QVERIFY(chords->isVisible());
-        QCOMPARE(leftModel()->path(), L());
-        int index = 0;
-        for (const auto& item : h.items())
-            if (item.pinned && item.path != L("sub"))
-                ++index;
-            else if (item.path == L("sub"))
-                break;
-        for (int i = 0; i < index; ++i)
-            QTest::keyClick(chords, Qt::Key_Right);
-        QTest::keyClick(chords, Qt::Key_Return);  // a key for the one without
-        QTest::keyClicks(chords, "x");
+        const QPoint below = star->mapTo(m_window.get(), QPoint(0, star->height()));
+        QVERIFY(chords->y() >= below.y());  // under the star, not somewhere else
+        QTest::keyClicks(chords, "lx");
         QTest::keyClick(chords, Qt::Key_Return);
-        QCOMPARE(h.pathForKey("x"), L("sub"));
-        QVERIFY(chords->isVisible());  // back in the list
-        QTest::keyClick(chords, Qt::Key_Delete);
-        QVERIFY(!h.isPinned(L("sub")));
-        QVERIFY(h.isPinned(R()));
-        QTest::keyClick(chords, Qt::Key_Escape);
-        QTRY_VERIFY(!chords->isVisible());
+        QTRY_COMPARE(star->text(), QString("★ lx"));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(chords->isVisible());
+        QVERIFY(chords->y() >= below.y());
+        QTest::keyClick(chords, Qt::Key_Delete);  // remove it
+        QTRY_COMPARE(star->text(), QString("☆"));
+        QVERIFY(!h.isPinned(L()));
     }
 
     void bookmarkChords()
@@ -3537,32 +3578,109 @@ private slots:
         h.setBookmark(L("sub"), "cp");
         h.setBookmark(L("sub/deep"), "cd");
         h.setBookmark(R(), "c");  // also a prefix of the two above
+        auto* popup = m_window->findChild<FuzzyPopup*>();
         auto* chords = m_window->findChild<KeyChordPopup*>();
-        QVERIFY(chords);
+        QVERIFY(popup && chords);
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_left->view()->setFocus();
+        auto rows = [&] {
+            QStringList keys;
+            auto* view = popup->findChild<QListView*>();
+            for (int r = 0; r < view->model()->rowCount(); ++r) {
+                view->setCurrentIndex(view->model()->index(r, 0));
+                keys << popup->currentItem()->chord;
+            }
+            view->setCurrentIndex(view->model()->index(0, 0));
+            return keys;
+        };
 
-        // A chain: "c" waits (cp, cd and c exist), "p" jumps.
+        // A chain: "c" waits and shows the three, the exact one first; "p" jumps.
         QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
-        QTRY_VERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "c");
-        QVERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "p");
-        QTRY_VERIFY(!chords->isVisible());
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "c");
+        QCOMPARE(rows(), QStringList({"c", "cp", "cd"}));
+        QTest::keyClicks(QApplication::focusWidget(), "p");
+        QTRY_VERIFY(!popup->isVisible());
         QTRY_COMPARE(leftModel()->path(), L("sub"));
 
         // Enter takes the exact key even though longer ones start with it.
         m_left->view()->setFocus();
         QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
-        QTRY_VERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "c");
-        QTest::keyClick(chords, Qt::Key_Return);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "c");
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), R());
 
-        // Assign a new chain to the current folder.
-        m_left->navigate(L("sub/deep"));
+        // The key the hint names works from inside it.
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(chords->isVisible());
+        QVERIFY(!popup->isVisible());
+        QTest::keyClick(chords, Qt::Key_Escape);
+        QTRY_VERIFY(!chords->isVisible());
+
+        // The switch shows Key; Tab makes it Search, by name, keys or not.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QToolButton* mode = popup->findChild<QToolButton*>("mode");
+        QVERIFY(mode && mode->isVisible());
+        QCOMPARE(mode->text(), QString("Key"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab);
+        QCOMPARE(mode->text(), QString("Search"));
+        QTest::keyClicks(QApplication::focusWidget(), "c");  // a key, but searching: no jump
+        QVERIFY(popup->isVisible());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Backspace);
+        QTest::keyClicks(QApplication::focusWidget(), "deep");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("sub/deep"));
+        QVERIFY(popup->isVisible());  // no jump while searching
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+
+        // Letters no key starts with search by themselves; the switch says so.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "rig");
+        QCOMPARE(mode->text(), QString("Search"));
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == R());
+
+        // Shift+Enter: the other panel; Ctrl+Enter: a new tab.
+        const QString rightBefore = rightModel()->path();
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return, Qt::ShiftModifier);
+        QTRY_VERIFY(!popup->isVisible());
+        QTRY_COMPARE(rightModel()->path(), R());
+        QCOMPARE(leftModel()->path(), L("sub/deep"));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab);
+        QTest::keyClicks(QApplication::focusWidget(), "right");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == R());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return, Qt::ControlModifier);
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L("sub/deep"), R()}));
+        m_left->closeCurrentTab();
+        QTRY_COMPARE(m_left->tabPaths(), QStringList({L("sub/deep")}));
+        m_right->navigate(rightBefore);
+        QTRY_COMPARE(rightModel()->path(), rightBefore);
+
+        // Tab takes the free key the hint offers.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(chords->isVisible());
+        for (int i = 0; i < 2; ++i)
+            QTest::keyClick(chords, Qt::Key_Backspace);  // clear "cd"
+        QStringList used;
+        for (const auto& b : h.bookmarks())
+            if (b.path != L("sub/deep"))
+                used << b.key;
+        const QString suggested = FolderHistory::suggestKeys(L("sub/deep"), used).value(0);
+        QVERIFY(!suggested.isEmpty());
+        QTest::keyClick(chords, Qt::Key_Tab);
+        QTest::keyClick(chords, Qt::Key_Return);
+        QTRY_COMPARE(h.bookmarkKey(L("sub/deep")), suggested);
+
+        // Assign a new chain to the current folder.
         m_left->view()->setFocus();
         QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY(chords->isVisible());
@@ -3572,14 +3690,14 @@ private slots:
         QTest::keyClick(chords, Qt::Key_Return);
         QTRY_COMPARE(h.pathForKey("zz"), L("sub/deep"));
 
-        // Vim: g + key.
+        // Modal: ' opens the list, then the key.
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
         m_left->setVimKeys(true);
         m_left->view()->setFocus();
-        QTest::keyClicks(m_left->view(), "gz");
-        QTRY_VERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "z");
+        QTest::keyClicks(m_left->view(), "'");
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "zz");
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
         m_left->setVimKeys(false);
 
@@ -3589,13 +3707,12 @@ private slots:
         QTRY_VERIFY(m_right->isActive());
         const QString leftBefore = leftModel()->path();
         QTest::keyClick(m_right->view(), Qt::Key_D, Qt::ControlModifier);
-        QTRY_VERIFY(chords->isVisible());
-        QTest::keyClicks(chords, "q");
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClicks(QApplication::focusWidget(), "q");
         QTRY_COMPARE(rightModel()->path(), L("sub"));
         QCOMPARE(leftModel()->path(), leftBefore);
         QVERIFY(m_right->isActive());
         // …and the same for the fuzzy jump.
-        auto* popup = m_window->findChild<FuzzyPopup*>();
         QTest::keyClick(m_right->view(), Qt::Key_J, Qt::ControlModifier);
         QTRY_VERIFY(popup->isVisible());
         QTest::keyClicks(QApplication::focusWidget(), "sub dee");
@@ -3608,17 +3725,18 @@ private slots:
         QTRY_COMPARE(rightModel()->path(), R());
         m_left->view()->setFocus();
 
-        // Regression: with more bookmarks than fit one row, every row gets
-        // its full height (rows were squeezed and the text cut off).
+        // Regression: with more bookmarks than fit one row, every row of the
+        // assign grid gets its full height (rows were squeezed, text cut off).
         h.setBookmark(L("sub"), "a");
         h.setBookmark(L(), "b");
-        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY(chords->isVisible());
         QApplication::processEvents();
         for (QLabel* label : chords->findChildren<QLabel*>()) {
             if (!label->isVisible())
                 continue;
-            QVERIFY2(label->height() >= label->sizeHint().height(), qPrintable(label->text()));
+            const int needed = label->hasHeightForWidth() ? label->heightForWidth(label->width()) : label->sizeHint().height();
+            QVERIFY2(label->height() >= needed, qPrintable(label->text()));
             QVERIFY(chords->rect().contains(label->mapTo(chords, label->rect().bottomRight())));
         }
         QTest::keyClick(chords, Qt::Key_Escape);

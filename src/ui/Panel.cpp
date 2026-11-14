@@ -192,6 +192,23 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_mountButton->setFocusPolicy(Qt::NoFocus);
     m_mountButton->setToolTip(tr("Locations (Alt+F1 / Alt+F2)"));
     m_pathBar = new PathBar(m_header);
+    // ☆: bookmark this folder; ★ and its key: change the key or remove it.
+    m_star = new QToolButton(m_header);
+    m_star->setObjectName(QStringLiteral("star"));
+    m_star->setAutoRaise(true);
+    m_star->setFocusPolicy(Qt::NoFocus);
+    m_star->setCursor(Qt::PointingHandCursor);
+    connect(m_star, &QToolButton::clicked, this, [this] {
+        emit activated(this);
+        const QString p = path();
+        if (FolderHistory::instance().isPinned(p)) {
+            emit bookmarkAssignRequested();
+            return;
+        }
+        FolderHistory::instance().setPinned(p, true);
+        showMessage(tr("Bookmarked. Click the star again to give it a key."));
+    });
+    connect(&FolderHistory::instance(), &FolderHistory::bookmarksChanged, this, &Panel::updateStar);
     if (auto* edit = m_pathBar->findChild<QLineEdit*>())
         edit->installEventFilter(this);
     m_freeLabel = new SpaceChip(m_header);
@@ -213,6 +230,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     });
     hl->addWidget(m_mountButton);
     hl->addWidget(m_pathBar, 1);
+    hl->addWidget(m_star);
     hl->addWidget(m_searchChip);
     hl->addWidget(m_placeLabel);
     hl->addWidget(m_branchLabel);
@@ -1548,7 +1566,10 @@ void Panel::updateActiveStyle()
         "QToolButton#crumb:hover { background: @border; }"
         "QLabel { color: @dimText; }"
         "QLabel#branch, QLabel#place { color: @text; background: @altBase; border-radius: 10px; padding: 2px 9px; }"
-        "QToolButton#searchChip { color: @accentText; background: @accent; border: none; border-radius: 9px; padding: 1px 8px; }")
+        "QToolButton#searchChip { color: @accentText; background: @accent; border: none; border-radius: 9px; padding: 1px 8px; }"
+        "QToolButton#star { color: @dimText; border: none; padding: 1px 6px; border-radius: 4px; }"
+        "QToolButton#star:hover { background: @border; color: @text; }"
+        "QToolButton#star[on=\"true\"] { color: @accent; }")
                                            : QStringLiteral(
         "#panelHeader { background: transparent; }"
         "QLineEdit { background: transparent; color: @dimText; font-weight: 600; }"
@@ -1556,7 +1577,10 @@ void Panel::updateActiveStyle()
         "QToolButton#crumb:hover { background: @border; color: @text; }"
         "QLabel { color: @dimText; }"
         "QLabel#branch, QLabel#place { color: @dimText; background: @altBase; border-radius: 10px; padding: 2px 9px; }"
-        "QToolButton#searchChip { color: @text; background: @border; border: none; border-radius: 9px; padding: 1px 8px; }"));
+        "QToolButton#searchChip { color: @text; background: @border; border: none; border-radius: 9px; padding: 1px 8px; }"
+        "QToolButton#star { color: @dimText; border: none; padding: 1px 6px; border-radius: 4px; }"
+        "QToolButton#star:hover { background: @border; color: @text; }"
+        "QToolButton#star[on=\"true\"] { color: @accent; }"));
 }
 
 // A card; the active one has an accent edge and a soft glow around it.
@@ -1604,6 +1628,33 @@ void Panel::updateHeader()
     else
         static_cast<SpaceChip*>(m_freeLabel)->set(0, 0);
     window()->setWindowTitle(QStringLiteral("Tandem — %1").arg(path()));
+    updateStar();
+}
+
+QWidget* Panel::starButton() const
+{
+    return m_star;
+}
+
+void Panel::updateStar()
+{
+    DirTab* t = tab();
+    // Search results and archives aren't places to come back to.
+    m_star->setVisible(t && !t->isSearch() && !t->inArchive());
+    if (!t)
+        return;
+    const QString p = t->path();
+    const bool on = FolderHistory::instance().isPinned(p);
+    const QString key = on ? FolderHistory::instance().bookmarkKey(p) : QString();
+    m_star->setText(on ? (key.isEmpty() ? QStringLiteral("★") : QStringLiteral("★ ") + key) : QStringLiteral("☆"));
+    m_star->setToolTip(!on            ? tr("Bookmark this folder")
+                       : key.isEmpty() ? tr("Bookmarked: click to give it a key, or remove it")
+                                       : tr("Bookmarked as “%1”: click to change the key, or remove it").arg(key));
+    if (m_star->property("on").toBool() != on) {
+        m_star->setProperty("on", on);
+        m_star->style()->unpolish(m_star);  // the style sheet colours ★ by this
+        m_star->style()->polish(m_star);
+    }
 }
 
 void Panel::updateStatus()
@@ -1955,6 +2006,8 @@ QList<PopupItem> Panel::locationItems()
                              {tr("Change key…"), [this, p = b.path] { emit bookmarkEditRequested(p); }},
                              {tr("Remove bookmark"), [p = b.path] { FolderHistory::instance().setPinned(p, false); }}};
     }
+    add(tr("Bookmarks"), IconCache::themed("bookmarks-organize", "folder"), tr("Edit bookmarks…"),
+        tr("keys, folders and their order, all at once"), {}, [this] { emit bookmarksWindowRequested(); });
 
     for (const MountPoint& m : listMounts()) {
         if (m.path == QLatin1String("/") || isSystemMount(m))

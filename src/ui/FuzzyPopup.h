@@ -12,6 +12,7 @@
 class QLineEdit;
 class QListView;
 class QLabel;
+class QToolButton;
 
 namespace tandem {
 
@@ -27,6 +28,9 @@ struct PopupItem {
     QString key;                 // caller's id (e.g. a path)
     QString section;             // a header above the first item of each section (unfiltered lists)
     QList<std::pair<QString, std::function<void()>>> menu;  // right-click: what else it can do
+    // Keys that run it right away (bookmarks: "cp"). While what's typed starts
+    // a key, only those rows show; the Key/Search switch (Tab) searches by name.
+    QString chord;
     std::function<void()> run;
 };
 
@@ -85,11 +89,15 @@ protected:
 
 private:
     void refilter();
+    void setSearching(bool on);  // the Key/Search switch, when rows have keys
     void place();
     void activate();
     void close();  // hand focus back first, so the right panel stays active
 
     QLineEdit* m_edit;
+    QToolButton* m_mode;     // Key or Search, shown when rows have keys
+    bool m_searchChosen = false;  // Search picked with Tab or a click, not because no key fits
+    QString m_placeholder;        // as open() got it; Search mode says what it searches
     QListView* m_list;
     QLabel* m_footer;
     PopupModel* m_model;

@@ -13,11 +13,15 @@ class QLabel;
 class QLineEdit;
 class QListWidget;
 class QPushButton;
+class QStackedWidget;
+class QToolButton;
 class QWidget;
 
 namespace tandem {
 
-// Saved servers (servers.toml): add, edit, remove, import from ~/.ssh/config.
+class BookmarksEditor;
+
+// Locations: bookmarks and saved servers, one tab each. Saved servers (servers.toml): add, edit, remove, import from ~/.ssh/config.
 // Nothing is written until Save; passwords then go to the keyring.
 class ServersDialog : public QDialog {
     Q_OBJECT
@@ -29,6 +33,8 @@ public:
     std::function<void(const QString& uri)> onConnect;
 
     QListWidget* list() const { return m_list; }
+    BookmarksEditor* bookmarks() const { return m_bookmarks; }
+    void showBookmarks(bool on);  // the Bookmarks tab, or Servers
     QList<SavedServer> servers() const { return m_servers; }
     // Hosts offered by "Import from SSH config" (tests point it elsewhere).
     QString sshConfigPath;
@@ -68,6 +74,11 @@ private:
     QPushButton* m_remove;
     QPushButton* m_connect;
     QPushButton* m_save;
+    QLabel* m_where;
+    QStackedWidget* m_pages;
+    QList<QToolButton*> m_tabs;
+    BookmarksEditor* m_bookmarks;
+    bool m_serversBroken = false;  // servers.toml can't be read: never overwritten
 };
 
 }  // namespace tandem

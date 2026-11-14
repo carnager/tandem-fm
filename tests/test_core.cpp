@@ -1279,6 +1279,8 @@ private slots:
         QVERIFY(h.isPinned("/b"));
         h.forget("/a");
         QCOMPARE(h.items().size(), 1);
+        h.forget("/b");             // a bookmark: its visits go, it stays
+        QVERIFY(h.isPinned("/b"));
         QVERIFY(FolderHistory::frecency(10, 0, 30) > FolderHistory::frecency(10, 0, 30 * 86400));
 
         // Bookmarks: unique keys, chains, persistence.
@@ -1296,6 +1298,15 @@ private slots:
         QCOMPARE(h.bookmarks().size(), 2);
         h.setPinned("/docs", false);    // unpinning drops the key
         QCOMPARE(h.pathForKey("cd"), QString());
+
+        // Key suggestions: from the name, free, and no clash with the start of another.
+        QCOMPARE(FolderHistory::suggestKeys("/home/me/Downloads", {}), QStringList({"d", "do", "dw"}));
+        QCOMPARE(FolderHistory::suggestKeys("/home/me/Downloads", {"d", "dw"}), QStringList({"o", "w", "n"}));
+        QCOMPARE(FolderHistory::suggestKeys("/x/tandem-fm", {}).at(1), QString("tf"));  // the initials
+        QCOMPARE(FolderHistory::suggestKeys("/x/tandem-fm", {"t"}).first(), QString("a"));  // tf would make t wait
+        QCOMPARE(FolderHistory::suggestKeys("/x/MusicRips", {}).at(1), QString("mr"));
+        QVERIFY(!FolderHistory::suggestKeys("/x/c", {"cp"}).contains("c"));  // c would need Enter
+        QCOMPARE(FolderHistory::suggestKeys("/", {"a"}).first(), QString("b"));
 
         // Old (v1) files still load; a missing file gets the defaults.
         writeFile(tmp.filePath("old.tsv"), "3\t100\t1\t/pinned old\n1\t50\t0\t/seen\n");

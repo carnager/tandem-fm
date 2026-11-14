@@ -665,31 +665,23 @@ bool FileView::modalKey(QKeyEvent* e)
         token == QLatin1String("Alt") || token == QLatin1String("Meta"))
         return false;
     const QList<Keymap::Binding>& bindings = Keymap::instance().modalBindings();
-    QStringList prefix;  // bookmark-prefix: then a free key is a bookmark
-    for (const Keymap::Binding& b : bindings)
-        if (b.action == QLatin1String("bookmark-prefix"))
-            prefix = b.sequence;
     QStringList seq = m_pending;
     seq << token;
     const Keymap::Binding* exact = nullptr;
     QList<const Keymap::Binding*> longer;
     for (const Keymap::Binding& b : bindings) {
-        if (b.action == QLatin1String("bookmark-prefix"))
-            continue;
         if (b.sequence == seq)
             exact = &b;
         else if (b.sequence.size() > seq.size() && b.sequence.mid(0, seq.size()) == seq)
             longer.append(&b);
     }
-    if (!longer.isEmpty() || (seq == prefix && !exact)) {
+    if (!longer.isEmpty()) {
         m_pending = seq;  // wait for the rest
         QStringList next;
         for (const Keymap::Binding* b : std::as_const(longer)) {
             const QString title = Keymap::actionTitle ? Keymap::actionTitle(b->action) : b->action;
             next << QStringLiteral("%1 %2").arg(b->sequence.mid(seq.size()).join(QLatin1Char(' ')), title);
         }
-        if (seq == prefix)
-            next << tr("any other key: that bookmark");
         emit hintRequested(seq.join(QLatin1Char(' ')) + QStringLiteral("  →  ") + next.join(QStringLiteral("  ·  ")));
         return true;
     }
@@ -699,10 +691,6 @@ bool FileView::modalKey(QKeyEvent* e)
         emit hintRequested(QString());
     if (exact) {
         runModalAction(exact->action);
-        return true;
-    }
-    if (hadPending && seq.mid(0, seq.size() - 1) == prefix && token.size() == 1 && token.at(0).isPrint()) {
-        emit bookmarkJumpRequested(token);
         return true;
     }
     if (hadPending)  // the sequence went nowhere: the key on its own
@@ -744,7 +732,7 @@ void FileView::runModalAction(const QString& action)
     case 13: emit searchNextRequested(-1); return;
     case 14: emit paletteRequested(); return;
     case 15: emit commandRequested(); return;
-    case 16: emit bookmarkJumpRequested(QString()); return;
+    case 16: emit bookmarkJumpRequested(); return;
     case 17: emit bookmarkAssignRequested(); return;
     default: break;
     }

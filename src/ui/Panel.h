@@ -33,6 +33,7 @@ public:
     static constexpr double kCardRadius = 12;
     explicit Panel(QWidget* parent = nullptr);
 
+    QWidget* starButton() const;  // the key popup opens under it
     DirTab* tab() const;
     FileView* view() const { return m_view; }
     QString path() const;
@@ -146,9 +147,10 @@ signals:
     void serversRequested(const QString& uri);
     void cursorChanged(Panel* panel);
     void paletteRequested();
-    void bookmarkJumpRequested(const QString& keys);
+    void bookmarkJumpRequested();
     void bookmarkAssignRequested();
     void bookmarkEditRequested(const QString& path);  // its key, from Locations
+    void bookmarksWindowRequested();
     void commandRequested();
 
 protected:
@@ -160,6 +162,7 @@ private:
     void showTab(int index);
     void onListingReady(DirTab* t, const QString& focus);
     void updateHeader();
+    void updateStar();  // ☆ or ★ and the key, for this folder
     void updateStatus();
     void updateActiveStyle();
     void applyDefaultColumns();
@@ -183,6 +186,7 @@ private:
     QTabBar* m_tabBar;
     QWidget* m_header;
     QToolButton* m_mountButton;
+    QToolButton* m_star;
     PathBar* m_pathBar;
     QWidget* m_freeLabel;  // free space: a little bar and the amount
     QLabel* m_placeLabel;  // server and protocol, when on one
