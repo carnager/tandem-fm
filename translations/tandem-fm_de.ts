@@ -4249,6 +4249,18 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>wiederherstellen oder endgültig löschen</translation>
     </message>
     <message>
+        <source>Bookmarks</source>
+        <translation>Lesezeichen</translation>
+    </message>
+    <message>
+        <source>Change key…</source>
+        <translation>Taste ändern…</translation>
+    </message>
+    <message>
+        <source>Remove bookmark</source>
+        <translation>Lesezeichen entfernen</translation>
+    </message>
+    <message>
         <source>Del ⏏</source>
         <translation>Entf ⏏</translation>
     </message>

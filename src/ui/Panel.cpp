@@ -5,6 +5,7 @@
 #include "core/Archive.h"
 #include "core/Backend.h"
 #include "core/FileOps.h"
+#include "core/FolderHistory.h"
 #include "core/Mounts.h"
 #include "core/Remote.h"
 #include "core/Servers.h"
@@ -1939,6 +1940,21 @@ QList<PopupItem> Panel::locationItems()
     add(places, IconCache::themed("user-trash", "user-trash-full"), tr("Trash"), tr("restore or delete for good"), {},
         [this] { emit trashRequested(); });
 
+    // Bookmarks, with their keys; also the ones without a key.
+    for (const FolderHistory::Item& b : FolderHistory::instance().items()) {
+        if (!b.pinned)
+            break;  // pinned ones come first
+        const bool remote = b.path.contains(QLatin1String("://"));
+        const QString name = baseName(b.path).isEmpty() ? b.path : baseName(b.path);
+        add(tr("Bookmarks"), IconCache::themed(remote ? "folder-remote" : "folder", "folder"), name,
+            name == b.path ? QString() : b.path, QStringLiteral("bookmark:") + b.path,
+            [this, p = b.path] { navigate(p); }, b.key);
+        items.last().hintWhenCurrent = false;  // the key, always shown
+        items.last().menu = {{tr("Open"), [this, p = b.path] { navigate(p); }},
+                             {tr("Change key…"), [this, p = b.path] { emit bookmarkEditRequested(p); }},
+                             {tr("Remove bookmark"), [p = b.path] { FolderHistory::instance().setPinned(p, false); }}};
+    }
+
     for (const MountPoint& m : listMounts()) {
         if (m.path == QLatin1String("/") || isSystemMount(m))
             continue;
@@ -2033,6 +2049,12 @@ void Panel::showLocations()
             return it;
         };
         m_locations->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
+            if (it && it->key.startsWith(QLatin1String("bookmark:")) && e->modifiers() == Qt::ControlModifier &&
+                e->key() == Qt::Key_E) {
+                m_locations->hide();
+                emit bookmarkEditRequested(it->key.mid(9));
+                return true;
+            }
             const bool saved = it && it->key.startsWith(QLatin1String("saved:"));
             const bool recent = it && it->key.startsWith(QLatin1String("recent:"));
             if (e->modifiers() == Qt::ControlModifier &&
@@ -2046,6 +2068,11 @@ void Panel::showLocations()
                 return false;
             if (it->key.startsWith(QLatin1String("recent:"))) {
                 Network::instance().forgetServer(it->key.mid(7));
+                m_locations->setItems(locationItems());
+                return true;
+            }
+            if (it->key.startsWith(QLatin1String("bookmark:"))) {
+                FolderHistory::instance().setPinned(it->key.mid(9), false);
                 m_locations->setItems(locationItems());
                 return true;
             }

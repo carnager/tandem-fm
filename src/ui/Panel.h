@@ -148,6 +148,7 @@ signals:
     void paletteRequested();
     void bookmarkJumpRequested(const QString& keys);
     void bookmarkAssignRequested();
+    void bookmarkEditRequested(const QString& path);  // its key, from Locations
     void commandRequested();
 
 protected:

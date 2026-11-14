@@ -3432,6 +3432,45 @@ private slots:
         QTRY_COMPARE(rightModel()->path(), R());
     }
 
+    // Locations lists bookmarks with their keys; Ctrl+E changes the key, Del removes it.
+    void locationsBookmarks()
+    {
+        FolderHistory& h = FolderHistory::instance();
+        QTRY_VERIFY(h.isLoaded());
+        h.setBookmark(L("sub"), "lb");
+        auto cleanup = qScopeGuard([&] { h.setPinned(L("sub"), false); });
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        auto openWith = [&](const QString& query) -> FuzzyPopup* {
+            m_left->showLocations();
+            FuzzyPopup* popup = nullptr;
+            for (auto* p : m_window->findChildren<FuzzyPopup*>())
+                if (p->isVisible())
+                    popup = p;
+            if (popup)
+                QTest::keyClicks(popup->findChild<QLineEdit*>(), query);
+            return popup;
+        };
+        FuzzyPopup* popup = openWith("sub");
+        QVERIFY(popup);
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == "bookmark:" + L("sub"));
+        QCOMPARE(popup->currentItem()->hint, QString("lb"));
+        QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_E, Qt::ControlModifier);
+        auto* chords = m_window->findChild<KeyChordPopup*>();
+        QTRY_VERIFY(chords->isVisible());
+        QTest::keyClick(chords, Qt::Key_Backspace);
+        QTest::keyClicks(chords, "c");
+        QTest::keyClick(chords, Qt::Key_Return);
+        QCOMPARE(h.pathForKey("lc"), L("sub"));
+        QTRY_VERIFY(!chords->isVisible());
+        popup = openWith("sub");
+        QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == "bookmark:" + L("sub"));
+        QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_Delete);
+        QVERIFY(!h.isPinned(L("sub")));
+        QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_Escape);
+    }
+
     // Tab in the bookmarks popup: all bookmarks, keys changed and removed there.
     void bookmarkEdit()
     {
