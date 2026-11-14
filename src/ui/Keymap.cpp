@@ -1,4 +1,8 @@
 #include "ui/Keymap.h"
+#ifdef Q_OS_MACOS
+#include "ui/MacModalKeys.h"
+#endif
+#include <QSettings>
 
 #include "core/TomlSettings.h"
 
@@ -71,6 +75,9 @@ Keymap& Keymap::instance()
 
 Keymap::Keymap()
 {
+#ifdef Q_OS_MACOS
+    m_physicalModalKeys = QSettings().value(QStringLiteral("input/physicalModalKeys"), false).toBool();
+#endif
     m_reload = new QTimer(this);
     m_reload->setSingleShot(true);
     m_reload->setInterval(150);  // editors write in steps
@@ -187,6 +194,27 @@ QString Keymap::tokenFor(const QKeyEvent* e)
     if (text.size() == 1 && text.at(0).isPrint() && text != QLatin1String(" "))
         return text;
     return QKeySequence(e->key()).toString(QKeySequence::PortableText);
+}
+
+QString Keymap::modalTokenFor(const QKeyEvent* e) const
+{
+#ifdef Q_OS_MACOS
+    if (m_physicalModalKeys) {
+        const QString physical = macPhysicalModalToken(e);
+        if (!physical.isEmpty())
+            return physical;
+    }
+#endif
+    return tokenFor(e);
+}
+
+void Keymap::setPhysicalModalKeys(bool on)
+{
+    if (m_physicalModalKeys == on)
+        return;
+    m_physicalModalKeys = on;
+    QSettings().setValue(QStringLiteral("input/physicalModalKeys"), on);
+    emit changed();
 }
 
 void Keymap::rebuildModal(const QHash<QString, QStringList>& overrides)

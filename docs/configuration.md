@@ -25,6 +25,15 @@ sort-by-size = ", s"
 down = ["j", "Down"]
 ```
 
+On macOS, **Settings → Behaviour → Use physical keys for modal commands**
+keeps modal bindings at US keyboard positions when you switch to Hebrew or
+another layout. It is off by default. With it enabled, `j`, `k`, `g g` and
+custom chains use the same physical keys across layouts; you do not need
+separate Hebrew bindings. Shift and Caps Lock keep upper/lowercase distinct.
+Only file-panel modal commands use this option. Text fields and standard
+window shortcuts keep their usual keyboard-layout behavior. Unmapped native
+keys, such as function and navigation keys, keep their normal Qt handling.
+
 The paths above follow your XDG configuration directories.
 
 Window size, columns and open tabs are Tandem's own business and live in

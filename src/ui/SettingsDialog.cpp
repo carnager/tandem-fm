@@ -542,6 +542,16 @@ QWidget* SettingsDialog::behaviourPage()
              tr("Letters are commands, as in vim and yazi: j k h l to move, v for visual mode, y x p to copy, cut "
                 "and paste, d to trash, r to rename, a to create, t q for tabs, / to search, : for the palette. "
                 "F1 lists them all. Typing no longer starts the quick search."));
+#ifdef Q_OS_MACOS
+    auto* physical = new QCheckBox(tr("Use physical keys for modal commands"), this);
+    physical->setObjectName(QStringLiteral("physicalModalKeys"));
+    physical->setChecked(Keymap::instance().physicalModalKeys());
+    connect(physical, &QCheckBox::toggled, this,
+            [](bool on) { Keymap::instance().setPhysicalModalKeys(on); });
+    page.add(QString(), physical,
+             tr("Use US key positions in file panels even with a Hebrew or other keyboard layout. "
+                "Text fields still use your chosen language. Off by default."));
+#endif
     page.add(tr("Notifications"),
              toggle(tr("Notify when long operations finish"), m_window->m_actions.value(QStringLiteral("notifications"))),
              tr("A desktop notification when a copy or move that took a while is done and Tandem isn't in front."));
