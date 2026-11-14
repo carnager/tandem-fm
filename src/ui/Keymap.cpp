@@ -240,6 +240,7 @@ bool Keymap::load()
             modal.insert(it.key().mid(6), entriesOf(it.value()));
     }
     m_commandKeys = commands;
+    m_modalKeys = modal;
     rebuildModal(modal);
     return true;
 }
@@ -329,6 +330,39 @@ void Keymap::setCommandKeys(const QString& id, const std::optional<QStringList>&
         m_commandKeys.insert(id, *keys);
     else
         m_commandKeys.remove(id);
+}
+
+std::optional<QStringList> Keymap::modalKeys(const QString& id) const
+{
+    const auto it = m_modalKeys.constFind(id);
+    if (it == m_modalKeys.cend())
+        return std::nullopt;
+    return *it;
+}
+
+void Keymap::setModalKeys(const QString& id, const std::optional<QStringList>& keys)
+{
+    QString text = readFile(path());
+    QVariantMap check;
+    if (!parseToml(text, &check))
+        return;  // a broken hand edit: leave it as it is
+    if (text.isEmpty())
+        text = kHeader;
+    QStringList defaults;
+    for (const auto& [action, sequence] : modalDefaults())
+        if (action == id)
+            defaults << sequence;
+    if (keys)
+        text = setTomlLine(text, QStringLiteral("modal"), id, keysValue(*keys));
+    else
+        text = setTomlLine(text, QStringLiteral("modal"), id, std::nullopt, keysValue(defaults));
+    writeFileText(text);
+    if (keys)
+        m_modalKeys.insert(id, *keys);
+    else
+        m_modalKeys.remove(id);
+    rebuildModal(m_modalKeys);
+    emit changed();
 }
 
 void Keymap::importOld(const QVariantMap& keys)

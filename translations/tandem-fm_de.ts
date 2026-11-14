@@ -858,6 +858,97 @@
     </message>
 </context>
 <context>
+    <name>SettingsDialog</name>
+    <message>
+        <source>Move down</source>
+        <translation>Nach unten</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Nach oben</translation>
+    </message>
+    <message>
+        <source>Out of the folder</source>
+        <translation>Aus dem Ordner heraus</translation>
+    </message>
+    <message>
+        <source>Into the folder, or open</source>
+        <translation>In den Ordner hinein oder öffnen</translation>
+    </message>
+    <message>
+        <source>To the top</source>
+        <translation>Zum Anfang</translation>
+    </message>
+    <message>
+        <source>To the bottom</source>
+        <translation>Zum Ende</translation>
+    </message>
+    <message>
+        <source>Half a page down</source>
+        <translation>Eine halbe Seite nach unten</translation>
+    </message>
+    <message>
+        <source>Half a page up</source>
+        <translation>Eine halbe Seite nach oben</translation>
+    </message>
+    <message>
+        <source>Visual mode</source>
+        <translation>Visueller Modus</translation>
+    </message>
+    <message>
+        <source>Visual mode, unmarking</source>
+        <translation>Visueller Modus, Markierung aufheben</translation>
+    </message>
+    <message>
+        <source>Search in the list</source>
+        <translation>In der Liste suchen</translation>
+    </message>
+    <message>
+        <source>Next match</source>
+        <translation>Nächster Treffer</translation>
+    </message>
+    <message>
+        <source>Previous match</source>
+        <translation>Vorheriger Treffer</translation>
+    </message>
+    <message>
+        <source>Command palette</source>
+        <translation>Befehlspalette</translation>
+    </message>
+    <message>
+        <source>Command line</source>
+        <translation>Befehlszeile</translation>
+    </message>
+    <message>
+        <source>Go to a bookmark</source>
+        <translation>Zu einem Lesezeichen</translation>
+    </message>
+    <message>
+        <source>Set a bookmark</source>
+        <translation>Lesezeichen setzen</translation>
+    </message>
+    <message>
+        <source>Bookmark prefix (then the bookmark&apos;s key)</source>
+        <translation>Lesezeichen-Präfix (danach die Taste des Lesezeichens)</translation>
+    </message>
+    <message>
+        <source>Create a file or folder</source>
+        <translation>Datei oder Ordner anlegen</translation>
+    </message>
+    <message>
+        <source>Background jobs</source>
+        <translation>Hintergrundaufgaben</translation>
+    </message>
+    <message>
+        <source>Scroll the preview up</source>
+        <translation>Vorschau nach oben scrollen</translation>
+    </message>
+    <message>
+        <source>Scroll the preview down</source>
+        <translation>Vorschau nach unten scrollen</translation>
+    </message>
+</context>
+<context>
     <name>Shortcuts</name>
     <message>
         <source>Moving around</source>
@@ -5331,20 +5422,44 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Befehl</translation>
     </message>
     <message>
-        <source>Press the new keys:</source>
-        <translation>Neue Tasten drücken:</translation>
+        <source>Modal keys</source>
+        <translation>Modale Tasten</translation>
     </message>
     <message>
-        <source>No key</source>
-        <translation>Keine Taste</translation>
+        <source>Keys:</source>
+        <translation>Tasten:</translation>
+    </message>
+    <message>
+        <source>Press a key to add it</source>
+        <translation>Drück eine Taste, um sie hinzuzufügen</translation>
+    </message>
+    <message>
+        <source>Modal keys:</source>
+        <translation>Modale Tasten:</translation>
+    </message>
+    <message>
+        <source>For example: g g, Home (Enter saves)</source>
+        <translation>Zum Beispiel: g g, Home (Enter speichert)</translation>
+    </message>
+    <message>
+        <source>Pick a command, then press a key to add it.</source>
+        <translation>Wähl einen Befehl und drück dann eine Taste, um sie hinzuzufügen.</translation>
+    </message>
+    <message>
+        <source>“%1”: %2</source>
+        <translation>„%1“: %2</translation>
+    </message>
+    <message>
+        <source>%1 was used by “%2”.</source>
+        <translation>%1 gehörte zu „%2“.</translation>
+    </message>
+    <message>
+        <source>Modal keys: %1</source>
+        <translation>Modale Tasten: %1</translation>
     </message>
     <message>
         <source>Default</source>
         <translation>Standard</translation>
-    </message>
-    <message>
-        <source>Pick a command, then press its new keys.</source>
-        <translation>Befehl wählen, dann die neuen Tasten drücken.</translation>
     </message>
     <message>
         <source>Reset all keys</source>
@@ -5363,20 +5478,20 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>keine</translation>
     </message>
     <message>
+        <source>Modal › %1</source>
+        <translation>Modal › %1</translation>
+    </message>
+    <message>
+        <source>Remove %1</source>
+        <translation>%1 entfernen</translation>
+    </message>
+    <message>
         <source>%1 was used by “%2”, which now has %3.</source>
         <translation>%1 gehörte zu „%2“, das jetzt %3 hat.</translation>
     </message>
     <message>
         <source>no key</source>
         <translation>keine Taste</translation>
-    </message>
-    <message>
-        <source>“%1” has no key now.</source>
-        <translation>„%1“ hat jetzt keine Taste.</translation>
-    </message>
-    <message>
-        <source>“%1” is now %2.</source>
-        <translation>„%1“ ist jetzt %2.</translation>
     </message>
 </context>
 <context>
