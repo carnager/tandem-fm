@@ -1950,6 +1950,7 @@ QList<PopupItem> Panel::locationItems()
             name == b.path ? QString() : b.path, QStringLiteral("bookmark:") + b.path,
             [this, p = b.path] { navigate(p); }, b.key);
         items.last().hintWhenCurrent = false;  // the key, always shown
+        items.last().matchSubtitle = !items.last().subtitle.isEmpty();  // the whole path, not only its name
         items.last().menu = {{tr("Open"), [this, p = b.path] { navigate(p); }},
                              {tr("Change key…"), [this, p = b.path] { emit bookmarkEditRequested(p); }},
                              {tr("Remove bookmark"), [p = b.path] { FolderHistory::instance().setPinned(p, false); }}};
