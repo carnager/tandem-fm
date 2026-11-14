@@ -38,6 +38,7 @@ private:
     void showCurrent();
     void formChanged();
     void updateRow(QListWidgetItem* item);
+    void updateKeyNote();  // free, taken, or the start of another; free ones to pick
 
     QListWidget* m_list;
     QWidget* m_form;
@@ -45,6 +46,8 @@ private:
     QLabel* m_address;
     QLabel* m_empty;
     QLineEdit* m_key;
+    QLabel* m_keyNote;
+    QWidget* m_suggestions;
     QLineEdit* m_folder;
     QPushButton* m_remove;
     QString m_currentFolder;

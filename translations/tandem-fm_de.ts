@@ -1500,12 +1500,40 @@
         <translation>Auswählen…</translation>
     </message>
     <message>
-        <source>Ctrl+D and the key go there; with modal keys, g and the key. Drag bookmarks in the list to change their order.</source>
-        <translation>Strg+D und die Taste führen dorthin, mit modalen Tasten g und die Taste. Zieh Lesezeichen in der Liste, um ihre Reihenfolge zu ändern.</translation>
+        <source>Ctrl+D and the key go there; with modal keys, &apos; and the key. Drag bookmarks in the list to change their order.</source>
+        <translation>Strg+D und die Taste führen dorthin, mit modalen Tasten &apos; und die Taste. Zieh Lesezeichen in der Liste, um ihre Reihenfolge zu ändern.</translation>
     </message>
     <message>
         <source>New bookmark</source>
         <translation>Neues Lesezeichen</translation>
+    </message>
+    <message>
+        <source>No key yet.</source>
+        <translation>Noch keine Taste.</translation>
+    </message>
+    <message>
+        <source>Already the key of %1.</source>
+        <translation>Schon die Taste von %1.</translation>
+    </message>
+    <message>
+        <source>%1 start with it too: after %2, Enter goes here.</source>
+        <translation>%1 beginnen auch damit: nach %2 führt Enter hierher.</translation>
+    </message>
+    <message>
+        <source>%1 is a key too: after it, %2 still jumps, but %1 needs Enter.</source>
+        <translation>%1 ist auch eine Taste: %2 springt weiterhin, aber %1 braucht danach Enter.</translation>
+    </message>
+    <message>
+        <source>Free: Ctrl+D, then %1, jumps here.</source>
+        <translation>Frei: Strg+D, dann %1, springt hierher.</translation>
+    </message>
+    <message>
+        <source>Free:</source>
+        <translation>Frei:</translation>
+    </message>
+    <message>
+        <source>Use %1</source>
+        <translation>%1 verwenden</translation>
     </message>
     <message>
         <source>A bookmark needs a folder.</source>
@@ -2353,12 +2381,16 @@
         <translation>Lesezeichen-Taste für %1:  %2</translation>
     </message>
     <message>
-        <source>“%1” is used by %2 and will move here   ·   Enter: save   ·   Esc</source>
-        <translation>„%1“ ist %2 zugewiesen und wird hierher übertragen   ·   Enter: speichern   ·   Esc</translation>
+        <source>free: %1   ·   Tab: %2   ·   </source>
+        <translation>frei: %1   ·   Tab: %2   ·   </translation>
     </message>
     <message>
-        <source>Type a key or chain (e.g. cp)   ·   Enter: save   ·   Delete: remove   ·   Esc</source>
-        <translation>Taste oder Tastenfolge eingeben (z. B. cp)   ·   Enter: speichern   ·   Delete: entfernen   ·   Esc</translation>
+        <source>“%1” is used by %2 and will move here   ·   %3Enter: save   ·   Esc</source>
+        <translation>„%1“ gehört zu %2 und wechselt hierher   ·   %3Enter: speichern   ·   Esc</translation>
+    </message>
+    <message>
+        <source>Type a key or chain (e.g. cp)   ·   %1Enter: save   ·   Delete: remove   ·   Esc</source>
+        <translation>Taste oder Tastenfolge eingeben (z. B. cp)   ·   %1Enter: speichern   ·   Delete: entfernen   ·   Esc</translation>
     </message>
     <message>
         <source>No bookmarks yet. Ctrl+Shift+D bookmarks the current folder.</source>

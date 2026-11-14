@@ -56,6 +56,54 @@ void FolderHistory::setStoragePath(const QString& path)
     m_keys.clear();
 }
 
+QStringList FolderHistory::suggestKeys(const QString& path, const QStringList& used, int count)
+{
+    auto fits = [&](const QString& k) {
+        for (const QString& u : used)
+            if (!u.isEmpty() && (u.startsWith(k) || k.startsWith(u)))
+                return false;
+        return true;
+    };
+    // The name's words: "tandem-fm" -> tandem, fm; "MusicRips" -> music, rips.
+    const QString name = path.section(QLatin1Char('/'), -1, -1, QString::SectionSkipEmpty);
+    QStringList words;
+    QString word;
+    for (int i = 0; i < name.size(); ++i) {
+        const QChar c = name.at(i);
+        if (!c.isLetterOrNumber() || (c.isUpper() && i > 0 && name.at(i - 1).isLower())) {
+            if (!word.isEmpty())
+                words << word;
+            word.clear();
+        }
+        if (c.isLetterOrNumber() && c.unicode() < 128)
+            word += c.toLower();
+    }
+    if (!word.isEmpty())
+        words << word;
+    const QString letters = words.join(QString());
+    QStringList candidates;
+    if (!letters.isEmpty()) {
+        candidates << letters.left(1);
+        if (words.size() > 1) {
+            QString initials;
+            for (const QString& w : std::as_const(words))
+                initials += w.at(0);
+            candidates << initials.left(3);
+        }
+        for (int i = 1; i < letters.size(); ++i)  // first letter + a later one: do, dw, dn…
+            candidates << letters.left(1) + letters.at(i);
+        for (int i = 1; i < letters.size(); ++i)  // its first letter taken: the others alone
+            candidates << QString(letters.at(i));
+    }
+    for (char c = 'a'; c <= 'z'; ++c)  // nothing from the name: any free letter
+        candidates << QString(QLatin1Char(c));
+    QStringList out;
+    for (const QString& k : std::as_const(candidates))
+        if (!out.contains(k) && fits(k) && (out << k).size() == count)
+            break;
+    return out;
+}
+
 double FolderHistory::frecency(double count, qint64 lastVisit, qint64 now)
 {
     const qint64 age = now - lastVisit;

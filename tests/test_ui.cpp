@@ -3516,6 +3516,18 @@ private slots:
                 b->click();
         QCOMPARE(list->count(), 3);
         QCOMPARE(ed->folderEdit()->text(), R());
+        ed->keyEdit()->setText("s");  // used twice: said so, free ones offered
+        auto* note = dlg.findChild<QLabel*>("keyNote");
+        QVERIFY(note->text().contains("sub"));
+        QPushButton* free = nullptr;
+        for (auto* b : note->parentWidget()->findChildren<QPushButton*>())
+            if (!b->isHidden())
+                free = b;
+        QVERIFY(free);
+        const QString suggested = free->text();
+        free->click();
+        QCOMPARE(ed->keyEdit()->text(), suggested);
+        QVERIFY(note->text().startsWith("Free"));
         ed->keyEdit()->setText("s");  // used twice: not saved
         QVERIFY(!dlg.save());
         QCOMPARE(h.pinnedBookmarks(), QList<FolderHistory::Bookmark>({{"a", L()}, {"", L("sub")}}));
@@ -3583,6 +3595,22 @@ private slots:
         QVERIFY(popup->isVisible());  // no jump while searching
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
+
+        // Tab takes the free key the hint offers.
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(chords->isVisible());
+        for (int i = 0; i < 2; ++i)
+            QTest::keyClick(chords, Qt::Key_Backspace);  // clear "cd"
+        QStringList used;
+        for (const auto& b : h.bookmarks())
+            if (b.path != L("sub/deep"))
+                used << b.key;
+        const QString suggested = FolderHistory::suggestKeys(L("sub/deep"), used).value(0);
+        QVERIFY(!suggested.isEmpty());
+        QTest::keyClick(chords, Qt::Key_Tab);
+        QTest::keyClick(chords, Qt::Key_Return);
+        QTRY_COMPARE(h.bookmarkKey(L("sub/deep")), suggested);
 
         // Assign a new chain to the current folder.
         m_left->view()->setFocus();

@@ -102,6 +102,20 @@ BookmarksEditor::BookmarksEditor(QWidget* parent) : QWidget(parent)
     m_key->setObjectName(QStringLiteral("bookmarkKey"));
     m_key->setPlaceholderText(tr("one or more letters, e.g. cp; empty: no key"));
     fields->addRow(tr("Key"), m_key);
+    auto* noteRow = new QWidget(m_form);
+    auto* noteLayout = new QHBoxLayout(noteRow);
+    noteLayout->setContentsMargins(0, 0, 0, 0);
+    noteLayout->setSpacing(4);
+    m_keyNote = new QLabel(noteRow);
+    m_keyNote->setObjectName(QStringLiteral("keyNote"));
+    noteLayout->addWidget(m_keyNote);
+    m_suggestions = new QWidget(noteRow);  // free keys, one click each
+    auto* chips = new QHBoxLayout(m_suggestions);
+    chips->setContentsMargins(0, 0, 0, 0);
+    chips->setSpacing(4);
+    noteLayout->addWidget(m_suggestions);
+    noteLayout->addStretch(1);
+    fields->addRow(QString(), noteRow);
     auto* folderRow = new QWidget(m_form);
     auto* folderLayout = new QHBoxLayout(folderRow);
     folderLayout->setContentsMargins(0, 0, 0, 0);
@@ -113,7 +127,7 @@ BookmarksEditor::BookmarksEditor(QWidget* parent) : QWidget(parent)
     folderLayout->addWidget(m_folder, 1);
     folderLayout->addWidget(browse);
     fields->addRow(tr("Folder"), folderRow);
-    auto* how = new QLabel(tr("Ctrl+D and the key go there; with modal keys, g and the key. "
+    auto* how = new QLabel(tr("Ctrl+D and the key go there; with modal keys, ' and the key. "
                               "Drag bookmarks in the list to change their order."), m_form);
     how->setWordWrap(true);
     setThemeStyle(how, QStringLiteral("color: @dimText;"));
@@ -190,6 +204,74 @@ void BookmarksEditor::showCurrent()
     m_loading = false;
     m_heading->setText(item ? item->text() : QString());
     m_address->setText(item ? item->data(kPathRole).toString() : QString());
+    updateKeyNote();
+}
+
+void BookmarksEditor::updateKeyNote()
+{
+    for (QWidget* old : m_suggestions->findChildren<QWidget*>(Qt::FindDirectChildrenOnly)) {
+        old->hide();
+        old->deleteLater();  // may be the one being clicked
+    }
+    QListWidgetItem* current = m_list->currentItem();
+    if (!current)
+        return;
+    const QString key = current->data(kKeyRole).toString();
+    QStringList used, longer;
+    QString owner, shorter;
+    for (int i = 0; i < m_list->count(); ++i) {
+        const QListWidgetItem* item = m_list->item(i);
+        const QString k = item->data(kKeyRole).toString();
+        if (item == current || k.isEmpty())
+            continue;
+        used << k;
+        if (key.isEmpty())
+            continue;
+        if (k == key)
+            owner = item->text();
+        else if (k.startsWith(key))
+            longer << k;
+        else if (key.startsWith(k))
+            shorter = k;
+    }
+    QString note;
+    bool problem = true;
+    if (key.isEmpty())
+        note = tr("No key yet.");
+    else if (!owner.isEmpty())
+        note = tr("Already the key of %1.").arg(owner);
+    else if (!longer.isEmpty())
+        note = tr("%1 start with it too: after %2, Enter goes here.").arg(longer.join(QStringLiteral(", ")), key);
+    else if (!shorter.isEmpty())
+        note = tr("%1 is a key too: after it, %2 still jumps, but %1 needs Enter.").arg(shorter, key);
+    else {
+        note = tr("Free: Ctrl+D, then %1, jumps here.").arg(key);
+        problem = false;
+    }
+    setThemeStyle(m_keyNote, problem && !key.isEmpty() ? QStringLiteral("color: @error;") : QStringLiteral("color: @dimText;"));
+    if (problem) {
+        const QStringList free = FolderHistory::suggestKeys(current->data(kPathRole).toString(), used);
+        if (!free.isEmpty()) {
+            auto* label = new QLabel(tr("Free:"), m_suggestions);
+            setThemeStyle(label, QStringLiteral("color: @dimText; padding-left: 6px;"));
+            m_suggestions->layout()->addWidget(label);
+            label->show();
+        }
+        for (const QString& k : free) {
+            auto* chip = new QPushButton(k, m_suggestions);
+            // Like the keys in the list: a cap to click.
+            setThemeStyle(chip, QStringLiteral(
+                "QPushButton { color: @accent; background: @window; border: 1px solid @border; border-radius: 4px;"
+                "  padding: 1px 8px; }"
+                "QPushButton:hover { border-color: @accent; }"));
+            chip->setCursor(Qt::PointingHandCursor);
+            chip->setToolTip(tr("Use %1").arg(k));
+            m_suggestions->layout()->addWidget(chip);
+            chip->show();
+            connect(chip, &QPushButton::clicked, this, [this, k] { m_key->setText(k); });
+        }
+    }
+    m_keyNote->setText(note);
 }
 
 void BookmarksEditor::formChanged()
@@ -202,6 +284,7 @@ void BookmarksEditor::formChanged()
     updateRow(item);
     m_heading->setText(item->text());
     m_address->setText(item->data(kPathRole).toString());
+    updateKeyNote();
     emit edited();
 }
 

@@ -62,6 +62,7 @@ private:
     Choices m_choices;
     QString m_typed;
     QString m_assignPath;
+    QStringList m_free;  // keys the folder could have, best first (Tab takes one)
     QPointer<QWidget> m_returnFocus;
     QLabel* m_title;
     QWidget* m_grid;

@@ -128,6 +128,14 @@ bool KeyChordPopup::event(QEvent* e)
         e->accept();
         return true;
     }
+    // Tab takes the first free key the hint offers (instead of moving the focus).
+    if (e->type() == QEvent::KeyPress && static_cast<QKeyEvent*>(e)->key() == Qt::Key_Tab && m_mode == Mode::Assign) {
+        if (!m_free.isEmpty()) {
+            m_typed = m_free.first();
+            refresh();
+        }
+        return true;
+    }
     return QFrame::event(e);
 }
 
@@ -208,9 +216,16 @@ void KeyChordPopup::refresh()
         const QString owner = m_typed.isEmpty() ? QString() : FolderHistory::instance().pathForKey(m_typed);
         m_title->setText(tr("Bookmark key for %1:  %2").arg(m_assignPath, m_typed.isEmpty() ? QStringLiteral("_")
                                                                                                       : m_typed));
+        QStringList used;
+        for (const auto& b : all)
+            if (b.path != m_assignPath)
+                used << b.key;
+        m_free = FolderHistory::suggestKeys(m_assignPath, used);
+        const QString free = m_free.isEmpty() ? QString()
+                                              : tr("free: %1   ·   Tab: %2   ·   ").arg(m_free.join(QStringLiteral(", ")), m_free.first());
         m_hint->setText(!owner.isEmpty() && owner != m_assignPath
-                            ? tr("“%1” is used by %2 and will move here   ·   Enter: save   ·   Esc").arg(m_typed, owner)
-                            : tr("Type a key or chain (e.g. cp)   ·   Enter: save   ·   Delete: remove   ·   Esc"));
+                            ? tr("“%1” is used by %2 and will move here   ·   %3Enter: save   ·   Esc").arg(m_typed, owner, free)
+                            : tr("Type a key or chain (e.g. cp)   ·   %1Enter: save   ·   Delete: remove   ·   Esc").arg(free));
     }
     int row = 0, col = 0;
     const int columns = 3;
