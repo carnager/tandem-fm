@@ -53,6 +53,8 @@ public:
     static void setListZoom(int percent);
     static int listZoom();
     static QFont zoomed(QFont f);  // a list font at the current zoom
+    // What a drag of files offers other apps, with these keys held as it starts.
+    static Qt::DropActions dragActions(Qt::KeyboardModifiers held);
     void zoomChanged();            // re-measures the rows
     void columnsMadeForZoom() { m_zoomOfColumns = listZoom(); }  // after setting or restoring widths
     double fade() const { return m_active ? 0.0 : inactiveDim(); }
