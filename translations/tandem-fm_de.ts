@@ -2236,6 +2236,21 @@
     </message>
 </context>
 <context>
+    <name>tandem::Keymap</name>
+    <message>
+        <source>Could not read key bindings: %1</source>
+        <translation>Tastenbelegungen konnten nicht gelesen werden: %1</translation>
+    </message>
+    <message>
+        <source>Key bindings changed outside Tandem. Reload them before editing.</source>
+        <translation>Die Tastenbelegungen wurden außerhalb von Tandem geändert. Lade sie vor dem Bearbeiten neu.</translation>
+    </message>
+    <message>
+        <source>Could not save key bindings: %1</source>
+        <translation>Tastenbelegungen konnten nicht gespeichert werden: %1</translation>
+    </message>
+</context>
+<context>
     <name>tandem::MainWindow</name>
     <message>
         <source>rename of %1</source>
@@ -2979,6 +2994,10 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Enter: save   ·   %1 opens one</source>
         <translation>Enter: speichern   ·   %1 öffnet einen</translation>
+    </message>
+    <message>
+        <source>Key bindings are still being saved. Try quitting again.</source>
+        <translation>Die Tastenbelegungen werden noch gespeichert. Versuche danach erneut, Tandem zu beenden.</translation>
     </message>
     <message>
         <source>Already on shelf %1</source>
@@ -5319,24 +5338,44 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Befehl oder Taste finden</translation>
     </message>
     <message>
+        <source>Standard shortcuts</source>
+        <translation>Normale Tastenkürzel</translation>
+    </message>
+    <message>
         <source>Command</source>
         <translation>Befehl</translation>
     </message>
     <message>
-        <source>Press the new keys:</source>
-        <translation>Neue Tasten drücken:</translation>
+        <source>Default: %1</source>
+        <translation>Standard: %1</translation>
     </message>
     <message>
-        <source>No key</source>
-        <translation>Keine Taste</translation>
+        <source>Bindings for “%1”: %2</source>
+        <translation>Belegungen für „%1“: %2</translation>
+    </message>
+    <message>
+        <source>“%1” is not a key name.</source>
+        <translation>„%1“ ist kein Tastenname.</translation>
+    </message>
+    <message>
+        <source>%1 keeps its navigation function. Use a letter or a modified key.</source>
+        <translation>%1 behält seine Navigationsfunktion. Nutze einen Buchstaben oder eine Tastenkombination.</translation>
+    </message>
+    <message>
+        <source>This chain overlaps “%1”. Change that binding first.</source>
+        <translation>Diese Folge überschneidet sich mit „%1“. Ändere zuerst dessen Belegung.</translation>
+    </message>
+    <message>
+        <source>Modal bindings updated.</source>
+        <translation>Modale Tastenbelegungen aktualisiert.</translation>
+    </message>
+    <message>
+        <source>This binding was moved from %1. Other bindings were kept.</source>
+        <translation>Diese Belegung wurde von %1 übernommen. Andere Belegungen bleiben erhalten.</translation>
     </message>
     <message>
         <source>Default</source>
         <translation>Standard</translation>
-    </message>
-    <message>
-        <source>Pick a command, then press its new keys.</source>
-        <translation>Befehl wählen, dann die neuen Tasten drücken.</translation>
     </message>
     <message>
         <source>Reset all keys</source>
@@ -5347,10 +5386,6 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Alle Tasten sind wieder wie anfangs.</translation>
     </message>
     <message>
-        <source>Default: %1</source>
-        <translation>Standard: %1</translation>
-    </message>
-    <message>
         <source>none</source>
         <translation>keine</translation>
     </message>
@@ -5359,16 +5394,144 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>%1 gehörte zu „%2“, das jetzt %3 hat.</translation>
     </message>
     <message>
+        <source>Key</source>
+        <translation>Taste</translation>
+    </message>
+    <message>
+        <source>Alternate keys</source>
+        <translation>Alternative Tasten</translation>
+    </message>
+    <message>
+        <source>A key or a chain, for example: g w s</source>
+        <translation>Eine Taste oder Folge, zum Beispiel: g w s</translation>
+    </message>
+    <message>
+        <source>Apply</source>
+        <translation>Anwenden</translation>
+    </message>
+    <message>
+        <source>Remove binding</source>
+        <translation>Belegung entfernen</translation>
+    </message>
+    <message>
+        <source>Use spaces for a chain. Press Enter or Apply to save it.</source>
+        <translation>Trenne die Tasten einer Folge mit Leerzeichen. Speichere mit Eingabe oder Anwenden.</translation>
+    </message>
+    <message>
+        <source>Choose a binding to change, or add an alternate key.</source>
+        <translation>Wähle eine Belegung zum Ändern oder füge eine alternative Taste hinzu.</translation>
+    </message>
+    <message>
+        <source>All modal keys are back to their defaults.</source>
+        <translation>Alle modalen Tasten haben wieder ihre Standardbelegung.</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translation>Nach unten</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Nach oben</translation>
+    </message>
+    <message>
+        <source>Parent folder</source>
+        <translation>Übergeordneter Ordner</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Öffnen</translation>
+    </message>
+    <message>
+        <source>First item</source>
+        <translation>Erster Eintrag</translation>
+    </message>
+    <message>
+        <source>Last item</source>
+        <translation>Letzter Eintrag</translation>
+    </message>
+    <message>
+        <source>Half a page down</source>
+        <translation>Eine halbe Seite nach unten</translation>
+    </message>
+    <message>
+        <source>Half a page up</source>
+        <translation>Eine halbe Seite nach oben</translation>
+    </message>
+    <message>
+        <source>Visual selection</source>
+        <translation>Visuelles Markieren</translation>
+    </message>
+    <message>
+        <source>Visual unmarking</source>
+        <translation>Visuelles Entmarkieren</translation>
+    </message>
+    <message>
+        <source>Find</source>
+        <translation>Suchen</translation>
+    </message>
+    <message>
+        <source>Next match</source>
+        <translation>Nächster Treffer</translation>
+    </message>
+    <message>
+        <source>Previous match</source>
+        <translation>Vorheriger Treffer</translation>
+    </message>
+    <message>
+        <source>Command palette</source>
+        <translation>Befehlspalette</translation>
+    </message>
+    <message>
+        <source>Command line</source>
+        <translation>Befehlszeile</translation>
+    </message>
+    <message>
+        <source>Jump to bookmark</source>
+        <translation>Zu Lesezeichen springen</translation>
+    </message>
+    <message>
+        <source>Set bookmark</source>
+        <translation>Lesezeichen setzen</translation>
+    </message>
+    <message>
+        <source>Bookmark prefix</source>
+        <translation>Lesezeichen-Präfix</translation>
+    </message>
+    <message>
+        <source>Create a file or folder</source>
+        <translation>Datei oder Ordner anlegen</translation>
+    </message>
+    <message>
+        <source>Show jobs</source>
+        <translation>Vorgänge anzeigen</translation>
+    </message>
+    <message>
+        <source>Scroll preview up</source>
+        <translation>Vorschau nach oben scrollen</translation>
+    </message>
+    <message>
+        <source>Scroll preview down</source>
+        <translation>Vorschau nach unten scrollen</translation>
+    </message>
+    <message>
+        <source>Modal › %1</source>
+        <translation>Modal › %1</translation>
+    </message>
+    <message>
+        <source>Alternate %1</source>
+        <translation>Alternative %1</translation>
+    </message>
+    <message>
+        <source>Primary key</source>
+        <translation>Primäre Taste</translation>
+    </message>
+    <message>
+        <source>Add alternate…</source>
+        <translation>Alternative hinzufügen…</translation>
+    </message>
+    <message>
         <source>no key</source>
         <translation>keine Taste</translation>
-    </message>
-    <message>
-        <source>“%1” has no key now.</source>
-        <translation>„%1“ hat jetzt keine Taste.</translation>
-    </message>
-    <message>
-        <source>“%1” is now %2.</source>
-        <translation>„%1“ ist jetzt %2.</translation>
     </message>
 </context>
 <context>

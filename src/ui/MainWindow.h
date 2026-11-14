@@ -218,6 +218,8 @@ private:
     double m_panelRatio = 0.5;  // left panel's share of the two panels
     QList<IconTheme> m_iconThemes;
     bool m_iconThemesLoaded = false;
+    bool m_waitingKeys = false;
+    QMetaObject::Connection m_keySaveConnection;
     QList<Plugin> m_plugins;
     QList<QAction*> m_pluginActions;
     QMenu* m_pluginMenu = nullptr;

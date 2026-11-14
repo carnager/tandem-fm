@@ -240,6 +240,7 @@ private slots:
     // closes (a real compositor does), so do it before every step.
     void init()
     {
+        QTRY_VERIFY(!Keymap::instance().isSaving());
         if (!m_window)
             return;
         m_window->activateWindow();
@@ -2794,6 +2795,231 @@ private slots:
         QVERIFY(!Keymap::instance().commandKeys("copy") && !Keymap::instance().commandKeys("move"));
     }
 
+    void alternateShortcutEditor()
+    {
+        SettingsDialog dialog(m_window.get());
+        dialog.showPage(4);
+        dialog.show();
+        auto* slot = dialog.findChild<QComboBox*>("keyBindingSlot");
+        QVERIFY(slot);
+        auto pick = [&](const QString& id) -> QAction* {
+            for (int row = 0; row < dialog.keyList()->topLevelItemCount(); ++row) {
+                auto* item = dialog.keyList()->topLevelItem(row);
+                if (item->data(0, Qt::UserRole + 1).toString() == id) {
+                    dialog.keyList()->setCurrentItem(item);
+                    return item->data(0, Qt::UserRole).value<QAction*>();
+                }
+            }
+            return nullptr;
+        };
+        QAction* rename = pick("rename");
+        QVERIFY(rename);
+        const auto originalRename = rename->shortcuts();
+        QAction* sort = pick("sort-by-name");
+        QAction* move = pick("move");
+        QVERIFY(sort && move);
+        const auto originalSort = sort->shortcuts(), originalMove = move->shortcuts();
+        const SortSpec sortSpec = m_left->sortSpec();
+        auto restore = qScopeGuard([&] {
+            for (auto [action, keys] : {std::pair{rename, originalRename}, std::pair{sort, originalSort}, std::pair{move, originalMove}}) {
+                action->setShortcuts(keys);
+                saveKeyBinding(action);
+            }
+            m_left->setSortSpec(sortSpec);
+            QTRY_VERIFY(!Keymap::instance().isSaving());
+        });
+        QVERIFY(originalRename.size() >= 2);
+        pick("rename");
+        dialog.keyEdit()->setKeySequence(QKeySequence("Ctrl+Alt+R"));
+        QCOMPARE(rename->shortcuts().mid(1), originalRename.mid(1));
+        QCOMPARE(rename->shortcut(), QKeySequence("Ctrl+Alt+R"));
+        pick("sort-by-name");
+        slot->setCurrentIndex(slot->count() - 1);  // add an alternate
+        dialog.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&dialog));
+        QVERIFY(QMetaObject::invokeMethod(slot, "activated", Q_ARG(int, slot->currentIndex())));
+        QTRY_VERIFY(dialog.keyEdit()->hasFocus() || dialog.keyEdit()->isAncestorOf(QApplication::focusWidget()));
+        dialog.keyEdit()->setKeySequence(QKeySequence("Ctrl+Alt+F12"));
+        QCOMPARE(sort->shortcuts().first(), originalSort.first());
+        QVERIFY(sort->shortcuts().contains(QKeySequence("Ctrl+Alt+F12")));
+        QCOMPARE(dialog.keyList()->currentItem()->text(2), QKeySequence("Ctrl+Alt+F12").toString(QKeySequence::NativeText));
+        slot->setCurrentIndex(slot->count() - 1);
+        dialog.keyEdit()->setKeySequence(QKeySequence("Ctrl+Alt+F11"));
+        QCOMPARE(sort->shortcuts().size(), originalSort.size() + 2);
+        slot->setCurrentIndex(1);
+        for (auto* button : dialog.findChildren<QPushButton*>())
+            if (button->text() == QObject::tr("Remove binding"))
+                button->click();
+        QVERIFY(!sort->shortcuts().contains(QKeySequence("Ctrl+Alt+F12")));
+        QVERIFY(sort->shortcuts().contains(QKeySequence("Ctrl+Alt+F11")));
+        // Adding an already assigned alternative never duplicates it.
+        slot->setCurrentIndex(slot->count() - 1);
+        dialog.keyEdit()->setKeySequence(QKeySequence("Ctrl+Alt+F11"));
+        QCOMPARE(sort->shortcuts().size(), originalSort.size() + 1);
+        move->setShortcuts({QKeySequence(Qt::Key_F6), QKeySequence("Ctrl+Alt+M")});
+        saveKeyBinding(move);
+        slot->setCurrentIndex(slot->count() - 1);
+        dialog.keyEdit()->setKeySequence(QKeySequence(Qt::Key_F6));
+        QCOMPARE(move->shortcuts(), QList<QKeySequence>{QKeySequence("Ctrl+Alt+M")});
+        QCOMPARE(sort->shortcuts().first(), originalSort.first());
+        QTRY_VERIFY(!Keymap::instance().isSaving());
+        const auto savedKeys = sort->shortcuts();
+        QVERIFY(Keymap::instance().load());
+        sort->setShortcuts({});
+        applyKeyBindings(m_window->actions());
+        QCOMPARE(sort->shortcuts(), savedKeys);
+        dialog.close();
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        QSignalSpy triggered(sort, &QAction::triggered);
+        QTest::keyClick(m_left->view(), Qt::Key_F11, Qt::ControlModifier | Qt::AltModifier);
+        QCOMPARE(triggered.count(), 1);
+    }
+
+    void modalBindingEditor()
+    {
+        const SortSpec originalSort = m_left->sortSpec();
+        Keymap& keys = Keymap::instance();
+        QFile file(keys.path());
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const QByteArray original = file.readAll();
+        file.close();
+        auto restore = qScopeGuard([&] {
+            QTRY_VERIFY(!keys.isSaving());
+            QSaveFile out(keys.path());
+            QVERIFY(out.open(QIODevice::WriteOnly));
+            out.write(original);
+            QVERIFY(out.commit());
+            QVERIFY(keys.load());
+            applyKeyBindings(m_window->actions());
+            m_left->setVimKeys(false);
+            m_left->setSortSpec(originalSort);
+        });
+        SettingsDialog dialog(m_window.get());
+        dialog.showPage(4);
+        dialog.show();
+        auto* mode = dialog.findChild<QComboBox*>("keyBindingMode");
+        auto* slot = dialog.findChild<QComboBox*>("keyBindingSlot");
+        auto* edit = dialog.findChild<QLineEdit*>("modalBindingEdit");
+        auto* apply = dialog.findChild<QPushButton*>("applyModalBinding");
+        QVERIFY(mode && slot && edit && apply);
+        mode->setCurrentIndex(1);
+        auto pick = [&](const QString& id) {
+            for (int row = 0; row < dialog.keyList()->topLevelItemCount(); ++row) {
+                auto* item = dialog.keyList()->topLevelItem(row);
+                if (item->data(0, Qt::UserRole + 1).toString() == id) {
+                    dialog.keyList()->setCurrentItem(item);
+                    return true;
+                }
+            }
+            return false;
+        };
+        QVERIFY(pick("down"));
+        edit->setText("n");
+        apply->click();
+        QCOMPARE(keys.modalKeys("down"), std::optional<QStringList>(QStringList{"n"}));
+        QVERIFY(dialog.keyNote()->text().contains("Next match"));
+        slot->setCurrentIndex(slot->count() - 1);
+        edit->setText("g j");
+        apply->click();
+        QCOMPARE(keys.modalKeys("down"), std::optional<QStringList>(QStringList{"n", "g j"}));
+        QVERIFY(pick("sort-by-size"));
+        slot->setCurrentIndex(0);
+        edit->setText("g w s");
+        apply->click();
+        QCOMPARE(keys.modalKeys("sort-by-size"), std::optional<QStringList>(QStringList{"g w s"}));
+        QVERIFY(pick("top"));
+        edit->setText("g");
+        apply->click();
+        QVERIFY(dialog.keyNote()->text().contains("overlaps"));
+        QVERIFY(!keys.modalKeys("top"));
+        edit->setText("NotAKeyName");
+        apply->click();
+        QVERIFY(!keys.modalKeys("top"));
+        edit->setText("Space");
+        apply->click();
+        QVERIFY(!keys.modalKeys("top"));
+        QTRY_VERIFY(!keys.isSaving());
+        QVERIFY(keys.load());
+        QCOMPARE(keys.modalKeys("down"), std::optional<QStringList>(QStringList{"n", "g j"}));
+        dialog.close();
+        m_left->setVimKeys(true);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        m_left->view()->setCurrentRow(0);
+        QTest::keyClick(m_left->view(), Qt::Key_N);
+        QCOMPARE(m_left->view()->currentRow(), 1);
+        QTest::keyClicks(m_left->view(), "gj");
+        QCOMPARE(m_left->view()->currentRow(), 2);
+        QTest::keyClicks(m_left->view(), "gws");
+        QCOMPARE(m_left->sortSpec().column, SortColumn::Size);
+        dialog.show();
+        QVERIFY(pick("down"));
+        for (auto* button : dialog.findChildren<QPushButton*>())
+            if (button->text() == QObject::tr("Default"))
+                button->click();
+        QVERIFY(!keys.modalKeys("down"));
+        QVERIFY(std::any_of(keys.modalBindings().begin(), keys.modalBindings().end(), [](const auto& b) {
+            return b.action == "find-next" && b.sequence == QStringList{"n"};
+        }));
+        keys.setModalKeys("up", QStringList{"k", "u"});
+        QVERIFY(pick("down"));
+        edit->setText("u");
+        apply->click();
+        QCOMPARE(keys.modalKeys("up"), std::optional<QStringList>(QStringList{"k"}));
+        QVERIFY(!keys.commandKeys("copy"));
+        QTRY_VERIFY(!keys.isSaving());
+        // Quitting immediately after an edit must drain the async writer.
+        keys.setModalKeys("down", QStringList{"n", "g j"});
+        dialog.close();
+        m_window->close();
+        QTRY_VERIFY(!m_window->isVisible());
+        QVERIFY(!keys.isSaving());
+        QVERIFY(keys.load());
+        QCOMPARE(keys.modalKeys("down"), std::optional<QStringList>(QStringList{"n", "g j"}));
+        m_window->show();
+        QVERIFY(QTest::qWaitForWindowExposed(m_window.get()));
+        keys.setCommandKeys("copy", QStringList{"F5", "Ctrl+Alt+F5"});
+        dialog.show();
+        for (auto* button : dialog.findChildren<QPushButton*>())
+            if (button->text() == QObject::tr("Reset all keys"))
+                button->click();
+        QVERIFY(!keys.modalKeys("down") && !keys.modalKeys("up"));
+        QCOMPARE(keys.modalBindings().size(), Keymap::modalDefaults().size());
+        QCOMPARE(keys.commandKeys("copy"), std::optional<QStringList>(QStringList{"F5", "Ctrl+Alt+F5"}));
+        QTRY_VERIFY(!keys.isSaving());
+    }
+
+    void keyEditsPreserveExternalChanges()
+    {
+        Keymap& keys = Keymap::instance();
+        QFile file(keys.path());
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const QByteArray original = file.readAll();
+        file.close();
+        auto restore = qScopeGuard([&] {
+            QTRY_VERIFY(!keys.isSaving());
+            QSaveFile out(keys.path());
+            QVERIFY(out.open(QIODevice::WriteOnly));
+            out.write(original);
+            QVERIFY(out.commit());
+            QVERIFY(keys.load());
+        });
+        const QByteArray external = original + "\n# changed in an external editor\n";
+        QSaveFile out(keys.path());
+        QVERIFY(out.open(QIODevice::WriteOnly));
+        out.write(external);
+        QVERIFY(out.commit());
+        QSignalSpy saved(&keys, &Keymap::saved);
+        keys.setModalKeys("down", QStringList{"u"});
+        QTRY_VERIFY(!saved.isEmpty());
+        QVERIFY(!saved.last().at(0).toBool());
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), external);
+    }
+
     // F1: grouped shortcuts in columns, with a filter.
     void shortcutsDialog()
     {
@@ -4098,6 +4324,7 @@ private slots:
 
     void cleanupTestCase()
     {
+        QTRY_VERIFY(!Keymap::instance().isSaving());
         // What the tests moved to a trash (/tmp has its own .Trash-<uid>) goes for good.
         QList<TrashItem> ours;
         for (const TrashItem& it : listTrash())

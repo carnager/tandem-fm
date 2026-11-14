@@ -1,6 +1,8 @@
 #include "ui/Keymap.h"
 
 #include "core/TomlSettings.h"
+#include "core/Util.h"
+#include <QPointer>
 
 #include <QDir>
 #include <QFile>
@@ -75,7 +77,7 @@ Keymap::Keymap()
     m_reload->setSingleShot(true);
     m_reload->setInterval(150);  // editors write in steps
     connect(m_reload, &QTimer::timeout, this, [this] {
-        if (readFile(path()) == m_written)
+        if (m_writing || readFile(path()) == m_written)
             return;
         load();
         emit changed();
@@ -222,8 +224,11 @@ void Keymap::rebuildModal(const QHash<QString, QStringList>& overrides)
 
 bool Keymap::load()
 {
+    if (m_writing)
+        return true;
     watch();
     const QString text = readFile(path());
+    m_diskText = text;
     m_written = text;  // what the watcher compares against: reload only when it differs
     QVariantMap map;
     QString error;
@@ -240,6 +245,7 @@ bool Keymap::load()
             modal.insert(it.key().mid(6), entriesOf(it.value()));
     }
     m_commandKeys = commands;
+    m_modalKeys = modal;
     rebuildModal(modal);
     return true;
 }
@@ -272,14 +278,62 @@ void Keymap::setCommands(const QList<Command>& commands)
 
 void Keymap::writeFileText(const QString& text)
 {
-    QDir().mkpath(QFileInfo(path()).path());
-    QSaveFile f(path());
-    if (!f.open(QIODevice::WriteOnly))
+    m_written = text;
+    m_pendingWrite = text;
+    writeNext();
+}
+
+void Keymap::writeNext()
+{
+    if (m_writing || !m_pendingWrite)
         return;
-    f.write(text.toUtf8());
-    if (f.commit())
-        m_written = text;
-    watch();
+    m_writing = true;
+    const QString text = *std::exchange(m_pendingWrite, std::nullopt);
+    const QString expected = m_diskText;
+    const QString file = path();
+    QPointer<Keymap> self(this);
+    ioPool()->start([self, text, expected, file] {
+        QString error;
+        // Do not overwrite a hand edit that the watcher hasn't delivered yet.
+        QFile current(file);
+        QString actual;
+        if (current.exists() && !current.open(QIODevice::ReadOnly))
+            error = tr("Could not read key bindings: %1").arg(current.errorString());
+        else if (current.isOpen())
+            actual = QString::fromUtf8(current.readAll());
+        current.close();
+        if (error.isEmpty() && actual != expected)
+            error = tr("Key bindings changed outside Tandem. Reload them before editing.");
+        if (error.isEmpty()) {
+            QSaveFile out(file);
+            const QByteArray bytes = text.toUtf8();
+            if (!QDir().mkpath(QFileInfo(file).path()) || !out.open(QIODevice::WriteOnly) ||
+                out.write(bytes) != bytes.size() || !out.commit())
+                error = tr("Could not save key bindings: %1").arg(out.errorString());
+        }
+        postToUi([self, text, error] {
+            if (!self)
+                return;
+            self->m_writing = false;
+            const bool hadError = !self->m_error.isEmpty();
+            if (error.isEmpty()) {
+                self->m_error.clear();
+                self->m_diskText = text;
+                self->writeNext();
+            } else {
+                self->m_pendingWrite.reset();
+                self->m_error = error;
+                emit self->changed();
+            }
+            if (!self->m_writing) {
+                self->watch();
+                self->m_reload->start();
+                if (error.isEmpty() && hadError)
+                    emit self->changed();
+                emit self->saved(error.isEmpty());
+            }
+        });
+    });
 }
 
 void Keymap::ensureFile()
@@ -310,7 +364,7 @@ std::optional<QStringList> Keymap::commandKeys(const QString& id) const
 
 void Keymap::setCommandKeys(const QString& id, const std::optional<QStringList>& keys)
 {
-    QString text = readFile(path());
+    QString text = m_written;
     QVariantMap check;
     if (!parseToml(text, &check))
         return;  // a broken hand edit: leave it as it is
@@ -329,6 +383,52 @@ void Keymap::setCommandKeys(const QString& id, const std::optional<QStringList>&
         m_commandKeys.insert(id, *keys);
     else
         m_commandKeys.remove(id);
+}
+
+std::optional<QStringList> Keymap::modalKeys(const QString& id) const
+{
+    const auto it = m_modalKeys.constFind(id);
+    return it == m_modalKeys.cend() ? std::nullopt : std::optional<QStringList>(*it);
+}
+
+void Keymap::setModalKeys(const QString& id, const std::optional<QStringList>& keys)
+{
+    QVariantMap check;
+    if (!parseToml(m_written, &check))
+        return;
+    QStringList defaults;
+    for (const auto& [action, sequence] : modalDefaults())
+        if (action == id)
+            defaults << sequence;
+    const QString text = setTomlLine(m_written, QStringLiteral("modal"), id,
+                                    keys ? std::optional<QString>(keysValue(*keys)) : std::nullopt,
+                                    keysValue(defaults));
+    if (keys)
+        m_modalKeys.insert(id, *keys);
+    else
+        m_modalKeys.remove(id);
+    rebuildModal(m_modalKeys);
+    writeFileText(text);
+    emit changed();
+}
+
+void Keymap::resetModalKeys()
+{
+    QVariantMap check;
+    if (!parseToml(m_written, &check))
+        return;
+    QString text = m_written;
+    for (auto it = m_modalKeys.cbegin(); it != m_modalKeys.cend(); ++it) {
+        QStringList defaults;
+        for (const auto& [action, sequence] : modalDefaults())
+            if (action == it.key())
+                defaults << sequence;
+        text = setTomlLine(text, QStringLiteral("modal"), it.key(), std::nullopt, keysValue(defaults));
+    }
+    m_modalKeys.clear();
+    rebuildModal({});
+    writeFileText(text);
+    emit changed();
 }
 
 void Keymap::importOld(const QVariantMap& keys)
