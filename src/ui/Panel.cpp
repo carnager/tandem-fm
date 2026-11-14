@@ -1946,6 +1946,9 @@ QList<PopupItem> Panel::locationItems()
         add(m.isNetwork ? network : drives, IconCache::themed(icon, "drive-harddisk"), baseName(m.path),
             m.path, QStringLiteral("mount:") + m.path, [this, p = m.path] { navigate(p); },
             m.isRemovable ? tr("Del ⏏") : QString(), kindBadge(m.fsType));
+        if (m.isRemovable)
+            items.last().menu = {{tr("Open"), [this, p = m.path] { navigate(p); }},
+                                 {tr("Eject"), [this, p = m.path] { disconnectMount(p); }}};
     }
     for (const Place& pl : Network::instance().places()) {
         const QIcon icon = IconCache::themed(pl.iconName.toUtf8().constData(),
@@ -1957,6 +1960,8 @@ QList<PopupItem> Panel::locationItems()
             add(pl.network ? network : drives, icon, pl.name, label,
                 QStringLiteral("mount:") + pl.path, [this, p = pl.path] { navigate(p); }, tr("Del ⏏"),
                 kind.isEmpty() ? QString() : kindBadge(kind));
+            items.last().menu = {{tr("Open"), [this, p = pl.path] { navigate(p); }},
+                                 {tr("Eject"), [this, p = pl.path] { disconnectMount(p); }}};
         } else {
             add(pl.network ? network : drives, icon, pl.name, tr("not mounted: Enter mounts it"), {}, [this, id = pl.volumeId] {
                 showMessage(tr("Mounting…"));
@@ -1980,6 +1985,8 @@ QList<PopupItem> Panel::locationItems()
         add(saved, IconCache::themed(s.type == QLatin1String("smb") ? "folder-remote" : "network-server", "network-server"),
             s.name, bare(uri), QStringLiteral("saved:") + uri, [this, uri] { connectTo(uri); }, tr("Ctrl+E edits"),
             kindBadge(s.type));
+        items.last().menu = {{tr("Connect"), [this, uri] { connectTo(uri); }},
+                             {tr("Edit…"), [this, uri] { emit serversRequested(uri); }}};
     }
     add(saved, IconCache::themed("preferences-system-network", "network-server"), tr("Edit servers…"),
         tr("add, change, import from the SSH config"), {}, [this] { emit serversRequested({}); });
@@ -1994,6 +2001,9 @@ QList<PopupItem> Panel::locationItems()
         add(recent, IconCache::themed("network-server", "folder-remote"), title, u.host().isEmpty() ? QString() : where,
             QStringLiteral("recent:") + uri, [this, uri] { connectTo(uri); }, tr("Ctrl+S saves · Del forgets"),
             kindBadge(u.scheme()));
+        items.last().menu = {{tr("Connect"), [this, uri] { connectTo(uri); }},
+                             {tr("Save…"), [this, uri] { emit serversRequested(uri); }},
+                             {tr("Forget"), [uri] { Network::instance().forgetServer(uri); }}};
     }
     add(QString(), IconCache::themed("network-connect", "network-server"), tr("Connect to server…"),
         tr("sftp, smb, WebDAV, ftp"), {}, [this] { connectDialog(); }, QStringLiteral("Ctrl+K"));

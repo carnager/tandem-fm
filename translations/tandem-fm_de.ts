@@ -4253,6 +4253,14 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Entf ⏏</translation>
     </message>
     <message>
+        <source>Open</source>
+        <translation>Öffnen</translation>
+    </message>
+    <message>
+        <source>Eject</source>
+        <translation>Auswerfen</translation>
+    </message>
+    <message>
         <source>not mounted: Enter mounts it</source>
         <translation>nicht eingehängt: Enter hängt ein</translation>
     </message>
@@ -4261,12 +4269,24 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Strg+E bearbeitet</translation>
     </message>
     <message>
+        <source>Edit…</source>
+        <translation>Bearbeiten…</translation>
+    </message>
+    <message>
         <source>Edit servers…</source>
         <translation>Server bearbeiten…</translation>
     </message>
     <message>
         <source>add, change, import from the SSH config</source>
         <translation>hinzufügen, ändern, aus der SSH-Konfiguration übernehmen</translation>
+    </message>
+    <message>
+        <source>Save…</source>
+        <translation>Speichern…</translation>
+    </message>
+    <message>
+        <source>Forget</source>
+        <translation>Vergessen</translation>
     </message>
     <message>
         <source>Connect to server…</source>

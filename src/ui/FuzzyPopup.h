@@ -26,6 +26,7 @@ struct PopupItem {
     int bonus = 0;               // added to the fuzzy score (frecency, pins…)
     QString key;                 // caller's id (e.g. a path)
     QString section;             // a header above the first item of each section (unfiltered lists)
+    QList<std::pair<QString, std::function<void()>>> menu;  // right-click: what else it can do
     std::function<void()> run;
 };
 
