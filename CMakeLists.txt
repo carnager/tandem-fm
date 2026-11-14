@@ -124,6 +124,7 @@ target_link_libraries(tandem_ui PUBLIC tandem_core Qt6::Widgets Qt6::Pdf)
 if(APPLE)
   enable_language(OBJCXX)
   set_property(TARGET tandem_ui PROPERTY OBJCXX_STANDARD 20)
+  target_sources(tandem_ui PRIVATE src/ui/MacModalKeys.h src/ui/MacModalKeys.cpp)
   target_sources(tandem_ui PRIVATE src/ui/MacFileIcons.h src/ui/MacFileIcons.cpp src/ui/MacFileIconProvider.mm)
   set_source_files_properties(src/ui/MacFileIconProvider.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   # "Open with" lists the apps Launch Services offers, as Finder does.

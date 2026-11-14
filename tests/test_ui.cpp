@@ -77,6 +77,7 @@
 #include <QCheckBox>
 #include <QScopeGuard>
 #include <QSignalSpy>
+#include <QSpontaneKeyEvent>
 #include <QListWidget>
 #include <QKeySequenceEdit>
 #include <QTreeWidget>
@@ -2752,6 +2753,98 @@ private slots:
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
         QTRY_VERIFY(!visiblePopup());
     }
+
+#ifdef Q_OS_MACOS
+    void physicalModalKeysAcrossLayouts()
+    {
+        Keymap& keys = Keymap::instance();
+        const bool original = keys.physicalModalKeys();
+        const QVariant saved = QSettings().value("input/physicalModalKeys");
+        auto restore = qScopeGuard([&] {
+            keys.setPhysicalModalKeys(original);
+            if (saved.isValid())
+                QSettings().setValue("input/physicalModalKeys", saved);
+            else
+                QSettings().remove("input/physicalModalKeys");
+        });
+        QVERIFY(!original);
+        SettingsDialog settings(m_window.get());
+        auto* physical = settings.findChild<QCheckBox*>("physicalModalKeys");
+        QVERIFY(physical);
+        QVERIFY(!physical->isChecked());
+
+        FileModel model;
+        std::vector<FileEntry> entries;
+        for (int n = 0; n < 8; ++n) {
+            FileEntry entry;
+            entry.name = QString::number(n);
+            entries.push_back(entry);
+        }
+        model.setListing(L(), std::move(entries));
+        FileView view;
+        view.resize(700, 400);
+        view.setModel(&model);
+        view.setVimKeys(true);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto press = [&](int virtualKey, const QString& text, Qt::KeyboardModifiers mods = Qt::NoModifier,
+                         quint32 nativeMods = 0) {
+            QKeyEvent event(QEvent::KeyPress, text.at(0).unicode(), mods, 0, virtualKey, nativeMods, text);
+            QApplication::sendEvent(&view, &event);
+        };
+        view.setCurrentRow(0);
+        press(38, QString::fromUtf8("ח"));  // physical J with the Hebrew layout
+        QCOMPARE(view.currentRow(), 0);       // unchanged until the option is enabled
+        physical->setChecked(true);
+        QVERIFY(keys.physicalModalKeys());
+        SettingsDialog reopened(m_window.get());
+        QVERIFY(reopened.findChild<QCheckBox*>("physicalModalKeys")->isChecked());
+        press(38, QString::fromUtf8("ח"));
+        QCOMPARE(view.currentRow(), 1);
+        press(40, QString::fromUtf8("ל"));  // K
+        QCOMPARE(view.currentRow(), 0);
+        press(5, QString::fromUtf8("ע"), Qt::ShiftModifier, 1u << 17);  // G
+        QCOMPARE(view.currentRow(), model.count() - 1);
+        press(5, QString::fromUtf8("ע"));
+        press(5, QString::fromUtf8("ע"));  // g g
+        QCOMPARE(view.currentRow(), 0);
+        QSignalSpy commands(&view, &FileView::commandIdRequested);
+        press(35, QString::fromUtf8("פ"));  // P: paste, just a signal in this isolated view
+        QCOMPARE(commands.count(), 1);
+        QCOMPARE(commands.first().first().toString(), QString("paste"));
+        QSignalSpy palette(&view, &FileView::paletteRequested);
+        press(41, QString::fromUtf8("ף"), Qt::ShiftModifier, 1u << 17);  // :
+        QCOMPARE(palette.count(), 1);
+        QKeyEvent caps(QEvent::KeyPress, 0x05e2, Qt::NoModifier, 0, 5, 1u << 16, QString::fromUtf8("ע"));
+        QCOMPARE(keys.modalTokenFor(&caps), QString("G"));
+        QKeyEvent shiftCaps(QEvent::KeyPress, 0x05e2, Qt::ShiftModifier, 0, 5, (1u << 16) | (1u << 17), QString::fromUtf8("ע"));
+        QCOMPARE(keys.modalTokenFor(&shiftCaps), QString("g"));
+        QKeyEvent a(QEvent::KeyPress, 0x05e9, Qt::NoModifier, 0, 0, 1u << 8, QString::fromUtf8("ש"));
+        QCOMPARE(keys.modalTokenFor(&a), QString("a"));  // native A is zero
+        QKeyEvent zero(QEvent::KeyPress, 0x05e9, Qt::NoModifier, 0, 0, 0, QString::fromUtf8("ש"));
+        QSpontaneKeyEvent::setSpontaneous(&zero);
+        QCOMPARE(keys.modalTokenFor(&zero), QString("a"));
+        QKeyEvent synthetic(QEvent::KeyPress, Qt::Key_J, Qt::NoModifier, "j");
+        QCOMPARE(keys.modalTokenFor(&synthetic), QString("j"));
+        QKeyEvent arrow(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier, 0, 125, 0);
+        QCOMPARE(keys.modalTokenFor(&arrow), QString("Down"));
+
+        QKeyEvent override(QEvent::ShortcutOverride, 0x05d2, Qt::ControlModifier, 0, 2, 1u << 20, QString::fromUtf8("ג"));
+        override.ignore();
+        QApplication::sendEvent(&view, &override);
+        QVERIFY(override.isAccepted());  // physical Ctrl+D still overrides the window's shortcut
+        QLineEdit editor;
+        editor.show();
+        QKeyEvent typed(QEvent::KeyPress, 0x05d7, Qt::NoModifier, 0, 38, 0, QString::fromUtf8("ח"));
+        QApplication::sendEvent(&editor, &typed);
+        QCOMPARE(editor.text(), QString::fromUtf8("ח"));
+        QCOMPARE(commands.count(), 1);
+        physical->setChecked(false);
+        view.setCurrentRow(0);
+        press(38, QString::fromUtf8("ח"));
+        QCOMPARE(view.currentRow(), 0);
+    }
+#endif
 
     // Ctrl+,: settings; keys can be changed, conflicts resolved, defaults restored.
     void settingsAndKeys()

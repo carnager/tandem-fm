@@ -65,6 +65,9 @@ public:
 
     // The key as a token for matching: "j", "G", "Ctrl+D", "Space".
     static QString tokenFor(const QKeyEvent* e);
+    QString modalTokenFor(const QKeyEvent* e) const;
+    bool physicalModalKeys() const { return m_physicalModalKeys; }
+    void setPhysicalModalKeys(bool on);
     static QString normalizeToken(const QString& t);
     // A readable name for an action (command titles come from the window).
     static std::function<QString(const QString&)> actionTitle;
@@ -82,6 +85,7 @@ private:
     QHash<QString, QStringList> m_commandKeys;
     QList<Binding> m_modal;
     QList<Command> m_commands;
+    bool m_physicalModalKeys = false;
     QString m_error;
     QVariantMap m_pendingImport;
     QString m_written;  // the text last loaded or written, so the watcher skips no-change events

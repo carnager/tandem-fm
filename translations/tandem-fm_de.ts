@@ -5167,6 +5167,14 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Buchstaben sind Befehle, wie in vim und yazi: j k h l zum Bewegen, v für den visuellen Modus, y x p zum Kopieren, Ausschneiden und Einfügen, d in den Papierkorb, r zum Umbenennen, a zum Anlegen, t q für Tabs, / zum Suchen, : für die Palette. F1 zeigt alle. Tippen startet nicht mehr die Schnellsuche.</translation>
     </message>
     <message>
+        <source>Use physical keys for modal commands</source>
+        <translation>Physische Tasten für modale Befehle verwenden</translation>
+    </message>
+    <message>
+        <source>Use US key positions in file panels even with a Hebrew or other keyboard layout. Text fields still use your chosen language. Off by default.</source>
+        <translation>Nutze in den Panels US-Tastenpositionen, auch mit hebräischer oder anderer Tastaturbelegung. Textfelder verwenden weiterhin deine gewählte Sprache. Standardmäßig aus.</translation>
+    </message>
+    <message>
         <source>Notifications</source>
         <translation>Benachrichtigungen</translation>
     </message>

@@ -321,6 +321,12 @@ void FileDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewI
 FileView::FileView(QWidget* parent) : QTreeView(parent)
 {
     setItemDelegate(new FileDelegate(this));
+    connect(&Keymap::instance(), &Keymap::changed, this, [this] {
+        if (!m_pending.isEmpty()) {
+            m_pending.clear();
+            emit hintRequested(QString());
+        }
+    });
     connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, [this] {
         zoomChanged();  // a new font or interface size: rows of another height
     });
@@ -453,7 +459,7 @@ bool FileView::event(QEvent* e)
         auto* ke = static_cast<QKeyEvent*>(e);
         if (ke->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) {
             QStringList seq = m_pending;
-            seq << Keymap::tokenFor(ke);
+            seq << Keymap::instance().modalTokenFor(ke);
             for (const Keymap::Binding& b : Keymap::instance().modalBindings())
                 if (b.sequence.mid(0, seq.size()) == seq) {
                     e->accept();
@@ -625,7 +631,7 @@ void FileView::keyPressEvent(QKeyEvent* e)
 // While a sequence is open, a hint shows what can follow.
 bool FileView::modalKey(QKeyEvent* e)
 {
-    const QString token = Keymap::tokenFor(e);
+    const QString token = Keymap::instance().modalTokenFor(e);
     if (token.isEmpty() || token == QLatin1String("Shift") || token == QLatin1String("Ctrl") ||
         token == QLatin1String("Alt") || token == QLatin1String("Meta"))
         return false;
