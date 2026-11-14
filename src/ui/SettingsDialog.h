@@ -28,6 +28,7 @@ public:
     QTreeWidget* keyList() const { return m_keys; }
     QKeySequenceEdit* keyEdit() const { return m_keyEdit; }
     QLabel* keyNote() const { return m_keyNote; }
+    QLineEdit* modalKeyEdit() const { return m_modalEdit; }
 
 private:
     QWidget* appearancePage();
@@ -41,7 +42,10 @@ private:
     void fillPlugins();
     void fillKeys();
     void keySelected();
-    void assignKeys(const QKeySequence& seq);
+    void addKey(const QKeySequence& seq);
+    void removeKey(const QKeySequence& seq);
+    void assignModalKeys();
+    bool modalOn() const;
 
     MainWindow* m_window;
     QListWidget* m_nav;
@@ -50,7 +54,9 @@ private:
     QLineEdit* m_keyFilter = nullptr;
     QKeySequenceEdit* m_keyEdit = nullptr;
     QLabel* m_keyNote = nullptr;
-    QPushButton* m_keyClear = nullptr;
+    QWidget* m_keyChips = nullptr;  // the selected command's keys, each with a remove button
+    QLineEdit* m_modalEdit = nullptr;
+    QWidget* m_modalRow = nullptr;
     QPushButton* m_keyReset = nullptr;
     bool m_loadingKey = false;
     QWidget* m_pluginList = nullptr;

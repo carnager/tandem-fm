@@ -808,29 +808,43 @@ QWidget* SettingsDialog::keysPage()
     m_keyFilter->setClearButtonEnabled(true);
     v->addWidget(m_keyFilter);
     m_keys = new QTreeWidget(w);
-    m_keys->setColumnCount(2);
-    m_keys->setHeaderLabels({tr("Command"), tr("Keys")});
+    m_keys->setColumnCount(3);
+    m_keys->setHeaderLabels({tr("Command"), tr("Keys"), tr("Modal keys")});
     m_keys->setRootIsDecorated(false);
     m_keys->setUniformRowHeights(true);
     m_keys->setAlternatingRowColors(true);
+    m_keys->header()->setStretchLastSection(false);
     m_keys->header()->setSectionResizeMode(0, QHeaderView::Stretch);
-    m_keys->header()->resizeSection(1, 200);
+    m_keys->header()->resizeSection(1, 180);
+    m_keys->header()->resizeSection(2, 110);
     v->addWidget(m_keys, 1);
 
-    auto* editRow = new QHBoxLayout;
-    editRow->addWidget(new QLabel(tr("Press the new keys:"), w));
+    // The selected command's keys, each removable, and a field that adds one.
+    auto* keyRow = new QHBoxLayout;
+    keyRow->addWidget(new QLabel(tr("Keys:"), w));
+    m_keyChips = new QWidget(w);
+    auto* chips = new QHBoxLayout(m_keyChips);
+    chips->setContentsMargins(0, 0, 0, 0);
+    keyRow->addWidget(m_keyChips);
     m_keyEdit = new QKeySequenceEdit(w);
     m_keyEdit->setMaximumSequenceLength(1);
     m_keyEdit->setClearButtonEnabled(false);
-    editRow->addWidget(m_keyEdit, 1);
-    m_keyClear = new QPushButton(tr("No key"), w);
+    m_keyEdit->setToolTip(tr("Press a key to add it"));
+    keyRow->addWidget(m_keyEdit, 1);
     m_keyReset = new QPushButton(tr("Default"), w);
-    for (QPushButton* b : {m_keyClear, m_keyReset})
-        b->setAutoDefault(false);
-    editRow->addWidget(m_keyClear);
-    editRow->addWidget(m_keyReset);
-    v->addLayout(editRow);
-    m_keyNote = hint(tr("Pick a command, then press its new keys."), w);
+    m_keyReset->setAutoDefault(false);
+    keyRow->addWidget(m_keyReset);
+    v->addLayout(keyRow);
+    // Modal keys are typed: single keys or chains, several split by commas.
+    m_modalRow = new QWidget(w);
+    auto* modalRow = new QHBoxLayout(m_modalRow);
+    modalRow->setContentsMargins(0, 0, 0, 0);
+    modalRow->addWidget(new QLabel(tr("Modal keys:"), m_modalRow));
+    m_modalEdit = new QLineEdit(m_modalRow);
+    m_modalEdit->setPlaceholderText(tr("For example: g g, Home (Enter saves)"));
+    modalRow->addWidget(m_modalEdit, 1);
+    v->addWidget(m_modalRow);
+    m_keyNote = hint(tr("Pick a command, then press a key to add it."), w);
     v->addWidget(m_keyNote);
     auto* resetAll = new QPushButton(tr("Reset all keys"), w);
     resetAll->setAutoDefault(false);
@@ -844,53 +858,136 @@ QWidget* SettingsDialog::keysPage()
     connect(m_keys, &QTreeWidget::currentItemChanged, this, &SettingsDialog::keySelected);
     connect(m_keyEdit, &QKeySequenceEdit::keySequenceChanged, this, [this](const QKeySequence& seq) {
         if (!m_loadingKey && !seq.isEmpty())
-            assignKeys(seq);
+            addKey(seq);
     });
-    connect(m_keyClear, &QPushButton::clicked, this, [this] { assignKeys({}); });
+    connect(m_modalEdit, &QLineEdit::returnPressed, this, &SettingsDialog::assignModalKeys);
+    if (QAction* vim = m_window->m_actions.value(QStringLiteral("vim")))
+        connect(vim, &QAction::toggled, this, &SettingsDialog::fillKeys);
     connect(m_keyReset, &QPushButton::clicked, this, [this] {
         QTreeWidgetItem* it = m_keys->currentItem();
-        auto* a = it ? it->data(0, Qt::UserRole).value<QAction*>() : nullptr;
-        if (!a)
+        if (!it)
             return;
-        a->setShortcuts(defaultKeys(a));
-        saveKeyBinding(a);
-        fillKeys();
-    });
-    connect(resetAll, &QPushButton::clicked, this, [this] {
-        for (QAction* a : m_window->actions()) {
-            if (a->property("commandId").toString().isEmpty())
-                continue;
+        if (auto* a = it->data(0, Qt::UserRole).value<QAction*>()) {
             a->setShortcuts(defaultKeys(a));
             saveKeyBinding(a);
         }
+        const QString id = it->data(0, Qt::UserRole + 1).toString();
+        if (Keymap::instance().modalKeys(id))
+            Keymap::instance().setModalKeys(id, std::nullopt);
+        fillKeys();
+    });
+    connect(resetAll, &QPushButton::clicked, this, [this] {
+        QStringList ids = Keymap::builtinActions();
+        for (QAction* a : m_window->actions()) {
+            const QString id = a->property("commandId").toString();
+            if (id.isEmpty())
+                continue;
+            ids << id;
+            a->setShortcuts(defaultKeys(a));
+            saveKeyBinding(a);
+        }
+        for (const QString& id : std::as_const(ids))
+            if (Keymap::instance().modalKeys(id))
+                Keymap::instance().setModalKeys(id, std::nullopt);
         m_keyNote->setText(tr("All keys are back to their defaults."));
         fillKeys();
     });
     return w;
 }
 
+namespace {
+
+// An action's modal keys as shown and typed: "g g, Home".
+QString modalText(const QString& id)
+{
+    QStringList out;
+    for (const Keymap::Binding& b : Keymap::instance().modalBindings())
+        if (b.action == id)
+            out << b.sequence.join(QLatin1Char(' '));
+    return out.join(QStringLiteral(", "));
+}
+
+QString modalDefaultText(const QString& id)
+{
+    QStringList out;
+    for (const auto& [action, keys] : Keymap::modalDefaults())
+        if (action == id)
+            out << keys;
+    return out.join(QStringLiteral(", "));
+}
+
+// Modal actions that aren't commands of the window.
+const std::pair<const char*, const char*> kModalOnly[] = {
+    {"down", QT_TRANSLATE_NOOP("SettingsDialog", "Move down")},
+    {"up", QT_TRANSLATE_NOOP("SettingsDialog", "Move up")},
+    {"parent", QT_TRANSLATE_NOOP("SettingsDialog", "Out of the folder")},
+    {"open", QT_TRANSLATE_NOOP("SettingsDialog", "Into the folder, or open")},
+    {"top", QT_TRANSLATE_NOOP("SettingsDialog", "To the top")},
+    {"bottom", QT_TRANSLATE_NOOP("SettingsDialog", "To the bottom")},
+    {"half-page-down", QT_TRANSLATE_NOOP("SettingsDialog", "Half a page down")},
+    {"half-page-up", QT_TRANSLATE_NOOP("SettingsDialog", "Half a page up")},
+    {"visual", QT_TRANSLATE_NOOP("SettingsDialog", "Visual mode")},
+    {"visual-unmark", QT_TRANSLATE_NOOP("SettingsDialog", "Visual mode, unmarking")},
+    {"find", QT_TRANSLATE_NOOP("SettingsDialog", "Search in the list")},
+    {"find-next", QT_TRANSLATE_NOOP("SettingsDialog", "Next match")},
+    {"find-previous", QT_TRANSLATE_NOOP("SettingsDialog", "Previous match")},
+    {"palette", QT_TRANSLATE_NOOP("SettingsDialog", "Command palette")},
+    {"command-line", QT_TRANSLATE_NOOP("SettingsDialog", "Command line")},
+    {"bookmark-jump", QT_TRANSLATE_NOOP("SettingsDialog", "Go to a bookmark")},
+    {"bookmark-set", QT_TRANSLATE_NOOP("SettingsDialog", "Set a bookmark")},
+    {"bookmark-prefix", QT_TRANSLATE_NOOP("SettingsDialog", "Bookmark prefix (then the bookmark's key)")},
+    {"create", QT_TRANSLATE_NOOP("SettingsDialog", "Create a file or folder")},
+    {"jobs", QT_TRANSLATE_NOOP("SettingsDialog", "Background jobs")},
+    {"preview-up", QT_TRANSLATE_NOOP("SettingsDialog", "Scroll the preview up")},
+    {"preview-down", QT_TRANSLATE_NOOP("SettingsDialog", "Scroll the preview down")},
+};
+
+}  // namespace
+
+bool SettingsDialog::modalOn() const
+{
+    QAction* vim = m_window->m_actions.value(QStringLiteral("vim"));
+    return vim && vim->isChecked();
+}
+
 void SettingsDialog::fillKeys()
 {
-    QAction* selected = m_keys->currentItem() ? m_keys->currentItem()->data(0, Qt::UserRole).value<QAction*>() : nullptr;
+    const QString selected = m_keys->currentItem() ? m_keys->currentItem()->data(0, Qt::UserRole + 1).toString() : QString();
     const QString q = m_keyFilter->text().trimmed();
+    const bool modal = modalOn();
+    m_keys->setColumnHidden(2, !modal);
+    m_modalRow->setVisible(modal);
     m_keys->clear();
     QTreeWidgetItem* reselect = nullptr;
-    for (QAction* a : m_window->actions()) {
-        if (a->property("commandId").toString().isEmpty())
-            continue;
-        const QString name = QStringLiteral("%1 › %2").arg(a->property("category").toString(), a->text().remove(QLatin1Char('&')));
-        const QString keys = keysText(a->shortcuts());
-        if (!q.isEmpty() && !name.contains(q, Qt::CaseInsensitive) && !keys.contains(q, Qt::CaseInsensitive))
-            continue;
-        auto* it = new QTreeWidgetItem(m_keys, {name, keys});
+    auto add = [&](const QString& id, const QString& name, QAction* a) {
+        const QString keys = a ? keysText(a->shortcuts()) : QString();
+        const QString chains = modal ? modalText(id) : QString();
+        if (!q.isEmpty() && !name.contains(q, Qt::CaseInsensitive) && !keys.contains(q, Qt::CaseInsensitive) &&
+            !chains.contains(q, Qt::CaseInsensitive))
+            return;
+        auto* it = new QTreeWidgetItem(m_keys, {name, keys, chains});
         it->setData(0, Qt::UserRole, QVariant::fromValue(a));
-        if (a->shortcuts() != defaultKeys(a)) {  // changed: in the accent colour
+        it->setData(0, Qt::UserRole + 1, id);
+        // Changed ones in the accent colour, the default in the tooltip.
+        if (a && a->shortcuts() != defaultKeys(a)) {
             it->setForeground(1, theme().accent);
             it->setToolTip(1, tr("Default: %1").arg(keysText(defaultKeys(a)).isEmpty() ? tr("none") : keysText(defaultKeys(a))));
         }
-        if (a == selected)
+        if (modal && Keymap::instance().modalKeys(id)) {
+            it->setForeground(2, theme().accent);
+            it->setToolTip(2, tr("Default: %1").arg(modalDefaultText(id).isEmpty() ? tr("none") : modalDefaultText(id)));
+        }
+        if (id == selected)
             reselect = it;
+    };
+    for (QAction* a : m_window->actions()) {
+        const QString id = a->property("commandId").toString();
+        if (!id.isEmpty())
+            add(id, QStringLiteral("%1 › %2").arg(a->property("category").toString(), a->text().remove(QLatin1Char('&'))), a);
     }
+    if (modal)
+        for (const auto& [id, title] : kModalOnly)
+            add(QLatin1String(id), tr("Modal › %1").arg(tr(title)), nullptr);
     if (reselect)
         m_keys->setCurrentItem(reselect);
     keySelected();
@@ -900,39 +997,108 @@ void SettingsDialog::keySelected()
 {
     QTreeWidgetItem* it = m_keys->currentItem();
     auto* a = it ? it->data(0, Qt::UserRole).value<QAction*>() : nullptr;
+    const QString id = it ? it->data(0, Qt::UserRole + 1).toString() : QString();
     m_loadingKey = true;
-    m_keyEdit->setKeySequence(a && !a->shortcuts().isEmpty() ? a->shortcuts().first() : QKeySequence());
+    m_keyEdit->clear();
+    m_modalEdit->setText(modalText(id));
     m_loadingKey = false;
-    for (QWidget* w : {static_cast<QWidget*>(m_keyEdit), static_cast<QWidget*>(m_keyClear), static_cast<QWidget*>(m_keyReset)})
-        w->setEnabled(a != nullptr);
+    for (QToolButton* old : m_keyChips->findChildren<QToolButton*>(Qt::FindDirectChildrenOnly)) {
+        old->hide();
+        old->deleteLater();  // may be the one being clicked
+    }
+    if (a)
+        for (const QKeySequence& k : a->shortcuts()) {
+            auto* chip = new QToolButton(m_keyChips);
+            chip->setText(k.toString(QKeySequence::NativeText) + QStringLiteral("  ✕"));
+            chip->setToolTip(tr("Remove %1").arg(k.toString(QKeySequence::NativeText)));
+            chip->setAutoRaise(true);
+            m_keyChips->layout()->addWidget(chip);
+            chip->show();
+            connect(chip, &QToolButton::clicked, this, [this, k] { removeKey(k); });
+        }
+    m_keyEdit->setEnabled(a != nullptr);
+    m_modalEdit->setEnabled(!id.isEmpty());
+    m_keyReset->setEnabled(!id.isEmpty());
 }
 
-void SettingsDialog::assignKeys(const QKeySequence& seq)
+void SettingsDialog::addKey(const QKeySequence& seq)
 {
     QTreeWidgetItem* it = m_keys->currentItem();
     auto* a = it ? it->data(0, Qt::UserRole).value<QAction*>() : nullptr;
     if (!a)
         return;
+    const QString name = a->text().remove(QLatin1Char('&'));
     QString note;
-    if (!seq.isEmpty()) {
-        // A key does one thing: whoever had it gives it up.
-        for (QAction* other : m_window->actions()) {
-            if (other == a || !other->shortcuts().contains(seq))
-                continue;
-            QList<QKeySequence> keys = other->shortcuts();
-            keys.removeAll(seq);
-            other->setShortcuts(keys);
-            saveKeyBinding(other);
-            note = tr("%1 was used by “%2”, which now has %3.")
-                       .arg(seq.toString(QKeySequence::NativeText), other->text().remove(QLatin1Char('&')),
-                            keys.isEmpty() ? tr("no key") : keysText(keys));
-        }
+    // A key does one thing: whoever had it gives it up.
+    for (QAction* other : m_window->actions()) {
+        if (other == a || !other->shortcuts().contains(seq))
+            continue;
+        QList<QKeySequence> keys = other->shortcuts();
+        keys.removeAll(seq);
+        other->setShortcuts(keys);
+        saveKeyBinding(other);
+        note = tr("%1 was used by “%2”, which now has %3.")
+                   .arg(seq.toString(QKeySequence::NativeText), other->text().remove(QLatin1Char('&')),
+                        keys.isEmpty() ? tr("no key") : keysText(keys));
     }
-    a->setShortcuts(seq.isEmpty() ? QList<QKeySequence>{} : QList<QKeySequence>{seq});
+    QList<QKeySequence> keys = a->shortcuts();
+    if (!keys.contains(seq))
+        keys << seq;
+    a->setShortcuts(keys);
     saveKeyBinding(a);
-    m_keyNote->setText(note.isEmpty() ? (seq.isEmpty() ? tr("“%1” has no key now.").arg(a->text().remove(QLatin1Char('&')))
-                                                       : tr("“%1” is now %2.").arg(a->text().remove(QLatin1Char('&')),
-                                                                                 seq.toString(QKeySequence::NativeText)))
+    m_keyNote->setText(note.isEmpty() ? tr("“%1”: %2").arg(name, keysText(keys)) : note);
+    fillKeys();
+}
+
+void SettingsDialog::removeKey(const QKeySequence& seq)
+{
+    QTreeWidgetItem* it = m_keys->currentItem();
+    auto* a = it ? it->data(0, Qt::UserRole).value<QAction*>() : nullptr;
+    if (!a)
+        return;
+    QList<QKeySequence> keys = a->shortcuts();
+    keys.removeAll(seq);
+    a->setShortcuts(keys);
+    saveKeyBinding(a);
+    m_keyNote->setText(tr("“%1”: %2").arg(a->text().remove(QLatin1Char('&')), keys.isEmpty() ? tr("no key") : keysText(keys)));
+    fillKeys();
+}
+
+void SettingsDialog::assignModalKeys()
+{
+    QTreeWidgetItem* it = m_keys->currentItem();
+    const QString id = it ? it->data(0, Qt::UserRole + 1).toString() : QString();
+    if (id.isEmpty() || m_loadingKey)
+        return;
+    QStringList chains;  // "g g", normalized
+    for (const QString& entry : m_modalEdit->text().split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+        QStringList tokens;
+        for (const QString& t : entry.split(QLatin1Char(' '), Qt::SkipEmptyParts))
+            tokens << Keymap::normalizeToken(t);
+        if (!tokens.isEmpty() && !chains.contains(tokens.join(QLatin1Char(' '))))
+            chains << tokens.join(QLatin1Char(' '));
+    }
+    if (chains.join(QStringLiteral(", ")) == modalText(id))
+        return;  // unchanged: focus just left the field
+    // A chain does one thing: whoever had it gives it up. Defaults give way
+    // on their own (Keymap), what the file set is changed here.
+    QString note;
+    const QList<Keymap::Binding> bindings = Keymap::instance().modalBindings();  // changes below
+    for (const Keymap::Binding& b : bindings) {
+        const QString chain = b.sequence.join(QLatin1Char(' '));
+        if (b.action == id || !chains.contains(chain))
+            continue;
+        if (auto keys = Keymap::instance().modalKeys(b.action)) {
+            keys->removeAll(chain);
+            Keymap::instance().setModalKeys(b.action, *keys);
+        }
+        note = tr("%1 was used by “%2”.").arg(chain, Keymap::actionTitle ? Keymap::actionTitle(b.action) : b.action);
+    }
+    if (chains.join(QStringLiteral(", ")) == modalDefaultText(id))
+        Keymap::instance().setModalKeys(id, std::nullopt);
+    else
+        Keymap::instance().setModalKeys(id, chains);
+    m_keyNote->setText(note.isEmpty() ? tr("Modal keys: %1").arg(chains.isEmpty() ? tr("none") : chains.join(QStringLiteral(", ")))
                                       : note);
     fillKeys();
 }

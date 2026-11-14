@@ -2861,12 +2861,20 @@ private slots:
         QVERIFY(copy && move);
         QCOMPARE(move->shortcut(), QKeySequence(Qt::Key_F6));
         dlg.keyList()->setCurrentItem(find("Copy…"));
-        dlg.keyEdit()->setKeySequence(QKeySequence(Qt::Key_F6));  // Move's key
-        QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F6));
+        dlg.keyEdit()->setKeySequence(QKeySequence(Qt::Key_F6));  // Move's key, added to F5
+        QCOMPARE(copy->shortcuts(), QList<QKeySequence>({QKeySequence(Qt::Key_F5), QKeySequence(Qt::Key_F6)}));
         QVERIFY(move->shortcuts().isEmpty());  // gave it up
         QVERIFY(dlg.keyNote()->text().contains("Move"));
-        QCOMPARE(Keymap::instance().commandKeys("copy"), std::optional<QStringList>(QStringList({"F6"})));
+        QCOMPARE(Keymap::instance().commandKeys("copy"), std::optional<QStringList>(QStringList({"F5", "F6"})));
         QCOMPARE(Keymap::instance().commandKeys("move"), std::optional<QStringList>(QStringList()));
+        // Each key has its own remove button.
+        QToolButton* removeF5 = nullptr;
+        for (auto* b : dlg.findChildren<QToolButton*>())
+            if (b->isVisible() && b->text().startsWith(QKeySequence(Qt::Key_F5).toString(QKeySequence::NativeText) + " "))
+                removeF5 = b;
+        QVERIFY(removeF5);
+        removeF5->click();
+        QCOMPARE(copy->shortcuts(), QList<QKeySequence>({QKeySequence(Qt::Key_F6)}));
         // A restart applies them: simulate with the saved values.
         copy->setShortcut(QKeySequence(Qt::Key_F5));
         applyKeyBindings(m_window->actions());
@@ -2877,6 +2885,37 @@ private slots:
         QCOMPARE(copy->shortcut(), QKeySequence(Qt::Key_F5));
         QCOMPARE(move->shortcut(), QKeySequence(Qt::Key_F6));
         QVERIFY(!Keymap::instance().commandKeys("copy") && !Keymap::instance().commandKeys("move"));
+
+        // With modal keys on, chains are typed; one taken from a default moves over.
+        QAction* vim = nullptr;
+        for (QAction* a : m_window->actions())
+            if (a->property("commandId").toString() == "modal-keys-vim-yazi")
+                vim = a;
+        QVERIFY(vim);
+        auto vimOff = qScopeGuard([&] { if (vim->isChecked()) vim->trigger(); });
+        if (!vim->isChecked())
+            vim->trigger();
+        QVERIFY(dlg.modalKeyEdit()->isVisibleTo(&dlg));
+        auto chainsOf = [](const QString& id) {
+            QStringList out;
+            for (const auto& b : Keymap::instance().modalBindings())
+                if (b.action == id)
+                    out << b.sequence.join(' ');
+            return out;
+        };
+        QCOMPARE(chainsOf("copy-to-clipboard"), QStringList({"y"}));
+        dlg.keyList()->setCurrentItem(find("Copy…"));
+        dlg.modalKeyEdit()->setText("y, c  c");
+        QTest::keyClick(dlg.modalKeyEdit(), Qt::Key_Return);
+        QCOMPARE(Keymap::instance().modalKeys("copy"), std::optional<QStringList>(QStringList({"y", "c c"})));
+        QVERIFY(chainsOf("copy-to-clipboard").isEmpty());
+        QVERIFY(dlg.keyNote()->text().contains("y"));
+        QVERIFY(find("To the top"));  // built-in modal actions are listed too
+        for (auto* b : dlg.findChildren<QPushButton*>())
+            if (b->text() == QObject::tr("Reset all keys"))
+                b->click();
+        QVERIFY(!Keymap::instance().modalKeys("copy"));
+        QCOMPARE(chainsOf("copy-to-clipboard"), QStringList({"y"}));
     }
 
     // F1: grouped shortcuts in columns, with a filter.
