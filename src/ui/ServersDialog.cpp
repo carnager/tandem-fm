@@ -4,6 +4,7 @@
 #include "core/Keyring.h"
 #include "core/Util.h"
 #include "ui/BookmarksEditor.h"
+#include "ui/CardList.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
 
@@ -20,7 +21,6 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QStackedWidget>
-#include <QTreeWidget>
 #include <QStyledItemDelegate>
 #include <QToolButton>
 #include <QUrl>
@@ -56,62 +56,6 @@ QString subtitleFor(const SavedServer& s)
     return kind + QStringLiteral("  ·  ") + who;
 }
 
-// Two lines per server, selected like the settings' sidebar.
-class ServerDelegate : public QStyledItemDelegate {
-public:
-    using QStyledItemDelegate::QStyledItemDelegate;
-    QSize sizeHint(const QStyleOptionViewItem& opt, const QModelIndex&) const override
-    {
-        return {opt.rect.width(), opt.fontMetrics.height() * 2 + 16};
-    }
-    void paint(QPainter* p, const QStyleOptionViewItem& opt, const QModelIndex& idx) const override
-    {
-        const Theme& t = theme();
-        p->save();
-        p->setRenderHint(QPainter::Antialiasing);
-        const QRectF card = QRectF(opt.rect).adjusted(0, 1, 0, -1);
-        if (opt.state & QStyle::State_Selected) {
-            p->setPen(Qt::NoPen);
-            p->setBrush(t.headerActive);
-            p->drawRoundedRect(card, 6, 6);
-        } else if (opt.state & QStyle::State_MouseOver) {
-            p->setPen(Qt::NoPen);
-            p->setBrush(t.altBase);
-            p->drawRoundedRect(card, 6, 6);
-        }
-        QRect r = opt.rect.adjusted(10, 0, -10, 0);
-        const int is = 22;
-        idx.data(Qt::DecorationRole).value<QIcon>().paint(p, QRect(r.left(), r.center().y() - is / 2, is, is));
-        r.setLeft(r.left() + is + 10);
-        const int line = opt.fontMetrics.height();
-        const int top = opt.rect.center().y() - line;
-        p->setFont(opt.font);
-        p->setPen(t.text);
-        p->drawText(QRect(r.left(), top, r.width(), line), Qt::AlignLeft | Qt::AlignVCenter,
-                    opt.fontMetrics.elidedText(idx.data(Qt::DisplayRole).toString(), Qt::ElideRight, r.width()));
-        QFont small = opt.font;
-        small.setPointSizeF(small.pointSizeF() * 0.9);
-        p->setFont(small);
-        p->setPen(t.dimText);
-        p->drawText(QRect(r.left(), top + line + 1, r.width(), line), Qt::AlignLeft | Qt::AlignVCenter,
-                    QFontMetrics(small).elidedText(idx.data(Qt::UserRole).toString(), Qt::ElideMiddle, r.width()));
-        p->restore();
-    }
-};
-
-// A small heading inside the form, like the location popup's sections.
-QLabel* sectionLabel(const QString& text, QWidget* parent)
-{
-    auto* l = new QLabel(text.toUpper(), parent);
-    QFont f = l->font();
-    f.setPointSizeF(f.pointSizeF() * 0.85);
-    f.setBold(true);
-    f.setLetterSpacing(QFont::PercentageSpacing, 108);
-    l->setFont(f);
-    setThemeStyle(l, QStringLiteral("color: @dimText; padding-top: 6px;"));
-    return l;
-}
-
 // The password goes to the keyring the way the backends look for it, and to
 // the backend for this session. Blocking (D-Bus): on a worker.
 void storePassword(const SavedServer& s, const QString& password)
@@ -134,7 +78,7 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
     setWindowTitle(tr("Locations"));
     resize(1000, 640);
     setThemeStyle(this, QStringLiteral(
-        "QListWidget#servers { background: transparent; border: none; outline: none; }"
+        "QListWidget#servers, QListWidget#bookmarkList { background: transparent; border: none; outline: none; }"
         "QPushButton#flat { background: transparent; border: none; color: @dimText; padding: 5px 8px;"
         "  border-radius: 6px; text-align: left; }"
         "QPushButton#flat:hover { background: @altBase; color: @text; }"
@@ -187,7 +131,7 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
     left->setSpacing(4);
     m_list = new QListWidget(this);
     m_list->setObjectName(QStringLiteral("servers"));
-    m_list->setItemDelegate(new ServerDelegate(m_list));
+    m_list->setItemDelegate(new CardDelegate(m_list));
     m_list->setMouseTracking(true);
     m_list->setFixedWidth(250);
     left->addWidget(m_list, 1);
@@ -326,7 +270,7 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
         bottom->addWidget(b);
     outer->addLayout(bottom);
 
-    connect(m_bookmarks->table(), &QTreeWidget::itemChanged, this, [this] {
+    connect(m_bookmarks, &BookmarksEditor::edited, this, [this] {
         if (!m_serversBroken)
             m_error->hide();  // the problem it showed may be fixed now
     });

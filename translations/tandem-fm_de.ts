@@ -1484,6 +1484,34 @@
         <translation>&amp;Entfernen</translation>
     </message>
     <message>
+        <source>No bookmarks yet. Add this folder, or press Ctrl+Shift+D in any folder.</source>
+        <translation>Noch keine Lesezeichen. Füg diesen Ordner hinzu, oder drück in einem Ordner Strg+Umschalt+D.</translation>
+    </message>
+    <message>
+        <source>Bookmark</source>
+        <translation>Lesezeichen</translation>
+    </message>
+    <message>
+        <source>one or more letters, e.g. cp; empty: no key</source>
+        <translation>ein oder mehrere Buchstaben, z. B. cp; leer: keine Taste</translation>
+    </message>
+    <message>
+        <source>a folder, or a server address</source>
+        <translation>ein Ordner oder eine Serveradresse</translation>
+    </message>
+    <message>
+        <source>Choose…</source>
+        <translation>Auswählen…</translation>
+    </message>
+    <message>
+        <source>Ctrl+D and the key go there; with modal keys, g and the key. Drag bookmarks in the list to change their order.</source>
+        <translation>Strg+D und die Taste führen dorthin, mit modalen Tasten g und die Taste. Zieh Lesezeichen in der Liste, um ihre Reihenfolge zu ändern.</translation>
+    </message>
+    <message>
+        <source>New bookmark</source>
+        <translation>Neues Lesezeichen</translation>
+    </message>
+    <message>
         <source>A bookmark needs a folder.</source>
         <translation>Ein Lesezeichen braucht einen Ordner.</translation>
     </message>

@@ -41,6 +41,7 @@
 #include "ui/SettingsDialog.h"
 #include "ui/ServersDialog.h"
 #include "ui/BookmarksEditor.h"
+#include "ui/CardList.h"
 #include "core/Servers.h"
 #include "ui/AboutDialog.h"
 #include "ui/ShortcutsDialog.h"
@@ -3487,7 +3488,8 @@ private slots:
 #endif
     }
 
-    // Locations › Bookmarks: keys, folders and order edited as a table, saved at once.
+    // Locations › Bookmarks: a list like the servers, the selected one in a
+    // form; keys, folders and order saved together, nothing on a clash.
     void bookmarksWindow()
     {
         FolderHistory& h = FolderHistory::instance();
@@ -3497,22 +3499,28 @@ private slots:
         h.setBookmarks({{"a", L()}, {"", L("sub")}});
         ServersDialog dlg(m_window.get());
         dlg.showBookmarks(true);
-        dlg.bookmarks()->setCurrentFolder(R());
-        QTreeWidget* table = dlg.bookmarks()->table();
-        QCOMPARE(table->topLevelItemCount(), 2);
-        QCOMPARE(table->topLevelItem(1)->text(1), L("sub"));
-        table->topLevelItem(1)->setText(0, "s");           // a key for the one without
-        table->topLevelItem(0)->setText(1, L("sub/deep"));  // another folder
+        BookmarksEditor* ed = dlg.bookmarks();
+        ed->setCurrentFolder(R());
+        QListWidget* list = ed->list();
+        QCOMPARE(list->count(), 2);
+        QCOMPARE(list->item(1)->data(Qt::UserRole).toString(), L("sub"));
+        list->setCurrentRow(1);
+        ed->keyEdit()->setText("s");  // a key for the one without
+        QCOMPARE(list->item(1)->data(kCardBadgeRole).toString(), QString("s"));
+        list->setCurrentRow(0);
+        QCOMPARE(ed->keyEdit()->text(), QString("a"));
+        ed->folderEdit()->setText(L("sub/deep"));  // another folder
+        QCOMPARE(list->item(0)->text(), QString("deep"));
         for (auto* b : dlg.findChildren<QPushButton*>())
             if (b->text().remove('&') == "Add this folder")
                 b->click();
-        QCOMPARE(table->topLevelItemCount(), 3);
-        table->closePersistentEditor(table->topLevelItem(2), 0);
-        table->topLevelItem(2)->setText(0, "s");  // used twice: not saved
+        QCOMPARE(list->count(), 3);
+        QCOMPARE(ed->folderEdit()->text(), R());
+        ed->keyEdit()->setText("s");  // used twice: not saved
         QVERIFY(!dlg.save());
         QCOMPARE(h.pinnedBookmarks(), QList<FolderHistory::Bookmark>({{"a", L()}, {"", L("sub")}}));
-        table->topLevelItem(2)->setText(0, "r");
-        table->insertTopLevelItem(0, table->takeTopLevelItem(2));  // reordered, as by dragging
+        ed->keyEdit()->setText("r");
+        list->insertItem(0, list->takeItem(2));  // reordered, as by dragging
         QVERIFY(dlg.save());
         QCOMPARE(h.pinnedBookmarks(),
                  QList<FolderHistory::Bookmark>({{"r", R()}, {"a", L("sub/deep")}, {"s", L("sub")}}));
