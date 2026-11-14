@@ -35,6 +35,7 @@ public:
 
     void openJump(const QString& initialKeys = {});
     void openAssign(const QString& path);
+    void openEdit();  // all bookmarks, also those without a key: change keys, remove
     void openChoices(const Choices& choices);
     bool isChoosing() const { return isVisible() && m_mode == Mode::Choices; }
 
@@ -59,9 +60,15 @@ private:
     void refresh();
     void place();
     void refreshChoices();
+    void refreshEdit();
     void pickChoice(int number, bool shift);
 
-    enum class Mode { Jump, Assign, Choices } m_mode = Mode::Jump;
+    void editKey(QKeyEvent* e);
+
+    enum class Mode { Jump, Assign, Choices, Edit } m_mode = Mode::Jump;
+    QStringList m_editPaths;  // in Edit: the bookmarked folders, in pin order
+    int m_editRow = 0;
+    bool m_assignFromEdit = false;  // Enter, Delete and Esc go back to the list
     Choices m_choices;
     QString m_typed;
     QString m_assignPath;

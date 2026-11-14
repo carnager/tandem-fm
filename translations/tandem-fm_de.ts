@@ -2215,8 +2215,16 @@
         <translation>Lesezeichen  ·  %1…</translation>
     </message>
     <message>
-        <source>Type a key   ·   Space: search all folders   ·   Ctrl+Shift+D: bookmark this folder   ·   Esc</source>
-        <translation>Taste drücken   ·   Space: alle Ordner durchsuchen   ·   Ctrl+Shift+D: Lesezeichen für diesen Ordner   ·   Esc</translation>
+        <source>Type a key   ·   Tab: edit   ·   Space: search all folders   ·   Ctrl+Shift+D: bookmark this folder   ·   Esc</source>
+        <translation>Taste drücken   ·   Tab: bearbeiten   ·   Space: alle Ordner durchsuchen   ·   Ctrl+Shift+D: Lesezeichen für diesen Ordner   ·   Esc</translation>
+    </message>
+    <message>
+        <source>Edit bookmarks</source>
+        <translation>Lesezeichen bearbeiten</translation>
+    </message>
+    <message>
+        <source>Arrows: choose   ·   Enter: change the key   ·   Delete: remove   ·   Tab: back   ·   Esc</source>
+        <translation>Pfeiltasten: auswählen   ·   Enter: Taste ändern   ·   Delete: entfernen   ·   Tab: zurück   ·   Esc</translation>
     </message>
     <message>
         <source>Bookmark key for %1:  %2</source>
@@ -2588,6 +2596,10 @@
     <message>
         <source>&amp;Bookmarks</source>
         <translation>&amp;Lesezeichen</translation>
+    </message>
+    <message>
+        <source>Edit bookmarks…</source>
+        <translation>Lesezeichen bearbeiten…</translation>
     </message>
     <message>
         <source>Pin or unpin tab</source>

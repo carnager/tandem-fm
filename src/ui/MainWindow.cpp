@@ -464,6 +464,7 @@ void MainWindow::createMenus()
     addCommand(marks, QT_TR_NOOP("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
                [this] { m_chords->openAssign(active()->path()); });
     addCommand(marks, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { m_chords->openJump(); });
+    addCommand(marks, QT_TR_NOOP("Edit bookmarks…"), {}, [this] { m_chords->openEdit(); });
     marks->addSeparator();
     connect(marks, &QMenu::aboutToShow, this, [this, marks] { fillBookmarksMenu(marks); });
 
