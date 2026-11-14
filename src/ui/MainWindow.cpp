@@ -2042,9 +2042,7 @@ void MainWindow::commandPalette()
 
 QList<PopupItem> MainWindow::folderItems() const
 {
-    static const QIcon pin = IconCache::themed("pin", "emblem-favorite");
     static const QIcon folder = IconCache::themed("folder");
-    const QString home = QDir::homePath();
     QList<PopupItem> items;
     for (const FolderHistory::Item& f : FolderHistory::instance().items()) {
         PopupItem it;
@@ -2052,10 +2050,10 @@ QList<PopupItem> MainWindow::folderItems() const
         it.title = f.path == QLatin1String("/") ? f.path : baseName(f.path);
         it.subtitle = f.path;
         it.matchSubtitle = true;
-        it.icon = f.pinned ? pin : folder;
-        // How well it matches comes first; frecency nudges (zoxide-like).
-        it.bonus = int(12 * std::log2(1 + f.frecency));
-        it.hint = f.key;  // a bookmark's key: the faster way there
+        it.icon = folder;
+        // How well it matches comes first; frecency nudges (zoxide-like), and
+        // being a bookmark a little more. Bookmarks have Ctrl+D of their own.
+        it.bonus = int(12 * std::log2(1 + f.frecency)) + (f.pinned ? 24 : 0);
         const QString path = f.path;
         it.run = [this, path] { active()->navigate(path); };
         items.append(it);

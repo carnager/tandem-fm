@@ -202,9 +202,7 @@ void FolderHistory::forget(const QString& path)
 {
     {
         QMutexLocker lock(&m_mutex);
-        m_entries.remove(path);
-        m_pinned.removeAll(path);
-        m_keys.remove(path);
+        m_entries.remove(path);  // bookmarks are removed on purpose only (a USB stick comes back)
     }
     scheduleSave();
 }

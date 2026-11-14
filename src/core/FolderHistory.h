@@ -34,7 +34,7 @@ public:
     void saveNow();  // blocking, small file; used at exit
 
     void visit(const QString& path);
-    void forget(const QString& path);
+    void forget(const QString& path);  // its visits; a bookmark on it stays
     void setPinned(const QString& path, bool pinned);
     bool isPinned(const QString& path) const;
     // Bookmarks are pins with a key. Keys are unique: assigning a used key

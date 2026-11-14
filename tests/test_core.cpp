@@ -1279,6 +1279,8 @@ private slots:
         QVERIFY(h.isPinned("/b"));
         h.forget("/a");
         QCOMPARE(h.items().size(), 1);
+        h.forget("/b");             // a bookmark: its visits go, it stays
+        QVERIFY(h.isPinned("/b"));
         QVERIFY(FolderHistory::frecency(10, 0, 30) > FolderHistory::frecency(10, 0, 30 * 86400));
 
         // Bookmarks: unique keys, chains, persistence.
