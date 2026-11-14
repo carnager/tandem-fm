@@ -31,7 +31,8 @@ background file operations and built-in SFTP and SMB.
   files, and update ZIP, 7z and tar archives. Save servers with their user,
   port and key file under **Servers…**, or import them from `~/.ssh/config`;
   they are kept in `servers.toml` and passwords in the desktop keyring when
-  available.
+  available. An SSH server can be reached through another one (a jump
+  host), and directly while you are in its home network.
 - **Look before you open.** An integrated viewer and content previews handle
   text, hex, images, PDF, Markdown, fonts, video and audio. Browse pictures
   with a thumbnail grid and see Git status alongside your files.

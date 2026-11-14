@@ -8,6 +8,7 @@
 #include <functional>
 
 class QButtonGroup;
+class QComboBox;
 class QFormLayout;
 class QLabel;
 class QLineEdit;
@@ -44,6 +45,7 @@ private:
     void updateRow(int row);
     void connectCurrent();
     void updateHeading();
+    void fillJumpHosts(int row);
 
     QList<SavedServer> m_servers;
     QStringList m_passwords;  // per row: typed, stored in the keyring on Save
@@ -62,6 +64,12 @@ private:
     QWidget* m_keyRow;
     QLineEdit* m_password;
     QLineEdit* m_folder;
+    QWidget* m_routeLabel;
+    QComboBox* m_jump;
+    QLineEdit* m_jumpAddress;
+    QWidget* m_directRow;
+    QLineEdit* m_directIn;
+    QPushButton* m_useNetwork;
     QLabel* m_address;
     QLabel* m_heading;
     QLabel* m_empty;

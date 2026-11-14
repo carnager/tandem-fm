@@ -11,6 +11,7 @@
 #include "core/Keyring.h"
 #include "core/Permissions.h"
 #include "core/Servers.h"
+#include "core/Subnet.h"
 #include "core/Util.h"
 
 #ifdef TANDEM_HAVE_LIBSSH
@@ -192,6 +193,15 @@ struct HopThread {
 };
 thread_local HopThread t_hop;
 
+// How one attempt goes. A saved server with a jump host is reached through
+// it, or straight away while the computer is in its home network.
+struct Route {
+    QByteArray proxyJump;  // "bob@vps:2222"; empty: as ~/.ssh/config says
+    QByteArray address;    // where the jump host forwards to
+    bool direct = false;   // straight there, and give up quickly
+};
+const long kDirectTimeout = 4;  // seconds: at home a server answers at once
+
 void markAsked()
 {
     if (t_hop.link) {
@@ -305,13 +315,52 @@ public:
         return Lease(server, std::move(conn), !spare);
     }
 
+    // The route a saved jump host gives; false if that jump host is missing.
+    static bool savedRoute(const QString& location, Route* via, bool* tryDirect, int& err, QString* errText)
+    {
+        const auto saved = ServerList::instance().find(location);
+        if (!saved || saved->jump.isEmpty())
+            return true;
+        const auto jump = ServerList::instance().named(saved->jump);
+        if (!jump || jump->type != QLatin1String("sftp") || jump->name == saved->name) {
+            err = EHOSTUNREACH;
+            if (errText)
+                *errText = QObject::tr("The jump host %1 isn't one of your saved SSH servers").arg(saved->jump);
+            return false;
+        }
+        QString spec = jump->host.contains(QLatin1Char(':')) ? QLatin1Char('[') + jump->host + QLatin1Char(']') : jump->host;
+        if (!jump->user.isEmpty())
+            spec.prepend(jump->user + QLatin1Char('@'));
+        if (jump->port > 0 && jump->port != 22)
+            spec += QLatin1Char(':') + QString::number(jump->port);
+        via->proxyJump = spec.toUtf8();
+        via->address = saved->hostViaJump().toUtf8();
+        *tryDirect = !saved->directIn.isEmpty() && inNetworks(saved->directIn);
+        return true;
+    }
+
     std::unique_ptr<Conn> connect(const QString& location, Server* server, int& err, QString* errText)
     {
+        Route via;
+        bool tryDirect = false;
+        if (!savedRoute(location, &via, &tryDirect, err, errText))
+            return nullptr;
+        if (tryDirect) {
+            // At home: straight there. If it doesn't answer, or another
+            // machine does, quietly take the jump host instead.
+            Route direct;
+            direct.direct = true;
+            bool fallBack = false;
+            if (auto c = connectOnce(location, server, direct, std::make_shared<HopLink>(), err, errText, &fallBack))
+                return c;
+            if (!fallBack)
+                return nullptr;
+        }
         // A question on a jump host can take longer than the connection
         // waits for it. Once it's answered (and remembered), try again.
         for (int attempt = 0;; ++attempt) {
             auto link = std::make_shared<HopLink>();
-            auto c = connectOnce(location, server, link, err, errText);
+            auto c = connectOnce(location, server, via, link, err, errText);
             if (c || attempt > 0)
                 return c;
             std::unique_lock<std::mutex> lock(link->mutex);
@@ -325,6 +374,12 @@ public:
                 return c;
             }
         }
+    }
+
+    static long timeoutSeconds()
+    {
+        const int seconds = qEnvironmentVariableIntValue("TANDEM_SSH_TIMEOUT");
+        return seconds > 0 ? seconds : 15;
     }
 
     // Options every session gets, jump hosts too: the test overrides, a key
@@ -343,8 +398,7 @@ public:
             const QByteArray id = QFile::encodeName(key);
             ssh_options_set(c->ssh, SSH_OPTIONS_IDENTITY, id.constData());
         }
-        const int seconds = qEnvironmentVariableIntValue("TANDEM_SSH_TIMEOUT");
-        const long timeout = seconds > 0 ? seconds : 15;
+        const long timeout = timeoutSeconds();
         ssh_options_set(c->ssh, SSH_OPTIONS_TIMEOUT, &timeout);
         ssh_callbacks_init(&c->callbacks);
         c->callbacks.auth_function = passphraseCallback;
@@ -472,8 +526,9 @@ public:
         return SSH_AUTH_SUCCESS;
     }
 
-    std::unique_ptr<Conn> connectOnce(const QString& location, Server* server, const std::shared_ptr<HopLink>& link, int& err,
-                                      QString* errText)
+    // fallBack: set when a direct attempt should give way to the jump host.
+    std::unique_ptr<Conn> connectOnce(const QString& location, Server* server, const Route& route,
+                                      const std::shared_ptr<HopLink>& link, int& err, QString* errText, bool* fallBack = nullptr)
     {
         auto fail = [&](int e, const QString& text) {
             err = e;
@@ -501,6 +556,20 @@ public:
             ssh_options_set(c->ssh, SSH_OPTIONS_PORT, &port);
         }
         commonOptions(c.get(), location);
+        // The name its host key is kept under: the host, after ~/.ssh/config.
+        QByteArray keyName = host;
+        if (char* named = nullptr; ssh_options_get(c->ssh, SSH_OPTIONS_HOST, &named) == SSH_OK) {
+            keyName = named;
+            ssh_string_free_char(named);
+        }
+        if (route.direct) {
+            ssh_options_set(c->ssh, SSH_OPTIONS_PROXYJUMP, "none");
+            const long timeout = std::min(timeoutSeconds(), kDirectTimeout);
+            ssh_options_set(c->ssh, SSH_OPTIONS_TIMEOUT, &timeout);
+        } else if (!route.proxyJump.isEmpty()) {
+            ssh_options_set(c->ssh, SSH_OPTIONS_PROXYJUMP, route.proxyJump.constData());
+            ssh_options_set(c->ssh, SSH_OPTIONS_HOST, route.address.constData());
+        }
         link->callbacks.userdata = link.get();
         link->callbacks.before_connection = hopBeforeConnection;
         link->callbacks.verify_knownhost = hopVerifyHost;
@@ -509,6 +578,8 @@ public:
 
         if (ssh_connect(c->ssh) != SSH_OK) {
             const QString why = QString::fromUtf8(ssh_get_error(c->ssh));
+            if (route.direct && fallBack)
+                *fallBack = true;
             std::lock_guard<std::mutex> lock(link->mutex);
             if (link->hop.isEmpty())
                 return fail(EHOSTUNREACH, why);
@@ -517,6 +588,23 @@ public:
             if (!link->connected)
                 return fail(EHOSTUNREACH, QObject::tr("Couldn't connect to the jump host %1").arg(link->hop));
             return fail(EHOSTUNREACH, QObject::tr("Couldn't reach %1 through the jump host %2: %3").arg(c->location, link->hop, why));
+        }
+
+        if (!route.proxyJump.isEmpty()) {
+            // One host key per server, whichever way it was reached.
+            ssh_options_set(c->ssh, SSH_OPTIONS_HOST, keyName.constData());
+        }
+        if (route.direct) {
+            const long timeout = timeoutSeconds();
+            ssh_options_set(c->ssh, SSH_OPTIONS_TIMEOUT, &timeout);
+            // Another machine at the home address (another network that
+            // uses the same addresses): not the one we know.
+            const auto known = ssh_session_is_known_server(c->ssh);
+            if (known == SSH_KNOWN_HOSTS_CHANGED || known == SSH_KNOWN_HOSTS_OTHER) {
+                if (fallBack)
+                    *fallBack = true;
+                return fail(EHOSTUNREACH, QObject::tr("Another machine answered at %1").arg(c->location));
+            }
         }
 
         // Known host and key login need no questions: those run in parallel

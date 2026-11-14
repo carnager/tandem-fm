@@ -56,7 +56,10 @@ const QString kHeader = QStringLiteral(
     "# user = \"bob\"            # optional\n"
     "# domain = \"WORKGROUP\"    # smb only\n"
     "# key-file = \"~/.ssh/id\"  # sftp only\n"
-    "# folder = \"/media\"       # where to start; empty: the home folder\n");
+    "# folder = \"/media\"       # where to start; empty: the home folder\n"
+    "# jump = \"vps\"            # sftp only: reach it through this saved server\n"
+    "# jump-address = \"10.0.0.2\"     # its address as the jump host sees it\n"
+    "# direct-in = \"192.168.1.0/24\"  # in this network: try directly first\n");
 
 }  // namespace
 
@@ -124,6 +127,12 @@ QString serversToml(const QList<SavedServer>& servers)
             line("key-file", s.keyFile);
         if (!s.folder.isEmpty())
             line("folder", s.folder);
+        if (!s.jump.isEmpty())
+            line("jump", s.jump);
+        if (!s.jumpAddress.isEmpty())
+            line("jump-address", s.jumpAddress);
+        if (!s.directIn.isEmpty())
+            line("direct-in", s.directIn);
     }
     return text;
 }
@@ -166,6 +175,9 @@ bool parseServersToml(const QString& text, QList<SavedServer>* out, QString* err
             s.domain = str("domain");
             s.keyFile = str("key-file");
             s.folder = str("folder");
+            s.jump = str("jump");
+            s.jumpAddress = str("jump-address");
+            s.directIn = str("direct-in");
             list.append(s);
         }
     }
@@ -391,6 +403,15 @@ std::optional<SavedServer> ServerList::find(const QString& location) const
         if (QUrl(s.authority() + QLatin1Char('/')).userName() == u.userName())
             return s;
     }
+    return std::nullopt;
+}
+
+std::optional<SavedServer> ServerList::named(const QString& name) const
+{
+    QMutexLocker lock(&m_mutex);
+    for (const SavedServer& s : m_servers)
+        if (s.name == name)
+            return s;
     return std::nullopt;
 }
 

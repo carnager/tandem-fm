@@ -20,8 +20,10 @@
 
 class SshServer {
 public:
-    bool start()
+    // address and port: listen there (port 0: a free one).
+    bool start(const QString& address = "127.0.0.1", int port = 0)
     {
+        m_address = address;
         if (QStandardPaths::findExecutable("sshd", {"/usr/bin", "/usr/sbin"}).isEmpty() ||
             QStandardPaths::findExecutable("ssh-keygen").isEmpty())
             return false;
@@ -30,16 +32,16 @@ public:
             if (QProcess::execute("ssh-keygen", {"-q", "-t", "ed25519", "-N", "", "-f", d + "/" + key}) != 0)
                 return false;
         QFile::copy(d + "/client_key.pub", d + "/authorized_keys");
-        m_port = freePort();
+        m_port = port > 0 ? port : freePort();
         QFile cfg(d + "/sshd_config");
         if (!cfg.open(QIODevice::WriteOnly))
             return false;
-        cfg.write(QStringLiteral("Port %1\nListenAddress 127.0.0.1\nHostKey %2/host_key\n"
+        cfg.write(QStringLiteral("Port %1\nListenAddress %3\nHostKey %2/host_key\n"
                                  "AuthorizedKeysFile %2/authorized_keys\nPidFile %2/sshd.pid\nUsePAM no\n"
                                  "StrictModes no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\n"
                                  "Subsystem sftp internal-sftp\nLogLevel ERROR\n")
                       .arg(m_port)
-                      .arg(d)
+                      .arg(d, m_address)
                       .toUtf8());
         cfg.close();
         QFile emptyConfig(d + "/ssh_config");  // empty: ignore ~/.ssh/config
@@ -51,11 +53,17 @@ public:
             return false;
         for (int i = 0; i < 50 && !accepting(); ++i)
             QThread::msleep(50);
+        useFiles();
+        return accepting();
+    }
+    // Points Tandem at this server's known hosts, client key and ssh config.
+    void useFiles() const
+    {
+        const QString d = m_dir.path();
         qputenv("TANDEM_SSH_KNOWN_HOSTS", (d + "/known_hosts").toUtf8());
         qputenv("TANDEM_SSH_IDENTITY", (d + "/client_key").toUtf8());
         qputenv("TANDEM_SSH_CONFIG", (d + "/ssh_config").toUtf8());
         qunsetenv("SSH_AUTH_SOCK");  // no agent: only the test key
-        return accepting();
     }
     ~SshServer()
     {
@@ -135,12 +143,13 @@ private:
         sockaddr_in a{};
         a.sin_family = AF_INET;
         a.sin_port = htons(uint16_t(m_port));
-        a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        inet_pton(AF_INET, m_address.toLatin1().constData(), &a.sin_addr);
         const bool ok = ::connect(fd, reinterpret_cast<sockaddr*>(&a), sizeof a) == 0;
         ::close(fd);
         return ok;
     }
     QTemporaryDir m_dir;
     QProcess m_proc;
+    QString m_address;
     int m_port = 0;
 };

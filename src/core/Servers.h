@@ -23,6 +23,9 @@ namespace tandem {
 //   domain = "WORKGROUP"    # smb only
 //   key-file = "~/.ssh/id"  # sftp only
 //   folder = "/media"       # where to start; empty: the login's home
+//   jump = "vps"            # sftp only: reach it through this saved server
+//   jump-address = "10.0.0.2"     # its address as the jump host sees it
+//   direct-in = "192.168.1.0/24"  # in this network: try directly first
 //
 // Passwords live in the keyring, never in the file.
 struct SavedServer {
@@ -34,11 +37,15 @@ struct SavedServer {
     QString domain;
     QString keyFile;
     QString folder;
+    QString jump;         // the name of another saved sftp server
+    QString jumpAddress;  // empty: host
+    QString directIn;     // networks, "192.168.1.0/24"
 
     // "sftp://bob@host:2222/srv", "smb://WORKGROUP;bob@nas/media".
     QString uri() const;
     // The server part only, as locations name it ("sftp://bob@host:2222").
     QString authority() const;
+    QString hostViaJump() const { return jumpAddress.isEmpty() ? host : jumpAddress; }
     bool operator==(const SavedServer&) const = default;
 };
 
@@ -67,6 +74,7 @@ public:
     bool save(const QList<SavedServer>& servers);
     // The saved server a location belongs to (same type, host, port, user).
     std::optional<SavedServer> find(const QString& location) const;
+    std::optional<SavedServer> named(const QString& name) const;
 
 signals:
     void changed();

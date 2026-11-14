@@ -33,6 +33,7 @@
 
 #include "core/TomlSettings.h"
 #include "core/Servers.h"
+#include "core/Subnet.h"
 #include "core/Workspaces.h"
 #include <QDateTime>
 #include <QFile>
@@ -2200,6 +2201,141 @@ private slots:
         l = listLocation("sftp://slow" + tmp.path(), opt);
         QVERIFY2(l.error == 0, qPrintable(l.errorText));
         QCOMPARE(questions.size(), 1);
+    }
+
+    // Networks for "direct in network": parsing, matching, the current one.
+    void subnets()
+    {
+        auto restore = qScopeGuard([] { setLocalAddressesForTests(std::nullopt); });
+        const auto home = Subnet::parse("192.168.1.0/24");
+        QVERIFY(home);
+        QVERIFY(home->contains(*Subnet::parse("192.168.1.77")));
+        QVERIFY(!home->contains(*Subnet::parse("192.168.2.1")));
+        QVERIFY(!home->contains(*Subnet::parse("fd00::1")));
+        QVERIFY(Subnet::parse("fd00::/64")->contains(*Subnet::parse("fd00::abcd")));
+        QCOMPARE(Subnet::parse("10.1.2.3/8")->toString(), QString("10.0.0.0/8"));
+        QVERIFY(!Subnet::parse("nas.lan"));  // never a name to look up
+        QVERIFY(!Subnet::parse("10.0.0.0/33"));
+        QString error;
+        QVERIFY(parseNetworks("192.168.1.0/24, nope", &error).isEmpty());
+        QVERIFY(error.contains("nope"));
+        QCOMPARE(parseNetworks("192.168.1.0/24, fd00::/64").size(), 2);
+
+        setLocalAddressesForTests(QList<Subnet>{*Subnet::parse("172.17.0.1/16"), *Subnet::parse("192.168.1.20/24")});
+        QVERIFY(inNetworks("10.0.0.0/8 192.168.1.0/24"));
+        QVERIFY(!inNetworks("192.168.2.0/24"));
+        QVERIFY(!inNetworks(""));
+        QCOMPARE(currentNetwork(), QString("192.168.1.0/24"));  // not the containers' network
+        setLocalAddressesForTests(QList<Subnet>{});
+        QCOMPARE(currentNetwork(), QString());
+    }
+
+    // A saved server with a saved jump host: through it while away, straight
+    // there at home, one host key either way.
+    void sftpSavedJumpHost()
+    {
+        registerBuiltinBackends();
+        if (!hasBackend("sftp"))
+            QSKIP("built without libssh");
+        SshServer hop, target;
+        if (!hop.start() || !target.start())
+            QSKIP("could not start a test sshd");
+        QVERIFY(hop.authorize(target));
+        // Another machine at the home address (Linux answers on all of 127/8).
+        SshServer other;
+        const bool haveOther = other.start("127.0.0.2", target.port());
+        target.useFiles();
+        QTemporaryDir tmp;
+        useConfigDir(tmp.path());
+        auto restore = qScopeGuard([] {
+            useConfigDir(QString());
+            ServerList::instance().load();
+            setAuthHandler({});
+            setLocalAddressesForTests(std::nullopt);
+        });
+        QStringList questions;
+        std::mutex questionsMutex;
+        setAuthHandler([&](const AuthQuestion& q) -> std::optional<QString> {
+            std::lock_guard<std::mutex> lock(questionsMutex);
+            questions << q.location + " " + q.message;
+            return q.kind == AuthQuestion::Kind::HostKey ? std::optional<QString>("yes") : std::nullopt;
+        });
+        writeFile(qEnvironmentVariable("TANDEM_SSH_CONFIG"),
+                  QStringLiteral("Host loop\n  HostName 127.0.0.1\n  ProxyJump deadhop\n"
+                                 "Host deadhop\n  HostName 127.0.0.1\n  Port 1\n")
+                      .toUtf8());
+        const QString user = qEnvironmentVariable("USER");
+        auto server = [&](const QString& name, const QString& host, int port, const QString& jump = {}) {
+            SavedServer s;
+            s.name = name;
+            s.host = host;
+            s.port = port;
+            s.user = user;
+            s.jump = jump;
+            return s;
+        };
+        SavedServer desk = server("desk", "127.0.0.2", target.port(), "vps");
+        desk.jumpAddress = "127.0.0.1";
+        desk.directIn = "10.99.0.0/24";
+        SavedServer deskNoUser = desk;  // a connection of its own, the same host key
+        deskNoUser.name = "desk2";
+        deskNoUser.user.clear();
+        SavedServer home = server("home", "loop", target.port(), "deadvps");
+        home.directIn = "10.99.0.0/24";
+        SavedServer fallback = server("fallback", "127.0.0.3", target.port(), "vps");
+        fallback.jumpAddress = "127.0.0.1";
+        fallback.directIn = "10.99.0.0/24";
+        const SavedServer lost = server("lost", "127.0.0.1", target.port(), "nope");
+        QVERIFY(ServerList::instance().save({server("vps", "127.0.0.1", hop.port()), server("deadvps", "127.0.0.1", 1), desk, deskNoUser,
+                                             home, fallback, lost}));
+        QList<SavedServer> back;
+        QVERIFY(parseServersToml(serversToml(ServerList::instance().servers()), &back));
+        QCOMPARE(back, ServerList::instance().servers());
+        auto at = [&](const SavedServer& s) {
+            const QString who = s.user.isEmpty() ? QString() : s.user + "@";
+            return QStringLiteral("sftp://%1%2:%3%4").arg(who, s.host).arg(s.port).arg(tmp.path());
+        };
+        ListOptions opt;
+
+        // Away: through the jump host; the server's key is kept under its
+        // own address, not the one the jump host forwards to.
+        setLocalAddressesForTests(QList<Subnet>{*Subnet::parse("192.168.7.5/24")});
+        ListResult l = listLocation(at(desk), opt);
+        QVERIFY2(l.error == 0, qPrintable(l.errorText + " / " + hop.log() + target.log()));
+        QCOMPARE(questions.size(), 2);
+        QVERIFY2(questions.filter("jump host").size() == 1, qPrintable(questions.join('\n')));
+        QVERIFY2(questions.filter("127.0.0.2").size() == 1, qPrintable(questions.join('\n')));
+
+        // A jump host that isn't saved is named.
+        l = listLocation(at(lost), opt);
+        QVERIFY(l.error != 0);
+        QVERIFY2(l.errorText.contains("nope"), qPrintable(l.errorText));
+
+        setLocalAddressesForTests(QList<Subnet>{*Subnet::parse("10.99.0.5/24")});
+
+        // At home another machine answers at that address: not the one we
+        // know, so through the jump host after all, without a question.
+        if (haveOther) {
+            questions.clear();
+            l = listLocation(at(deskNoUser), opt);
+            QVERIFY2(l.error == 0, qPrintable(l.errorText));
+            QVERIFY2(questions.isEmpty(), qPrintable(questions.join('\n')));
+        }
+
+        // At home: straight there, past a ProxyJump in the SSH config and a
+        // jump host that is down.
+        questions.clear();
+        l = listLocation(at(home), opt);
+        QVERIFY2(l.error == 0, qPrintable(l.errorText));
+        QCOMPARE(questions.size(), 1);
+        QVERIFY(questions.filter("jump host").isEmpty());
+
+        // At home, but it doesn't answer there: through the jump host.
+        questions.clear();
+        l = listLocation(at(fallback), opt);
+        QVERIFY2(l.error == 0, qPrintable(l.errorText));
+        QCOMPARE(questions.size(), 1);
+        QVERIFY(questions.first().contains("127.0.0.3"));
     }
 
     // --config-dir: settings and folder history in one chosen folder, as TOML.

@@ -40,6 +40,7 @@
 #include "ui/PermissionsDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/ServersDialog.h"
+#include "core/Subnet.h"
 #include "core/Servers.h"
 #include "ui/AboutDialog.h"
 #include "ui/ShortcutsDialog.h"
@@ -2282,6 +2283,72 @@ private slots:
         m_right->navigate(R());
         QTRY_COMPARE(rightModel()->path(), R());
         QVERIFY(ioPool()->waitForDone(5000));
+    }
+
+    // A jump host: another saved SSH server, its name followed on rename;
+    // the address from there and the home network only once one is chosen.
+    void savedServerJumpHost()
+    {
+        ServerList& list = ServerList::instance();
+        const QList<SavedServer> before = list.servers();
+        setLocalAddressesForTests(QList<Subnet>{*Subnet::parse("192.168.5.20/24")});
+        auto restore = qScopeGuard([&] {
+            list.save(before);
+            setLocalAddressesForTests(std::nullopt);
+        });
+        SavedServer vps, desk, nas;
+        vps.name = "vps";
+        vps.host = "vps.example.org";
+        desk.name = "desk";
+        desk.host = "192.168.5.10";
+        nas.name = "nas";
+        nas.type = "smb";
+        nas.host = "nas.lan";
+        QVERIFY(list.save({vps, desk, nas}));
+
+        ServersDialog dlg(m_window.get(), "sftp://192.168.5.10/");
+        dlg.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&dlg));
+        QCOMPARE(dlg.list()->currentRow(), 1);
+        auto* jump = dlg.findChild<QComboBox*>("jump");
+        auto* address = dlg.findChild<QLineEdit*>("jumpAddress");
+        auto* directIn = dlg.findChild<QLineEdit*>("directIn");
+        QVERIFY(jump && address && directIn);
+        QCOMPARE(jump->count(), 2);  // none, vps: not itself, not the SMB share
+        QVERIFY(!address->isVisibleTo(&dlg));
+        jump->setCurrentIndex(jump->findData("vps"));
+        QVERIFY(address->isVisibleTo(&dlg));
+        address->setText("10.10.0.2");
+        QPushButton* useNetwork = nullptr;
+        for (auto* b : dlg.findChildren<QPushButton*>())
+            if (b->text() == QObject::tr("Use %1").arg("192.168.5.0/24"))
+                useNetwork = b;
+        QVERIFY(useNetwork);
+        useNetwork->click();
+        QCOMPARE(directIn->text(), QString("192.168.5.0/24"));
+
+        // A network that doesn't read isn't saved.
+        directIn->setText("home");
+        QVERIFY(!dlg.save());
+        directIn->setText("192.168.5.0/24");
+
+        // Renaming the jump host keeps desk going through it.
+        dlg.list()->setCurrentRow(0);
+        dlg.findChild<QLineEdit*>("name")->setText("gateway");
+        QCOMPARE(dlg.servers()[1].jump, QString("gateway"));
+        QVERIFY(dlg.save());
+        const SavedServer saved = list.servers()[1];
+        QCOMPARE(saved.jump, QString("gateway"));
+        QCOMPARE(saved.jumpAddress, QString("10.10.0.2"));
+        QCOMPARE(saved.directIn, QString("192.168.5.0/24"));
+        QVERIFY(readFile(list.path()).contains("jump = \"gateway\""));
+
+        // Without the jump host, desk can't be saved.
+        dlg.list()->setCurrentRow(0);
+        for (auto* b : dlg.findChildren<QPushButton*>())
+            if (b->text() == QObject::tr("&Remove"))
+                b->click();
+        QVERIFY(!dlg.save());
     }
 
     // Servers: saved with their login, imported from the SSH config, offered
