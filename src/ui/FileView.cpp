@@ -1126,7 +1126,21 @@ void FileView::startFileDrag()
     const FileEntry* e = fileModel() ? fileModel()->entry(currentRow()) : nullptr;
     if (e)
         drag->setPixmap(model()->index(currentRow(), 0).data(Qt::DecorationRole).value<QIcon>().pixmap(32));
-    drag->exec(Qt::CopyAction | Qt::MoveAction | Qt::LinkAction, Qt::CopyAction);
+    drag->exec(dragActions(QApplication::keyboardModifiers()), Qt::CopyAction);
+}
+
+Qt::DropActions FileView::dragActions(Qt::KeyboardModifiers held)
+{
+#ifdef Q_OS_MACOS
+    // Qt tells macOS to ignore the keys held during a drag, so Option can't
+    // make Finder copy, and Finder moves on the same disk. Copy, unless Shift
+    // was held as the drag started.
+    if (!(held & Qt::ShiftModifier))
+        return Qt::CopyAction | Qt::LinkAction;
+#else
+    Q_UNUSED(held);
+#endif
+    return Qt::CopyAction | Qt::MoveAction | Qt::LinkAction;
 }
 
 }  // namespace tandem

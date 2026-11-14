@@ -3474,6 +3474,21 @@ private slots:
         QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_Escape);
     }
 
+    // Dragging files out: on macOS Finder can't see Option, so drags copy
+    // unless Shift was held as they started; elsewhere all actions are offered.
+    void dragActionsOffered()
+    {
+        const Qt::DropActions all = Qt::CopyAction | Qt::MoveAction | Qt::LinkAction;
+#ifdef Q_OS_MACOS
+        QCOMPARE(FileView::dragActions(Qt::NoModifier), Qt::CopyAction | Qt::LinkAction);
+        QCOMPARE(FileView::dragActions(Qt::AltModifier), Qt::CopyAction | Qt::LinkAction);
+        QCOMPARE(FileView::dragActions(Qt::ShiftModifier), all);
+#else
+        QCOMPARE(FileView::dragActions(Qt::NoModifier), all);
+        QCOMPARE(FileView::dragActions(Qt::ShiftModifier), all);
+#endif
+    }
+
     // Tab in the bookmarks popup: all bookmarks, keys changed and removed there.
     void bookmarkEdit()
     {
