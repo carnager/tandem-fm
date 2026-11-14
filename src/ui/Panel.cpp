@@ -928,9 +928,9 @@ void Panel::applyDefaultColumns()
     QHeaderView* h = m_view->header();
     const QFontMetrics fm(FileView::zoomed(theme().numberFont));
     h->setSectionResizeMode(FileModel::ColName, QHeaderView::Stretch);
-    for (int c = FileModel::ColExt; c < FileModel::ColCount; ++c)
+    h->setSectionResizeMode(FileModel::ColExt, QHeaderView::Fixed);  // as wide as the longest extension
+    for (int c = FileModel::ColSize; c < FileModel::ColCount; ++c)
         h->setSectionResizeMode(c, QHeaderView::Interactive);
-    m_view->setColumnWidth(FileModel::ColExt, fm.horizontalAdvance(QStringLiteral("desktop")) + 24);
     m_view->setColumnWidth(FileModel::ColSize, fm.horizontalAdvance(QStringLiteral("999.9 MiB")) + 24);
     // Dates: room for the longer of both styles ("Yesterday 23:59", "2026-12-31 23:59").
     const int dateWidth = qMax(fm.horizontalAdvance(QStringLiteral("2026-12-31 23:59")),
