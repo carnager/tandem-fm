@@ -3562,6 +3562,20 @@ private slots:
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), R());
 
+        // The keys the hint names work from inside it.
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(chords->isVisible());
+        QVERIFY(!popup->isVisible());
+        QTest::keyClick(chords, Qt::Key_Escape);
+        QTRY_VERIFY(!chords->isVisible());
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_J, Qt::ControlModifier);
+        QTRY_VERIFY(popup->isVisible() && popup->currentItem() && popup->currentItem()->chord.isEmpty());
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+        QTRY_VERIFY(!popup->isVisible());
+
         // A space first: search by name, keys or not.
         m_left->view()->setFocus();
         QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);

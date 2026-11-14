@@ -2103,7 +2103,20 @@ void MainWindow::openBookmarks(const QString& keys)
         items << it;
     }
     m_popup->queryItem = nullptr;
-    m_popup->keyHandler = nullptr;
+    // The popup keeps Ctrl+keys from the window; the two the hint names go through.
+    m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem*) {
+        const QKeySequence pressed(e->keyCombination());
+        for (QAction* a : actions()) {
+            const QString id = a->property("commandId").toString();
+            if ((id == QLatin1String("jump-to-folder-search") || id == QLatin1String("bookmark-this-folder")) &&
+                a->shortcuts().contains(pressed)) {
+                m_popup->hide();
+                a->trigger();
+                return true;
+            }
+        }
+        return false;
+    };
     m_popup->open(tr("Type a bookmark's key, or a space and its name"), items,
                   tr("Enter: go   ·   Space: search by name   ·   %1: all folders   ·   %2: bookmark this folder")
                       .arg(keyHint(QStringLiteral("jump-to-folder-search"), false),
