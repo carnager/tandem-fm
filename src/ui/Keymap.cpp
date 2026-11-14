@@ -58,8 +58,7 @@ const QString kModalHeader = QStringLiteral(
     "# Besides the commands above: down, up, parent, open, top, bottom,\n"
     "# half-page-down, half-page-up, visual, visual-unmark, find, find-next,\n"
     "# find-previous, palette, command-line, bookmark-jump, bookmark-set,\n"
-    "# create (a name ending in / makes a folder), jobs, preview-up, preview-down.\n"
-    "# bookmark-prefix: after it, a key bound to nothing goes to that bookmark (g h: home).\n");
+    "# create (a name ending in / makes a folder), jobs, preview-up, preview-down.\n");
 
 }  // namespace
 
@@ -96,7 +95,7 @@ const QStringList& Keymap::builtinActions()
         QStringLiteral("half-page-down"), QStringLiteral("half-page-up"),  QStringLiteral("visual"),
         QStringLiteral("visual-unmark"), QStringLiteral("find"),           QStringLiteral("find-next"),
         QStringLiteral("find-previous"), QStringLiteral("palette"),        QStringLiteral("command-line"),
-        QStringLiteral("bookmark-jump"), QStringLiteral("bookmark-set"),   QStringLiteral("bookmark-prefix"),
+        QStringLiteral("bookmark-jump"), QStringLiteral("bookmark-set"),
         // Handled by the window, without a menu entry of their own:
         QStringLiteral("create"),        QStringLiteral("jobs"),           QStringLiteral("preview-up"),
         QStringLiteral("preview-down"),
@@ -125,7 +124,6 @@ const QList<std::pair<QString, QString>>& Keymap::modalDefaults()
         {QStringLiteral("command-line"), QStringLiteral("!")},
         {QStringLiteral("bookmark-jump"), QStringLiteral("'")},
         {QStringLiteral("bookmark-set"), QStringLiteral("m")},
-        {QStringLiteral("bookmark-prefix"), QStringLiteral("g")},
         {QStringLiteral("copy-to-clipboard"), QStringLiteral("y")},
         {QStringLiteral("cut-to-clipboard"), QStringLiteral("x")},
         {QStringLiteral("paste"), QStringLiteral("p")},

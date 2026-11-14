@@ -83,7 +83,7 @@ signals:
     void cursorMoved();
     void searchNextRequested(int direction);  // vim n / N
     void paletteRequested();                  // vim :
-    void bookmarkJumpRequested(const QString& keys);  // vim ' and g<key>
+    void bookmarkJumpRequested();  // modal '
     void bookmarkAssignRequested();                   // vim m
     void commandRequested();                          // vim !
     void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);

@@ -3594,14 +3594,14 @@ private slots:
         QTest::keyClick(chords, Qt::Key_Return);
         QTRY_COMPARE(h.pathForKey("zz"), L("sub/deep"));
 
-        // Vim: g + key.
+        // Modal: ' opens the list, then the key.
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
         m_left->setVimKeys(true);
         m_left->view()->setFocus();
-        QTest::keyClicks(m_left->view(), "gz");
+        QTest::keyClicks(m_left->view(), "'");
         QTRY_VERIFY(popup->isVisible());
-        QTest::keyClicks(QApplication::focusWidget(), "z");
+        QTest::keyClicks(QApplication::focusWidget(), "zz");
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
         m_left->setVimKeys(false);
 

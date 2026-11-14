@@ -229,7 +229,7 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::zoomRequested, this, &MainWindow::setZoom);
         connect(p, &Panel::commandIdRequested, this, &MainWindow::runCommandId);
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
-        connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { openBookmarks(keys); });
+        connect(p, &Panel::bookmarkJumpRequested, this, [this] { openBookmarks(); });
         connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
         connect(p, &Panel::bookmarkEditRequested, this, [this](const QString& path) { m_chords->openAssign(path); });
         connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
@@ -2080,7 +2080,7 @@ void MainWindow::jumpToFolder()
 }
 
 // Bookmarks like the palette: keys jump at once, a space first searches by name.
-void MainWindow::openBookmarks(const QString& keys)
+void MainWindow::openBookmarks()
 {
     QList<PopupItem> items;
     for (const FolderHistory::Bookmark& b : FolderHistory::instance().pinnedBookmarks()) {
@@ -2112,8 +2112,6 @@ void MainWindow::openBookmarks(const QString& keys)
     m_popup->open(tr("Type a bookmark's key, or a space and its name"), items,
                   tr("Enter: go   ·   Space: search by name   ·   %1: bookmark this folder")
                       .arg(keyHint(QStringLiteral("bookmark-this-folder"), false)));
-    if (!keys.isEmpty())
-        m_popup->setQuery(keys);
 }
 
 // ------------------------------------------------------------ icon themes

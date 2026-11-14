@@ -190,7 +190,7 @@ private:
     void openSettings(int page = 0);
     void showTrash();
     void showServers(const QString& uri = {}, bool bookmarks = false);  // the Locations window
-    void openBookmarks(const QString& keys = {});  // Ctrl+D: keys jump, a space searches
+    void openBookmarks();  // Ctrl+D: keys jump, a space searches
     void findDuplicates();
     void showDiskUsage();
     void showChecksums();

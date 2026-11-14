@@ -928,10 +928,6 @@
         <translation>Lesezeichen setzen</translation>
     </message>
     <message>
-        <source>Bookmark prefix (then the bookmark&apos;s key)</source>
-        <translation>Lesezeichen-Präfix (danach die Taste des Lesezeichens)</translation>
-    </message>
-    <message>
         <source>Create a file or folder</source>
         <translation>Datei oder Ordner anlegen</translation>
     </message>
@@ -2153,10 +2149,6 @@
 </context>
 <context>
     <name>tandem::FileView</name>
-    <message>
-        <source>any other key: that bookmark</source>
-        <translation>jede andere Taste: dieses Lesezeichen</translation>
-    </message>
     <message numerus="yes">
         <source>%n item(s)</source>
         <translation>

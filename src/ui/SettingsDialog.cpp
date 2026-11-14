@@ -935,7 +935,6 @@ const std::pair<const char*, const char*> kModalOnly[] = {
     {"command-line", QT_TRANSLATE_NOOP("SettingsDialog", "Command line")},
     {"bookmark-jump", QT_TRANSLATE_NOOP("SettingsDialog", "Go to a bookmark")},
     {"bookmark-set", QT_TRANSLATE_NOOP("SettingsDialog", "Set a bookmark")},
-    {"bookmark-prefix", QT_TRANSLATE_NOOP("SettingsDialog", "Bookmark prefix (then the bookmark's key)")},
     {"create", QT_TRANSLATE_NOOP("SettingsDialog", "Create a file or folder")},
     {"jobs", QT_TRANSLATE_NOOP("SettingsDialog", "Background jobs")},
     {"preview-up", QT_TRANSLATE_NOOP("SettingsDialog", "Scroll the preview up")},

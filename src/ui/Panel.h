@@ -146,7 +146,7 @@ signals:
     void serversRequested(const QString& uri);
     void cursorChanged(Panel* panel);
     void paletteRequested();
-    void bookmarkJumpRequested(const QString& keys);
+    void bookmarkJumpRequested();
     void bookmarkAssignRequested();
     void bookmarkEditRequested(const QString& path);  // its key, from Locations
     void bookmarksWindowRequested();
