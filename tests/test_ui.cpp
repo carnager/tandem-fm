@@ -310,6 +310,27 @@ private slots:
         QVERIFY(qAbs(split->sizes()[0] - split->sizes()[1]) <= 1);
     }
 
+    // The Ext column is as wide as the longest extension in the folder.
+    void extColumnFitsExtensions()
+    {
+        QHeaderView* h = m_left->view()->header();
+        h->setSectionHidden(FileModel::ColExt, false);
+        auto cleanup = qScopeGuard([&] {
+            QFile::remove(L("notes.markdown"));
+            h->setSectionHidden(FileModel::ColExt, true);
+        });
+        m_left->view()->fitColumns();
+        const int narrow = h->sectionSize(FileModel::ColExt);
+        QVERIFY(narrow < h->fontMetrics().horizontalAdvance("markdown") + 24);
+        writeFile(L("notes.markdown"), "md");
+        QTRY_VERIFY(leftModel()->rowOf("notes.markdown") >= 0);
+        QVERIFY(h->sectionSize(FileModel::ColExt) > narrow);
+        QFile::remove(L("notes.markdown"));
+        QTRY_VERIFY(leftModel()->rowOf("notes.markdown") < 0);
+        m_left->refresh();
+        QTRY_COMPARE(h->sectionSize(FileModel::ColExt), narrow);
+    }
+
     void enterAndLeaveFolder()
     {
         moveCursorTo(m_left, "sub");
