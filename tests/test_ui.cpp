@@ -1919,11 +1919,8 @@ private slots:
         QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key.startsWith(L("sub")));
         QTest::keyClicks(QApplication::focusWidget(), " dee");
         QTRY_VERIFY(popup->currentItem() && popup->currentItem()->key == L("sub/deep"));
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_P, Qt::ControlModifier);  // pin it
-        QVERIFY(FolderHistory::instance().isPinned(L("sub/deep")));
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), L("sub/deep"));
-        FolderHistory::instance().setPinned(L("sub/deep"), false);
         m_left->navigate(L());
         QTRY_COMPARE(leftModel()->path(), L());
     }
@@ -3562,19 +3559,12 @@ private slots:
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
         QTRY_COMPARE(leftModel()->path(), R());
 
-        // The keys the hint names work from inside it.
+        // The key the hint names works from inside it.
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY(chords->isVisible());
         QVERIFY(!popup->isVisible());
         QTest::keyClick(chords, Qt::Key_Escape);
         QTRY_VERIFY(!chords->isVisible());
-        m_left->view()->setFocus();
-        QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
-        QTRY_VERIFY(popup->isVisible());
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_J, Qt::ControlModifier);
-        QTRY_VERIFY(popup->isVisible() && popup->currentItem() && popup->currentItem()->chord.isEmpty());
-        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
-        QTRY_VERIFY(!popup->isVisible());
 
         // A space first: search by name, keys or not.
         m_left->view()->setFocus();

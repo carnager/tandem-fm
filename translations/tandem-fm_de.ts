@@ -3091,20 +3091,12 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Enter: ausführen oder öffnen   ·   %1: nur Ordner</translation>
     </message>
     <message>
-        <source>pinned</source>
-        <translation>angeheftet</translation>
-    </message>
-    <message>
         <source>Jump to a folder: type parts of its path</source>
         <translation>Zu einem Ordner springen: Teile des Pfads eingeben</translation>
     </message>
     <message>
         <source>Type a bookmark&apos;s key, or a space and its name</source>
         <translation>Taste eines Lesezeichens, oder Leerzeichen und sein Name</translation>
-    </message>
-    <message>
-        <source>Enter: go   ·   Space: search by name   ·   %1: all folders   ·   %2: bookmark this folder</source>
-        <translation>Enter: hin   ·   Space: nach Namen suchen   ·   %1: alle Ordner   ·   %2: Lesezeichen für diesen Ordner</translation>
     </message>
     <message>
         <source>Enter: save   ·   %1 opens one</source>
@@ -3156,6 +3148,14 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Extracting %1 …</source>
         <translation>%1 wird entpackt …</translation>
+    </message>
+    <message>
+        <source>Enter: go   ·   Shift+Del: forget   ·   %1: bookmarks</source>
+        <translation>Enter: öffnen   ·   Umschalt+Entf: vergessen   ·   %1: Lesezeichen</translation>
+    </message>
+    <message>
+        <source>Enter: go   ·   Space: search by name   ·   %1: bookmark this folder</source>
+        <translation>Enter: öffnen   ·   Space: nach Namen suchen   ·   %1: Lesezeichen für diesen Ordner</translation>
     </message>
     <message>
         <source>Cannot extract: %1</source>
@@ -3623,10 +3623,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Copy to another tab, a bookmark or a recent folder</source>
         <translation>In einen anderen Tab, ein Lesezeichen oder einen letzten Ordner kopieren</translation>
-    </message>
-    <message>
-        <source>Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   %1: bookmark keys</source>
-        <translation>Enter: öffnen   ·   Strg+P: anheften / lösen   ·   Umschalt+Entf: vergessen   ·   %1: Lesezeichen-Tasten</translation>
     </message>
     <message>
         <source>No bookmarks yet: %1 bookmarks the shown folder</source>

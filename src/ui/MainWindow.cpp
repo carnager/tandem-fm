@@ -2053,9 +2053,9 @@ QList<PopupItem> MainWindow::folderItems() const
         it.subtitle = f.path;
         it.matchSubtitle = true;
         it.icon = f.pinned ? pin : folder;
-        // Pins on top; otherwise frecency nudges the fuzzy ranking (zoxide-like).
-        it.bonus = f.pinned ? 1000 : int(12 * std::log2(1 + f.frecency));
-        it.hint = !f.key.isEmpty() ? f.key : (f.pinned ? tr("pinned") : QString());
+        // How well it matches comes first; frecency nudges (zoxide-like).
+        it.bonus = int(12 * std::log2(1 + f.frecency));
+        it.hint = f.key;  // a bookmark's key: the faster way there
         const QString path = f.path;
         it.run = [this, path] { active()->navigate(path); };
         items.append(it);
@@ -2069,11 +2069,6 @@ void MainWindow::jumpToFolder()
     m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
         if (!it)
             return false;
-        if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_P) {
-            FolderHistory::instance().setPinned(it->key, !FolderHistory::instance().isPinned(it->key));
-            m_popup->setItems(folderItems());
-            return true;
-        }
         if ((e->modifiers() & Qt::ShiftModifier) && e->key() == Qt::Key_Delete) {
             FolderHistory::instance().forget(it->key);
             m_popup->setItems(folderItems());
@@ -2082,7 +2077,7 @@ void MainWindow::jumpToFolder()
         return false;
     };
     m_popup->open(tr("Jump to a folder: type parts of its path"), folderItems(),
-                  tr("Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   %1: bookmark keys")
+                  tr("Enter: go   ·   Shift+Del: forget   ·   %1: bookmarks")
                       .arg(keyHint(QStringLiteral("bookmarks-key-chains"), false)));
 }
 
@@ -2103,13 +2098,12 @@ void MainWindow::openBookmarks(const QString& keys)
         items << it;
     }
     m_popup->queryItem = nullptr;
-    // The popup keeps Ctrl+keys from the window; the two the hint names go through.
+    // The popup keeps Ctrl+keys from the window; the one the hint names goes through.
     m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem*) {
         const QKeySequence pressed(e->keyCombination());
         for (QAction* a : actions()) {
             const QString id = a->property("commandId").toString();
-            if ((id == QLatin1String("jump-to-folder-search") || id == QLatin1String("bookmark-this-folder")) &&
-                a->shortcuts().contains(pressed)) {
+            if (id == QLatin1String("bookmark-this-folder") && a->shortcuts().contains(pressed)) {
                 m_popup->hide();
                 a->trigger();
                 return true;
@@ -2118,9 +2112,8 @@ void MainWindow::openBookmarks(const QString& keys)
         return false;
     };
     m_popup->open(tr("Type a bookmark's key, or a space and its name"), items,
-                  tr("Enter: go   ·   Space: search by name   ·   %1: all folders   ·   %2: bookmark this folder")
-                      .arg(keyHint(QStringLiteral("jump-to-folder-search"), false),
-                           keyHint(QStringLiteral("bookmark-this-folder"), false)));
+                  tr("Enter: go   ·   Space: search by name   ·   %1: bookmark this folder")
+                      .arg(keyHint(QStringLiteral("bookmark-this-folder"), false)));
     if (!keys.isEmpty())
         m_popup->setQuery(keys);
 }
