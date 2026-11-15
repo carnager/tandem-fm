@@ -336,6 +336,21 @@ private slots:
         m_left->refresh();
         QTRY_COMPARE(h->sectionSize(FileModel::ColExt), narrow);
 
+        // Size likewise: as wide as the sizes shown ("4.88 KiB" here), up
+        // to "999.9 MiB"; a folder of tiny files gets a narrower one.
+        const int here = h->sectionSize(FileModel::ColSize);
+        const QFontMetrics nfm(FileView::zoomed(theme().numberFont));
+        QVERIFY(here < nfm.horizontalAdvance("999.9 MiB") + 24);
+        QVERIFY(QDir().mkpath(L("tiny")));
+        writeFile(L("tiny/a"), "1");
+        auto removeTiny = qScopeGuard([&] { QDir(L("tiny")).removeRecursively(); });
+        m_left->navigate(L("tiny"));
+        QTRY_COMPARE(leftModel()->path(), L("tiny"));
+        QTRY_VERIFY(h->sectionSize(FileModel::ColSize) < here);
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QTRY_COMPARE(h->sectionSize(FileModel::ColSize), here);
+
         // A width saved by older versions is ignored, and none is saved.
         m_left->setColumnLayout({"name", "ext 300", "size 98", "modified 168"});
         QCOMPARE(h->sectionSize(FileModel::ColExt), narrow);
@@ -909,9 +924,9 @@ private slots:
         QCOMPARE(h->logicalIndex(2), int(FileModel::ColSize));
         QVERIFY(!h->isSectionHidden(FileModel::ColOwner));
         QVERIFY(h->isSectionHidden(FileModel::ColTime));
-        QCOMPARE(h->sectionSize(FileModel::ColSize), 120);
+        QVERIFY(h->sectionSize(FileModel::ColSize) < 120);  // fits the sizes shown, whatever was saved
         const QStringList layout = m_left->columnLayout();
-        QCOMPARE(layout.mid(0, 5), QStringList({"name", "owner 77", "size 120", "-modified", "-ext"}));
+        QCOMPARE(layout.mid(0, 5), QStringList({"name", "owner 77", "size", "-modified", "-ext"}));
         QVERIFY(layout.contains("-link"));  // not named: where it was, hidden
         QCOMPARE(layout.size(), int(FileModel::ColCount));
 
@@ -923,7 +938,7 @@ private slots:
         old.setSectionHidden(FileModel::ColExt, true);
         old.moveSection(old.visualIndex(FileModel::ColTime), 1);
         QCOMPARE(Panel::columnLayoutFromHeaderState(old.saveState()).mid(1),
-                 QStringList({"modified " + QString::number(old.sectionSize(FileModel::ColTime)), "-ext", "size 111",
+                 QStringList({"modified " + QString::number(old.sectionSize(FileModel::ColTime)), "-ext", "size",
                               "attributes " + QString::number(old.sectionSize(FileModel::ColAttr))}));
         QVERIFY(Panel::columnLayoutFromHeaderState("garbage").isEmpty());
 
