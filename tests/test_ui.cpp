@@ -336,6 +336,11 @@ private slots:
         m_left->refresh();
         QTRY_COMPARE(h->sectionSize(FileModel::ColExt), narrow);
 
+        // A width saved by older versions is ignored, and none is saved.
+        m_left->setColumnLayout({"name", "ext 300", "size 98", "modified 168"});
+        QCOMPARE(h->sectionSize(FileModel::ColExt), narrow);
+        QVERIFY(m_left->columnLayout().contains("ext"));
+
         // Each tab its own: a long extension in another tab doesn't widen this one.
         writeFile(L("sub/notes.markdown"), "md");
         auto removeNote = qScopeGuard([&] { QFile::remove(L("sub/notes.markdown")); });
