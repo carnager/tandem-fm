@@ -3580,10 +3580,91 @@ private slots:
         QCOMPARE(FileView::dragActions(Qt::NoModifier), Qt::CopyAction | Qt::LinkAction);
         QCOMPARE(FileView::dragActions(Qt::AltModifier), Qt::CopyAction | Qt::LinkAction);
         QCOMPARE(FileView::dragActions(Qt::ShiftModifier), all);
+        FileView::setDropMoves(true, true);  // then Finder decides too
+        QCOMPARE(FileView::dragActions(Qt::NoModifier), all);
+        FileView::setDropMoves(false, true);
 #else
         QCOMPARE(FileView::dragActions(Qt::NoModifier), all);
         QCOMPARE(FileView::dragActions(Qt::ShiftModifier), all);
 #endif
+    }
+
+    // Dropping without Shift or Ctrl: copies unless set to move; then maybe
+    // only on one drive, never into archives or to or from servers.
+    void dropDefaultAction()
+    {
+        auto restore = qScopeGuard([] { FileView::setDropMoves(false, true); });
+        FileView::setDropMoves(true, true);
+        QList<MountPoint> mounts;
+        for (const auto& [path, device] : {std::pair{"/", "/dev/sda1"}, {"/home", "/dev/sda2"}, {"/run/media/usb", "/dev/sdb1"}}) {
+            MountPoint m;
+            m.path = path;
+            m.device = device;
+            mounts << m;
+        }
+        auto action = [&](const QStringList& from, const QString& to, bool archive = false) {
+            QList<QUrl> urls;
+            for (const QString& f : from)
+                urls << (isRemoteLocation(f) ? QUrl(f) : QUrl::fromLocalFile(f));
+            return FileView::plainDropAction(urls, to, archive, mounts);
+        };
+        QCOMPARE(action({"/home/me/a"}, "/home/me/b"), Qt::MoveAction);
+        QCOMPARE(action({"/home/me/a"}, "/srv"), Qt::CopyAction);
+        QCOMPARE(action({"/home2/a"}, "/srv"), Qt::MoveAction);  // not under /home
+        QCOMPARE(action({"/run/media/usb/a"}, "/run/media/usb"), Qt::MoveAction);
+        QCOMPARE(action({"/home/me/a", "/run/media/usb/a"}, "/home/me"), Qt::CopyAction);
+        QCOMPARE(action({"/home/me/a"}, "/home/me/x.zip/inner", true), Qt::CopyAction);
+        QCOMPARE(action({"/home/me/a"}, "sftp://desk/home"), Qt::CopyAction);
+        QCOMPARE(action({"sftp://desk/a"}, "/home/me"), Qt::CopyAction);
+        FileView::setDropMoves(true, false);
+        QCOMPARE(action({"/home/me/a"}, "/srv"), Qt::MoveAction);
+        QCOMPARE(action({"/home/me/a"}, "/home/me/x.zip/inner", true), Qt::CopyAction);
+        QCOMPARE(action({"/home/me/a"}, "sftp://desk/home"), Qt::CopyAction);
+
+        // In a panel, on the drive the tests run on.
+        writeFile(L("drag.txt"), "x");
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        QMimeData data;
+        data.setUrls({QUrl::fromLocalFile(L("drag.txt"))});
+        FileView* v = m_left->view();
+        const QPoint below(10, v->viewport()->height() - 5);
+        auto dragWith = [&](Qt::KeyboardModifiers keys) {
+            QDragEnterEvent enter(below, Qt::CopyAction | Qt::MoveAction, &data, Qt::LeftButton, keys);
+            QApplication::sendEvent(v->viewport(), &enter);
+            QDragMoveEvent move(below, Qt::CopyAction | Qt::MoveAction, &data, Qt::LeftButton, keys);
+            QApplication::sendEvent(v->viewport(), &move);
+            const QString text = v->dropText();
+            QDragLeaveEvent leave;
+            QApplication::sendEvent(v->viewport(), &leave);
+            return text.section(' ', 0, 0);
+        };
+        FileView::setDropMoves(true, true);
+        QCOMPARE(dragWith(Qt::NoModifier), QString("Move"));
+        QCOMPARE(dragWith(Qt::ControlModifier), QString("Copy"));
+        FileView::setDropMoves(false, true);
+        QCOMPARE(dragWith(Qt::NoModifier), QString("Copy"));
+        QCOMPARE(dragWith(Qt::ShiftModifier), QString("Move"));
+
+        // Settings: the checkbox only counts while drops move.
+        SettingsDialog dlg(m_window.get());
+        dlg.show();
+        dlg.findChild<QListWidget*>()->setCurrentRow(1);
+        auto* sameDrive = dlg.findChild<QCheckBox*>("dropSameDrive");
+        QVERIFY(sameDrive && !sameDrive->isEnabled());
+        QToolButton* moves = nullptr;
+        for (auto* b : dlg.findChildren<QToolButton*>())
+            if (b->text() == QObject::tr("Moves"))
+                moves = b;
+        QVERIFY(moves);
+        moves->click();
+        QVERIFY(FileView::dropMoves());
+        QVERIFY(sameDrive->isEnabled());
+        sameDrive->setChecked(false);
+        QVERIFY(!FileView::dropMovesSameDriveOnly());
+        QCOMPARE(QSettings().value("input/dropMoves").toBool(), true);
+        QSettings().remove("input/dropMoves");
+        QSettings().remove("input/dropMovesSameDrive");
     }
 
     // Locations › Bookmarks: a list like the servers, the selected one in a

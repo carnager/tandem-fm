@@ -542,6 +542,27 @@ QWidget* SettingsDialog::behaviourPage()
              tr("Letters are commands, as in vim and yazi: j k h l to move, v for visual mode, y x p to copy, cut "
                 "and paste, d to trash, r to rename, a to create, t q for tabs, / to search, : for the palette. "
                 "F1 lists them all. Typing no longer starts the quick search."));
+    auto* sameDrive = new QCheckBox(tr("Only on the same drive"), this);
+    sameDrive->setObjectName(QStringLiteral("dropSameDrive"));
+    sameDrive->setChecked(FileView::dropMovesSameDriveOnly());
+    sameDrive->setEnabled(FileView::dropMoves());
+    page.add(tr("Dropping files"),
+             segments(this, {{QStringLiteral("copy"), tr("Copies")}, {QStringLiteral("move"), tr("Moves")}},
+                      FileView::dropMoves() ? QStringLiteral("move") : QStringLiteral("copy"),
+                      [sameDrive](const QString& code) {
+                          const bool moves = code == QLatin1String("move");
+                          QSettings().setValue(QStringLiteral("input/dropMoves"), moves);
+                          FileView::setDropMoves(moves, FileView::dropMovesSameDriveOnly());
+                          sameDrive->setEnabled(moves);
+                      }),
+             QString());
+    connect(sameDrive, &QCheckBox::toggled, this, [](bool on) {
+        QSettings().setValue(QStringLiteral("input/dropMovesSameDrive"), on);
+        FileView::setDropMoves(FileView::dropMoves(), on);
+    });
+    page.add(QString(), sameDrive,
+             tr("Across drives it then copies, like most file managers. Shift always moves and Ctrl always copies; "
+                "into archives and to or from servers it always copies."));
     page.add(tr("Notifications"),
              toggle(tr("Notify when long operations finish"), m_window->m_actions.value(QStringLiteral("notifications"))),
              tr("A desktop notification when a copy or move that took a while is done and Tandem isn't in front."));
