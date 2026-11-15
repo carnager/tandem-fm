@@ -1283,7 +1283,8 @@ private slots:
         }());
     }
 
-    // F2 renames in place, like Shift+F6, and has a button in the F-key bar.
+    // F2 renames in place, like Shift+F6, and has a button in the F-key bar;
+    // the name is selected without its extension, F2 again selects all of it.
     // Enter confirms the new name without also opening the file.
     void renameWithF2()
     {
@@ -1297,6 +1298,13 @@ private slots:
         QTest::keyClick(m_left->view(), Qt::Key_F2);
         QLineEdit* editor = nullptr;
         QTRY_VERIFY((editor = qobject_cast<QLineEdit*>(QApplication::focusWidget())));
+        // F2 again takes the extension too, once more only the name.
+        QTRY_COMPARE(editor->selectedText(), QString("f2"));
+        QTest::keyClick(editor, Qt::Key_F2);
+        QCOMPARE(editor->selectedText(), QString("f2.txt"));
+        QTest::keyClick(editor, Qt::Key_F2);
+        QCOMPARE(editor->selectedText(), QString("f2"));
+        QCOMPARE(QApplication::focusWidget(), editor);  // still the same rename
         editor->setText("f2-renamed.txt");
         QTest::keyClick(editor, Qt::Key_Return);
         QTRY_VERIFY(QFile::exists(L("f2-renamed.txt")));

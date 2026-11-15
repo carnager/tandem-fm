@@ -1426,6 +1426,8 @@ void Panel::startRename()
         showMessage(why, true);
         return;
     }
+    if (m_view->toggleRenameSelection())
+        return;
     const FileEntry* e = currentEntry();
     if (!e || e->isParent)
         return;
