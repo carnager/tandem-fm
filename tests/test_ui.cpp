@@ -3704,6 +3704,27 @@ private slots:
         popup->hide();
     }
 
+    // The menu button and the menu bar hold the same menus: never both.
+    void menuButtonOrBar()
+    {
+        QToolButton* button = nullptr;
+        for (auto* b : m_window->findChildren<QToolButton*>())
+            if (b->accessibleName() == QObject::tr("Menu"))
+                button = b;
+        QVERIFY(button);
+        const bool before = m_window->menuBar()->isVisible();
+        auto restore = qScopeGuard([&] {
+            if (m_window->menuBar()->isVisible() != before)
+                QTest::keyClick(m_window.get(), Qt::Key_M, Qt::ControlModifier | Qt::ShiftModifier);
+        });
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        for (int i = 0; i < 2; ++i) {
+            QTest::keyClick(m_window.get(), Qt::Key_M, Qt::ControlModifier | Qt::ShiftModifier);
+            QCOMPARE(button->isVisibleTo(m_window.get()), !m_window->menuBar()->isVisibleTo(m_window.get()));
+        }
+    }
+
     void dropDefaultAction()
     {
         auto restore = qScopeGuard([] { FileView::setDropMoves(false, true); });
