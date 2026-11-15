@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Builds packaging/macos/tandem-fm.icns from the app icons in data/.
+"""Builds packaging/macos/tandem-fm.icns from data/tandem-fm.svg.
+
+macOS app icons sit on a rounded square tile (Apple's grid: 824 of 1024 px,
+with a soft shadow), so the glyph is placed on one. Every size is rendered
+from that.
 
 Like Apple's iconutil, which only runs on macOS: 16 and 32 px as ARGB, the
-rest as PNG. 1024 px is rendered from the SVG. Needs Pillow and rsvg-convert.
+rest as PNG. Needs Pillow and rsvg-convert.
 
     python3 packaging/macos/make_icns.py
 """
 import io
+import re
 import struct
 import subprocess
 import sys
@@ -15,17 +20,25 @@ from pathlib import Path
 from PIL import Image
 
 root = Path(__file__).resolve().parents[2]
-icons = root / "data" / "icons"
+glyph = re.sub(r"(?s)^.*?<svg[^>]*>|</svg>\s*$", "", (root / "data" / "tandem-fm.svg").read_text())
+tile = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe3ea"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)" filter="url(#shadow)"/>
+  <g transform="translate(147 150) scale(2.85)">{glyph}</g>
+</svg>"""
 
 
 def png(size):
-    if size == 1024:
-        data = subprocess.run(["rsvg-convert", "-w", "1024", "-h", "1024", str(root / "data" / "tandem-fm.svg")],
-                              check=True, capture_output=True).stdout
-        image = Image.open(io.BytesIO(data))
-    else:
-        image = Image.open(icons / f"{size}x{size}" / "tandem-fm.png")
-    image = image.convert("RGBA")
+    data = subprocess.run(["rsvg-convert", "-w", str(size), "-h", str(size)],
+                          input=tile.encode(), check=True, capture_output=True).stdout
+    image = Image.open(io.BytesIO(data)).convert("RGBA")
     if image.size != (size, size):
         sys.exit(f"{size} px icon is {image.size}")
     return image
