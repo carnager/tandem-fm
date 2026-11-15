@@ -34,6 +34,7 @@
 #include "ui/FuzzyPopup.h"
 #include "ui/Keymap.h"
 #include "ui/KeyChordPopup.h"
+#include "ui/DragData.h"
 #include "ui/IconCache.h"
 #include "ui/MainWindow.h"
 #include "ui/MultiRenameDialog.h"
@@ -2865,6 +2866,63 @@ private slots:
         QVERIFY(ioPool()->waitForDone(5000));
     }
 
+    // Files on a server drag like any others: within one server a drop moves
+    // (when drops move), and the server's paths reach the job.
+    void dragOnServer()
+    {
+        QTemporaryDir serverDir;
+        QVERIFY(QDir().mkpath(serverDir.filePath("src")));
+        QVERIFY(QDir().mkpath(serverDir.filePath("dst")));
+        writeFile(serverDir.filePath("src/one.txt"), "1");
+        writeFile(serverDir.filePath("src/two.txt"), "2");
+        auto backend = std::make_shared<TestBackend>(serverDir.path());
+        registerBackend("test", backend);
+        auto restore = qScopeGuard([&] {
+            FileView::setDropMoves(false, true);
+            m_left->navigate(L());
+            m_right->navigate(R());
+            registerBackend("test", nullptr);
+        });
+        FileView::setDropMoves(true, true);
+        m_left->navigate("test://srv/src");
+        m_right->navigate("test://srv/dst");
+        QTRY_COMPARE(leftModel()->path(), QString("test://srv/src"));
+        QTRY_COMPARE(rightModel()->path(), QString("test://srv/dst"));
+        QTRY_VERIFY(leftModel()->rowOf("one.txt") >= 0);
+
+        auto dragOf = [&](const QString& name) {
+            moveCursorTo(m_left, name);
+            QStringList paths;
+            emit m_left->view()->dragPathsRequested(paths);
+            return paths;
+        };
+        FileView* v = m_right->view();
+        const QPoint below(10, v->viewport()->height() - 5);
+        auto drop = [&](const QStringList& paths, Qt::KeyboardModifiers keys) {
+            std::unique_ptr<QMimeData> data(locationsMimeData(paths));
+            QDragEnterEvent enter(below, Qt::CopyAction | Qt::MoveAction, data.get(), Qt::LeftButton, keys);
+            QApplication::sendEvent(v->viewport(), &enter);
+            QDragMoveEvent move(below, Qt::CopyAction | Qt::MoveAction, data.get(), Qt::LeftButton, keys);
+            QApplication::sendEvent(v->viewport(), &move);
+            const QString said = v->dropText().section(' ', 0, 0);
+            QDropEvent dropped(below, Qt::CopyAction | Qt::MoveAction, data.get(), Qt::LeftButton, keys);
+            QApplication::sendEvent(v->viewport(), &dropped);
+            return said;
+        };
+
+        const QStringList one = dragOf("one.txt");
+        QCOMPARE(one, QStringList{"test://srv/src/one.txt"});
+        QCOMPARE(drop(one, Qt::NoModifier), QString("Move"));
+        QTRY_VERIFY(QFileInfo::exists(serverDir.filePath("dst/one.txt")));
+        QTRY_VERIFY(!QFileInfo::exists(serverDir.filePath("src/one.txt")));
+
+        QTRY_VERIFY(leftModel()->rowOf("two.txt") >= 0);
+        QCOMPARE(drop(dragOf("two.txt"), Qt::ControlModifier), QString("Copy"));
+        QTRY_VERIFY(QFileInfo::exists(serverDir.filePath("dst/two.txt")));
+        QVERIFY(QFileInfo::exists(serverDir.filePath("src/two.txt")));
+        QVERIFY(ioPool()->waitForDone(5000));
+    }
+
     // keys.toml: every command listed; saving it changes keys at once, modal ones too.
     void keysToml()
     {
@@ -3638,10 +3696,7 @@ private slots:
             mounts << m;
         }
         auto action = [&](const QStringList& from, const QString& to, bool archive = false) {
-            QList<QUrl> urls;
-            for (const QString& f : from)
-                urls << (isRemoteLocation(f) ? QUrl(f) : QUrl::fromLocalFile(f));
-            return FileView::plainDropAction(urls, to, archive, mounts);
+            return FileView::plainDropAction(from, to, archive, mounts);
         };
         QCOMPARE(action({"/home/me/a"}, "/home/me/b"), Qt::MoveAction);
         QCOMPARE(action({"/home/me/a"}, "/srv"), Qt::CopyAction);
@@ -3649,12 +3704,17 @@ private slots:
         QCOMPARE(action({"/run/media/usb/a"}, "/run/media/usb"), Qt::MoveAction);
         QCOMPARE(action({"/home/me/a", "/run/media/usb/a"}, "/home/me"), Qt::CopyAction);
         QCOMPARE(action({"/home/me/a"}, "/home/me/x.zip/inner", true), Qt::CopyAction);
+        // A server counts as one drive.
         QCOMPARE(action({"/home/me/a"}, "sftp://desk/home"), Qt::CopyAction);
         QCOMPARE(action({"sftp://desk/a"}, "/home/me"), Qt::CopyAction);
+        QCOMPARE(action({"sftp://desk/a", "sftp://desk/b/c"}, "sftp://desk/d"), Qt::MoveAction);
+        QCOMPARE(action({"sftp://desk/a"}, "sftp://nas/d"), Qt::CopyAction);
+        QCOMPARE(action({"sftp://desk/a"}, "sftp://desk/x.zip/inner", true), Qt::CopyAction);
         FileView::setDropMoves(true, false);
         QCOMPARE(action({"/home/me/a"}, "/srv"), Qt::MoveAction);
         QCOMPARE(action({"/home/me/a"}, "/home/me/x.zip/inner", true), Qt::CopyAction);
-        QCOMPARE(action({"/home/me/a"}, "sftp://desk/home"), Qt::CopyAction);
+        QCOMPARE(action({"/home/me/a"}, "sftp://desk/home"), Qt::MoveAction);
+        QCOMPARE(action({"sftp://desk/a"}, "/home/me"), Qt::MoveAction);
 
         // In a panel, on the drive the tests run on.
         writeFile(L("drag.txt"), "x");

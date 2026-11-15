@@ -78,7 +78,7 @@ private:
     void viewCurrent();
     void editCurrent();
     void openFile(const QString& path);
-    void handleDrop(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
+    void handleDrop(QStringList locations, const QString& targetDir, Qt::DropAction action);
     void copyToClipboard(bool cut);
     void copyPathsAsText();
     void copyNamesAsText(bool withoutExtension);

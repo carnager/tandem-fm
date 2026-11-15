@@ -135,7 +135,7 @@ signals:
     void openFileRequested(const QString& path);
     void zoomRequested(bool grid, int value);  // list percent, or thumbnail size
     void commandIdRequested(const QString& id);  // modal keys
-    void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
+    void dropRequested(const QStringList& locations, const QString& targetDir, Qt::DropAction action);
     void stateChanged();
     void statusChanged();  // folder, tab or selection: what the status line shows changed
     void contextMenuRequested(Panel* panel, const QPoint& globalPos, bool onItem);
