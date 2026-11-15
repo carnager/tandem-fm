@@ -3,6 +3,7 @@
 #include "core/ExifDate.h"
 #include "core/Util.h"
 #include "ui/Theme.h"
+#include "ui/DialogSize.h"
 
 #include <QButtonGroup>
 #include <QDateTime>
@@ -162,6 +163,7 @@ RenameConfirmDialog::RenameConfirmDialog(const RenamePlan& plan, QWidget* parent
 {
     setWindowTitle(tr("Rename from editor"));
     resize(820, 560);
+    rememberSize(this, QStringLiteral("renamePreview"));
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 14, 16, 12);
     auto* model = new RenamePreviewModel(this);
@@ -270,6 +272,7 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString folder, QS
 {
     setWindowTitle(plural(tr("Rename %n item(s)", nullptr, int(m_items.size())), int(m_items.size())));
     resize(940, 640);
+    rememberSize(this, QStringLiteral("multiRename"));
     const Theme& t = theme();
 
     auto* layout = new QVBoxLayout(this);

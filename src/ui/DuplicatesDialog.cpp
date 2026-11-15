@@ -3,6 +3,7 @@
 #include "core/Util.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
+#include "ui/DialogSize.h"
 
 #include <QButtonGroup>
 #include <QCheckBox>
@@ -27,6 +28,7 @@ DuplicatesDialog::DuplicatesDialog(QString here, QString other, QWidget* parent)
 {
     setWindowTitle(tr("Duplicate files"));
     resize(1000, 660);
+    rememberSize(this, QStringLiteral("duplicates"));
     setThemeStyle(this, QStringLiteral(
         "QToolButton#segment { padding: 5px 12px; border: 1px solid @control; background: @base; }"
         "QToolButton#segment:hover:!checked { background: @altBase; border-color: @accent; }"

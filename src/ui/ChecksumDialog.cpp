@@ -3,6 +3,7 @@
 #include "core/Checksums.h"
 #include "core/Util.h"
 #include "ui/Theme.h"
+#include "ui/DialogSize.h"
 
 #include <QApplication>
 #include <QButtonGroup>
@@ -36,6 +37,7 @@ ChecksumDialog::ChecksumDialog(QStringList paths, QWidget* parent) : QDialog(par
     m_base = parentPath(m_paths.first());
     setWindowTitle(m_verify ? tr("Check checksums") : tr("Checksums"));
     resize(900, 560);
+    rememberSize(this, QStringLiteral("checksums"));
     setThemeStyle(this, QStringLiteral(
         "QToolButton#segment { padding: 5px 12px; border: 1px solid @control; background: @base; }"
         "QToolButton#segment:hover:!checked { background: @altBase; border-color: @accent; }"

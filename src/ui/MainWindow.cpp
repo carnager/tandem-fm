@@ -15,6 +15,7 @@
 #include "core/Util.h"
 #include "ui/DirTab.h"
 #include "ui/Dialogs.h"
+#include "ui/DialogSize.h"
 #include "ui/FileModel.h"
 #include "ui/FileColors.h"
 #include "ui/FileView.h"
@@ -2909,6 +2910,7 @@ void MainWindow::runCommand(const QString& command, bool inTerminal)
         dlg->setAttribute(Qt::WA_DeleteOnClose);
         dlg->setWindowTitle(command);
         dlg->resize(760, 460);
+        rememberSize(dlg, QStringLiteral("commandOutput"));
         auto* l = new QVBoxLayout(dlg);
         auto* text = new QPlainTextEdit(out, dlg);
         text->setReadOnly(true);

@@ -47,6 +47,7 @@
 #include "ui/CardList.h"
 #include "core/Servers.h"
 #include "ui/AboutDialog.h"
+#include "core/TomlSettings.h"
 #include "ui/ShortcutsDialog.h"
 #include "ui/TrashDialog.h"
 #include "ui/Panel.h"
@@ -213,6 +214,7 @@ private slots:
         QStandardPaths::setTestModeEnabled(true);
         setKeyringHooksForTests({});  // never the real keyring
         installTestLaunchGuard();      // never real apps
+        QSettings().remove(QStringLiteral("dialogs"));  // sizes from earlier runs
         qputenv("XDG_CONFIG_HOME", QFile::encodeName(m_tmp.filePath("config")));
         applyTheme(*qApp);
         DirWatcher::instance();
@@ -3150,6 +3152,24 @@ private slots:
         QVERIFY(dlg.visibleEntries() >= 1);
         dlg.filterEdit()->setText("zzzz");
         QCOMPARE(dlg.visibleEntries(), 0);
+    }
+
+    // Dialogs open at the size they had when last closed.
+    void dialogRemembersSize()
+    {
+        QSettings().remove(QStringLiteral("dialogs/shortcuts"));
+        const QSize chosen(520, 410);
+        {
+            ShortcutsDialog dlg(m_window.get());
+            dlg.show();
+            QVERIFY(dlg.size() != chosen);
+            dlg.resize(chosen);
+            dlg.close();
+        }
+        QVERIFY(isStateKey(QStringLiteral("dialogs/shortcuts")));
+        ShortcutsDialog again(m_window.get());
+        QCOMPARE(again.size(), chosen);
+        QSettings().remove(QStringLiteral("dialogs/shortcuts"));
     }
 
     // Help > About Tandem: the mascot, the version, the project's page.
