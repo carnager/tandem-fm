@@ -60,8 +60,10 @@ int main(int argc, char** argv)
     tandem::applyTheme(app);
 #ifdef Q_OS_MACOS
     tandem::installDialogKeys(&app);  // underlined letters on buttons
-#endif
+    // No window icon: on macOS it replaces the app's Dock icon from the bundle.
+#else
     QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("tandem-fm"), QIcon(QStringLiteral(":/icons/tandem-fm.svg"))));
+#endif
     tandem::DirWatcher::instance();  // must be created on the UI thread
     tandem::registerBuiltinBackends();
     tandem::setActivationTokenProvider(tandem::requestActivationToken);  // started apps get the focus (Wayland)
