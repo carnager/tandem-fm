@@ -1,4 +1,5 @@
 #include "ui/MainWindow.h"
+#include "ui/DragData.h"
 #include "ui/OpenUrl.h"
 #include "core/Launch.h"
 
@@ -125,28 +126,6 @@ private:
     QString m_full, m_brief;
 };
 
-QStringList localPaths(const QList<QUrl>& urls)
-{
-    QStringList out;
-    for (const QUrl& u : urls)
-        if (u.isLocalFile())
-            out.append(QDir::cleanPath(u.toLocalFile()));
-    return out;
-}
-
-// Tandem's own clipboard format: locations as Tandem writes them, server
-// ones included, separated by NUL. Other programs get the usual URL list.
-const QString kLocationsMime = QStringLiteral("application/x-tandem-locations");
-
-QUrl locationUrl(const QString& location)
-{
-    if (!isRemoteLocation(location))
-        return QUrl::fromLocalFile(location);
-    QUrl u(locationRoot(location), QUrl::TolerantMode);
-    u.setPath(locationPath(location));
-    return u;
-}
-
 QString describeItems(const QStringList& paths)
 {
     if (paths.size() == 1)
@@ -222,8 +201,8 @@ MainWindow::MainWindow(const QStringList& startPaths)
         });
         connect(p, &Panel::openFileRequested, this, [this, p](const QString& path) { openFrom(p, path); });
         connect(p, &Panel::dropRequested, this,
-                [this, p](const QList<QUrl>& urls, const QString& dir, Qt::DropAction action) {
-                    handleDrop(urls, dir, action);
+                [this](const QStringList& locations, const QString& dir, Qt::DropAction action) {
+                    handleDrop(locations, dir, action);
                 });
         connect(p, &Panel::contextMenuRequested, this, &MainWindow::showContextMenu);
         connect(p, &Panel::zoomRequested, this, &MainWindow::setZoom);
@@ -805,9 +784,7 @@ QWidget* MainWindow::createFKeyBar()
     m_shelfBar = new ShelfBar(bar);
     connect(m_shelfBar, &ShelfBar::openRequested, this, &MainWindow::openShelf);
     connect(m_shelfBar, &ShelfBar::dropped, this, [this](int shelf, const QMimeData* mime) {
-        const QStringList paths = mime->hasFormat(kLocationsMime)
-                                      ? QString::fromUtf8(mime->data(kLocationsMime)).split(QChar(0), Qt::SkipEmptyParts)
-                                      : localPaths(mime->urls());
+        const QStringList paths = locationsOf(mime);
         const int added = Shelves::instance().add(shelf, paths);
         active()->showMessage(plural(tr("%n put on shelf %1", nullptr, added), added).arg(shelf));
     });
@@ -1520,19 +1497,12 @@ void MainWindow::openFile(const QString& path)
         active()->showMessage(tr("No application to open %1").arg(baseName(path)), true);
 }
 
-void MainWindow::handleDrop(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action)
+void MainWindow::handleDrop(QStringList paths, const QString& targetDir, Qt::DropAction action)
 {
-    QStringList paths = localPaths(urls);
     // Dropping something onto the folder it already lives in does nothing.
     paths.removeIf([&](const QString& p) { return parentPath(p) == targetDir || p == targetDir; });
-    if (paths.isEmpty())
-        return;
-    const auto mode = action == Qt::MoveAction ? CopyJob::Mode::Move : CopyJob::Mode::Copy;
-    if (Panel* ap = archivePanelFor(targetDir)) {
-        addToArchive(ap, paths, ap->innerPath(targetDir), mode == CopyJob::Mode::Move);
-        return;
-    }
-    m_jobs->add(new CopyJob(mode, paths, targetDir));
+    if (!paths.isEmpty())
+        putInto(paths, targetDir, action == Qt::MoveAction);
 }
 
 void MainWindow::copyToClipboard(bool cut)
@@ -1544,16 +1514,10 @@ void MainWindow::copyToClipboard(bool cut)
         active()->showMessage(tr("The clipboard can't hold archive contents yet. Use F5 to extract."), true);
         return;
     }
-    auto* mime = new QMimeData;
-    QList<QUrl> urls;
+    QMimeData* mime = locationsMimeData(paths);
     QByteArray gnome = cut ? "cut" : "copy";
-    for (const QString& p : paths) {
-        const QUrl u = locationUrl(p);
-        urls.append(u);
+    for (const QUrl& u : mime->urls())
         gnome += '\n' + u.toEncoded();
-    }
-    mime->setUrls(urls);
-    mime->setData(kLocationsMime, paths.join(QChar(0)).toUtf8());
     mime->setData(QStringLiteral("x-special/gnome-copied-files"), gnome);
     mime->setData(QStringLiteral("application/x-kde-cutselection"), cut ? "1" : "0");
     mime->setText(paths.join(QLatin1Char('\n')));
@@ -1618,11 +1582,7 @@ void MainWindow::pasteInto(const QString& dir)
     const QMimeData* mime = QApplication::clipboard()->mimeData();
     if (!mime)
         return;
-    // Our own list first: it keeps server locations, which URLs from other
-    // programs can't be trusted to.
-    const QStringList paths = mime->hasFormat(kLocationsMime)
-                                  ? QString::fromUtf8(mime->data(kLocationsMime)).split(QChar(0), Qt::SkipEmptyParts)
-                                  : localPaths(mime->urls());
+    const QStringList paths = locationsOf(mime);
     if (paths.isEmpty())
         return;
     const bool cut = mime->data(QStringLiteral("x-special/gnome-copied-files")).startsWith("cut") ||

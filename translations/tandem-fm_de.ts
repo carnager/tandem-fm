@@ -4171,10 +4171,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Zoom (Strg+Mausrad, Strg+= und Strg+−, Strg+0 setzt zurück)</translation>
     </message>
     <message>
-        <source>Dragging files off a server isn&apos;t supported yet. Use F5 to copy.</source>
-        <translation>Dateien von einem Server zu ziehen geht noch nicht. F5 kopiert.</translation>
-    </message>
-    <message>
         <source>Cannot open %1: %2</source>
         <translation>%1 kann nicht geöffnet werden: %2</translation>
     </message>

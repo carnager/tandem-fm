@@ -6,6 +6,7 @@
 #include "core/Mounts.h"
 #include "core/Sorting.h"
 #include "core/Util.h"
+#include "ui/DragData.h"
 #include "ui/FileColors.h"
 #include "ui/FileModel.h"
 #include "ui/Keymap.h"
@@ -908,7 +909,7 @@ QString FileView::dropTargetFor(const QPoint& pos, int* row) const
 
 void FileView::dragEnterEvent(QDragEnterEvent* e)
 {
-    if (e->mimeData()->hasUrls()) {
+    if (!locationsOf(e->mimeData()).isEmpty()) {
         // Only /proc (or getfsstat without waiting): nothing that can hang.
         m_dragMounts = g_dropMoves && g_dropSameDriveOnly ? listMounts() : QList<MountPoint>{};
         e->acceptProposedAction();
@@ -925,7 +926,7 @@ Qt::DropAction FileView::dropActionFor(const QDropEvent* e, const QString& targe
         return Qt::CopyAction;
     if (!g_dropMoves || !(e->possibleActions() & Qt::MoveAction))
         return e->proposedAction();
-    return plainDropAction(e->mimeData()->urls(), target, m_inArchive && m_inArchive(), m_dragMounts);
+    return plainDropAction(locationsOf(e->mimeData()), target, m_inArchive && m_inArchive(), m_dragMounts);
 }
 
 void FileView::setDropMoves(bool moves, bool sameDriveOnly)
@@ -944,18 +945,17 @@ bool FileView::dropMovesSameDriveOnly()
     return g_dropSameDriveOnly;
 }
 
-Qt::DropAction FileView::plainDropAction(const QList<QUrl>& sources, const QString& target, bool intoArchive,
+Qt::DropAction FileView::plainDropAction(const QStringList& sources, const QString& target, bool intoArchive,
                                          const QList<MountPoint>& mounts)
 {
-    if (sources.isEmpty() || intoArchive || isRemoteLocation(target))
+    if (sources.isEmpty() || intoArchive)
         return Qt::CopyAction;
-    for (const QUrl& u : sources)
-        if (!u.isLocalFile())
-            return Qt::CopyAction;
     if (!g_dropSameDriveOnly)
         return Qt::MoveAction;
-    // The device of the innermost mount holding the path.
+    // A server, or the device of the innermost mount holding the path.
     auto drive = [&](const QString& path) {
+        if (isRemoteLocation(path))
+            return locationAuthority(path);
         const MountPoint* best = nullptr;
         for (const MountPoint& m : mounts) {
             const bool holds = m.path == QLatin1String("/") || path == m.path ||
@@ -968,15 +968,15 @@ Qt::DropAction FileView::plainDropAction(const QList<QUrl>& sources, const QStri
     const QString there = drive(target);
     if (there.isEmpty())
         return Qt::CopyAction;
-    for (const QUrl& u : sources)
-        if (drive(QDir::cleanPath(u.toLocalFile())) != there)
+    for (const QString& s : sources)
+        if (drive(s) != there)
             return Qt::CopyAction;
     return Qt::MoveAction;
 }
 
 void FileView::dragMoveEvent(QDragMoveEvent* e)
 {
-    if (!e->mimeData()->hasUrls()) {
+    if (locationsOf(e->mimeData()).isEmpty()) {
         e->ignore();
         return;
     }
@@ -1059,14 +1059,15 @@ void FileView::dropEvent(QDropEvent* e)
     m_dropRow = -1;
     m_dropText.clear();
     viewport()->update();
-    if (!e->mimeData()->hasUrls() || target.isEmpty()) {
+    const QStringList locations = locationsOf(e->mimeData());
+    if (locations.isEmpty() || target.isEmpty()) {
         e->ignore();
         return;
     }
     const Qt::DropAction action = dropActionFor(e, target);
     e->setDropAction(action);
     e->accept();
-    emit dropRequested(e->mimeData()->urls(), target, action);
+    emit dropRequested(locations, target, action);
 }
 
 void FileView::currentChanged(const QModelIndex& current, const QModelIndex& previous)
@@ -1175,11 +1176,7 @@ void FileView::startFileDrag()
     emit dragPathsRequested(paths);
     if (paths.isEmpty())
         return;
-    auto* mime = new QMimeData;
-    QList<QUrl> urls;
-    for (const QString& p : std::as_const(paths))
-        urls.append(QUrl::fromLocalFile(p));
-    mime->setUrls(urls);
+    QMimeData* mime = locationsMimeData(paths);
     auto* drag = new QDrag(this);
     drag->setMimeData(mime);
     const FileEntry* e = fileModel() ? fileModel()->entry(currentRow()) : nullptr;

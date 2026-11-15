@@ -515,8 +515,6 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_view, &FileView::dragPathsRequested, this, [this](QStringList& out) {
         if (inArchive())
             showMessage(tr("Dragging out of archives isn't supported yet. Use F5 to extract."), true);
-        else if (isRemote())
-            showMessage(tr("Dragging files off a server isn't supported yet. Use F5 to copy."), true);
         else
             out = selectedPaths();
     });

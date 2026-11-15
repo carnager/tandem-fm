@@ -65,9 +65,9 @@ public:
     static void setDropMoves(bool moves, bool sameDriveOnly);
     static bool dropMoves();
     static bool dropMovesSameDriveOnly();
-    // What such a drop does while moving is set: never a move into an archive
-    // or to or from a server; on one drive by the device in mounts.
-    static Qt::DropAction plainDropAction(const QList<QUrl>& sources, const QString& target, bool intoArchive,
+    // What such a drop does while moving is set: never a move into an
+    // archive; a server counts as one drive, local ones by the device in mounts.
+    static Qt::DropAction plainDropAction(const QStringList& sources, const QString& target, bool intoArchive,
                                           const QList<MountPoint>& mounts);
     void setInArchiveCheck(std::function<bool()> check) { m_inArchive = std::move(check); }
     void zoomChanged();            // re-measures the rows
@@ -101,7 +101,7 @@ signals:
     void bookmarkJumpRequested(const QString& keys);  // vim ' and g<key>
     void bookmarkAssignRequested();                   // vim m
     void commandRequested();                          // vim !
-    void dropRequested(const QList<QUrl>& urls, const QString& targetDir, Qt::DropAction action);
+    void dropRequested(const QStringList& locations, const QString& targetDir, Qt::DropAction action);
     void dragPathsRequested(QStringList& out);  // panel fills marked/current paths
     void contextMenuRequested(const QPoint& globalPos, int row);  // row -1: empty area
     void zoomStepRequested(int step);  // Ctrl+wheel: +1 bigger, -1 smaller
