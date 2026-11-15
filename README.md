@@ -176,6 +176,7 @@ found at build time:
 | libacl | POSIX ACL editing on Linux |
 | KSyntaxHighlighting for Qt 6 | Syntax highlighting in the viewer |
 | Qt Multimedia (with its FFmpeg backend at runtime) | Playing videos and music in the viewer and preview |
+| wayland-client and wayland-scanner | Programs started from Tandem get the focus on Wayland, also on another workspace |
 | Qt Linguist tools | Compiled translations and translation updates |
 
 At runtime, `fd` speeds up filename search, `rg` handles content search,

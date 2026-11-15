@@ -1,6 +1,7 @@
 #include "TestLaunchGuard.h"
 #include "core/Archive.h"
 #include "core/Backend.h"
+#include "core/Launch.h"
 #include "core/ConfigDir.h"
 #include "core/DesktopApps.h"
 #include "core/DirLister.h"
@@ -472,6 +473,27 @@ private slots:
                     {"mpv", "--player-operation-mode=pseudo-gui", "--", "/y"}}));
         QCOMPARE(DesktopApps::commandLines("gimp %i %F", {"/p.png"}), L({{"gimp", "/p.png"}}));
         QCOMPARE(DesktopApps::commandLines("\"my app\" --x=100%%", {"/f"}), L({{"my app", "--x=100%", "/f"}}));
+    }
+
+    // Started programs get the compositor's activation token (Wayland), so
+    // their window takes the focus; never a stale one Tandem was given.
+    void launchPassesActivationToken()
+    {
+        QTemporaryDir tmp;
+        const QString out = tmp.filePath("env");
+        const QStringList args = {"-c", QString("echo \"$XDG_ACTIVATION_TOKEN|$DESKTOP_STARTUP_ID\" > '%1'").arg(out)};
+        qputenv("XDG_ACTIVATION_TOKEN", "stale");
+        auto restore = qScopeGuard([] {
+            qunsetenv("XDG_ACTIVATION_TOKEN");
+            setActivationTokenProvider({});
+        });
+        setActivationTokenProvider([] { return QString("fresh-token"); });
+        QVERIFY(launchDetached("sh", args, tmp.path()));
+        QTRY_COMPARE(readFile(out).trimmed(), QByteArray("fresh-token|fresh-token"));
+        QFile::remove(out);
+        setActivationTokenProvider([] { return QString(); });
+        QVERIFY(launchDetached("sh", args, tmp.path()));
+        QTRY_COMPARE(readFile(out).trimmed(), QByteArray("|"));
     }
 
     void terminalCommands()

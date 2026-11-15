@@ -1,7 +1,9 @@
+#include "core/Launch.h"
 #include "core/Backend.h"
 #include "core/ConfigDir.h"
 #include "core/DirWatcher.h"
 #include "core/TomlSettings.h"
+#include "ui/Activation.h"
 #include "ui/AuthDialogs.h"
 #include "ui/DialogKeys.h"
 #include "ui/Keymap.h"
@@ -62,6 +64,7 @@ int main(int argc, char** argv)
     QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("tandem-fm"), QIcon(QStringLiteral(":/icons/tandem-fm.svg"))));
     tandem::DirWatcher::instance();  // must be created on the UI thread
     tandem::registerBuiltinBackends();
+    tandem::setActivationTokenProvider(tandem::requestActivationToken);  // started apps get the focus (Wayland)
     tandem::installAuthDialogs();
     tandem::Network::instance().recentServers();  // drops passwords older versions stored
 
