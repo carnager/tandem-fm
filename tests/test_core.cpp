@@ -113,6 +113,40 @@ private slots:
         QCOMPARE(names, QStringList({"..", "A-dir", "b-dir", "file1", "File2", "file10"}));
     }
 
+    void mixedFolderSort()
+    {
+        std::vector<FileEntry> entries = {entry("z-folder", true), entry("file10.txt"), entry("File2.txt"),
+                                         entry("a.txt"), entry("b-folder", true)};
+        FileEntry parent = entry("..", true);
+        parent.isParent = true;
+        entries.push_back(parent);
+        auto names = [&] {
+            QStringList result;
+            for (const auto& e : entries)
+                result << e.name;
+            return result;
+        };
+        sortEntries(entries, {SortColumn::Name, false, false});
+        QCOMPARE(names(), QStringList({"..", "a.txt", "b-folder", "File2.txt", "file10.txt", "z-folder"}));
+        sortEntries(entries, {SortColumn::Name, true, false});
+        QCOMPARE(names(), QStringList({"..", "z-folder", "file10.txt", "File2.txt", "b-folder", "a.txt"}));
+        sortEntries(entries, {SortColumn::Name, false});
+        QCOMPARE(names(), QStringList({"..", "b-folder", "z-folder", "a.txt", "File2.txt", "file10.txt"}));
+
+        // Mixed extension sorting must be symmetric: folders have no extension.
+        entries = {entry("z.txt", true), entry("a.zip"), entry("b.txt"), entry("b", true), entry("a")};
+        const SortSpec spec{SortColumn::Ext, false, false};
+        for (const auto& a : entries)
+            for (const auto& b : entries) {
+                QVERIFY(!(entryLess(a, b, spec) && entryLess(b, a, spec)));
+                for (const auto& c : entries)
+                    if (entryLess(a, b, spec) && entryLess(b, c, spec))
+                        QVERIFY(entryLess(a, c, spec));
+            }
+        sortEntries(entries, spec);
+        QCOMPARE(names(), QStringList({"a", "b", "z.txt", "b.txt", "a.zip"}));
+    }
+
     void extension()
     {
         QCOMPARE(extensionOf("archive.tar.gz").toString(), QString("tar.gz"));
@@ -1246,6 +1280,8 @@ private slots:
         QVERIFY(h.isPinned("/b"));
         h.forget("/a");
         QCOMPARE(h.items().size(), 1);
+        h.forget("/b");             // a bookmark: its visits go, it stays
+        QVERIFY(h.isPinned("/b"));
         QVERIFY(FolderHistory::frecency(10, 0, 30) > FolderHistory::frecency(10, 0, 30 * 86400));
 
         // Bookmarks: unique keys, chains, persistence.
@@ -1263,6 +1299,15 @@ private slots:
         QCOMPARE(h.bookmarks().size(), 2);
         h.setPinned("/docs", false);    // unpinning drops the key
         QCOMPARE(h.pathForKey("cd"), QString());
+
+        // Key suggestions: from the name, free, and no clash with the start of another.
+        QCOMPARE(FolderHistory::suggestKeys("/home/me/Downloads", {}), QStringList({"d", "do", "dw"}));
+        QCOMPARE(FolderHistory::suggestKeys("/home/me/Downloads", {"d", "dw"}), QStringList({"o", "w", "n"}));
+        QCOMPARE(FolderHistory::suggestKeys("/x/tandem-fm", {}).at(1), QString("tf"));  // the initials
+        QCOMPARE(FolderHistory::suggestKeys("/x/tandem-fm", {"t"}).first(), QString("a"));  // tf would make t wait
+        QCOMPARE(FolderHistory::suggestKeys("/x/MusicRips", {}).at(1), QString("mr"));
+        QVERIFY(!FolderHistory::suggestKeys("/x/c", {"cp"}).contains("c"));  // c would need Enter
+        QCOMPARE(FolderHistory::suggestKeys("/", {"a"}).first(), QString("b"));
 
         // Old (v1) files still load; a missing file gets the defaults.
         writeFile(tmp.filePath("old.tsv"), "3\t100\t1\t/pinned old\n1\t50\t0\t/seen\n");

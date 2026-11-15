@@ -32,6 +32,7 @@
 #include "ui/MultiRenameDialog.h"
 #include "ui/PermissionsDialog.h"
 #include "ui/ServersDialog.h"
+#include "ui/BookmarksEditor.h"
 #include "ui/SettingsDialog.h"
 #include "ui/AboutDialog.h"
 #include "ui/ShortcutsDialog.h"
@@ -208,6 +209,10 @@ MainWindow::MainWindow(const QStringList& startPaths)
 
     for (Panel* p : {m_left, m_right}) {
         connect(p, &Panel::activated, this, &MainWindow::setActive);
+        connect(p, &Panel::stateChanged, this, [this, p] {
+            if (m_foldersFirstAction && p == active())
+                m_foldersFirstAction->setChecked(p->sortSpec().foldersFirst);
+        });
         connect(p, &Panel::switchRequested, this, [this] {
             other()->view()->setFocus();
         });
@@ -224,11 +229,13 @@ MainWindow::MainWindow(const QStringList& startPaths)
         connect(p, &Panel::zoomRequested, this, &MainWindow::setZoom);
         connect(p, &Panel::commandIdRequested, this, &MainWindow::runCommandId);
         connect(p, &Panel::paletteRequested, this, &MainWindow::commandPalette);
-        connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { m_chords->openJump(keys); });
-        connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path()); });
+        connect(p, &Panel::bookmarkJumpRequested, this, [this](const QString& keys) { openBookmarks(keys); });
+        connect(p, &Panel::bookmarkAssignRequested, this, [this] { m_chords->openAssign(active()->path(), active()->starButton()); });
+        connect(p, &Panel::bookmarkEditRequested, this, [this](const QString& path) { m_chords->openAssign(path); });
         connect(p, &Panel::commandRequested, this, &MainWindow::openCommandBar);
         connect(p, &Panel::trashRequested, this, &MainWindow::showTrash);
-        connect(p, &Panel::serversRequested, this, &MainWindow::showServers);
+        connect(p, &Panel::serversRequested, this, [this](const QString& uri) { showServers(uri); });
+        connect(p, &Panel::bookmarksWindowRequested, this, [this] { showServers({}, true); });
         connect(p, &Panel::archiveRenameRequested, this, [this, p](const QString& from, const QString& to) {
             ArchiveChanges c;
             c.rename.append({p->innerPath(from), p->innerPath(to)});
@@ -272,8 +279,6 @@ MainWindow::MainWindow(const QStringList& startPaths)
     m_commandBar = new CommandBar(this);
     connect(m_commandBar, &CommandBar::runRequested, this, &MainWindow::runCommand);
     m_chords = new KeyChordPopup(this);
-    connect(m_chords, &KeyChordPopup::jumpRequested, this, [this](const QString& p) { active()->navigate(p); });
-    connect(m_chords, &KeyChordPopup::fuzzyRequested, this, &MainWindow::jumpToFolder);
     connect(m_chords, &KeyChordPopup::message, this,
             [this](const QString& text, bool error) { active()->showMessage(text, error); });
     m_quickTimer = new QTimer(this);
@@ -314,6 +319,8 @@ void MainWindow::setActive(Panel* p)
     m_active = p;
     m_left->setActive(p == m_left);
     m_right->setActive(p == m_right);
+    if (m_foldersFirstAction)
+        m_foldersFirstAction->setChecked(p->sortSpec().foldersFirst);
     scheduleFKeyUpdate();
     if (m_quickView)
         m_quickTimer->start();
@@ -456,8 +463,9 @@ void MainWindow::createMenus()
     // mouse; the keys show where shortcuts go. Filled each time it opens.
     QMenu* marks = bar->addMenu(tr("&Bookmarks"));
     addCommand(marks, QT_TR_NOOP("Bookmark this folder…"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_D)},
-               [this] { m_chords->openAssign(active()->path()); });
-    addCommand(marks, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { m_chords->openJump(); });
+               [this] { m_chords->openAssign(active()->path(), active()->starButton()); });
+    addCommand(marks, QT_TR_NOOP("Bookmarks (key chains)…"), {K(Qt::CTRL | Qt::Key_D)}, [this] { openBookmarks(); });
+    addCommand(marks, QT_TR_NOOP("Edit bookmarks…"), {}, [this] { showServers({}, true); });
     marks->addSeparator();
     connect(marks, &QMenu::aboutToShow, this, [this, marks] { fillBookmarksMenu(marks); });
 
@@ -492,9 +500,31 @@ void MainWindow::createMenus()
     m_actions[QStringLiteral("sortExt")] = addCommand(sort, QT_TR_NOOP("Sort by extension"), {K(Qt::CTRL | Qt::Key_F4)}, [this] { active()->sortBy(SortColumn::Ext); });
     m_actions[QStringLiteral("sortDate")] = addCommand(sort, QT_TR_NOOP("Sort by date"), {K(Qt::CTRL | Qt::Key_F5)}, [this] { active()->sortBy(SortColumn::Time); });
     m_actions[QStringLiteral("sortSize")] = addCommand(sort, QT_TR_NOOP("Sort by size"), {K(Qt::CTRL | Qt::Key_F6)}, [this] { active()->sortBy(SortColumn::Size); });
+    sort->addSeparator();
+    m_foldersFirstAction = addCommand(sort, QT_TR_NOOP("Folders first"), {}, [this] {
+        SortSpec spec = active()->sortSpec();
+        spec.foldersFirst = !spec.foldersFirst;
+        active()->setSortSpec(spec);
+        m_foldersFirstAction->setChecked(spec.foldersFirst);
+    });
+    m_foldersFirstAction->setCheckable(true);
+    m_foldersFirstAction->setChecked(true);
+    connect(sort, &QMenu::aboutToShow, this,
+            [this] { m_foldersFirstAction->setChecked(active()->sortSpec().foldersFirst); });
     for (QAction* a : sort->actions())
         a->setProperty("category", tr("View"));  // for the palette and keys page
     view->addSeparator();
+    addCommand(view, tr("Equal panel widths (50/50)"), {}, [this] {
+        m_panelRatio = 0.5;  // setSizes does not emit splitterMoved
+        QList<int> sizes = m_splitter->sizes();
+        if (sizes.size() < 2)
+            return;
+        const int total = qMax(2, sizes[0] + sizes[1]);
+        sizes[0] = total / 2;
+        sizes[1] = total - sizes[0];
+        // Keep a right-side preview at its current width.
+        m_splitter->setSizes(sizes);
+    }, QStringLiteral("equal-panel-widths"));
     m_hiddenAction = addCommand(view, QT_TR_NOOP("Show hidden files"), {K(Qt::CTRL | Qt::Key_H)}, [this] {
         m_left->setShowHidden(m_hiddenAction->isChecked());
         m_right->setShowHidden(m_hiddenAction->isChecked());
@@ -700,9 +730,11 @@ void MainWindow::findDuplicates()
 }
 
 // Saved servers: edit them, or connect the active panel to one.
-void MainWindow::showServers(const QString& uri)
+void MainWindow::showServers(const QString& uri, bool bookmarks)
 {
     ServersDialog dlg(this, uri);
+    dlg.bookmarks()->setCurrentFolder(active()->path());
+    dlg.showBookmarks(bookmarks);
     QPointer<Panel> target(active());
     dlg.onConnect = [target](const QString& uri) {
         if (target)
@@ -1871,7 +1903,7 @@ QWidget* MainWindow::createTopBar(QWidget* parent)
     l->addWidget(name);
     l->addStretch(1);
     m_searchField = new QPushButton(IconCache::themed("edit-find", "system-search"),
-                                    tr("Go to a folder, find a file, run a command"), bar);
+                                    tr("Find a file or run a command"), bar);
     m_searchField->setObjectName(QStringLiteral("searchField"));
     m_searchField->setFocusPolicy(Qt::NoFocus);
     m_searchField->setCursor(Qt::IBeamCursor);
@@ -1955,10 +1987,8 @@ void MainWindow::commandPalette()
     });
     for (PopupItem& it : items)
         it.section = rank(it) < kRecentShown ? tr("Recently used") : tr("Commands");
-    for (PopupItem it : folderItems()) {
-        it.section = tr("Folders");
-        items.append(it);
-    }
+    // Folders have their own lists (Ctrl+J, Ctrl+D): here they crowded out
+    // the commands, the often visited ones most of all.
     Panel* p = active();
     if (DirTab* t = p->tab(); t && !t->isSearch()) {
         const QString dir = p->path();
@@ -1980,15 +2010,23 @@ void MainWindow::commandPalette()
             items.append(it);
         }
     }
-    // The jump key (Ctrl+J) narrows to folders, keeping what was typed. The
-    // list's own Ctrl+J (down) would take it otherwise.
+    // The jump key (Ctrl+J) goes on to the folders, keeping what was typed;
+    // the bookmarks key (Ctrl+D) to the bookmarks. The list's own Ctrl+J
+    // (down) would take it otherwise.
     m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem*) {
-        bool jump = false;
-        for (QAction* a : actions())
-            if (a->property("commandId").toString() == QLatin1String("jump-to-folder-search"))
-                for (const QKeySequence& k : a->shortcuts())
-                    jump |= k.count() == 1 && k[0] == e->keyCombination();
-        if (!jump)
+        auto is = [&](const char* id) {
+            for (QAction* a : actions())
+                if (a->property("commandId").toString() == QLatin1String(id))
+                    for (const QKeySequence& k : a->shortcuts())
+                        if (k.count() == 1 && k[0] == e->keyCombination())
+                            return true;
+            return false;
+        };
+        if (is("bookmarks-key-chains")) {
+            QTimer::singleShot(0, this, [this] { openBookmarks(); });
+            return true;
+        }
+        if (!is("jump-to-folder-search"))
             return false;
         const QString query = m_popup->query();
         QTimer::singleShot(0, this, [this, query] {  // not from inside the handler it replaces
@@ -1998,10 +2036,12 @@ void MainWindow::commandPalette()
         return true;
     };
     m_popup->queryItem = nullptr;
-    const QString placeholder = tr("Go to a folder, find a file, run a command");
+    const QString placeholder = tr("Find a file or run a command");
     const QString jumpKey = keyHint(QStringLiteral("jump-to-folder-search"), false);
-    const QString footer = jumpKey.isEmpty() ? tr("Enter: run or open")
-                                             : tr("Enter: run or open   ·   %1: folders only").arg(jumpKey);
+    const QString marksKey = keyHint(QStringLiteral("bookmarks-key-chains"), false);
+    const QString footer = jumpKey.isEmpty() || marksKey.isEmpty()
+                               ? tr("Enter: run or open")
+                               : tr("Enter: run or open   ·   %1: visited folders   ·   %2: bookmarks").arg(jumpKey, marksKey);
     if (m_searchField && m_searchField->isVisible())
         m_popup->openUnder(m_searchField, placeholder, items, footer);
     else
@@ -2010,9 +2050,7 @@ void MainWindow::commandPalette()
 
 QList<PopupItem> MainWindow::folderItems() const
 {
-    static const QIcon pin = IconCache::themed("pin", "emblem-favorite");
     static const QIcon folder = IconCache::themed("folder");
-    const QString home = QDir::homePath();
     QList<PopupItem> items;
     for (const FolderHistory::Item& f : FolderHistory::instance().items()) {
         PopupItem it;
@@ -2020,10 +2058,10 @@ QList<PopupItem> MainWindow::folderItems() const
         it.title = f.path == QLatin1String("/") ? f.path : baseName(f.path);
         it.subtitle = f.path;
         it.matchSubtitle = true;
-        it.icon = f.pinned ? pin : folder;
-        // Pins on top; otherwise frecency nudges the fuzzy ranking (zoxide-like).
-        it.bonus = f.pinned ? 1000 : int(12 * std::log2(1 + f.frecency));
-        it.hint = !f.key.isEmpty() ? f.key : (f.pinned ? tr("pinned") : QString());
+        it.icon = folder;
+        // How well it matches comes first; frecency nudges (zoxide-like), and
+        // being a bookmark a little more. Bookmarks have Ctrl+D of their own.
+        it.bonus = int(12 * std::log2(1 + f.frecency)) + (f.pinned ? 24 : 0);
         const QString path = f.path;
         it.run = [this, path] { active()->navigate(path); };
         items.append(it);
@@ -2037,11 +2075,6 @@ void MainWindow::jumpToFolder()
     m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
         if (!it)
             return false;
-        if ((e->modifiers() & Qt::ControlModifier) && e->key() == Qt::Key_P) {
-            FolderHistory::instance().setPinned(it->key, !FolderHistory::instance().isPinned(it->key));
-            m_popup->setItems(folderItems());
-            return true;
-        }
         if ((e->modifiers() & Qt::ShiftModifier) && e->key() == Qt::Key_Delete) {
             FolderHistory::instance().forget(it->key);
             m_popup->setItems(folderItems());
@@ -2050,8 +2083,58 @@ void MainWindow::jumpToFolder()
         return false;
     };
     m_popup->open(tr("Jump to a folder: type parts of its path"), folderItems(),
-                  tr("Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   %1: bookmark keys")
+                  tr("Enter: go   ·   Shift+Del: forget   ·   %1: bookmarks")
                       .arg(keyHint(QStringLiteral("bookmarks-key-chains"), false)));
+}
+
+// Bookmarks like the palette: keys jump at once, a space first searches by name.
+void MainWindow::openBookmarks(const QString& keys)
+{
+    QList<PopupItem> items;
+    for (const FolderHistory::Bookmark& b : FolderHistory::instance().pinnedBookmarks()) {
+        PopupItem it;
+        it.icon = IconCache::themed(b.path.contains(QLatin1String("://")) ? "folder-remote" : "folder", "folder");
+        it.title = baseName(b.path).isEmpty() ? b.path : baseName(b.path);
+        it.subtitle = it.title == b.path ? QString() : b.path;
+        it.matchSubtitle = !it.subtitle.isEmpty();  // the whole path, not only its name
+        it.hint = b.key;
+        it.chord = b.key;
+        it.key = b.path;
+        it.run = [this, path = b.path] { active()->navigate(path); };
+        items << it;
+    }
+    m_popup->queryItem = nullptr;
+    m_popup->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
+        // Shift+Enter: in the other panel; Ctrl+Enter: in a new tab.
+        if (it && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) &&
+            (e->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier))) {
+            const QString path = it->key;
+            const bool newTab = e->modifiers() & Qt::ControlModifier;
+            m_popup->hide();
+            Panel* other = active() == m_left ? m_right : m_left;
+            if (newTab)
+                active()->addTab(path);
+            else
+                other->navigate(path);
+            return true;
+        }
+        // The popup keeps Ctrl+keys from the window; the one the hint names goes through.
+        const QKeySequence pressed(e->keyCombination());
+        for (QAction* a : actions()) {
+            const QString id = a->property("commandId").toString();
+            if (id == QLatin1String("bookmark-this-folder") && a->shortcuts().contains(pressed)) {
+                m_popup->hide();
+                a->trigger();
+                return true;
+            }
+        }
+        return false;
+    };
+    m_popup->open(tr("Type a bookmark's key"), items,
+                  tr("Enter: go   ·   Shift+Enter: other panel   ·   Ctrl+Enter: new tab   ·   Tab: search   ·   %1: add this folder")
+                      .arg(keyHint(QStringLiteral("bookmark-this-folder"), false)));
+    if (!keys.isEmpty())
+        m_popup->setQuery(keys);
 }
 
 // ------------------------------------------------------------ icon themes
@@ -3335,7 +3418,14 @@ void MainWindow::fillBookmarksMenu(QMenu* menu)
     static const QIcon folder = IconCache::themed("folder");
     static const QIcon pin = IconCache::themed("pin", "emblem-favorite");
     auto entry = [&](const QString& path, const QString& key, const QIcon& icon) {
-        QAction* a = add(menu->addAction(icon, key.isEmpty() ? label(path) : label(path) + QLatin1Char('\t') + key));
+#ifdef Q_OS_MACOS
+        // The menu bar there turns text after a tab into a real shortcut:
+        // a bookmark keyed "up" would take the Up arrow.
+        const QString text = key.isEmpty() ? label(path) : QStringLiteral("%1   (%2)").arg(label(path), key);
+#else
+        const QString text = key.isEmpty() ? label(path) : label(path) + QLatin1Char('\t') + key;
+#endif
+        QAction* a = add(menu->addAction(icon, text));
         a->setToolTip(path);
         a->setStatusTip(path);
         connect(a, &QAction::triggered, this, [this, path] { active()->navigate(path); });
@@ -3854,6 +3944,7 @@ void MainWindow::loadSettings(const QStringList& startPaths)
         SortSpec spec;
         spec.column = SortColumn(s.value(QStringLiteral("sortColumn"), 0).toInt());
         spec.descending = s.value(QStringLiteral("sortDescending"), false).toBool();
+        spec.foldersFirst = s.value(QStringLiteral("foldersFirst"), true).toBool();
         p.panel->setSortSpec(spec);
         p.panel->setShowHidden(hidden);
         // Columns by name; older versions kept Qt's header state, read once.
@@ -3961,6 +4052,7 @@ void MainWindow::saveSettings()
         s.setValue(QStringLiteral("tabPins"), pins);
         s.setValue(QStringLiteral("sortColumn"), int(panel->sortSpec().column));
         s.setValue(QStringLiteral("sortDescending"), panel->sortSpec().descending);
+        s.setValue(QStringLiteral("foldersFirst"), panel->sortSpec().foldersFirst);
         s.setValue(QStringLiteral("columns"), panel->columnLayout());
         s.remove(QStringLiteral("header"));  // older versions
         s.endGroup();

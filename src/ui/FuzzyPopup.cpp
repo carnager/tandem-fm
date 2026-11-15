@@ -5,13 +5,17 @@
 
 #include <QApplication>
 #include <QGraphicsDropShadowEffect>
+#include <QHBoxLayout>
 #include <QHash>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListView>
+#include <QMenu>
 #include <QPainter>
 #include <QTextLayout>
+#include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -216,6 +220,9 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
         "QLineEdit { background: @base; color: @text; border: 1px solid @border; border-radius: 8px;"
         "  padding: 7px 10px; }"
         "QLineEdit:focus { border-color: @accent; }"
+        "QToolButton#mode { color: @accent; background: @base; border: 1px solid @border; border-radius: 8px;"
+        "  padding: 7px 10px; font-weight: 600; }"
+        "QToolButton#mode:hover { border-color: @accent; }"
         "QListView { background: transparent; border: none; outline: none; }"
         "QLabel { color: @dimText; }"));
     auto* shadow = new QGraphicsDropShadowEffect(this);
@@ -237,7 +244,21 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
     else
         editFont.setPixelSize(qRound(editFont.pixelSize() * 1.1));
     m_edit->setFont(editFont);
-    layout->addWidget(m_edit);
+    m_mode = new QToolButton(this);
+    m_mode->setObjectName(QStringLiteral("mode"));
+    m_mode->setFocusPolicy(Qt::NoFocus);
+    m_mode->setCursor(Qt::PointingHandCursor);
+    m_mode->setToolTip(tr("Tab switches between keys and searching by name"));
+    m_mode->hide();
+    // As wide as its wider word, so the field doesn't move when it switches.
+    const QFontMetrics mfm(m_mode->font());
+    m_mode->setMinimumWidth(qMax(mfm.horizontalAdvance(tr("Key")), mfm.horizontalAdvance(tr("Search"))) + 26);
+    connect(m_mode, &QToolButton::clicked, this, [this] { setSearching(m_mode->text() != tr("Search")); });
+    auto* editRow = new QHBoxLayout;
+    editRow->setSpacing(6);
+    editRow->addWidget(m_mode);
+    editRow->addWidget(m_edit, 1);
+    layout->addLayout(editRow);
     m_model = new PopupModel(this);
     m_list = new QListView(this);
     m_list->setModel(m_model);
@@ -248,6 +269,7 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
     m_list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     layout->addWidget(m_list, 1);
     m_footer = new QLabel(this);
+    m_footer->setWordWrap(true);  // never cut off
     m_footer->hide();
     layout->addWidget(m_footer);
 
@@ -255,6 +277,23 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
     connect(m_list, &QListView::clicked, this, [this](const QModelIndex& i) {
         m_list->setCurrentIndex(i);
         activate();
+    });
+    m_list->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_list, &QListView::customContextMenuRequested, this, [this](const QPoint& pos) {
+        const QModelIndex i = m_list->indexAt(pos);
+        const PopupItem* it = m_model->item(i.row());
+        if (!it || it->menu.isEmpty())
+            return;
+        m_list->setCurrentIndex(i);
+        QMenu menu(this);
+        for (const auto& [text, run] : it->menu)
+            connect(menu.addAction(text), &QAction::triggered, this, [this, run] {
+                close();
+                run();
+            });
+        menu.exec(m_list->viewport()->mapToGlobal(pos));
+        if (isVisible())
+            m_edit->setFocus();
     });
     hide();
     window->installEventFilter(this);
@@ -273,6 +312,9 @@ void FuzzyPopup::open(const QString& placeholder, const QList<PopupItem>& items,
     if (!isVisible())
         m_returnFocus = QApplication::focusWidget();
     m_items = items;
+    m_searchChosen = false;
+    m_mode->setVisible(std::any_of(m_items.cbegin(), m_items.cend(), [](const PopupItem& it) { return !it.chord.isEmpty(); }));
+    m_placeholder = placeholder;
     m_edit->setPlaceholderText(placeholder);
     m_footer->setText(footer);
     m_footer->setVisible(!footer.isEmpty());
@@ -325,6 +367,40 @@ void FuzzyPopup::refilter()
 {
     const QString q = m_edit->text().trimmed();
     m_shown = m_items;
+    // Typing keys: the rows whose keys start with it, the exact one first
+    // (Enter takes it); a complete key no other one continues runs at once.
+    const QString typedKeys = m_edit->text();
+    bool searching = m_searchChosen;
+    if (!typedKeys.isEmpty() && !m_searchChosen) {
+        QList<PopupModel::Row> keyed;
+        int exact = -1;
+        for (int i = 0; i < m_shown.size(); ++i) {
+            if (m_shown[i].chord.isEmpty() || !m_shown[i].chord.startsWith(typedKeys))
+                continue;
+            if (m_shown[i].chord == typedKeys)
+                exact = int(keyed.size());
+            keyed.append({i, {}, {}});
+        }
+        if (!keyed.isEmpty()) {
+            if (exact > 0)
+                keyed.move(exact, 0);
+            m_model->set(&m_shown, keyed);
+            m_list->setCurrentIndex(m_model->index(0));
+            place();
+            if (keyed.size() == 1 && exact >= 0)
+                QTimer::singleShot(0, this, [this] {
+                    if (isVisible())
+                        activate();
+                });
+            m_mode->setText(tr("Key"));
+            m_edit->setPlaceholderText(m_placeholder);
+            return;
+        }
+        searching = true;  // no key starts like this: a name, then
+    }
+    m_mode->setText(searching ? tr("Search") : tr("Key"));
+    if (m_mode->isVisible())
+        m_edit->setPlaceholderText(searching ? tr("Search by name or path") : m_placeholder);
     std::optional<PopupItem> typed = queryItem && !q.isEmpty() ? queryItem(q) : std::nullopt;
     QList<PopupModel::Row> rows;
     QList<int> scores;
@@ -370,6 +446,13 @@ void FuzzyPopup::refilter()
     if (m_model->rowCount() > 0)
         m_list->setCurrentIndex(m_model->index(0));
     place();
+}
+
+void FuzzyPopup::setSearching(bool on)
+{
+    m_searchChosen = on;
+    m_edit->setFocus();
+    refilter();
 }
 
 void FuzzyPopup::place()
@@ -451,6 +534,12 @@ bool FuzzyPopup::eventFilter(QObject* obj, QEvent* e)
     case Qt::Key_Escape:
         close();
         return true;
+    case Qt::Key_Tab:
+        if (m_mode->isVisible()) {
+            setSearching(m_mode->text() != tr("Search"));
+            return true;
+        }
+        break;
     case Qt::Key_Return:
     case Qt::Key_Enter:
         activate();

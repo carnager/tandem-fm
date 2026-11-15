@@ -886,6 +886,97 @@
     </message>
 </context>
 <context>
+    <name>SettingsDialog</name>
+    <message>
+        <source>Move down</source>
+        <translation>Nach unten</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Nach oben</translation>
+    </message>
+    <message>
+        <source>Out of the folder</source>
+        <translation>Aus dem Ordner heraus</translation>
+    </message>
+    <message>
+        <source>Into the folder, or open</source>
+        <translation>In den Ordner hinein oder öffnen</translation>
+    </message>
+    <message>
+        <source>To the top</source>
+        <translation>Zum Anfang</translation>
+    </message>
+    <message>
+        <source>To the bottom</source>
+        <translation>Zum Ende</translation>
+    </message>
+    <message>
+        <source>Half a page down</source>
+        <translation>Eine halbe Seite nach unten</translation>
+    </message>
+    <message>
+        <source>Half a page up</source>
+        <translation>Eine halbe Seite nach oben</translation>
+    </message>
+    <message>
+        <source>Visual mode</source>
+        <translation>Visueller Modus</translation>
+    </message>
+    <message>
+        <source>Visual mode, unmarking</source>
+        <translation>Visueller Modus, Markierung aufheben</translation>
+    </message>
+    <message>
+        <source>Search in the list</source>
+        <translation>In der Liste suchen</translation>
+    </message>
+    <message>
+        <source>Next match</source>
+        <translation>Nächster Treffer</translation>
+    </message>
+    <message>
+        <source>Previous match</source>
+        <translation>Vorheriger Treffer</translation>
+    </message>
+    <message>
+        <source>Command palette</source>
+        <translation>Befehlspalette</translation>
+    </message>
+    <message>
+        <source>Command line</source>
+        <translation>Befehlszeile</translation>
+    </message>
+    <message>
+        <source>Go to a bookmark</source>
+        <translation>Zu einem Lesezeichen</translation>
+    </message>
+    <message>
+        <source>Set a bookmark</source>
+        <translation>Lesezeichen setzen</translation>
+    </message>
+    <message>
+        <source>Bookmark prefix (then the bookmark&apos;s key)</source>
+        <translation>Lesezeichen-Präfix (danach die Taste des Lesezeichens)</translation>
+    </message>
+    <message>
+        <source>Create a file or folder</source>
+        <translation>Datei oder Ordner anlegen</translation>
+    </message>
+    <message>
+        <source>Background jobs</source>
+        <translation>Hintergrundaufgaben</translation>
+    </message>
+    <message>
+        <source>Scroll the preview up</source>
+        <translation>Vorschau nach oben scrollen</translation>
+    </message>
+    <message>
+        <source>Scroll the preview down</source>
+        <translation>Vorschau nach unten scrollen</translation>
+    </message>
+</context>
+<context>
     <name>Shortcuts</name>
     <message>
         <source>Moving around</source>
@@ -1400,6 +1491,97 @@
     <message>
         <source>Cannot remove %1 (%2)</source>
         <translation>%1 kann nicht entfernt werden (%2)</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::BookmarksEditor</name>
+    <message>
+        <source>Key</source>
+        <translation>Taste</translation>
+    </message>
+    <message>
+        <source>Folder</source>
+        <translation>Ordner</translation>
+    </message>
+    <message>
+        <source>&amp;Add this folder</source>
+        <translation>Diesen Ordner &amp;hinzufügen</translation>
+    </message>
+    <message>
+        <source>&amp;Remove</source>
+        <translation>&amp;Entfernen</translation>
+    </message>
+    <message>
+        <source>No bookmarks yet. Add this folder, or press Ctrl+Shift+D in any folder.</source>
+        <translation>Noch keine Lesezeichen. Füg diesen Ordner hinzu, oder drück in einem Ordner Strg+Umschalt+D.</translation>
+    </message>
+    <message>
+        <source>Bookmark</source>
+        <translation>Lesezeichen</translation>
+    </message>
+    <message>
+        <source>one or more letters, e.g. cp; empty: no key</source>
+        <translation>ein oder mehrere Buchstaben, z. B. cp; leer: keine Taste</translation>
+    </message>
+    <message>
+        <source>a folder, or a server address</source>
+        <translation>ein Ordner oder eine Serveradresse</translation>
+    </message>
+    <message>
+        <source>Choose…</source>
+        <translation>Auswählen…</translation>
+    </message>
+    <message>
+        <source>Ctrl+D and the key go there; with modal keys, &apos; or g and the key. Drag bookmarks in the list to change their order.</source>
+        <translation>Strg+D und die Taste führen dorthin, mit modalen Tasten &apos; oder g und die Taste. Zieh Lesezeichen in der Liste, um ihre Reihenfolge zu ändern.</translation>
+    </message>
+    <message>
+        <source>New bookmark</source>
+        <translation>Neues Lesezeichen</translation>
+    </message>
+    <message>
+        <source>No key yet.</source>
+        <translation>Noch keine Taste.</translation>
+    </message>
+    <message>
+        <source>Already the key of %1.</source>
+        <translation>Schon die Taste von %1.</translation>
+    </message>
+    <message>
+        <source>%1 start with it too: after %2, Enter goes here.</source>
+        <translation>%1 beginnen auch damit: nach %2 führt Enter hierher.</translation>
+    </message>
+    <message>
+        <source>%1 is a key too: after it, %2 still jumps, but %1 needs Enter.</source>
+        <translation>%1 ist auch eine Taste: %2 springt weiterhin, aber %1 braucht danach Enter.</translation>
+    </message>
+    <message>
+        <source>Free: Ctrl+D, then %1, jumps here.</source>
+        <translation>Frei: Strg+D, dann %1, springt hierher.</translation>
+    </message>
+    <message>
+        <source>Free:</source>
+        <translation>Frei:</translation>
+    </message>
+    <message>
+        <source>Use %1</source>
+        <translation>%1 verwenden</translation>
+    </message>
+    <message>
+        <source>A bookmark needs a folder.</source>
+        <translation>Ein Lesezeichen braucht einen Ordner.</translation>
+    </message>
+    <message>
+        <source>Keys have no spaces: “%1”.</source>
+        <translation>Tasten enthalten keine Leerzeichen: „%1“.</translation>
+    </message>
+    <message>
+        <source>The key “%1” is used twice.</source>
+        <translation>Die Taste „%1“ ist doppelt vergeben.</translation>
+    </message>
+    <message>
+        <source>%1 is bookmarked twice.</source>
+        <translation>%1 ist doppelt als Lesezeichen gespeichert.</translation>
     </message>
 </context>
 <context>
@@ -2079,6 +2261,25 @@
     </message>
 </context>
 <context>
+    <name>tandem::FuzzyPopup</name>
+    <message>
+        <source>Tab switches between keys and searching by name</source>
+        <translation>Tab wechselt zwischen Tasten und der Suche nach Namen</translation>
+    </message>
+    <message>
+        <source>Key</source>
+        <translation>Taste</translation>
+    </message>
+    <message>
+        <source>Search</source>
+        <translation>Suche</translation>
+    </message>
+    <message>
+        <source>Search by name or path</source>
+        <translation>Nach Name oder Pfad suchen</translation>
+    </message>
+</context>
+<context>
     <name>tandem::HexView</name>
     <message>
         <source>Loading…</source>
@@ -2219,10 +2420,6 @@
 <context>
     <name>tandem::KeyChordPopup</name>
     <message>
-        <source>No bookmark “%1”</source>
-        <translation>Kein Lesezeichen „%1“</translation>
-    </message>
-    <message>
         <source>Pinned %1</source>
         <translation>%1 angeheftet</translation>
     </message>
@@ -2235,32 +2432,24 @@
         <translation>Lesezeichen für %1 entfernt</translation>
     </message>
     <message>
-        <source>Bookmarks</source>
-        <translation>Lesezeichen</translation>
+        <source>Bookmark key for %1</source>
+        <translation>Lesezeichen-Taste für %1</translation>
     </message>
     <message>
-        <source>Bookmarks  ·  %1…</source>
-        <translation>Lesezeichen  ·  %1…</translation>
+        <source>Type a key</source>
+        <translation>Taste eingeben</translation>
     </message>
     <message>
-        <source>Type a key   ·   Space: search all folders   ·   Ctrl+Shift+D: bookmark this folder   ·   Esc</source>
-        <translation>Taste drücken   ·   Space: alle Ordner durchsuchen   ·   Ctrl+Shift+D: Lesezeichen für diesen Ordner   ·   Esc</translation>
+        <source>“%1” moves here from %2   ·   %3Enter: save   ·   Esc</source>
+        <translation>„%1“ wechselt von %2 hierher   ·   %3Enter: speichern   ·   Esc</translation>
     </message>
     <message>
-        <source>Bookmark key for %1:  %2</source>
-        <translation>Lesezeichen-Taste für %1:  %2</translation>
+        <source>free: %1   ·   Tab: %2   ·   </source>
+        <translation>frei: %1   ·   Tab: %2   ·   </translation>
     </message>
     <message>
-        <source>“%1” is used by %2 and will move here   ·   Enter: save   ·   Esc</source>
-        <translation>„%1“ ist %2 zugewiesen und wird hierher übertragen   ·   Enter: speichern   ·   Esc</translation>
-    </message>
-    <message>
-        <source>Type a key or chain (e.g. cp)   ·   Enter: save   ·   Delete: remove   ·   Esc</source>
-        <translation>Taste oder Tastenfolge eingeben (z. B. cp)   ·   Enter: speichern   ·   Delete: entfernen   ·   Esc</translation>
-    </message>
-    <message>
-        <source>No bookmarks yet. Ctrl+Shift+D bookmarks the current folder.</source>
-        <translation>Noch keine Lesezeichen. Ctrl+Shift+D setzt ein Lesezeichen für den aktuellen Ordner.</translation>
+        <source>Type a key or chain (e.g. cp)   ·   %1Enter: save   ·   Delete: remove   ·   Esc</source>
+        <translation>Taste oder Tastenfolge eingeben (z. B. cp)   ·   %1Enter: speichern   ·   Delete: entfernen   ·   Esc</translation>
     </message>
 </context>
 <context>
@@ -2618,6 +2807,10 @@
         <translation>&amp;Lesezeichen</translation>
     </message>
     <message>
+        <source>Edit bookmarks…</source>
+        <translation>Lesezeichen bearbeiten…</translation>
+    </message>
+    <message>
         <source>Pin or unpin tab</source>
         <translation>Tab anheften oder lösen</translation>
     </message>
@@ -2632,6 +2825,14 @@
     <message>
         <source>Open workspace</source>
         <translation>Arbeitsbereich öffnen</translation>
+    </message>
+    <message>
+        <source>Folders first</source>
+        <translation>Ordner zuerst</translation>
+    </message>
+    <message>
+        <source>Equal panel widths (50/50)</source>
+        <translation>Gleiche Panelbreiten (50/50)</translation>
     </message>
     <message>
         <source>Preview: details instead of content</source>
@@ -2969,10 +3170,6 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Menü</translation>
     </message>
     <message>
-        <source>Go to a folder, find a file, run a command</source>
-        <translation>Zu einem Ordner, eine Datei finden, einen Befehl ausführen</translation>
-    </message>
-    <message>
         <source>Settings (Ctrl+,)</source>
         <translation>Einstellungen (Strg+,)</translation>
     </message>
@@ -2991,14 +3188,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Enter: run or open</source>
         <translation>Enter: ausführen oder öffnen</translation>
-    </message>
-    <message>
-        <source>Enter: run or open   ·   %1: folders only</source>
-        <translation>Enter: ausführen oder öffnen   ·   %1: nur Ordner</translation>
-    </message>
-    <message>
-        <source>pinned</source>
-        <translation>angeheftet</translation>
     </message>
     <message>
         <source>Jump to a folder: type parts of its path</source>
@@ -3054,6 +3243,18 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Extracting %1 …</source>
         <translation>%1 wird entpackt …</translation>
+    </message>
+    <message>
+        <source>Find a file or run a command</source>
+        <translation>Eine Datei finden oder einen Befehl ausführen</translation>
+    </message>
+    <message>
+        <source>Enter: run or open   ·   %1: visited folders   ·   %2: bookmarks</source>
+        <translation>Enter: ausführen oder öffnen   ·   %1: besuchte Ordner   ·   %2: Lesezeichen</translation>
+    </message>
+    <message>
+        <source>Enter: go   ·   Shift+Del: forget   ·   %1: bookmarks</source>
+        <translation>Enter: öffnen   ·   Umschalt+Entf: vergessen   ·   %1: Lesezeichen</translation>
     </message>
     <message>
         <source>Cannot extract: %1</source>
@@ -3229,12 +3430,16 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Befehle</translation>
     </message>
     <message>
-        <source>Folders</source>
-        <translation>Ordner</translation>
-    </message>
-    <message>
         <source>Files in %1</source>
         <translation>Dateien in %1</translation>
+    </message>
+    <message>
+        <source>Type a bookmark&apos;s key</source>
+        <translation>Taste eines Lesezeichens eingeben</translation>
+    </message>
+    <message>
+        <source>Enter: go   ·   Shift+Enter: other panel   ·   Ctrl+Enter: new tab   ·   Tab: search   ·   %1: add this folder</source>
+        <translation>Enter: öffnen   ·   Umschalt+Enter: anderes Panel   ·   Strg+Enter: neuer Tab   ·   Tab: suchen   ·   %1: diesen Ordner hinzufügen</translation>
     </message>
     <message>
         <source>The folder changed while editing; nothing renamed</source>
@@ -3521,10 +3726,6 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Copy to another tab, a bookmark or a recent folder</source>
         <translation>In einen anderen Tab, ein Lesezeichen oder einen letzten Ordner kopieren</translation>
-    </message>
-    <message>
-        <source>Enter: go   ·   Ctrl+P: pin / unpin   ·   Shift+Del: forget   ·   %1: bookmark keys</source>
-        <translation>Enter: öffnen   ·   Strg+P: anheften / lösen   ·   Umschalt+Entf: vergessen   ·   %1: Lesezeichen-Tasten</translation>
     </message>
     <message>
         <source>No bookmarks yet: %1 bookmarks the shown folder</source>
@@ -4050,6 +4251,10 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Neuer Tab</translation>
     </message>
     <message>
+        <source>Bookmarked. Click the star again to give it a key.</source>
+        <translation>Als Lesezeichen gespeichert. Klick den Stern noch einmal, um ihm eine Taste zu geben.</translation>
+    </message>
+    <message>
         <source>words or *.ext — Alt+S with subfolders, Esc clears, Enter/↓ back to the list</source>
         <translation>Wörter oder *.ext – Alt+S mit Unterordnern, Esc leert, Enter/↓ zurück zur Liste</translation>
     </message>
@@ -4084,6 +4289,18 @@ F3 lädt es herunter und öffnet es</translation>
     <message>
         <source>Close tab</source>
         <translation>Tab schließen</translation>
+    </message>
+    <message>
+        <source>Bookmark this folder</source>
+        <translation>Lesezeichen für diesen Ordner</translation>
+    </message>
+    <message>
+        <source>Bookmarked: click to give it a key, or remove it</source>
+        <translation>Lesezeichen: klicken, um ihm eine Taste zu geben oder es zu entfernen</translation>
+    </message>
+    <message>
+        <source>Bookmarked as “%1”: click to change the key, or remove it</source>
+        <translation>Lesezeichen „%1“: klicken, um die Taste zu ändern oder es zu entfernen</translation>
     </message>
     <message>
         <source>Searching %1 for “%2” …  %3 found   (Esc stops)</source>
@@ -4166,8 +4383,36 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>wiederherstellen oder endgültig löschen</translation>
     </message>
     <message>
+        <source>Bookmarks</source>
+        <translation>Lesezeichen</translation>
+    </message>
+    <message>
+        <source>Change key…</source>
+        <translation>Taste ändern…</translation>
+    </message>
+    <message>
+        <source>Remove bookmark</source>
+        <translation>Lesezeichen entfernen</translation>
+    </message>
+    <message>
+        <source>Edit bookmarks…</source>
+        <translation>Lesezeichen bearbeiten…</translation>
+    </message>
+    <message>
+        <source>keys, folders and their order, all at once</source>
+        <translation>Tasten, Ordner und Reihenfolge, alle auf einmal</translation>
+    </message>
+    <message>
         <source>Del ⏏</source>
         <translation>Entf ⏏</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Öffnen</translation>
+    </message>
+    <message>
+        <source>Eject</source>
+        <translation>Auswerfen</translation>
     </message>
     <message>
         <source>not mounted: Enter mounts it</source>
@@ -4178,12 +4423,24 @@ F3 lädt es herunter und öffnet es</translation>
         <translation>Strg+E bearbeitet</translation>
     </message>
     <message>
+        <source>Edit…</source>
+        <translation>Bearbeiten…</translation>
+    </message>
+    <message>
         <source>Edit servers…</source>
         <translation>Server bearbeiten…</translation>
     </message>
     <message>
         <source>add, change, import from the SSH config</source>
         <translation>hinzufügen, ändern, aus der SSH-Konfiguration übernehmen</translation>
+    </message>
+    <message>
+        <source>Save…</source>
+        <translation>Speichern…</translation>
+    </message>
+    <message>
+        <source>Forget</source>
+        <translation>Vergessen</translation>
     </message>
     <message>
         <source>Connect to server…</source>
@@ -4853,6 +5110,14 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>leer: der Persönliche Ordner</translation>
     </message>
     <message>
+        <source>Locations</source>
+        <translation>Orte</translation>
+    </message>
+    <message>
+        <source>Bookmarks</source>
+        <translation>Lesezeichen</translation>
+    </message>
+    <message>
         <source>No servers yet. Add one, or import hosts from your SSH config.</source>
         <translation>Noch keine Server. Füge einen hinzu oder übernimm Hosts aus deiner SSH-Konfiguration.</translation>
     </message>
@@ -5411,20 +5676,44 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Befehl</translation>
     </message>
     <message>
-        <source>Press the new keys:</source>
-        <translation>Neue Tasten drücken:</translation>
+        <source>Modal keys</source>
+        <translation>Modale Tasten</translation>
     </message>
     <message>
-        <source>No key</source>
-        <translation>Keine Taste</translation>
+        <source>Keys:</source>
+        <translation>Tasten:</translation>
+    </message>
+    <message>
+        <source>Press a key to add it</source>
+        <translation>Drück eine Taste, um sie hinzuzufügen</translation>
+    </message>
+    <message>
+        <source>Modal keys:</source>
+        <translation>Modale Tasten:</translation>
+    </message>
+    <message>
+        <source>For example: g g, Home (Enter saves)</source>
+        <translation>Zum Beispiel: g g, Home (Enter speichert)</translation>
+    </message>
+    <message>
+        <source>Pick a command, then press a key to add it.</source>
+        <translation>Wähl einen Befehl und drück dann eine Taste, um sie hinzuzufügen.</translation>
+    </message>
+    <message>
+        <source>“%1”: %2</source>
+        <translation>„%1“: %2</translation>
+    </message>
+    <message>
+        <source>%1 was used by “%2”.</source>
+        <translation>%1 gehörte zu „%2“.</translation>
+    </message>
+    <message>
+        <source>Modal keys: %1</source>
+        <translation>Modale Tasten: %1</translation>
     </message>
     <message>
         <source>Default</source>
         <translation>Standard</translation>
-    </message>
-    <message>
-        <source>Pick a command, then press its new keys.</source>
-        <translation>Befehl wählen, dann die neuen Tasten drücken.</translation>
     </message>
     <message>
         <source>Reset all keys</source>
@@ -5443,20 +5732,20 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>keine</translation>
     </message>
     <message>
+        <source>Modal › %1</source>
+        <translation>Modal › %1</translation>
+    </message>
+    <message>
+        <source>Remove %1</source>
+        <translation>%1 entfernen</translation>
+    </message>
+    <message>
         <source>%1 was used by “%2”, which now has %3.</source>
         <translation>%1 gehörte zu „%2“, das jetzt %3 hat.</translation>
     </message>
     <message>
         <source>no key</source>
         <translation>keine Taste</translation>
-    </message>
-    <message>
-        <source>“%1” has no key now.</source>
-        <translation>„%1“ hat jetzt keine Taste.</translation>
-    </message>
-    <message>
-        <source>“%1” is now %2.</source>
-        <translation>„%1“ ist jetzt %2.</translation>
     </message>
 </context>
 <context>

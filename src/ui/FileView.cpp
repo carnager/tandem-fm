@@ -202,8 +202,9 @@ void FileView::zoomChanged()
         for (int c = FileModel::ColExt; c < header()->count(); ++c)
             setColumnWidth(c, qRound(columnWidth(c) * double(g_listZoom) / m_zoomOfColumns));
         m_zoomOfColumns = g_listZoom;
-        fitColumns();
     }
+    m_extWidth = 0;  // another font: measure the extensions again
+    fitColumns();
     scheduleDelayedItemsLayout();  // rows get their new height
     viewport()->update();
 }
@@ -211,15 +212,53 @@ void FileView::zoomChanged()
 void FileView::setModel(QAbstractItemModel* model)
 {
     setVisual(0);
-    if (QAbstractItemModel* old = this->model())
-        disconnect(old, &QAbstractItemModel::modelAboutToBeReset, this, nullptr);
+    // Only the shown folder's changes count here: another tab's refresh
+    // must not touch this list.
+    for (const QMetaObject::Connection& c : std::as_const(m_modelConnections))
+        disconnect(c);
+    m_modelConnections.clear();
     QTreeView::setModel(model);
+    m_extWidth = 0;  // another tab's folder: its own extensions (measured by the next fitColumns)
     // A new listing: another folder ends visual mode, a refresh of this one keeps it.
-    if (model)
-        connect(model, &QAbstractItemModel::modelReset, this, [this] {
+    if (model) {
+        m_modelConnections << connect(model, &QAbstractItemModel::modelReset, this, [this] {
             if (m_visual)
                 applyVisual();
+            m_extWidth = 0;
+            fitColumns();
         });
+        m_modelConnections << connect(model, &QAbstractItemModel::rowsInserted, this, [this](const QModelIndex&, int first, int last) {
+            if (m_extWidth > 0 && !isColumnHidden(FileModel::ColExt)) {
+                measureExt(first, last);
+                setColumnWidth(FileModel::ColExt, m_extWidth);
+            }
+        });
+    }
+}
+
+// Widens m_extWidth to fit the extensions of these rows, up to a limit, so
+// one odd long extension doesn't take the names' room.
+void FileView::measureExt(int first, int last)
+{
+    const FileModel* m = fileModel();
+    if (!m)
+        return;
+    QFont f = zoomed(theme().listFont);
+    f.setWeight(QFont::Bold);  // marked rows
+    const QFontMetrics fm(f);
+    const int most = fm.averageCharWidth() * 10 + 24;
+    if (m_extWidth == 0)
+        m_extWidth = header()->fontMetrics().horizontalAdvance(m->headerData(FileModel::ColExt, Qt::Horizontal, Qt::DisplayRole).toString()) + 24;
+    QSet<QString> seen;
+    for (int row = first; row <= last && m_extWidth < most; ++row)
+        if (const FileEntry* e = m->entry(row)) {
+            const QString ext = FileModel::displayExt(*e);
+            if (!ext.isEmpty() && !seen.contains(ext)) {
+                seen.insert(ext);
+                m_extWidth = std::max(m_extWidth, fm.horizontalAdvance(ext) + 24);
+            }
+        }
+    m_extWidth = std::min(m_extWidth, most);
 }
 
 void FileView::setVisual(int mode)
@@ -993,6 +1032,12 @@ void FileView::fitColumns()
     QHeaderView* h = header();
     if (!model() || h->count() < FileModel::ColCount)
         return;
+    if (!h->isSectionHidden(FileModel::ColExt)) {
+        if (m_extWidth == 0)
+            measureExt(0, fileModel() ? fileModel()->count() - 1 : -1);
+        if (m_extWidth > 0)
+            setColumnWidth(FileModel::ColExt, m_extWidth);
+    }
     auto nameRoom = [&] {
         int others = 0;
         for (int c = 1; c < h->count(); ++c)
@@ -1085,7 +1130,21 @@ void FileView::startFileDrag()
     const FileEntry* e = fileModel() ? fileModel()->entry(currentRow()) : nullptr;
     if (e)
         drag->setPixmap(model()->index(currentRow(), 0).data(Qt::DecorationRole).value<QIcon>().pixmap(32));
-    drag->exec(Qt::CopyAction | Qt::MoveAction | Qt::LinkAction, Qt::CopyAction);
+    drag->exec(dragActions(QApplication::keyboardModifiers()), Qt::CopyAction);
+}
+
+Qt::DropActions FileView::dragActions(Qt::KeyboardModifiers held)
+{
+#ifdef Q_OS_MACOS
+    // Qt tells macOS to ignore the keys held during a drag, so Option can't
+    // make Finder copy, and Finder moves on the same disk. Copy, unless Shift
+    // was held as the drag started.
+    if (!(held & Qt::ShiftModifier))
+        return Qt::CopyAction | Qt::LinkAction;
+#else
+    Q_UNUSED(held);
+#endif
+    return Qt::CopyAction | Qt::MoveAction | Qt::LinkAction;
 }
 
 }  // namespace tandem

@@ -5,6 +5,7 @@
 #include "core/Archive.h"
 #include "core/Backend.h"
 #include "core/FileOps.h"
+#include "core/FolderHistory.h"
 #include "core/Mounts.h"
 #include "core/Remote.h"
 #include "core/Servers.h"
@@ -191,6 +192,23 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     m_mountButton->setFocusPolicy(Qt::NoFocus);
     m_mountButton->setToolTip(tr("Locations (Alt+F1 / Alt+F2)"));
     m_pathBar = new PathBar(m_header);
+    // ☆: bookmark this folder; ★ and its key: change the key or remove it.
+    m_star = new QToolButton(m_header);
+    m_star->setObjectName(QStringLiteral("star"));
+    m_star->setAutoRaise(true);
+    m_star->setFocusPolicy(Qt::NoFocus);
+    m_star->setCursor(Qt::PointingHandCursor);
+    connect(m_star, &QToolButton::clicked, this, [this] {
+        emit activated(this);
+        const QString p = path();
+        if (FolderHistory::instance().isPinned(p)) {
+            emit bookmarkAssignRequested();
+            return;
+        }
+        FolderHistory::instance().setPinned(p, true);
+        showMessage(tr("Bookmarked. Click the star again to give it a key."));
+    });
+    connect(&FolderHistory::instance(), &FolderHistory::bookmarksChanged, this, &Panel::updateStar);
     if (auto* edit = m_pathBar->findChild<QLineEdit*>())
         edit->installEventFilter(this);
     m_freeLabel = new SpaceChip(m_header);
@@ -212,6 +230,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     });
     hl->addWidget(m_mountButton);
     hl->addWidget(m_pathBar, 1);
+    hl->addWidget(m_star);
     hl->addWidget(m_searchChip);
     hl->addWidget(m_placeLabel);
     hl->addWidget(m_branchLabel);
@@ -928,9 +947,9 @@ void Panel::applyDefaultColumns()
     QHeaderView* h = m_view->header();
     const QFontMetrics fm(FileView::zoomed(theme().numberFont));
     h->setSectionResizeMode(FileModel::ColName, QHeaderView::Stretch);
-    for (int c = FileModel::ColExt; c < FileModel::ColCount; ++c)
+    h->setSectionResizeMode(FileModel::ColExt, QHeaderView::Fixed);  // as wide as the longest extension
+    for (int c = FileModel::ColSize; c < FileModel::ColCount; ++c)
         h->setSectionResizeMode(c, QHeaderView::Interactive);
-    m_view->setColumnWidth(FileModel::ColExt, fm.horizontalAdvance(QStringLiteral("desktop")) + 24);
     m_view->setColumnWidth(FileModel::ColSize, fm.horizontalAdvance(QStringLiteral("999.9 MiB")) + 24);
     // Dates: room for the longer of both styles ("Yesterday 23:59", "2026-12-31 23:59").
     const int dateWidth = qMax(fm.horizontalAdvance(QStringLiteral("2026-12-31 23:59")),
@@ -1547,7 +1566,10 @@ void Panel::updateActiveStyle()
         "QToolButton#crumb:hover { background: @border; }"
         "QLabel { color: @dimText; }"
         "QLabel#branch, QLabel#place { color: @text; background: @altBase; border-radius: 10px; padding: 2px 9px; }"
-        "QToolButton#searchChip { color: @accentText; background: @accent; border: none; border-radius: 9px; padding: 1px 8px; }")
+        "QToolButton#searchChip { color: @accentText; background: @accent; border: none; border-radius: 9px; padding: 1px 8px; }"
+        "QToolButton#star { color: @dimText; border: none; padding: 1px 6px; border-radius: 4px; }"
+        "QToolButton#star:hover { background: @border; color: @text; }"
+        "QToolButton#star[on=\"true\"] { color: @accent; }")
                                            : QStringLiteral(
         "#panelHeader { background: transparent; }"
         "QLineEdit { background: transparent; color: @dimText; font-weight: 600; }"
@@ -1555,7 +1577,10 @@ void Panel::updateActiveStyle()
         "QToolButton#crumb:hover { background: @border; color: @text; }"
         "QLabel { color: @dimText; }"
         "QLabel#branch, QLabel#place { color: @dimText; background: @altBase; border-radius: 10px; padding: 2px 9px; }"
-        "QToolButton#searchChip { color: @text; background: @border; border: none; border-radius: 9px; padding: 1px 8px; }"));
+        "QToolButton#searchChip { color: @text; background: @border; border: none; border-radius: 9px; padding: 1px 8px; }"
+        "QToolButton#star { color: @dimText; border: none; padding: 1px 6px; border-radius: 4px; }"
+        "QToolButton#star:hover { background: @border; color: @text; }"
+        "QToolButton#star[on=\"true\"] { color: @accent; }"));
 }
 
 // A card; the active one has an accent edge and a soft glow around it.
@@ -1603,6 +1628,33 @@ void Panel::updateHeader()
     else
         static_cast<SpaceChip*>(m_freeLabel)->set(0, 0);
     window()->setWindowTitle(QStringLiteral("Tandem — %1").arg(path()));
+    updateStar();
+}
+
+QWidget* Panel::starButton() const
+{
+    return m_star;
+}
+
+void Panel::updateStar()
+{
+    DirTab* t = tab();
+    // Search results and archives aren't places to come back to.
+    m_star->setVisible(t && !t->isSearch() && !t->inArchive());
+    if (!t)
+        return;
+    const QString p = t->path();
+    const bool on = FolderHistory::instance().isPinned(p);
+    const QString key = on ? FolderHistory::instance().bookmarkKey(p) : QString();
+    m_star->setText(on ? (key.isEmpty() ? QStringLiteral("★") : QStringLiteral("★ ") + key) : QStringLiteral("☆"));
+    m_star->setToolTip(!on            ? tr("Bookmark this folder")
+                       : key.isEmpty() ? tr("Bookmarked: click to give it a key, or remove it")
+                                       : tr("Bookmarked as “%1”: click to change the key, or remove it").arg(key));
+    if (m_star->property("on").toBool() != on) {
+        m_star->setProperty("on", on);
+        m_star->style()->unpolish(m_star);  // the style sheet colours ★ by this
+        m_star->style()->polish(m_star);
+    }
 }
 
 void Panel::updateStatus()
@@ -1939,6 +1991,24 @@ QList<PopupItem> Panel::locationItems()
     add(places, IconCache::themed("user-trash", "user-trash-full"), tr("Trash"), tr("restore or delete for good"), {},
         [this] { emit trashRequested(); });
 
+    // Bookmarks, with their keys; also the ones without a key.
+    for (const FolderHistory::Item& b : FolderHistory::instance().items()) {
+        if (!b.pinned)
+            break;  // pinned ones come first
+        const bool remote = b.path.contains(QLatin1String("://"));
+        const QString name = baseName(b.path).isEmpty() ? b.path : baseName(b.path);
+        add(tr("Bookmarks"), IconCache::themed(remote ? "folder-remote" : "folder", "folder"), name,
+            name == b.path ? QString() : b.path, QStringLiteral("bookmark:") + b.path,
+            [this, p = b.path] { navigate(p); }, b.key);
+        items.last().hintWhenCurrent = false;  // the key, always shown
+        items.last().matchSubtitle = !items.last().subtitle.isEmpty();  // the whole path, not only its name
+        items.last().menu = {{tr("Open"), [this, p = b.path] { navigate(p); }},
+                             {tr("Change key…"), [this, p = b.path] { emit bookmarkEditRequested(p); }},
+                             {tr("Remove bookmark"), [p = b.path] { FolderHistory::instance().setPinned(p, false); }}};
+    }
+    add(tr("Bookmarks"), IconCache::themed("bookmarks-organize", "folder"), tr("Edit bookmarks…"),
+        tr("keys, folders and their order, all at once"), {}, [this] { emit bookmarksWindowRequested(); });
+
     for (const MountPoint& m : listMounts()) {
         if (m.path == QLatin1String("/") || isSystemMount(m))
             continue;
@@ -1946,6 +2016,9 @@ QList<PopupItem> Panel::locationItems()
         add(m.isNetwork ? network : drives, IconCache::themed(icon, "drive-harddisk"), baseName(m.path),
             m.path, QStringLiteral("mount:") + m.path, [this, p = m.path] { navigate(p); },
             m.isRemovable ? tr("Del ⏏") : QString(), kindBadge(m.fsType));
+        if (m.isRemovable)
+            items.last().menu = {{tr("Open"), [this, p = m.path] { navigate(p); }},
+                                 {tr("Eject"), [this, p = m.path] { disconnectMount(p); }}};
     }
     for (const Place& pl : Network::instance().places()) {
         const QIcon icon = IconCache::themed(pl.iconName.toUtf8().constData(),
@@ -1957,6 +2030,8 @@ QList<PopupItem> Panel::locationItems()
             add(pl.network ? network : drives, icon, pl.name, label,
                 QStringLiteral("mount:") + pl.path, [this, p = pl.path] { navigate(p); }, tr("Del ⏏"),
                 kind.isEmpty() ? QString() : kindBadge(kind));
+            items.last().menu = {{tr("Open"), [this, p = pl.path] { navigate(p); }},
+                                 {tr("Eject"), [this, p = pl.path] { disconnectMount(p); }}};
         } else {
             add(pl.network ? network : drives, icon, pl.name, tr("not mounted: Enter mounts it"), {}, [this, id = pl.volumeId] {
                 showMessage(tr("Mounting…"));
@@ -1980,6 +2055,8 @@ QList<PopupItem> Panel::locationItems()
         add(saved, IconCache::themed(s.type == QLatin1String("smb") ? "folder-remote" : "network-server", "network-server"),
             s.name, bare(uri), QStringLiteral("saved:") + uri, [this, uri] { connectTo(uri); }, tr("Ctrl+E edits"),
             kindBadge(s.type));
+        items.last().menu = {{tr("Connect"), [this, uri] { connectTo(uri); }},
+                             {tr("Edit…"), [this, uri] { emit serversRequested(uri); }}};
     }
     add(saved, IconCache::themed("preferences-system-network", "network-server"), tr("Edit servers…"),
         tr("add, change, import from the SSH config"), {}, [this] { emit serversRequested({}); });
@@ -1994,6 +2071,9 @@ QList<PopupItem> Panel::locationItems()
         add(recent, IconCache::themed("network-server", "folder-remote"), title, u.host().isEmpty() ? QString() : where,
             QStringLiteral("recent:") + uri, [this, uri] { connectTo(uri); }, tr("Ctrl+S saves · Del forgets"),
             kindBadge(u.scheme()));
+        items.last().menu = {{tr("Connect"), [this, uri] { connectTo(uri); }},
+                             {tr("Save…"), [this, uri] { emit serversRequested(uri); }},
+                             {tr("Forget"), [uri] { Network::instance().forgetServer(uri); }}};
     }
     add(QString(), IconCache::themed("network-connect", "network-server"), tr("Connect to server…"),
         tr("sftp, smb, WebDAV, ftp"), {}, [this] { connectDialog(); }, QStringLiteral("Ctrl+K"));
@@ -2023,6 +2103,12 @@ void Panel::showLocations()
             return it;
         };
         m_locations->keyHandler = [this](QKeyEvent* e, const PopupItem* it) {
+            if (it && it->key.startsWith(QLatin1String("bookmark:")) && e->modifiers() == Qt::ControlModifier &&
+                e->key() == Qt::Key_E) {
+                m_locations->hide();
+                emit bookmarkEditRequested(it->key.mid(9));
+                return true;
+            }
             const bool saved = it && it->key.startsWith(QLatin1String("saved:"));
             const bool recent = it && it->key.startsWith(QLatin1String("recent:"));
             if (e->modifiers() == Qt::ControlModifier &&
@@ -2036,6 +2122,11 @@ void Panel::showLocations()
                 return false;
             if (it->key.startsWith(QLatin1String("recent:"))) {
                 Network::instance().forgetServer(it->key.mid(7));
+                m_locations->setItems(locationItems());
+                return true;
+            }
+            if (it->key.startsWith(QLatin1String("bookmark:"))) {
+                FolderHistory::instance().setPinned(it->key.mid(9), false);
                 m_locations->setItems(locationItems());
                 return true;
             }

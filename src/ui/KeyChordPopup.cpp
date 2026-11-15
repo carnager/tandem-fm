@@ -1,6 +1,9 @@
 #include "ui/KeyChordPopup.h"
 
 #include "core/FolderHistory.h"
+#include "core/Util.h"
+#include "ui/IconCache.h"
+#include "ui/Keymap.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
@@ -9,6 +12,7 @@
 #include <QGridLayout>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QListView>
 #include <QVBoxLayout>
 
 namespace tandem {
@@ -25,7 +29,9 @@ KeyChordPopup::KeyChordPopup(QWidget* window) : QFrame(window)
         "QLabel#cap { color: @accent; background: @window; border: 1px solid @border; border-radius: 4px;"
         "  padding: 1px 6px; font-weight: 600; }"
         "QLabel#capTyped { color: @accentText; background: @accent; border-radius: 4px; padding: 1px 6px;"
-        "  font-weight: 600; }"));
+        "  font-weight: 600; }"
+        "QLabel#keyField { background: @base; border: 1px solid @accent; border-radius: 8px; padding: 7px 10px; }"
+        "QListView { background: transparent; border: none; outline: none; }"));
     auto* shadow = new QGraphicsDropShadowEffect(this);
     shadow->setBlurRadius(28);
     shadow->setOffset(0, 6);
@@ -40,6 +46,22 @@ KeyChordPopup::KeyChordPopup(QWidget* window) : QFrame(window)
     f.setWeight(QFont::DemiBold);
     m_title->setFont(f);
     layout->addWidget(m_title);
+    m_field = new QLabel(this);
+    m_field->setObjectName(QStringLiteral("keyField"));
+    m_field->setTextFormat(Qt::RichText);
+    QFont ff = m_field->font();  // a little larger, like the palette's input
+    if (ff.pointSizeF() > 0)
+        ff.setPointSizeF(ff.pointSizeF() * 1.1);
+    m_field->setFont(ff);
+    layout->addWidget(m_field);
+    m_model = new PopupModel(this);
+    m_list = new QListView(this);
+    m_list->setModel(m_model);
+    m_list->setItemDelegate(new PopupDelegate(m_list));
+    m_list->setFocusPolicy(Qt::NoFocus);
+    m_list->setSelectionMode(QAbstractItemView::NoSelection);
+    m_list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    layout->addWidget(m_list);
     m_grid = new QWidget(this);
     m_gridLayout = new QGridLayout(m_grid);
     m_gridLayout->setContentsMargins(0, 0, 0, 0);
@@ -50,6 +72,7 @@ KeyChordPopup::KeyChordPopup(QWidget* window) : QFrame(window)
     layout->addWidget(m_grid);
     m_hint = new QLabel(this);
     m_hint->setObjectName(QStringLiteral("dim"));
+    m_hint->setWordWrap(true);  // never cut off
     layout->addWidget(m_hint);
     hide();
 }
@@ -61,22 +84,9 @@ void KeyChordPopup::close()
     hide();
 }
 
-void KeyChordPopup::openJump(const QString& initialKeys)
+void KeyChordPopup::openAssign(const QString& path, QWidget* anchor)
 {
-    if (!isVisible())
-        m_returnFocus = QApplication::focusWidget();
-    m_mode = Mode::Jump;
-    m_typed.clear();
-    show();
-    raise();
-    setFocus();
-    refresh();
-    if (!initialKeys.isEmpty())
-        type(initialKeys);
-}
-
-void KeyChordPopup::openAssign(const QString& path)
-{
+    m_anchor = anchor && anchor->isVisible() ? anchor : nullptr;
     if (!isVisible())
         m_returnFocus = QApplication::focusWidget();
     m_mode = Mode::Assign;
@@ -142,6 +152,14 @@ bool KeyChordPopup::event(QEvent* e)
         e->accept();
         return true;
     }
+    // Tab takes the first free key the hint offers (instead of moving the focus).
+    if (e->type() == QEvent::KeyPress && static_cast<QKeyEvent*>(e)->key() == Qt::Key_Tab && m_mode == Mode::Assign) {
+        if (!m_free.isEmpty()) {
+            m_typed = m_free.first();
+            refresh();
+        }
+        return true;
+    }
     return QFrame::event(e);
 }
 
@@ -154,29 +172,6 @@ void KeyChordPopup::focusOutEvent(QFocusEvent* e)
 void KeyChordPopup::type(const QString& keys)
 {
     m_typed += keys;
-    if (m_mode == Mode::Assign) {
-        refresh();
-        return;
-    }
-    const auto all = FolderHistory::instance().bookmarks();
-    QList<FolderHistory::Bookmark> matches;
-    for (const auto& b : all)
-        if (b.key.startsWith(m_typed))
-            matches.append(b);
-    if (matches.isEmpty()) {
-        emit message(tr("No bookmark “%1”").arg(m_typed), true);
-        m_typed.chop(keys.size());
-        refresh();
-        return;
-    }
-    // Unique and complete: go. (A chain that is also the start of a longer
-    // one waits; Enter takes the exact one.)
-    if (matches.size() == 1 && matches.first().key == m_typed) {
-        const QString path = matches.first().path;
-        close();
-        emit jumpRequested(path);
-        return;
-    }
     refresh();
 }
 
@@ -204,41 +199,22 @@ void KeyChordPopup::keyPressEvent(QKeyEvent* e)
         close();
         return;
     case Qt::Key_Backspace:
-        if (m_typed.isEmpty() && m_mode == Mode::Jump) {
-            close();
-            return;
-        }
         m_typed.chop(1);
         refresh();
         return;
     case Qt::Key_Return:
     case Qt::Key_Enter:
-        if (m_mode == Mode::Assign) {
-            FolderHistory::instance().setBookmark(m_assignPath, m_typed);
-            emit message(m_typed.isEmpty() ? tr("Pinned %1").arg(m_assignPath)
-                                           : tr("Bookmarked %1 as “%2”").arg(m_assignPath, m_typed),
-                         false);
-            close();
-        } else if (const QString p = FolderHistory::instance().pathForKey(m_typed); !p.isEmpty()) {
-            close();
-            emit jumpRequested(p);
-        }
+        FolderHistory::instance().setBookmark(m_assignPath, m_typed);
+        emit message(m_typed.isEmpty() ? tr("Pinned %1").arg(m_assignPath)
+                                       : tr("Bookmarked %1 as “%2”").arg(m_assignPath, m_typed),
+                     false);
+        close();
         return;
     case Qt::Key_Delete:
-        if (m_mode == Mode::Assign) {
-            FolderHistory::instance().setPinned(m_assignPath, false);
-            emit message(tr("Removed bookmark for %1").arg(m_assignPath), false);
-            close();
-            return;
-        }
-        break;
-    case Qt::Key_Space:
-        if (m_mode == Mode::Jump) {
-            close();
-            emit fuzzyRequested();
-            return;
-        }
-        break;
+        FolderHistory::instance().setPinned(m_assignPath, false);
+        emit message(tr("Removed bookmark for %1").arg(m_assignPath), false);
+        close();
+        return;
     default:
         break;
     }
@@ -255,56 +231,52 @@ void KeyChordPopup::refresh()
         }
         delete item;
     }
-    if (m_mode == Mode::Choices) {
+    const bool assign = m_mode == Mode::Assign;
+    m_field->setVisible(assign);
+    m_list->setVisible(assign);
+    m_grid->setVisible(!assign);
+    if (!assign) {
         refreshChoices();
         return;
     }
     const auto all = FolderHistory::instance().bookmarks();
-    if (m_mode == Mode::Jump) {
-        m_title->setText(m_typed.isEmpty() ? tr("Bookmarks") : tr("Bookmarks  ·  %1…").arg(m_typed));
-        m_hint->setText(tr("Type a key   ·   Space: search all folders   ·   Ctrl+Shift+D: bookmark this folder   ·   Esc"));
-    } else {
+    {
         const QString owner = m_typed.isEmpty() ? QString() : FolderHistory::instance().pathForKey(m_typed);
-        m_title->setText(tr("Bookmark key for %1:  %2").arg(m_assignPath, m_typed.isEmpty() ? QStringLiteral("_")
-                                                                                                      : m_typed));
+        m_title->setText(tr("Bookmark key for %1").arg(m_assignPath));
+        const Theme& t = theme();
+        m_field->setText(m_typed.isEmpty()
+                             ? QStringLiteral("<span style='color:%1'>%2</span>").arg(t.dimText.name(), tr("Type a key").toHtmlEscaped())
+                             : QStringLiteral("<span style='color:%1'>%2</span><span style='color:%3'>▏</span>")
+                                   .arg(t.text.name(), m_typed.toHtmlEscaped(), t.accent.name()));
+        QStringList used;
+        for (const auto& b : all)
+            if (b.path != m_assignPath)
+                used << b.key;
+        m_free = FolderHistory::suggestKeys(m_assignPath, used + Keymap::instance().keysAfterBookmarkPrefix());
+        const QString free = m_free.isEmpty() ? QString()
+                                              : tr("free: %1   ·   Tab: %2   ·   ").arg(m_free.join(QStringLiteral(", ")), m_free.first());
         m_hint->setText(!owner.isEmpty() && owner != m_assignPath
-                            ? tr("“%1” is used by %2 and will move here   ·   Enter: save   ·   Esc").arg(m_typed, owner)
-                            : tr("Type a key or chain (e.g. cp)   ·   Enter: save   ·   Delete: remove   ·   Esc"));
+                            ? tr("“%1” moves here from %2   ·   %3Enter: save   ·   Esc")
+                                  .arg(m_typed, baseName(owner).isEmpty() ? owner : baseName(owner), free)
+                            : tr("Type a key or chain (e.g. cp)   ·   %1Enter: save   ·   Delete: remove   ·   Esc").arg(free));
     }
-    int row = 0, col = 0;
-    const int columns = 3;
+    // The other bookmarks, as Ctrl+D lists them: all of them, or those whose
+    // keys clash with what's typed (the same, or one the start of the other).
+    m_rows.clear();
+    QList<PopupModel::Row> rows;
     for (const auto& b : all) {
-        const bool match = m_mode == Mode::Assign || b.key.startsWith(m_typed);
-        if (!match)
+        if (b.path == m_assignPath || !(b.key.startsWith(m_typed) || m_typed.startsWith(b.key)))
             continue;
-        auto* cap = new QLabel(m_grid);
-        if (m_mode == Mode::Jump && !m_typed.isEmpty()) {
-            // Typed part highlighted, the rest still to press.
-            cap->setTextFormat(Qt::RichText);
-            cap->setText(QStringLiteral("<span style='opacity:0.5'>%1</span><b>%2</b>")
-                             .arg(m_typed.toHtmlEscaped(), b.key.mid(m_typed.size()).toHtmlEscaped()));
-        } else {
-            cap->setText(b.key);
-        }
-        cap->setObjectName(QStringLiteral("cap"));
-        auto* path = new QLabel(b.path, m_grid);
-        path->setObjectName(b.path == m_assignPath ? QString() : QStringLiteral("dim"));
-        path->setTextFormat(Qt::PlainText);
-        cap->show();
-        path->show();
-        m_gridLayout->addWidget(cap, row, col * 2, Qt::AlignLeft);
-        m_gridLayout->addWidget(path, row, col * 2 + 1);
-        if (++col == columns) {
-            col = 0;
-            ++row;
-        }
+        PopupItem it;
+        it.icon = IconCache::themed(b.path.contains(QLatin1String("://")) ? "folder-remote" : "folder", "folder");
+        it.title = baseName(b.path).isEmpty() ? b.path : baseName(b.path);
+        it.subtitle = it.title == b.path ? QString() : b.path;
+        it.hint = b.key;
+        rows.append({int(m_rows.size()), {}, {}});
+        m_rows << it;
     }
-    if (all.isEmpty()) {
-        auto* none = new QLabel(tr("No bookmarks yet. Ctrl+Shift+D bookmarks the current folder."), m_grid);
-        none->setObjectName(QStringLiteral("dim"));
-        none->show();
-        m_gridLayout->addWidget(none, 0, 0);
-    }
+    m_model->set(&m_rows, rows);
+    m_list->setVisible(!rows.isEmpty());
     place();
 }
 
@@ -331,6 +303,29 @@ void KeyChordPopup::refreshChoices()
 void KeyChordPopup::place()
 {
     QWidget* w = parentWidget();
+    if (m_mode == Mode::Assign) {  // where and as wide as Ctrl+D's list; a dozen rows, the rest scroll
+        QStyleOptionViewItem opt;
+        opt.initFrom(m_list);
+        int listHeight = 0;
+        for (int r = 0; r < qMin(11, m_model->rowCount()); ++r)
+            listHeight += m_list->itemDelegate()->sizeHint(opt, m_model->index(r)).height();
+        m_list->setFixedHeight(listHeight + 4);
+        if (m_anchor) {  // under the star, its right edge at the star's
+            const int width = qMin(520, w->width() - 20);
+            setFixedWidth(width);
+            layout()->activate();
+            adjustSize();
+            const QPoint at = m_anchor->mapTo(w, QPoint(m_anchor->width(), m_anchor->height() + 4));
+            move(qBound(10, at.x() - width, w->width() - width - 10), at.y());
+            return;
+        }
+        const int width = qMin(680, w->width() - 40);
+        setFixedWidth(width);
+        layout()->activate();
+        adjustSize();
+        move((w->width() - width) / 2, qMin(72, w->height() / 8));
+        return;
+    }
     const int width = qMin(860, w->width() - 40);
     setFixedWidth(width);
     // The grid was just refilled: let it measure the new rows before the

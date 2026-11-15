@@ -53,6 +53,8 @@ public:
     static void setListZoom(int percent);
     static int listZoom();
     static QFont zoomed(QFont f);  // a list font at the current zoom
+    // What a drag of files offers other apps, with these keys held as it starts.
+    static Qt::DropActions dragActions(Qt::KeyboardModifiers held);
     void zoomChanged();            // re-measures the rows
     void columnsMadeForZoom() { m_zoomOfColumns = listZoom(); }  // after setting or restoring widths
     double fade() const { return m_active ? 0.0 : inactiveDim(); }
@@ -60,7 +62,7 @@ public:
     // Header state as the user configured it (ignores columns hidden for width).
     QByteArray userHeaderState();
     QList<int> autoHiddenColumns() const { return m_autoHidden; }
-    void fitColumns();
+    void fitColumns();  // also sizes the Ext column to the longest extension
     void setCurrentRow(int row, bool center = false);
     // Thumbnails in a grid instead of the detailed list.
     void setThumbnails(bool on);
@@ -124,6 +126,7 @@ private:
     QString dropTargetFor(const QPoint& pos, int* row) const;
     void startFileDrag();
     void showHeaderMenu(const QPoint& pos);
+    void measureExt(int first, int last);
 
     bool m_active = false;
     int m_dropRow = -1;
@@ -141,6 +144,8 @@ private:
     bool m_arrowFolders = true;
     int m_zoomOfColumns = 100;  // the zoom the column widths were made for
     QList<int> m_autoHidden;  // columns hidden because the panel is narrow
+    int m_extWidth = 0;       // the longest extension's width; 0: not measured yet
+    QList<QMetaObject::Connection> m_modelConnections;  // to the shown folder's model
     ThumbGrid* m_grid = nullptr;
 };
 

@@ -189,7 +189,8 @@ private:
     QString previewMode() const;  // "each" (default), "bottom", "right"
     void openSettings(int page = 0);
     void showTrash();
-    void showServers(const QString& uri = {});
+    void showServers(const QString& uri = {}, bool bookmarks = false);  // the Locations window
+    void openBookmarks(const QString& keys = {});  // Ctrl+D: keys jump, Tab searches; keys: typed already (g + key)
     void findDuplicates();
     void showDiskUsage();
     void showChecksums();
@@ -203,6 +204,7 @@ private:
     JobManager* m_jobs;
     JobsPanel* m_jobsPanel;
     QAction* m_hiddenAction = nullptr;
+    QAction* m_foldersFirstAction = nullptr;
     QHash<QString, QAction*> m_actions;
     FuzzyPopup* m_popup = nullptr;
     KeyChordPopup* m_chords = nullptr;
