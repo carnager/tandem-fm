@@ -3895,6 +3895,32 @@ private slots:
         latin->close();
     }
 
+    // The search field opens into the palette: its field exactly where the
+    // search field is. The search field shows the palette's key.
+    void paletteOverSearchField()
+    {
+        auto* field = m_window->findChild<QPushButton*>("searchField");
+        QVERIFY(field && field->isVisible());
+        auto* key = field->findChild<QLabel*>("searchKey");
+        QTRY_COMPARE(key->text(), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_P).toString(QKeySequence::NativeText));
+        field->click();
+        auto visiblePopup = [&] {
+            for (auto* f : m_window->findChildren<FuzzyPopup*>())
+                if (f->isVisible())
+                    return f;
+            return static_cast<FuzzyPopup*>(nullptr);
+        };
+        FuzzyPopup* popup = nullptr;
+        QTRY_VERIFY((popup = visiblePopup()));
+        auto close = qScopeGuard([&] { if (popup->isVisible()) QTest::keyClick(popup->findChild<QLineEdit*>(), Qt::Key_Escape); });
+        auto* edit = popup->findChild<QLineEdit*>();
+        const QRect fieldRect(field->mapToGlobal(QPoint(0, 0)), field->size());
+        const QRect editRect(edit->mapToGlobal(QPoint(0, 0)), edit->size());
+        QCOMPARE(editRect, fieldRect);
+        QTest::keyClick(edit, Qt::Key_Escape);
+        QTRY_VERIFY(!popup->isVisible());
+    }
+
     void dropDefaultAction()
     {
         auto restore = qScopeGuard([] { FileView::setDropMoves(false, true); });
@@ -4063,9 +4089,17 @@ private slots:
         h.setBookmark(L("sub"), "cp");
         h.setBookmark(L("sub/deep"), "cd");
         h.setBookmark(R(), "c");  // also a prefix of the two above
-        auto* popup = m_window->findChild<FuzzyPopup*>();
+        // The one that shows: which popup comes first among the window's
+        // children changes as they are raised.
+        FuzzyPopup* popup = nullptr;
+        auto visiblePopup = [&] {
+            for (auto* f : m_window->findChildren<FuzzyPopup*>())
+                if (f->isVisible())
+                    return f;
+            return static_cast<FuzzyPopup*>(nullptr);
+        };
         auto* chords = m_window->findChild<KeyChordPopup*>();
-        QVERIFY(popup && chords);
+        QVERIFY(chords);
         m_window->activateWindow();
         QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
         m_left->view()->setFocus();
@@ -4082,7 +4116,7 @@ private slots:
 
         // A chain: "c" waits and shows the three, the exact one first; "p" jumps.
         QTest::keyClick(m_left->view(), Qt::Key_D, Qt::ControlModifier);
-        QTRY_VERIFY(popup->isVisible());
+        QTRY_VERIFY((popup = visiblePopup()));
         QTest::keyClicks(QApplication::focusWidget(), "c");
         QCOMPARE(rows(), QStringList({"c", "cp", "cd"}));
         QTest::keyClicks(QApplication::focusWidget(), "p");

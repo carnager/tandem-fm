@@ -310,6 +310,7 @@ void FuzzyPopup::close()
         m_returnFocus->setFocus();
     hide();
     m_anchor = nullptr;
+    m_over = false;
 }
 
 void FuzzyPopup::open(const QString& placeholder, const QList<PopupItem>& items, const QString& footer)
@@ -346,6 +347,15 @@ void FuzzyPopup::openUnder(QWidget* anchor, const QString& placeholder, const QL
                            const QString& footer)
 {
     m_anchor = anchor;
+    m_over = false;
+    open(placeholder, items, footer);
+}
+
+void FuzzyPopup::openOver(QWidget* field, const QString& placeholder, const QList<PopupItem>& items,
+                          const QString& footer)
+{
+    m_anchor = field;
+    m_over = true;
     open(placeholder, items, footer);
 }
 
@@ -469,6 +479,23 @@ void FuzzyPopup::place()
     opt.initFrom(m_list);
     for (int r = 0; r < qMin(kVisibleRows, m_model->rowCount()); ++r)
         listHeight += m_list->itemDelegate()->sizeHint(opt, m_model->index(r)).height();
+    m_edit->setMinimumHeight(0);
+    m_edit->setMaximumHeight(QWIDGETSIZE_MAX);
+    if (m_anchor && m_over) {  // the field opens up: ours exactly where it is, as tall and as wide
+        const QRect field(m_anchor->mapTo(w, QPoint(0, 0)), m_anchor->size());
+        m_edit->setFixedHeight(field.height());
+        m_list->setFixedHeight(qBound(40, listHeight + 4, qMax(120, w->height() - field.bottom() - 110)));
+        // Room above the field may be less than the usual margin.
+        layout()->setContentsMargins(10, qBound(0, field.y() - 1, 10), 10, 8);
+        // Measured, not assumed: borders and margins put our field where it lands.
+        resize(field.width() + 22, height());
+        layout()->activate();
+        const QRect ours(m_edit->mapTo(this, QPoint(0, 0)), m_edit->size());
+        const int wide = QWidget::width() + field.width() - ours.width();
+        setGeometry(field.x() - ours.x(), field.y() - ours.y(), wide, sizeHint().height());
+        return;
+    }
+    layout()->setContentsMargins(10, 10, 10, 8);
     if (m_anchor) {  // a drop-down under the field: a handful of rows, the rest scroll
         QPoint at = m_anchor->mapTo(w, QPoint(0, m_anchor->height() + 4));
         const int top = m_anchor->mapTo(w, QPoint(0, 0)).y() - 4;

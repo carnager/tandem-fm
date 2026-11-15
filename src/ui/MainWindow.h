@@ -228,7 +228,8 @@ private:
     QMenu* m_workspaceMenu = nullptr;
     QHash<QString, QAbstractButton*> m_fkeys;  // F3 … F8
     class ShelfBar* m_shelfBar = nullptr;
-    QWidget* m_menuButton = nullptr;  // the menus, while the menu bar is hidden
+    QWidget* m_menuButton = nullptr;
+    class QLabel* m_searchKey = nullptr;  // the palette's key, in the search field  // the menus, while the menu bar is hidden
     void showMenuBar(bool on);
     class ShelfPanel* m_shelfPanel = nullptr;
     bool m_fkeyUpdatePending = false;
