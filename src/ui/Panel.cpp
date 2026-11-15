@@ -273,6 +273,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     layout->addLayout(twrap);
 
     m_view = new FileView(this);
+    m_view->setInArchiveCheck([this] { return inArchive(); });
     layout->addWidget(m_view, 1);
 
     m_filterBar = new QWidget(this);

@@ -5520,6 +5520,26 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Buchstaben sind Befehle, wie in vim und yazi: j k h l zum Bewegen, v für den visuellen Modus, y x p zum Kopieren, Ausschneiden und Einfügen, d in den Papierkorb, r zum Umbenennen, a zum Anlegen, t q für Tabs, / zum Suchen, : für die Palette. F1 zeigt alle. Tippen startet nicht mehr die Schnellsuche.</translation>
     </message>
     <message>
+        <source>Only on the same drive</source>
+        <translation>Nur auf demselben Laufwerk</translation>
+    </message>
+    <message>
+        <source>Dropping files</source>
+        <translation>Dateien ablegen</translation>
+    </message>
+    <message>
+        <source>Copies</source>
+        <translation>Kopiert</translation>
+    </message>
+    <message>
+        <source>Moves</source>
+        <translation>Verschiebt</translation>
+    </message>
+    <message>
+        <source>Across drives it then copies, like most file managers. Shift always moves and Ctrl always copies; into archives and to or from servers it always copies.</source>
+        <translation>Zwischen Laufwerken wird dann kopiert, wie in den meisten Dateimanagern. Umschalt verschiebt immer, Strg kopiert immer; in Archive und von oder zu Servern wird immer kopiert.</translation>
+    </message>
+    <message>
         <source>Notifications</source>
         <translation>Benachrichtigungen</translation>
     </message>

@@ -5,9 +5,14 @@
 #include <QTreeView>
 #include <QUrl>
 
+#include "core/Mounts.h"
+
+#include <functional>
+
 namespace tandem {
 
 class FileModel;
+
 class ThumbGrid;
 
 class FileDelegate : public QStyledItemDelegate {
@@ -55,6 +60,16 @@ public:
     static QFont zoomed(QFont f);  // a list font at the current zoom
     // What a drag of files offers other apps, with these keys held as it starts.
     static Qt::DropActions dragActions(Qt::KeyboardModifiers held);
+    // A drop without Shift or Ctrl: copies (what the source proposes), or
+    // moves; then maybe only when all of it stays on one drive.
+    static void setDropMoves(bool moves, bool sameDriveOnly);
+    static bool dropMoves();
+    static bool dropMovesSameDriveOnly();
+    // What such a drop does while moving is set: never a move into an archive
+    // or to or from a server; on one drive by the device in mounts.
+    static Qt::DropAction plainDropAction(const QList<QUrl>& sources, const QString& target, bool intoArchive,
+                                          const QList<MountPoint>& mounts);
+    void setInArchiveCheck(std::function<bool()> check) { m_inArchive = std::move(check); }
     void zoomChanged();            // re-measures the rows
     void columnsMadeForZoom() { m_zoomOfColumns = listZoom(); }  // after setting or restoring widths
     double fade() const { return m_active ? 0.0 : inactiveDim(); }
@@ -124,6 +139,9 @@ private:
     // unmarks) the files passed over, then moves there.
     void markTo(int target, bool includeTarget);
     QString dropTargetFor(const QPoint& pos, int* row) const;
+    Qt::DropAction dropActionFor(const QDropEvent* e, const QString& target) const;
+    QList<MountPoint> m_dragMounts;  // read as a drag comes in
+    std::function<bool()> m_inArchive;
     void startFileDrag();
     void showHeaderMenu(const QPoint& pos);
     void measureExt(int first, int last);

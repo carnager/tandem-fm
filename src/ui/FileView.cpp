@@ -2,6 +2,8 @@
 
 #include "ui/ThumbGrid.h"
 
+#include "core/Backend.h"
+#include "core/Mounts.h"
 #include "core/Sorting.h"
 #include "core/Util.h"
 #include "ui/FileColors.h"
@@ -173,6 +175,8 @@ void FileDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
 
 namespace {
 double g_inactiveDim = 0.0;
+bool g_dropMoves = false;
+bool g_dropSameDriveOnly = true;
 int g_listZoom = 100;
 }
 
@@ -904,10 +908,70 @@ QString FileView::dropTargetFor(const QPoint& pos, int* row) const
 
 void FileView::dragEnterEvent(QDragEnterEvent* e)
 {
-    if (e->mimeData()->hasUrls())
+    if (e->mimeData()->hasUrls()) {
+        // Only /proc (or getfsstat without waiting): nothing that can hang.
+        m_dragMounts = g_dropMoves && g_dropSameDriveOnly ? listMounts() : QList<MountPoint>{};
         e->acceptProposedAction();
-    else
+    } else {
         e->ignore();
+    }
+}
+
+Qt::DropAction FileView::dropActionFor(const QDropEvent* e, const QString& target) const
+{
+    if (e->modifiers() & Qt::ShiftModifier)
+        return Qt::MoveAction;
+    if (e->modifiers() & Qt::ControlModifier)
+        return Qt::CopyAction;
+    if (!g_dropMoves || !(e->possibleActions() & Qt::MoveAction))
+        return e->proposedAction();
+    return plainDropAction(e->mimeData()->urls(), target, m_inArchive && m_inArchive(), m_dragMounts);
+}
+
+void FileView::setDropMoves(bool moves, bool sameDriveOnly)
+{
+    g_dropMoves = moves;
+    g_dropSameDriveOnly = sameDriveOnly;
+}
+
+bool FileView::dropMoves()
+{
+    return g_dropMoves;
+}
+
+bool FileView::dropMovesSameDriveOnly()
+{
+    return g_dropSameDriveOnly;
+}
+
+Qt::DropAction FileView::plainDropAction(const QList<QUrl>& sources, const QString& target, bool intoArchive,
+                                         const QList<MountPoint>& mounts)
+{
+    if (sources.isEmpty() || intoArchive || isRemoteLocation(target))
+        return Qt::CopyAction;
+    for (const QUrl& u : sources)
+        if (!u.isLocalFile())
+            return Qt::CopyAction;
+    if (!g_dropSameDriveOnly)
+        return Qt::MoveAction;
+    // The device of the innermost mount holding the path.
+    auto drive = [&](const QString& path) {
+        const MountPoint* best = nullptr;
+        for (const MountPoint& m : mounts) {
+            const bool holds = m.path == QLatin1String("/") || path == m.path ||
+                               path.startsWith(m.path + QLatin1Char('/'));
+            if (holds && (!best || m.path.size() > best->path.size()))
+                best = &m;
+        }
+        return best ? best->device : QString();
+    };
+    const QString there = drive(target);
+    if (there.isEmpty())
+        return Qt::CopyAction;
+    for (const QUrl& u : sources)
+        if (drive(QDir::cleanPath(u.toLocalFile())) != there)
+            return Qt::CopyAction;
+    return Qt::MoveAction;
 }
 
 void FileView::dragMoveEvent(QDragMoveEvent* e)
@@ -917,17 +981,12 @@ void FileView::dragMoveEvent(QDragMoveEvent* e)
         return;
     }
     int row = -1;
-    dropTargetFor(e->position().toPoint(), &row);
+    const QString target = dropTargetFor(e->position().toPoint(), &row);
     if (row != m_dropRow) {
         m_dropRow = row;
         viewport()->update();
     }
-    if (e->modifiers() & Qt::ShiftModifier)
-        e->setDropAction(Qt::MoveAction);
-    else if (e->modifiers() & Qt::ControlModifier)
-        e->setDropAction(Qt::CopyAction);
-    else
-        e->setDropAction(e->proposedAction());
+    e->setDropAction(dropActionFor(e, target));
     e->accept();
     updateDropText(e->mimeData(), e->dropAction(), e->position().toPoint());
 }
@@ -1004,11 +1063,7 @@ void FileView::dropEvent(QDropEvent* e)
         e->ignore();
         return;
     }
-    Qt::DropAction action = e->proposedAction();
-    if (e->modifiers() & Qt::ShiftModifier)
-        action = Qt::MoveAction;
-    else if (e->modifiers() & Qt::ControlModifier)
-        action = Qt::CopyAction;
+    const Qt::DropAction action = dropActionFor(e, target);
     e->setDropAction(action);
     e->accept();
     emit dropRequested(e->mimeData()->urls(), target, action);
@@ -1138,8 +1193,9 @@ Qt::DropActions FileView::dragActions(Qt::KeyboardModifiers held)
 #ifdef Q_OS_MACOS
     // Qt tells macOS to ignore the keys held during a drag, so Option can't
     // make Finder copy, and Finder moves on the same disk. Copy, unless Shift
-    // was held as the drag started.
-    if (!(held & Qt::ShiftModifier))
+    // was held as the drag started, or drops move here too (then Finder
+    // decides, moving on the same disk).
+    if (!(held & Qt::ShiftModifier) && !g_dropMoves)
         return Qt::CopyAction | Qt::LinkAction;
 #else
     Q_UNUSED(held);

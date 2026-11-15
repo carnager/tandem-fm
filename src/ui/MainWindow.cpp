@@ -3912,6 +3912,8 @@ void MainWindow::loadSettings(const QStringList& startPaths)
     m_left->setVimKeys(vimKeys);
     m_right->setVimKeys(vimKeys);
     FileView::setInactiveDim(s.value(QStringLiteral("view/inactiveDim"), 0).toInt() / 100.0);
+    FileView::setDropMoves(s.value(QStringLiteral("input/dropMoves"), false).toBool(),
+                           s.value(QStringLiteral("input/dropMovesSameDrive"), true).toBool());
     FileModel::setRelativeDates(s.value(QStringLiteral("view/relativeDates"), true).toBool());
     ThumbGrid::setDefaultSize(s.value(QStringLiteral("view/gridSize"), ThumbGrid::kDefaultSize).toInt());
     FileView::setListZoom(s.value(QStringLiteral("view/listZoom"), 100).toInt());
