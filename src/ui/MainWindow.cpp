@@ -528,7 +528,7 @@ void MainWindow::createMenus()
     });
     view->addSeparator();
     addCommand(view, QT_TR_NOOP("Toggle menu bar"), {K(Qt::CTRL | Qt::SHIFT | Qt::Key_M)},
-               [this] { menuBar()->setVisible(!menuBar()->isVisible()); });
+               [this] { showMenuBar(!menuBar()->isVisible()); });
     m_actions[QStringLiteral("refresh")] = addCommand(view, QT_TR_NOOP("Refresh"), {K(Qt::CTRL | Qt::Key_R)}, [this] { active()->refresh(); });
 
     // Tools: the bigger jobs, each with its own window or bar.
@@ -1605,6 +1605,14 @@ void MainWindow::putInto(const QStringList& paths, const QString& dir, bool move
     m_jobs->add(new CopyJob(move ? CopyJob::Mode::Move : CopyJob::Mode::Copy, paths, dir));
 }
 
+// The same menus twice is one too many: the button goes while the bar shows.
+void MainWindow::showMenuBar(bool on)
+{
+    menuBar()->setVisible(on);
+    if (m_menuButton)
+        m_menuButton->setVisible(!on);
+}
+
 void MainWindow::swapPanels()
 {
     const QString l = m_left->path();
@@ -1855,6 +1863,7 @@ QWidget* MainWindow::createTopBar(QWidget* parent)
     });
     menuButton->setMenu(menu);
     l->addWidget(menuButton);
+    m_menuButton = menuButton;
     auto* logo = new QLabel(bar);
     logo->setPixmap(windowIcon().isNull() ? QApplication::windowIcon().pixmap(18, 18) : windowIcon().pixmap(18, 18));
     l->addWidget(logo);
@@ -3860,7 +3869,7 @@ void MainWindow::loadSettings(const QStringList& startPaths)
             m_panelRatio = double(s[0]) / (s[0] + s[1]);
     });
     // The menus live behind the top bar's button; the classic bar is optional.
-    menuBar()->setVisible(s.value(QStringLiteral("window/menuBar2"), false).toBool());
+    showMenuBar(s.value(QStringLiteral("window/menuBar2"), false).toBool());
     const QString iconTheme = s.value(QStringLiteral("view/iconTheme")).toString();
     if (!iconTheme.isEmpty())
         IconCache::setTheme(iconTheme);

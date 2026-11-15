@@ -496,7 +496,7 @@ QWidget* SettingsDialog::appearancePage()
     auto* menu = new QCheckBox(tr("Show the menu bar (Ctrl+Shift+M)"), this);
     menu->setChecked(m_window->menuBar()->isVisible());
     connect(menu, &QCheckBox::toggled, this, [this](bool on) {
-        m_window->menuBar()->setVisible(on);
+        m_window->showMenuBar(on);
         QSettings().setValue(QStringLiteral("window/menuBar2"), on);
     });
     page.add(QString(), menu);
