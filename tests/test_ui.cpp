@@ -4422,6 +4422,58 @@ private slots:
         QTRY_COMPARE(leftModel()->path(), L());
     }
 
+    // Ctrl+Shift+F on a server: the walk goes through the backend, off the
+    // UI thread; the matches from all subfolders copy flat into a local folder.
+    void deepFilterOnServer()
+    {
+        QTemporaryDir serverDir;
+        QVERIFY(QDir(serverDir.path()).mkpath("docs/a/b"));
+        writeFile(serverDir.filePath("docs/a/report.pdf"), "r");
+        writeFile(serverDir.filePath("docs/a/b/notes.pdf"), "n");
+        writeFile(serverDir.filePath("docs/a/b/photo.jpg"), "p");
+        auto backend = std::make_shared<TestBackend>(serverDir.path());
+        registerBackend("test", backend);
+        auto unregister = qScopeGuard([] { registerBackend("test", nullptr); });
+        QVERIFY(QDir().mkpath(R("from-server")));
+        m_right->navigate(R("from-server"));
+        QTRY_COMPARE(rightModel()->path(), R("from-server"));
+        m_left->navigate("test://srv/docs");
+        QTRY_COMPARE(leftModel()->path(), QString("test://srv/docs"));
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        backend->uiThreadCalls = 0;
+
+        QTest::keyClick(m_left->view(), Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(m_left->tab()->isLive());
+        QVERIFY(m_left->isRemote());  // a delete there must not look for a trash
+        auto* edit = qobject_cast<QLineEdit*>(QApplication::focusWidget());
+        QVERIFY(edit);
+        QTest::keyClicks(edit, "*.pdf");
+        QTRY_COMPARE(m_left->tab()->searchFound(), 2);
+        QTRY_VERIFY(leftModel()->rowOf("a/b/notes.pdf") >= 0);
+        QVERIFY(leftModel()->rowOf("a/report.pdf") >= 0);
+        QCOMPARE(leftModel()->rowOf("a/b/photo.jpg"), -1);
+        QCOMPARE(leftModel()->entry(leftModel()->rowOf("a/report.pdf"))->size, qint64(1));
+
+        leftModel()->markAll(true);
+        m_left->view()->setFocus();
+        answerNextDialog([](QWidget* w) { acceptDialog(w); });  // the destination prompt
+        QTest::keyClick(m_left->view(), Qt::Key_F5);
+        QTRY_COMPARE_WITH_TIMEOUT(readFile(R("from-server/report.pdf")), QByteArray("r"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(readFile(R("from-server/notes.pdf")), QByteArray("n"), 5000);
+        QVERIFY(!QFile::exists(R("from-server/photo.jpg")));
+        QCOMPARE(backend->uiThreadCalls.load(), 0);
+
+        QTest::keyClick(edit, Qt::Key_Escape);
+        QTRY_VERIFY(!m_left->tab()->isSearch());
+        m_left->navigate(L());
+        QTRY_COMPARE(leftModel()->path(), L());
+        m_right->navigate(R());
+        QTRY_COMPARE(rightModel()->path(), R());
+        QVERIFY(ioPool()->waitForDone(5000));
+    }
+
     // Shelves: Ctrl+B and a digit puts the marked files on one (b1 with
     // modal keys); a chip shows it; Ctrl+Shift+B copies it here; the chip
     // opens it: Del takes one off, Ctrl+Del clears it.

@@ -96,8 +96,16 @@ void DirTab::refresh()
         ioPool()->start([self, root, names] {
             auto updates = std::make_shared<std::vector<EntryUpdate>>(statNames(root, names, true));
             postToUi([self, updates] {
-                if (self && self->m_inSearch)
-                    self->m_model->applyUpdates(std::move(*updates));
+                if (!self || !self->m_inSearch)
+                    return;
+                // Gone or changed on a server: the next words must not bring back the old.
+                if (!self->m_liveEntries.isEmpty())
+                    for (const auto& [name, e] : *updates)
+                        if (e)
+                            self->m_liveEntries.insert(name, *e);
+                        else
+                            self->m_liveEntries.remove(name);
+                self->m_model->applyUpdates(std::move(*updates));
             });
         });
         return;
@@ -217,6 +225,7 @@ void DirTab::startListing(const QString& pathIn, const QString& focus, History h
         m_inSearch = false;
         m_live = false;
         m_liveNames.clear();
+        m_liveEntries.clear();
         madeForSearch = false;
         m_model->setListing(QString(), {});  // forget the results; the real listing follows
         emit searchChanged();
@@ -450,8 +459,10 @@ void DirTab::beginSearch(const SearchSpec& spec)
     m_inSearch = true;
     m_live = false;
     m_liveNames.clear();
+    m_liveEntries.clear();
+    m_remote = isRemoteLocation(spec.root);  // deletes then skip the trash, as in the folder
     m_model->setCountable(false, false);  // results are paths below the folder
-    m_model->setOwners(FileModel::Owners::Names);  // search is local only
+    m_model->setOwners(m_remote ? FileModel::Owners::Numbers : FileModel::Owners::Names);
 #ifdef Q_OS_MACOS
     m_model->setLocalIconPaths(false);
 #endif
@@ -522,17 +533,32 @@ void DirTab::startLiveSearch(const QString& root)
     const quint64 gen = m_gen;
     QPointer<DirTab> self(this);
     ioPool()->start([self, root, cancel, gen] {
-        const QString error = listTree(root, false, cancel.get(), kLiveNames, [&](const QStringList& batch) {
-            postToUi([self, gen, batch] {
+        auto add = [&](const QStringList& names, std::shared_ptr<std::vector<FileEntry>> entries) {
+            postToUi([self, gen, names, entries] {
                 if (!self || gen != self->m_gen || !self->isLive())
                     return;
-                self->m_liveNames += batch;
+                self->m_liveNames += names;
+                if (entries)
+                    for (FileEntry& e : *entries)
+                        self->m_liveEntries.insert(e.name, std::move(e));
                 // While names come in, matches are looked for now and then, not per batch.
                 if (!self->m_search.query.isEmpty() && !self->m_liveTimer->isActive())
                     self->m_liveTimer->start(300);
                 emit self->searchChanged();
             });
-        });
+        };
+        const QString error =
+            isRemoteLocation(root)
+                ? listServerTree(root, false, cancel.get(), kLiveNames,
+                                 [&](std::vector<FileEntry>&& batch) {
+                                     QStringList names;
+                                     names.reserve(qsizetype(batch.size()));
+                                     for (const FileEntry& e : batch)
+                                         names << e.name;
+                                     add(names, std::make_shared<std::vector<FileEntry>>(std::move(batch)));
+                                 })
+                : listTree(root, false, cancel.get(), kLiveNames,
+                           [&](const QStringList& batch) { add(batch, nullptr); });
         postToUi([self, gen, error, cancel] {
             if (!self || gen != self->m_gen || cancel->load() || !self->isLive())
                 return;
@@ -564,8 +590,9 @@ void DirTab::filterLive()
     const QString query = m_search.query;
     const QStringList names = m_liveNames;  // shared, not copied
     const QSet<QString> marked = m_model->markedSet();
+    const QHash<QString, FileEntry> known = m_liveEntries;  // shared, not copied
     QPointer<DirTab> self(this);
-    ioPool()->start([self, gen, listGen, root, query, names, marked] {
+    ioPool()->start([self, gen, listGen, root, query, names, marked, known] {
         const PathMatcher matcher(query);
         QStringList shown;
         int found = 0;
@@ -575,7 +602,15 @@ void DirTab::filterLive()
                     shown << n;
         for (const QString& n : marked)
             shown << n;
-        auto updates = std::make_shared<std::vector<EntryUpdate>>(statNames(root, shown, true));
+        std::shared_ptr<std::vector<EntryUpdate>> updates;
+        if (isRemoteLocation(root)) {  // from the walk: a stat each would be a round trip each
+            updates = std::make_shared<std::vector<EntryUpdate>>();
+            for (const QString& n : std::as_const(shown))
+                if (auto it = known.constFind(n); it != known.cend())
+                    updates->emplace_back(n, *it);
+        } else {
+            updates = std::make_shared<std::vector<EntryUpdate>>(statNames(root, shown, true));
+        }
         postToUi([self, gen, listGen, found, updates] {
             if (!self || gen != self->m_liveGen || listGen != self->m_gen || !self->isLive())
                 return;

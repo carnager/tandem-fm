@@ -5,8 +5,11 @@
 #include <QString>
 #include <QStringList>
 
+#include "core/FileEntry.h"
+
 #include <atomic>
 #include <functional>
+#include <vector>
 
 namespace tandem {
 
@@ -29,6 +32,12 @@ QString runSearch(const SearchSpec& spec, const std::atomic<bool>* cancel, int l
 // unless `all`), in batches, like runSearch.
 QString listTree(const QString& root, bool all, const std::atomic<bool>* cancel, int limit,
                  const std::function<void(const QStringList& batch)>& onBatch);
+
+// listTree for a server (sftp://, smb://, …): walks root through its Backend,
+// in one request where the server can. The entries come with what the
+// listing knew, their names relative to root, so nothing needs a stat later.
+QString listServerTree(const QString& root, bool all, const std::atomic<bool>* cancel, int limit,
+                       const std::function<void(std::vector<FileEntry>&& batch)>& onBatch);
 
 // The live filter's matching, on paths relative to the searched folder:
 // every space-separated word must be in the path ("ph 24 raw" finds

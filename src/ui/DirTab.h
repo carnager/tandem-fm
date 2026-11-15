@@ -150,6 +150,8 @@ private:
     void filterLive();
     bool m_live = false;
     QStringList m_liveNames;
+    // On a server: what the walk found, so matches need no stat each.
+    QHash<QString, FileEntry> m_liveEntries;
     quint64 m_liveGen = 0;
     QTimer* m_liveTimer = nullptr;
     quint64 m_gitGen = 0;
