@@ -58,6 +58,8 @@ KeyChordPopup::KeyChordPopup(QWidget* window) : QFrame(window)
     m_list = new QListView(this);
     m_list->setModel(m_model);
     m_list->setItemDelegate(new PopupDelegate(m_list));
+    m_list->setMouseTracking(true);
+    m_list->viewport()->setAttribute(Qt::WA_Hover);
     m_list->setFocusPolicy(Qt::NoFocus);
     m_list->setSelectionMode(QAbstractItemView::NoSelection);
     m_list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);

@@ -143,9 +143,12 @@ void PopupDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QM
         p->setFont(opt.font);
     }
     const QStyleOptionViewItem& opt2 = o;
-    if (opt.state & QStyle::State_Selected) {
+    if (opt.state & (QStyle::State_Selected | QStyle::State_MouseOver)) {
+        QColor fill = t.cursorActive;
+        if (!(opt.state & QStyle::State_Selected))
+            fill.setAlphaF(fill.alphaF() * 0.5);  // under the mouse: half as strong
         p->setPen(Qt::NoPen);
-        p->setBrush(t.cursorActive);
+        p->setBrush(fill);
         p->drawRoundedRect(QRectF(opt2.rect).adjusted(4, 1, -4, -1), 6, 6);
     }
     QRect r = opt2.rect.adjusted(14, 6, -14, -6);
@@ -263,6 +266,8 @@ FuzzyPopup::FuzzyPopup(QWidget* window) : QFrame(window)
     m_list = new QListView(this);
     m_list->setModel(m_model);
     m_list->setItemDelegate(new PopupDelegate(m_list));
+    m_list->setMouseTracking(true);
+    m_list->viewport()->setAttribute(Qt::WA_Hover);  // rows light up under the mouse
     m_list->setFocusPolicy(Qt::NoFocus);
     m_list->setUniformItemSizes(false);
     m_list->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);

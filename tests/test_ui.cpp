@@ -3682,6 +3682,26 @@ private slots:
             QVERIFY(list->viewport()->testAttribute(Qt::WA_Hover));
         }
         QVERIFY(dlg.styleSheet().contains("segment:hover"));
+
+        // The Locations popup (and the other popups like it) too.
+        m_left->showLocations();
+        FuzzyPopup* popup = nullptr;
+        auto visiblePopup = [&] {
+            for (auto* f : m_window->findChildren<FuzzyPopup*>())
+                if (f->isVisible())
+                    return f;
+            return static_cast<FuzzyPopup*>(nullptr);
+        };
+        QTRY_VERIFY((popup = visiblePopup()));
+        auto* list = popup->findChild<QListView*>();
+        QVERIFY(list->viewport()->testAttribute(Qt::WA_Hover));
+        const QPointF at = list->visualRect(list->model()->index(2, 0)).center();
+        QEnterEvent en(at, at, list->viewport()->mapToGlobal(at));
+        QApplication::sendEvent(list->viewport(), &en);
+        QHoverEvent hv(QEvent::HoverMove, at, list->viewport()->mapToGlobal(at), QPointF(-1, -1));
+        QApplication::sendEvent(list->viewport(), &hv);
+        QTest::qWait(50);
+        popup->hide();
     }
 
     void dropDefaultAction()
