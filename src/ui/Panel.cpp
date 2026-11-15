@@ -187,7 +187,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     hl->setContentsMargins(6, 4, 10, 4);
     hl->setSpacing(6);
     m_mountButton = new QToolButton(m_header);
-    m_mountButton->setIcon(IconCache::themed("drive-harddisk", "folder"));
+    m_mountButton->setIcon(IconCache::glyph("drive-harddisk", "folder", theme().text));
     m_mountButton->setAutoRaise(true);
     m_mountButton->setFocusPolicy(Qt::NoFocus);
     m_mountButton->setToolTip(tr("Locations (Alt+F1 / Alt+F2)"));
@@ -489,6 +489,7 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     connect(m_view, &FileView::parentRequested, this, &Panel::goUp);
     connect(m_view, &FileView::intoRequested, this, &Panel::stepInto);
     connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, &Panel::updateStatus);
+    connect(&ThemeNotifier::instance(), &ThemeNotifier::changed, this, &Panel::updateHeader);  // the icon's colour
     connect(m_view, &FileView::switchPanelRequested, this, &Panel::switchRequested);
     // Esc in the list closes one thing at a time, innermost first.
     connect(m_view, &FileView::escapePressed, this, [this] {
@@ -1619,9 +1620,9 @@ void Panel::updateHeader()
     m_placeLabel->setVisible(t->isRemote() && !url.host().isEmpty());
     m_placeLabel->setText(QStringLiteral("%1 · %2").arg(url.host(), url.scheme()));
     m_branchLabel->setToolTip(tr("Git branch"));
-    m_mountButton->setIcon(t->inArchive()  ? IconCache::themed("package-x-generic", "application-x-archive")
-                           : t->isRemote() ? IconCache::themed("network-server", "folder-remote")
-                                           : IconCache::themed("drive-harddisk", "folder"));
+    m_mountButton->setIcon(t->inArchive()  ? IconCache::glyph("package-x-generic", "application-x-archive", theme().text)
+                           : t->isRemote() ? IconCache::glyph("network-server", "folder-remote", theme().text)
+                                           : IconCache::glyph("drive-harddisk", "folder", theme().text));
     m_mountButton->setToolTip(t->inArchive() ? tr("Inside archive %1").arg(t->archivePath())
                                              : tr("Locations (Alt+F1 / Alt+F2)"));
     if (t->freeBytes() >= 0 && t->totalBytes() > 0)  // GVfs/FUSE often report 0 of 0

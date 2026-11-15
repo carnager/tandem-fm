@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QHash>
 #include <QMimeDatabase>
+#include <QPainter>
 #include <QSet>
 
 #include <algorithm>
@@ -64,6 +65,34 @@ QIcon IconCache::themed(const char* name, const char* fallback)
     if (icon.isNull() && fallback)
         icon = QIcon::fromTheme(QLatin1String(fallback));
     return icon;
+}
+
+QIcon IconCache::glyph(const char* name, const char* fallback, const QColor& color)
+{
+    QIcon source;
+    for (const char* n : {name, fallback}) {
+        if (!n)
+            continue;
+        source = QIcon::fromTheme(QLatin1String(n) + QLatin1String("-symbolic"));
+        if (source.isNull())
+            source = QIcon::fromTheme(QLatin1String(n));
+        if (!source.isNull())
+            break;
+    }
+    if (source.isNull())
+        return {};
+    QIcon out;
+    for (int size : {16, 22, 24, 32, 48, 64}) {
+        QPixmap pm = source.pixmap(size);
+        if (pm.isNull())
+            continue;
+        QPainter p(&pm);
+        p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        p.fillRect(pm.rect(), color);
+        p.end();
+        out.addPixmap(pm);
+    }
+    return out;
 }
 
 void IconCache::clear()

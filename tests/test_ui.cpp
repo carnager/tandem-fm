@@ -3591,6 +3591,41 @@ private slots:
 
     // Dropping without Shift or Ctrl: copies unless set to move; then maybe
     // only on one drive, never into archives or to or from servers.
+
+    // The Locations button's icon is drawn in the theme's text colour, so
+    // it shows whether the icon theme is made for light or dark.
+    void locationsIconFollowsTheme()
+    {
+        const QIcon icon = IconCache::glyph("drive-harddisk", "folder", QColor("#ff00ff"));
+        if (icon.isNull())
+            QSKIP("no icon theme here");
+        const QImage img = icon.pixmap(16).toImage();
+        int seen = 0;
+        for (int y = 0; y < img.height(); ++y)
+            for (int x = 0; x < img.width(); ++x) {
+                const QColor c = img.pixelColor(x, y);
+                if (c.alpha() < 128)
+                    continue;
+                ++seen;
+                QCOMPARE(c.rgb() & 0xffffff, QColor("#ff00ff").rgb() & 0xffffff);
+            }
+        QVERIFY(seen > 0);
+    }
+
+
+    // The Locations window's lists light up under the mouse (Qt only tells
+    // a list about hovering when its viewport asks for it).
+    void locationsHover()
+    {
+        ServersDialog dlg(m_window.get());
+        for (const char* name : {"servers", "bookmarkList"}) {
+            auto* list = dlg.findChild<QListWidget*>(name);
+            QVERIFY2(list, name);
+            QVERIFY(list->viewport()->testAttribute(Qt::WA_Hover));
+        }
+        QVERIFY(dlg.styleSheet().contains("segment:hover"));
+    }
+
     void dropDefaultAction()
     {
         auto restore = qScopeGuard([] { FileView::setDropMoves(false, true); });

@@ -28,6 +28,13 @@ struct Theme {
     QFont numberFont;   // tabular digits for sizes and dates
 
     QString css(const QString& tmpl) const;  // replaces @window, @accent, ...
+    // A row under the mouse (@hover): the selection's colour, half as strong.
+    QColor hover() const
+    {
+        QColor c = headerActive;
+        c.setAlphaF(0.5);
+        return c;
+    }
 };
 
 const Theme& theme();

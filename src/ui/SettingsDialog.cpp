@@ -231,9 +231,11 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
     setThemeStyle(this, QStringLiteral(
         "QListWidget#nav { background: transparent; border: none; outline: none; }"
         "QListWidget#nav::item { padding: 8px 12px; border-radius: 6px; color: @text; }"
+        "QListWidget#nav::item:hover:!selected { background: @hover; }"
         "QListWidget#nav::item:selected { background: @headerActive; color: @text; }"
         "QTreeWidget::item { padding: 4px 2px; }"
         "QToolButton#segment { padding: 5px 14px; border: 1px solid @control; background: @base; }"
+        "QToolButton#segment:hover:!checked { background: @altBase; border-color: @accent; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"));
 
     auto* outer = new QVBoxLayout(this);

@@ -97,6 +97,7 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
         "QPushButton#flat:hover { background: @altBase; color: @text; }"
         "QPushButton#flat:disabled { color: @border; }"
         "QToolButton#segment { padding: 5px 16px; border: 1px solid @control; background: @base; }"
+        "QToolButton#segment:hover:!checked { background: @altBase; border-color: @accent; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
         "QToolButton#segment[edge=\"first\"] { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }"
         "QToolButton#segment[edge=\"last\"] { border-top-right-radius: 6px; border-bottom-right-radius: 6px;"
@@ -146,6 +147,7 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
     m_list->setObjectName(QStringLiteral("servers"));
     m_list->setItemDelegate(new CardDelegate(m_list));
     m_list->setMouseTracking(true);
+    m_list->viewport()->setAttribute(Qt::WA_Hover);  // the cards light up under the mouse
     m_list->setFixedWidth(250);
     left->addWidget(m_list, 1);
     auto* add = new QPushButton(IconCache::themed("list-add", "document-new"), tr("&Add"), this);

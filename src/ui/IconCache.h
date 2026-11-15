@@ -2,6 +2,7 @@
 
 #include "core/FileEntry.h"
 
+#include <QColor>
 #include <QIcon>
 #include <QList>
 
@@ -13,6 +14,10 @@ class IconCache {
 public:
     static const QIcon& forEntry(const FileEntry& e);
     static QIcon themed(const char* name, const char* fallback = nullptr);
+    // One colour, for the window's own controls: the -symbolic version
+    // (else the icon itself) as a silhouette in color, so it shows whether
+    // the icon theme is made for light or dark backgrounds.
+    static QIcon glyph(const char* name, const char* fallback, const QColor& color);
 
     // Switch icon theme ("" = the system's) and drop cached icons.
     static void setTheme(const QString& name);

@@ -380,6 +380,7 @@ MultiRenameDialog::MultiRenameDialog(QList<RenameItem> items, QString folder, QS
     layout->addLayout(grid);
     setThemeStyle(this, QStringLiteral(
         "QToolButton#segment { padding: 4px 12px; border: 1px solid @border; background: @base; }"
+        "QToolButton#segment:hover:!checked { background: @altBase; border-color: @accent; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
         "QToolButton#chip { padding: 2px 10px; border: 1px solid @border; border-radius: 10px; background: @altBase; }"
         "QToolButton#chip:hover { border-color: @accent; }"));

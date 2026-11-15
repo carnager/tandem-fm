@@ -29,6 +29,7 @@ DuplicatesDialog::DuplicatesDialog(QString here, QString other, QWidget* parent)
     resize(1000, 660);
     setThemeStyle(this, QStringLiteral(
         "QToolButton#segment { padding: 5px 12px; border: 1px solid @control; background: @base; }"
+        "QToolButton#segment:hover:!checked { background: @altBase; border-color: @accent; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
         "QTreeWidget::item { padding: 3px 2px; }"));
     auto* layout = new QVBoxLayout(this);

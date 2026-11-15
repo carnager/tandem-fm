@@ -97,6 +97,7 @@ QString Theme::css(const QString& tmpl) const
         {"@dimText", dimText}, {"@accentText", accentText}, {"@accent", accent},   {"@border", border},
         {"@headerActive", headerActive}, {"@header", header}, {"@error", error},    {"@success", success},
         {"@mark", mark},       {"@control", control},       {"@cursorActive", cursorActive},
+        {"@hover", hover()},
     };
     for (const auto& [name, color] : vars)
         s.replace(QLatin1String(name), rgba(color));
