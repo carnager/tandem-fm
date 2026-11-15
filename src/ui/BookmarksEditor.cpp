@@ -54,6 +54,7 @@ BookmarksEditor::BookmarksEditor(QWidget* parent) : QWidget(parent)
     m_list->setObjectName(QStringLiteral("bookmarkList"));
     m_list->setItemDelegate(new CardDelegate(m_list));
     m_list->setMouseTracking(true);
+    m_list->viewport()->setAttribute(Qt::WA_Hover);  // the cards light up under the mouse
     m_list->setFixedWidth(250);  // as the servers: the divider stays put
     m_list->setDragDropMode(QAbstractItemView::InternalMove);
     m_list->installEventFilter(this);

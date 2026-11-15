@@ -24,7 +24,7 @@ void CardDelegate::paint(QPainter* p, const QStyleOptionViewItem& opt, const QMo
         p->drawRoundedRect(card, 6, 6);
     } else if (opt.state & QStyle::State_MouseOver) {
         p->setPen(Qt::NoPen);
-        p->setBrush(t.altBase);
+        p->setBrush(t.hover());
         p->drawRoundedRect(card, 6, 6);
     }
     QRect r = opt.rect.adjusted(10, 0, -10, 0);
