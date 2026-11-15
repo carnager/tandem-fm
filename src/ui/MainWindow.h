@@ -77,6 +77,7 @@ private:
     void makeFolder(const QString& given = {});  // asks for a name unless given
     void viewCurrent();
     void editCurrent();
+    void openInEditor(const QString& path);  // F4's editor for the file's type, else its default app
     void openFile(const QString& path);
     void handleDrop(QStringList locations, const QString& targetDir, Qt::DropAction action);
     void copyToClipboard(bool cut);

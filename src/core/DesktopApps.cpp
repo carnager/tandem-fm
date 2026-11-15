@@ -298,6 +298,41 @@ bool DesktopApps::setDefault(const QString& mime, const QString& appId, QString*
     return true;
 }
 
+DesktopApp DesktopApps::app(const QString& id) const
+{
+    QMutexLocker lock(&m_mutex);
+    return m_apps.value(id);
+}
+
+QString DesktopApps::editGroup(const QStringList& mimeChain)
+{
+    for (const QString& m : mimeChain) {
+        const QString top = m.section(QLatin1Char('/'), 0, 0);
+        if (top == QLatin1String("image") || top == QLatin1String("video") || top == QLatin1String("audio"))
+            return top;
+        if (top == QLatin1String("text"))
+            return QStringLiteral("text");
+    }
+    return {};
+}
+
+QString DesktopApps::editorKey(const QString& group)
+{
+    // tools/editor is older than the groups: it was the one editor for all.
+    return group == QLatin1String("text") ? QStringLiteral("tools/editor") : QStringLiteral("tools/%1Editor").arg(group);
+}
+
+QString DesktopApps::groupMime(const QString& group)
+{
+    if (group == QLatin1String("image"))
+        return QStringLiteral("image/png");
+    if (group == QLatin1String("video"))
+        return QStringLiteral("video/mp4");
+    if (group == QLatin1String("audio"))
+        return QStringLiteral("audio/flac");
+    return QStringLiteral("text/plain");
+}
+
 QString DesktopApps::defaultTerminal() const
 {
     const QString chosen = QSettings().value(QStringLiteral("tools/terminal")).toString().trimmed();

@@ -1459,6 +1459,8 @@ void MainWindow::followInViewer()
         m_viewer->showFile(path);
 }
 
+static QStringList mimeChainFor(const QString& path);
+
 void MainWindow::editCurrent()
 {
     const QString path = active()->currentPath();
@@ -1473,15 +1475,7 @@ void MainWindow::editCurrent()
         editRemote(active(), path);
         return;
     }
-    const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
-    if (!editor.isEmpty()) {
-        QStringList args = QProcess::splitCommand(editor);
-        const QString program = args.takeFirst();
-        args.append(path);
-        if (launchDetached(program, args, active()->path()))
-            return;
-    }
-    openFile(path);
+    openInEditor(path);
 }
 
 // Mime types for a file name, most specific first. Name-based only: no disk I/O.
@@ -1494,6 +1488,27 @@ static QStringList mimeChainFor(const QString& path)
         chain << types.first().name() << types.first().aliases() << types.first().allAncestors();
     chain << QStringLiteral("application/octet-stream");
     return chain;
+}
+
+// F4: the editor chosen for the file's group (Settings › Tools), else the
+// default app. A choice is an installed app (its .desktop id, terminal apps
+// in the terminal) or a command the file is added to.
+void MainWindow::openInEditor(const QString& path)
+{
+    const QString group = DesktopApps::editGroup(mimeChainFor(path));
+    const QString choice = group.isEmpty() ? QString() : QSettings().value(DesktopApps::editorKey(group)).toString().trimmed();
+    if (choice.endsWith(QLatin1String(".desktop"))) {
+        DesktopApps& apps = DesktopApps::instance();
+        const DesktopApp app = apps.app(choice);
+        if (!app.id.isEmpty() && DesktopApps::launch(app, {path}, parentPath(path), apps.defaultTerminal()))
+            return;
+    } else if (!choice.isEmpty()) {
+        QStringList args = QProcess::splitCommand(choice);
+        const QString program = args.takeFirst();
+        if (launchDetached(program, args << path, parentPath(path)))
+            return;
+    }
+    openFile(path);
 }
 
 void MainWindow::openFile(const QString& path)
@@ -2322,10 +2337,7 @@ void MainWindow::editRemote(Panel* p, const QString& path)
     const QString editCopy = remoteCachePath(path).replace(QStringLiteral("/tandem-fm/remote/"), QStringLiteral("/tandem-fm/edit/"));
     if (m_editedRemote.value(editCopy) == path && QFileInfo::exists(editCopy)) {
         // Already being edited: reopen that copy, don't fetch over changes.
-        const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
-        QStringList args = QProcess::splitCommand(editor);
-        if (args.isEmpty() || !launchDetached(args.takeFirst(), args << editCopy, parentPath(editCopy)))
-            openFile(editCopy);
+        openInEditor(editCopy);
         return;
     }
     withLocalCopy(p, path, [this, path](const QString& local) {
@@ -2354,15 +2366,7 @@ void MainWindow::watchEdit(const QString& local)
     }
     m_editWatch->addPath(local);
     m_editWatch->addPath(parentPath(local));
-    const QString editor = QSettings().value(QStringLiteral("tools/editor")).toString();
-    if (!editor.isEmpty()) {
-        QStringList args = QProcess::splitCommand(editor);
-        const QString program = args.takeFirst();
-        args.append(local);
-        if (launchDetached(program, args, parentPath(local)))
-            return;
-    }
-    openFile(local);
+    openInEditor(local);
 }
 
 // F4 inside an archive: edit a copy; every save is written back into the archive.
