@@ -1,9 +1,13 @@
 #include "core/Search.h"
 
+#include "core/Backend.h"
+#include "core/DirLister.h"
+#include "core/Sorting.h"
 #include "core/Util.h"
 
 #include <QDirIterator>
 #include <algorithm>
+#include <cstring>
 #include <QElapsedTimer>
 #include <QProcess>
 #include <QRegularExpression>
@@ -197,6 +201,62 @@ QString listTree(const QString& root, bool all, const std::atomic<bool>* cancel,
     spec.query = QStringLiteral("*");  // every name
     spec.all = all;
     return runSearch(spec, cancel, limit, onBatch);
+}
+
+QString listServerTree(const QString& root, bool all, const std::atomic<bool>* cancel, int limit,
+                       const std::function<void(std::vector<FileEntry>&& batch)>& onBatch)
+{
+    Backend* b = backendFor(root);
+    if (!b)
+        return QObject::tr("This server can't be reached");
+    int count = 0;
+    // Names relative to root; false once the limit is reached.
+    auto report = [&](const QString& folder, const std::vector<FileEntry>& entries) {
+        std::vector<FileEntry> batch;
+        batch.reserve(entries.size());
+        for (const FileEntry& e : entries) {
+            if (count >= limit)
+                break;
+            FileEntry r = e;
+            r.name = folder.isEmpty() ? e.name : folder + QLatin1Char('/') + e.name;
+            r.key = makeSortKey(r.name);
+            batch.push_back(std::move(r));
+            ++count;
+        }
+        if (!batch.empty())
+            onBatch(std::move(batch));
+        return count < limit;
+    };
+    if (Backend::Tree tree; b->listTree(root, all, tree, cancel)) {  // one request for all of it
+        for (auto it = tree.cbegin(); it != tree.cend(); ++it)
+            if ((cancel && cancel->load()) || !report(it.key(), it.value()))
+                break;
+        return {};
+    }
+    // Folder by folder, level by level, so the first names come quickly.
+    ListOptions opt;
+    opt.showHidden = all;
+    QStringList level{QString()};
+    while (!level.isEmpty()) {
+        QStringList deeper;
+        for (const QString& folder : std::as_const(level)) {
+            if (cancel && cancel->load())
+                return {};
+            const ListResult l = b->list(folder.isEmpty() ? root : joinPath(root, folder), opt, cancel);
+            if (l.error) {
+                if (folder.isEmpty())
+                    return l.errorText.isEmpty() ? QString::fromLocal8Bit(strerror(l.error)) : l.errorText;
+                continue;  // an unreadable subfolder: the rest still counts
+            }
+            if (!report(folder, l.entries))
+                return {};
+            for (const FileEntry& e : l.entries)
+                if (e.isDir && !e.isLink)
+                    deeper << (folder.isEmpty() ? e.name : folder + QLatin1Char('/') + e.name);
+        }
+        level = deeper;
+    }
+    return {};
 }
 
 PathMatcher::PathMatcher(const QString& query)

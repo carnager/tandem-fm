@@ -1797,10 +1797,6 @@ void Panel::startFilter()
 
 void Panel::startDeepFilter()
 {
-    if (isRemote()) {
-        showMessage(tr("Searching on servers isn't supported yet"), true);
-        return;
-    }
     if (inArchive()) {
         showMessage(tr("Searching inside archives isn't supported yet"), true);
         return;
@@ -1859,7 +1855,7 @@ void Panel::toggleFilterDepth()
         m_filterEdit->setFocus();
         return;
     }
-    if (isRemote() || inArchive()) {
+    if (inArchive()) {
         startDeepFilter();  // says why not
         return;
     }

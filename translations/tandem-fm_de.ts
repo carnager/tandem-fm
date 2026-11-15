@@ -538,6 +538,10 @@
         <translation>Für die Inhaltssuche ripgrep (rg) installieren</translation>
     </message>
     <message>
+        <source>This server can&apos;t be reached</source>
+        <translation>Dieser Server ist nicht erreichbar</translation>
+    </message>
+    <message>
         <source>Connect</source>
         <translation>Verbinden</translation>
     </message>
