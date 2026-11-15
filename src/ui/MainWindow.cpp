@@ -914,6 +914,11 @@ void MainWindow::updateFKeys()
         {"F2", "rename"}, {"F3", "view"}, {"F4", "edit"}, {"F5", "copy"}, {"F6", "move"},
         {"F7", "new-folder"}, {"F8", "move-to-trash"}, {"all", "command-palette"},
     };
+    if (m_searchKey) {
+        const QString keys = keyHint(QStringLiteral("command-palette"), false);
+        m_searchKey->setText(keys);
+        m_searchKey->setVisible(!keys.isEmpty());
+    }
     for (const auto& [button, id] : ids) {
         auto* b = static_cast<KeyButton*>(m_fkeys.value(QLatin1String(button)));
         const QString keys = keyHint(QLatin1String(id));
@@ -1879,7 +1884,8 @@ QWidget* MainWindow::createTopBar(QWidget* parent)
         "QToolButton::menu-indicator { image: none; width: 0; }"
         "QPushButton#searchField { background: @base; color: @dimText; border: 1px solid @border; border-radius: 9px;"
         "  padding: 6px 12px; text-align: left; min-height: 0; }"
-        "QPushButton#searchField:hover { border-color: @control; }"));
+        "QPushButton#searchField:hover { border-color: @control; }"
+        "QLabel#searchKey { color: @dimText; border: 1px solid @border; border-radius: 5px; padding: 1px 6px; }"));
     auto* l = new QHBoxLayout(bar);
     l->setContentsMargins(0, 0, 0, 0);
     l->setSpacing(8);
@@ -1908,6 +1914,14 @@ QWidget* MainWindow::createTopBar(QWidget* parent)
     m_searchField->setMaximumWidth(560);
     m_searchField->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     connect(m_searchField, &QPushButton::clicked, this, &MainWindow::commandPalette);
+    // Its key on the right, like the key caps in the lists (set by updateFKeys).
+    auto* sl = new QHBoxLayout(m_searchField);
+    sl->setContentsMargins(0, 0, 8, 0);
+    sl->addStretch(1);
+    m_searchKey = new QLabel(m_searchField);
+    m_searchKey->setObjectName(QStringLiteral("searchKey"));
+    m_searchKey->setAttribute(Qt::WA_TransparentForMouseEvents);
+    sl->addWidget(m_searchKey, 0, Qt::AlignVCenter);
     l->addWidget(m_searchField, 3);
     l->addStretch(1);
     auto* settings = new QToolButton(bar);
@@ -2040,7 +2054,7 @@ void MainWindow::commandPalette()
                                ? tr("Enter: run or open")
                                : tr("Enter: run or open   ·   %1: visited folders   ·   %2: bookmarks").arg(jumpKey, marksKey);
     if (m_searchField && m_searchField->isVisible())
-        m_popup->openUnder(m_searchField, placeholder, items, footer);
+        m_popup->openOver(m_searchField, placeholder, items, footer);
     else
         m_popup->open(placeholder, items, footer);
 }

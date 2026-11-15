@@ -72,6 +72,9 @@ public:
     void open(const QString& placeholder, const QList<PopupItem>& items, const QString& footer = {});
     // Same, as a drop-down under a widget (a button) instead of centered.
     void openUnder(QWidget* anchor, const QString& placeholder, const QList<PopupItem>& items, const QString& footer = {});
+    // Over a search field: the popup's own field takes its place (same spot,
+    // same width), the list opens below it.
+    void openOver(QWidget* field, const QString& placeholder, const QList<PopupItem>& items, const QString& footer = {});
     void setItems(const QList<PopupItem>& items);  // keeps the query (after pin/forget)
     const PopupItem* currentItem() const;
     QString query() const;
@@ -105,6 +108,7 @@ private:
     QList<PopupItem> m_shown;  // m_items, plus the queryItem row
     QPointer<QWidget> m_returnFocus;
     QPointer<QWidget> m_anchor;
+    bool m_over = false;  // m_anchor is a field the popup covers
 };
 
 }  // namespace tandem
