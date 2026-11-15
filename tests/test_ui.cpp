@@ -1085,9 +1085,11 @@ private slots:
         auto* strip = m_right->findChild<QFrame*>("transfer");
         QVERIFY(strip && !strip->isVisible());
         const int listTop = m_right->view()->mapTo(m_right, QPoint(0, 0)).y();
-        QTest::qWait(900);
-        m_right->showTransfer(&job, "Copying <b>big.bin</b> here from /tmp");
-        QVERIFY(strip->isVisible());
+        // Reported again and again, as the window's timer does: shows after 0.8 s.
+        QElapsedTimer waited;
+        waited.start();
+        QTRY_VERIFY_WITH_TIMEOUT((m_right->showTransfer(&job, "Copying <b>big.bin</b> here from /tmp"), strip->isVisible()), 3000);
+        QVERIFY(waited.elapsed() >= 700);
         QVERIFY(strip->findChild<QLabel*>()->text().contains("paused"));
         QTest::qWait(50);
         QCOMPARE(m_right->view()->mapTo(m_right, QPoint(0, 0)).y(), listTop);
