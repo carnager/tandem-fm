@@ -12,6 +12,7 @@
 #include <QSaveFile>
 #include <QSet>
 #include <QUrl>
+#include <QSettings>
 #include <QStandardPaths>
 
 namespace tandem {
@@ -299,6 +300,9 @@ bool DesktopApps::setDefault(const QString& mime, const QString& appId, QString*
 
 QString DesktopApps::defaultTerminal() const
 {
+    const QString chosen = QSettings().value(QStringLiteral("tools/terminal")).toString().trimmed();
+    if (!chosen.isEmpty())
+        return chosen;
     QMutexLocker lock(&m_mutex);
     return m_terminal;
 }

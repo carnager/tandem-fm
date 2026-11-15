@@ -482,6 +482,17 @@ private slots:
         QCOMPARE(DesktopApps::terminalCommand("wezterm", cmd), QStringList({"wezterm", "start", "--", "nvim", "/tmp/f"}));
         QCOMPARE(DesktopApps::terminalCommand("kitty --class x", cmd),
                  QStringList({"kitty", "--class", "x", "nvim", "/tmp/f"}));
+
+        // The terminal chosen in the settings is the one everything uses
+        // (opening files with terminal apps too), over $TERMINAL or the
+        // first one installed.
+        QSettings s;
+        const QVariant before = s.value("tools/terminal");
+        auto restore = qScopeGuard([&] { before.isValid() ? s.setValue("tools/terminal", before) : s.remove("tools/terminal"); });
+        s.setValue("tools/terminal", "my-terminal --flag");
+        QCOMPARE(DesktopApps::instance().defaultTerminal(), QString("my-terminal --flag"));
+        s.setValue("tools/terminal", "");
+        QVERIFY(DesktopApps::instance().defaultTerminal() != "my-terminal --flag");
     }
 
     void defaultAppFromMimeappsList()

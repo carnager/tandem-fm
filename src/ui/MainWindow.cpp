@@ -2853,9 +2853,7 @@ void MainWindow::runCommand(const QString& command, bool inTerminal)
     const QString expanded = expandCommand(command, ctx);
 
     if (inTerminal) {
-        QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
-        if (terminal.isEmpty())
-            terminal = DesktopApps::instance().defaultTerminal();
+        const QString terminal = DesktopApps::instance().defaultTerminal();
         if (terminal.isEmpty()) {
             p->showMessage(tr("No terminal found. Set tools/terminal in the config."), true);
             return;
@@ -3625,9 +3623,7 @@ void MainWindow::openTerminal(const QString& dir)
         return;
     }
 #endif
-    QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
-    if (terminal.isEmpty())
-        terminal = DesktopApps::instance().defaultTerminal();
+    const QString terminal = DesktopApps::instance().defaultTerminal();
     if (terminal.isEmpty()) {
         active()->showMessage(tr("No terminal found. Set tools/terminal in the config."), true);
         return;

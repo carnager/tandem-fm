@@ -34,6 +34,8 @@ public:
     // The app a double-click should use: the user's default, else the best
     // registered match. Empty id if nothing handles the type.
     DesktopApp defaultFor(const QStringList& mimeChain) const;
+    // Settings › Tools (tools/terminal) when set, else $TERMINAL or the
+    // first one installed.
     QString defaultTerminal() const;
 
     // Makes appId the default for mime: updates [Default Applications] in
