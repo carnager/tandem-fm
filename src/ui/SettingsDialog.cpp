@@ -203,6 +203,8 @@ QComboBox* editorBox(QWidget* parent, const QString& group)
     box->setEditable(true);
     box->setInsertPolicy(QComboBox::NoInsert);
     box->addItem(automatic, QString());
+    if (group == QLatin1String("text"))
+        box->addItem(QObject::tr("Tandem (built-in)"), QStringLiteral("tandem"));
     for (const DesktopApp& app : DesktopApps::instance().appsFor({DesktopApps::groupMime(group)}))
         box->addItem(QIcon::fromTheme(app.icon), app.name, app.id);
     const QString current = QSettings().value(key).toString();

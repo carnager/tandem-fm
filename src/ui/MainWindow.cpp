@@ -1,5 +1,6 @@
 #include "ui/MainWindow.h"
 #include "ui/DragData.h"
+#include "ui/TextEditor.h"
 #include "ui/OpenUrl.h"
 #include "core/Launch.h"
 
@@ -1497,6 +1498,10 @@ void MainWindow::openInEditor(const QString& path)
 {
     const QString group = DesktopApps::editGroup(mimeChainFor(path));
     const QString choice = group.isEmpty() ? QString() : QSettings().value(DesktopApps::editorKey(group)).toString().trimmed();
+    if (choice == QLatin1String("tandem")) {  // the built-in one
+        TextEditor::open(path, this);
+        return;
+    }
     if (choice.endsWith(QLatin1String(".desktop"))) {
         DesktopApps& apps = DesktopApps::instance();
         const DesktopApp app = apps.app(choice);

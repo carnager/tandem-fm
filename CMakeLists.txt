@@ -106,6 +106,7 @@ add_library(tandem_ui STATIC
   src/ui/BookmarksEditor.h src/ui/BookmarksEditor.cpp
   src/ui/CardList.h src/ui/CardList.cpp
   src/ui/DragData.h src/ui/DragData.cpp
+  src/ui/TextEditor.h src/ui/TextEditor.cpp
   src/ui/SettingsDialog.h src/ui/SettingsDialog.cpp
   src/ui/TrashDialog.h src/ui/TrashDialog.cpp
   src/ui/DuplicatesDialog.h src/ui/DuplicatesDialog.cpp
