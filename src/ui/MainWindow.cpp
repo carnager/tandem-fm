@@ -337,6 +337,13 @@ void MainWindow::createMenus()
 {
     using K = QKeySequence;
     QMenuBar* bar = menuBar();
+    // Just the icon, left of the menus.
+    auto* logo = new QLabel(bar);
+    logo->setObjectName(QStringLiteral("menuLogo"));
+    logo->setPixmap(QIcon::fromTheme(QStringLiteral("tandem-fm"), QIcon(QStringLiteral(":/icons/tandem-fm.svg"))).pixmap(18, 18));
+    logo->setContentsMargins(8, 0, 4, 0);
+    logo->setToolTip(QStringLiteral("Tandem"));
+    bar->setCornerWidget(logo, Qt::TopLeftCorner);
 
     // Files: what happens to the selected items.
     QMenu* files = bar->addMenu(tr("&Files"));
@@ -1852,8 +1859,7 @@ QWidget* MainWindow::createTopBar(QWidget* parent)
         "QToolButton::menu-indicator { image: none; width: 0; }"
         "QPushButton#searchField { background: @base; color: @dimText; border: 1px solid @border; border-radius: 9px;"
         "  padding: 6px 12px; text-align: left; min-height: 0; }"
-        "QPushButton#searchField:hover { border-color: @control; }"
-        "QLabel#appName { font-weight: 600; }"));
+        "QPushButton#searchField:hover { border-color: @control; }"));
     auto* l = new QHBoxLayout(bar);
     l->setContentsMargins(0, 0, 0, 0);
     l->setSpacing(8);
@@ -1872,12 +1878,6 @@ QWidget* MainWindow::createTopBar(QWidget* parent)
     menuButton->setMenu(menu);
     l->addWidget(menuButton);
     m_menuButton = menuButton;
-    auto* logo = new QLabel(bar);
-    logo->setPixmap(windowIcon().isNull() ? QApplication::windowIcon().pixmap(18, 18) : windowIcon().pixmap(18, 18));
-    l->addWidget(logo);
-    auto* name = new QLabel(QStringLiteral("Tandem"), bar);
-    name->setObjectName(QStringLiteral("appName"));
-    l->addWidget(name);
     l->addStretch(1);
     m_searchField = new QPushButton(IconCache::themed("edit-find", "system-search"),
                                     tr("Find a file or run a command"), bar);
