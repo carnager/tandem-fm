@@ -948,7 +948,8 @@ void Panel::applyDefaultColumns()
     const QFontMetrics fm(FileView::zoomed(theme().numberFont));
     h->setSectionResizeMode(FileModel::ColName, QHeaderView::Stretch);
     h->setSectionResizeMode(FileModel::ColExt, QHeaderView::Fixed);  // as wide as the longest extension
-    for (int c = FileModel::ColSize; c < FileModel::ColCount; ++c)
+    h->setSectionResizeMode(FileModel::ColSize, QHeaderView::Fixed);  // and the widest size
+    for (int c = FileModel::ColTime; c < FileModel::ColCount; ++c)
         h->setSectionResizeMode(c, QHeaderView::Interactive);
     m_view->setColumnWidth(FileModel::ColSize, fm.horizontalAdvance(QStringLiteral("999.9 MiB")) + 24);
     // Dates: room for the longer of both styles ("Yesterday 23:59", "2026-12-31 23:59").
@@ -987,7 +988,7 @@ QStringList layoutOf(QHeaderView* h, const QList<int>& autoHidden)
             out << QLatin1Char('-') + id;
             continue;
         }
-        if (c == FileModel::ColName || c == FileModel::ColExt) {  // takes what's left; fits its extensions
+        if (c == FileModel::ColName || c == FileModel::ColExt || c == FileModel::ColSize) {  // what's left; fitted
             out << id;
             continue;
         }
@@ -1035,7 +1036,7 @@ void Panel::applyColumnLayout()
         h->moveSection(h->visualIndex(c), visual++);
         bool ok = false;
         const int width = parts.value(1).toInt(&ok);
-        if (ok && width > 0 && c != FileModel::ColName && c != FileModel::ColExt)  // older layouts kept ext's width
+        if (ok && width > 0 && c != FileModel::ColName && c != FileModel::ColExt && c != FileModel::ColSize)  // older layouts kept these
             m_view->setColumnWidth(c, width);
         h->setSectionHidden(c, hidden && c != FileModel::ColName);
     }

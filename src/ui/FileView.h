@@ -144,7 +144,8 @@ private:
     std::function<bool()> m_inArchive;
     void startFileDrag();
     void showHeaderMenu(const QPoint& pos);
-    void measureExt(int first, int last);
+    void measureFitted(int first, int last);  // widens Ext and Size for these rows
+    void applyFitted();
 
     bool m_active = false;
     int m_dropRow = -1;
@@ -163,6 +164,7 @@ private:
     int m_zoomOfColumns = 100;  // the zoom the column widths were made for
     QList<int> m_autoHidden;  // columns hidden because the panel is narrow
     int m_extWidth = 0;       // the longest extension's width; 0: not measured yet
+    int m_sizeWidth = 0;      // the same for the sizes and item counts shown
     QList<QMetaObject::Connection> m_modelConnections;  // to the shown folder's model
     ThumbGrid* m_grid = nullptr;
 };

@@ -113,15 +113,7 @@ QVariant FileModel::data(const QModelIndex& index, int role) const
         case ColExt:
             return displayExt(*e);
         case ColSize:
-            if (e->isParent)
-                return QString();
-            if (e->isDir) {
-                if (e->size >= 0)  // computed (Space)
-                    return formatSize(e->size);
-                const std::optional<int> n = itemCount(*e);
-                return n ? plural(tr("%n item(s)", nullptr, *n), *n) : QString();
-            }
-            return formatSize(e->size);
+            return sizeText(*e, true);
         case ColTime:
             if (e->isParent || e->mtime == 0)
                 return QString();
@@ -187,6 +179,21 @@ void FileModel::setCountable(bool on, bool hidden)
         m_counts.clear();
     m_countable = on;
     m_countHidden = hidden;
+}
+
+QString FileModel::sizeText(const FileEntry& e, bool count) const
+{
+    if (e.isParent)
+        return QString();
+    if (!e.isDir || e.size >= 0)  // a folder's computed (Space)
+        return formatSize(e.size);
+    std::optional<int> n;
+    if (count) {
+        n = itemCount(e);
+    } else if (const auto it = m_counts.constFind(e.name); it != m_counts.cend() && *it >= 0) {
+        n = *it;
+    }
+    return n ? plural(tr("%n item(s)", nullptr, *n), *n) : QString();
 }
 
 std::optional<int> FileModel::itemCount(const FileEntry& e) const

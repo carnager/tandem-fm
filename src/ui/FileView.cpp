@@ -208,7 +208,7 @@ void FileView::zoomChanged()
             setColumnWidth(c, qRound(columnWidth(c) * double(g_listZoom) / m_zoomOfColumns));
         m_zoomOfColumns = g_listZoom;
     }
-    m_extWidth = 0;  // another font: measure the extensions again
+    m_extWidth = m_sizeWidth = 0;  // another font: measure again
     fitColumns();
     scheduleDelayedItemsLayout();  // rows get their new height
     viewport()->update();
@@ -223,27 +223,36 @@ void FileView::setModel(QAbstractItemModel* model)
         disconnect(c);
     m_modelConnections.clear();
     QTreeView::setModel(model);
-    m_extWidth = 0;  // another tab's folder: its own extensions (measured by the next fitColumns)
+    m_extWidth = m_sizeWidth = 0;  // another tab's folder: its own (measured by the next fitColumns)
     // A new listing: another folder ends visual mode, a refresh of this one keeps it.
     if (model) {
         m_modelConnections << connect(model, &QAbstractItemModel::modelReset, this, [this] {
             if (m_visual)
                 applyVisual();
-            m_extWidth = 0;
+            m_extWidth = m_sizeWidth = 0;
             fitColumns();
         });
         m_modelConnections << connect(model, &QAbstractItemModel::rowsInserted, this, [this](const QModelIndex&, int first, int last) {
-            if (m_extWidth > 0 && !isColumnHidden(FileModel::ColExt)) {
-                measureExt(first, last);
-                setColumnWidth(FileModel::ColExt, m_extWidth);
+            if (m_extWidth > 0) {
+                measureFitted(first, last);
+                applyFitted();
+            }
+        });
+        // Item counts and folder sizes (Space) arrive later.
+        m_modelConnections << connect(model, &QAbstractItemModel::dataChanged, this,
+                                      [this](const QModelIndex& from, const QModelIndex& to) {
+            if (m_extWidth > 0 && from.column() <= FileModel::ColSize && to.column() >= FileModel::ColSize) {
+                measureFitted(from.row(), to.row());
+                applyFitted();
             }
         });
     }
 }
 
-// Widens m_extWidth to fit the extensions of these rows, up to a limit, so
-// one odd long extension doesn't take the names' room.
-void FileView::measureExt(int first, int last)
+// Widens Ext and Size to fit what these rows show, Ext up to a limit so
+// one odd long extension doesn't take the names' room, Size up to the
+// widest size ("999.9 MiB"), its old fixed width.
+void FileView::measureFitted(int first, int last)
 {
     const FileModel* m = fileModel();
     if (!m)
@@ -251,19 +260,42 @@ void FileView::measureExt(int first, int last)
     QFont f = zoomed(theme().listFont);
     f.setWeight(QFont::Bold);  // marked rows
     const QFontMetrics fm(f);
-    const int most = fm.averageCharWidth() * 10 + 24;
+    QFont nf = zoomed(theme().numberFont);
+    nf.setWeight(QFont::Bold);
+    const QFontMetrics nfm(nf);
+    const int mostExt = fm.averageCharWidth() * 10 + 24;
+    const int mostSize = nfm.horizontalAdvance(QStringLiteral("999.9 MiB")) + 24;
+    auto headerWidth = [&](int col) {
+        return header()->fontMetrics().horizontalAdvance(m->headerData(col, Qt::Horizontal, Qt::DisplayRole).toString()) + 24;
+    };
     if (m_extWidth == 0)
-        m_extWidth = header()->fontMetrics().horizontalAdvance(m->headerData(FileModel::ColExt, Qt::Horizontal, Qt::DisplayRole).toString()) + 24;
+        m_extWidth = headerWidth(FileModel::ColExt);
+    if (m_sizeWidth == 0)
+        m_sizeWidth = headerWidth(FileModel::ColSize);
     QSet<QString> seen;
-    for (int row = first; row <= last && m_extWidth < most; ++row)
-        if (const FileEntry* e = m->entry(row)) {
+    for (int row = first; row <= last; ++row) {
+        const FileEntry* e = m->entry(row);
+        if (!e)
+            continue;
+        if (m_extWidth < mostExt) {
             const QString ext = FileModel::displayExt(*e);
             if (!ext.isEmpty() && !seen.contains(ext)) {
                 seen.insert(ext);
                 m_extWidth = std::max(m_extWidth, fm.horizontalAdvance(ext) + 24);
             }
         }
-    m_extWidth = std::min(m_extWidth, most);
+        if (m_sizeWidth < mostSize)
+            m_sizeWidth = std::max(m_sizeWidth, nfm.horizontalAdvance(m->sizeText(*e, false)) + 24);
+    }
+    m_extWidth = std::min(m_extWidth, mostExt);
+    m_sizeWidth = std::min(m_sizeWidth, mostSize);
+}
+
+void FileView::applyFitted()
+{
+    for (const auto& [col, width] : {std::pair{int(FileModel::ColExt), m_extWidth}, std::pair{int(FileModel::ColSize), m_sizeWidth}})
+        if (width > 0 && !isColumnHidden(col) && columnWidth(col) != width)
+            setColumnWidth(col, width);
 }
 
 void FileView::setVisual(int mode)
@@ -1088,12 +1120,9 @@ void FileView::fitColumns()
     QHeaderView* h = header();
     if (!model() || h->count() < FileModel::ColCount)
         return;
-    if (!h->isSectionHidden(FileModel::ColExt)) {
-        if (m_extWidth == 0)
-            measureExt(0, fileModel() ? fileModel()->count() - 1 : -1);
-        if (m_extWidth > 0)
-            setColumnWidth(FileModel::ColExt, m_extWidth);
-    }
+    if (m_extWidth == 0)
+        measureFitted(0, fileModel() ? fileModel()->count() - 1 : -1);
+    applyFitted();
     auto nameRoom = [&] {
         int others = 0;
         for (int c = 1; c < h->count(); ++c)

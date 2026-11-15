@@ -66,6 +66,8 @@ public:
     void setLocalIconPaths(bool on) { m_localIconPaths = on; }
 #endif
     std::optional<int> itemCount(const FileEntry& e) const;  // asks for it when unknown
+    // The Size column's text; count: start counting a folder not counted yet.
+    QString sizeText(const FileEntry& e, bool count) const;
     void setOwners(Owners owners) { m_owners = owners; }
 
     // Dates as "12 min ago", "Yesterday 14:20", "3 Nov"; or exact.
