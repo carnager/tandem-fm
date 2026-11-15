@@ -3342,10 +3342,22 @@ private slots:
         QTest::keyClick(v, Qt::Key_N);
         QTest::qWait(200);
         QCOMPARE(v->currentPath(), L("follow/c.png"));
+        // ↑ / ↓ the same way, from the viewer; in the panel, files of
+        // another type leave the picture as it is.
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Up);
+        QTRY_COMPARE(v->currentPath(), L("follow/a.jpg"));
+        QCOMPARE(m_left->currentPath(), L("follow/a.jpg"));
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Down);
+        QTRY_COMPARE(m_left->currentPath(), L("follow/c.png"));
+        QTRY_COMPARE(v->currentPath(), L("follow/c.png"));
+        moveCursorTo(m_left, "d.txt");
+        QTest::qWait(300);
+        QCOMPARE(v->currentPath(), L("follow/c.png"));
         QCOMPARE(ViewerWindow::kindOf("x.webp"), QString("image"));
         QCOMPARE(ViewerWindow::kindOf("x.pdf"), QString("application/pdf"));
 
         // Typing in the find bar is typing, not stepping.
+        v->setSameKindOnly(false);
         moveCursorTo(m_left, "b.txt");
         QTRY_COMPARE(v->currentPath(), L("follow/b.txt"));
         QTest::keyClick(v, Qt::Key_F7);
