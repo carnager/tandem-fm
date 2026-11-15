@@ -2223,6 +2223,18 @@ private slots:
         QVERIFY2(questions.filter("jump host").size() == 1, qPrintable(questions.join('\n')));
         QVERIFY(questions.filter("jump host").first().startsWith("sftp://hop "));
 
+        // The target restarts: the pooled connection through the jump host
+        // is dead (libssh never says so), and the next listing quietly takes
+        // a fresh one, without waiting for the timeout.
+        qputenv("TANDEM_SSH_PROBE_AFTER_MS", "0");
+        auto probe = qScopeGuard([] { qunsetenv("TANDEM_SSH_PROBE_AFTER_MS"); });
+        QVERIFY(target.restart());
+        QElapsedTimer waited;
+        waited.start();
+        l = listLocation("sftp://desk" + tmp.path(), opt);
+        QVERIFY2(l.error == 0, qPrintable(QString::number(l.error) + " " + l.errorText));
+        QVERIFY2(waited.elapsed() < 5000, qPrintable(QString::number(waited.elapsed())));
+
         // A jump host that is down is named in the error.
         l = listLocation("sftp://far/", opt);
         QVERIFY(l.error != 0);

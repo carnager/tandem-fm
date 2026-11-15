@@ -89,6 +89,8 @@ struct Conn {
     struct ssh_callbacks_struct callbacks {};
     QString location;  // for passphrase questions
     bool hop = false;  // a jump host: libssh owns the session
+    bool jumped = false;  // reached through a jump host
+    QElapsedTimer idleSince;  // in the pool since
 
     ~Conn()
     {
@@ -114,7 +116,14 @@ struct Conn {
             dead = true;
             return ECONNRESET;
         }
-        return fx == SSH_FX_OK ? EIO : sftpErrno(fx);  // OK: failed below SFTP
+        if (fx == SSH_FX_OK) {
+            // No answer at all (the timeout): don't trust it again. Through a
+            // jump host this is how a restarted server shows, as libssh doesn't
+            // pass on that the jump host closed the way there.
+            dead = true;
+            return EIO;
+        }
+        return sftpErrno(fx);
     }
 };
 
@@ -152,8 +161,10 @@ public:
         if (m_counted)
             --t_leases;
         std::lock_guard<std::mutex> lock(m_server->mutex);
-        if (m_conn && !m_conn->dead && m_server->idle.size() < size_t(kMaxConnections))
+        if (m_conn && !m_conn->dead && m_server->idle.size() < size_t(kMaxConnections)) {
+            m_conn->idleSince.start();
             m_server->idle.push_back(std::move(m_conn));
+        }
         else
             m_server->open -= 1;
         m_conn.reset();
@@ -285,13 +296,30 @@ public:
     Lease acquire(const QString& location, int& err, QString* errText, bool spare = false)
     {
         Server* server = serverFor(location);
+        std::vector<std::unique_ptr<Conn>> gone;  // freed outside the lock
         {
             std::unique_lock<std::mutex> lock(server->mutex);
             for (;;) {
                 if (!server->idle.empty()) {
                     auto c = std::move(server->idle.back());
                     server->idle.pop_back();
-                    return Lease(server, std::move(c), !spare);
+                    if (!c->jumped || c->idleSince.elapsed() < probeAfterMs())
+                        return Lease(server, std::move(c), !spare);
+                    lock.unlock();
+                    const bool ok = alive(c.get());
+                    lock.lock();
+                    if (ok)
+                        return Lease(server, std::move(c), !spare);
+                    // Its server went away: so did the others, open a fresh one.
+                    gone.push_back(std::move(c));
+                    for (auto& other : server->idle)
+                        gone.push_back(std::move(other));
+                    server->idle.clear();
+                    for (auto& g : gone)
+                        g->dead = true;
+                    server->open -= int(gone.size());
+                    server->freed.notify_all();
+                    continue;
                 }
                 if (server->open < kMaxConnections)
                     break;
@@ -374,6 +402,28 @@ public:
                 return c;
             }
         }
+    }
+
+    // A connection through a jump host that rested a while is asked once,
+    // shortly, before it's used: when its server restarted, it would only
+    // find out after the whole timeout (see Conn::error).
+    static qint64 probeAfterMs()
+    {
+        bool set = false;
+        const int ms = qEnvironmentVariableIntValue("TANDEM_SSH_PROBE_AFTER_MS", &set);
+        return set ? ms : 10000;
+    }
+    static bool alive(Conn* c)
+    {
+        long timeout = std::min(timeoutSeconds(), 3L);
+        ssh_options_set(c->ssh, SSH_OPTIONS_TIMEOUT, &timeout);
+        sftp_attributes a = sftp_stat(c->sftp, ".");
+        timeout = timeoutSeconds();
+        ssh_options_set(c->ssh, SSH_OPTIONS_TIMEOUT, &timeout);
+        if (!a)
+            return false;
+        sftp_attributes_free(a);
+        return true;
     }
 
     static long timeoutSeconds()
@@ -590,6 +640,10 @@ public:
             return fail(EHOSTUNREACH, QObject::tr("Couldn't reach %1 through the jump host %2: %3").arg(c->location, link->hop, why));
         }
 
+        {
+            std::lock_guard<std::mutex> lock(link->mutex);
+            c->jumped = !link->hop.isEmpty();
+        }
         if (!route.proxyJump.isEmpty()) {
             // One host key per server, whichever way it was reached.
             ssh_options_set(c->ssh, SSH_OPTIONS_HOST, keyName.constData());
