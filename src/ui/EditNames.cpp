@@ -75,9 +75,7 @@ QStringList EditNamesSession::editorCommand(const QString& file, QString* error)
         QStringList argv = QProcess::splitCommand(editor);
         if (addWaitFlag(argv))
             return argv << file;
-        QString terminal = QSettings().value(QStringLiteral("tools/terminal")).toString();
-        if (terminal.isEmpty())
-            terminal = DesktopApps::instance().defaultTerminal();
+        const QString terminal = DesktopApps::instance().defaultTerminal();
         if (terminal.isEmpty()) {
             *error = QObject::tr("No terminal found for $EDITOR. Set tools/terminal or tools/nameEditor.");
             return {};
