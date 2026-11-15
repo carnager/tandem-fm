@@ -209,6 +209,11 @@ private:
     QToolButton* m_transferPause = nullptr;
     QPointer<class Job> m_transferJob;
     qint64 m_transferBytes = 0, m_transferMs = 0;
+    qint64 m_transferSince = 0;    // since when a transfer has been going on here
+    qint64 m_transferShownAt = 0;  // when the bar appeared
+    QTimer m_transferHide;
+    static constexpr qint64 kTransferDelay = 800;   // ms before the bar shows
+    static constexpr qint64 kTransferMinShow = 1000;  // ms it stays once shown
     double m_transferSpeed = 0;
     QSlider* m_zoom = nullptr;
     QLineEdit* m_search;

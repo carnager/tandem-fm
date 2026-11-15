@@ -1079,12 +1079,23 @@ private slots:
         job.setPaused(true);
         job.start();
         QTRY_VERIFY(job.snapshot().paused);
+        // Not at once: quick ones never show. Below the list, so the rows
+        // on screen stay where they are.
         m_right->showTransfer(&job, "Copying <b>big.bin</b> here from /tmp");
         auto* strip = m_right->findChild<QFrame*>("transfer");
-        QVERIFY(strip && strip->isVisible());
+        QVERIFY(strip && !strip->isVisible());
+        const int listTop = m_right->view()->mapTo(m_right, QPoint(0, 0)).y();
+        QTest::qWait(900);
+        m_right->showTransfer(&job, "Copying <b>big.bin</b> here from /tmp");
+        QVERIFY(strip->isVisible());
         QVERIFY(strip->findChild<QLabel*>()->text().contains("paused"));
+        QTest::qWait(50);
+        QCOMPARE(m_right->view()->mapTo(m_right, QPoint(0, 0)).y(), listTop);
+        QVERIFY(strip->mapTo(m_right, QPoint(0, 0)).y() > listTop);
+        // Done: it stays a moment, then goes.
         m_right->showTransfer(nullptr, {});
-        QVERIFY(!strip->isVisible());
+        QVERIFY(strip->isVisible());
+        QTRY_VERIFY(!strip->isVisible());
         job.cancel();
         QTRY_VERIFY(job.isFinished());
 
