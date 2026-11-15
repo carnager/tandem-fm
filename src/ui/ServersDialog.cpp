@@ -2,6 +2,7 @@
 
 #include "core/Backend.h"
 #include "core/Keyring.h"
+#include "core/Subnet.h"
 #include "core/Util.h"
 #include "ui/BookmarksEditor.h"
 #include "ui/CardList.h"
@@ -9,6 +10,7 @@
 #include "ui/Theme.h"
 
 #include <QButtonGroup>
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFileDialog>
@@ -26,9 +28,17 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 namespace tandem {
 
 namespace {
+
+// What other servers' "jump" calls it: an empty name is saved as the host.
+QString nameOf(const SavedServer& s)
+{
+    return s.name.isEmpty() ? s.host : s.name;
+}
 
 QIcon iconFor(const SavedServer& s)
 {
@@ -53,7 +63,10 @@ QString subtitleFor(const SavedServer& s)
     QString who = s.user.isEmpty() ? s.host : s.user + QLatin1Char('@') + s.host;
     if (s.port > 0)
         who += QLatin1Char(':') + QString::number(s.port);
-    return kind + QStringLiteral("  ·  ") + who;
+    QString text = kind + QStringLiteral("  ·  ") + who;
+    if (!s.jump.isEmpty())
+        text += QStringLiteral("  ·  ") + QObject::tr("via %1").arg(s.jump);
+    return text;
 }
 
 // The password goes to the keyring the way the backends look for it, and to
@@ -250,6 +263,32 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
     keyLayout->addWidget(m_keyFile, 1);
     keyLayout->addWidget(browse);
     m_fields->addRow(tr("Key file"), m_keyRow);
+
+    // SSH through a jump host: away through it, at home maybe straight there.
+    auto* routeLabel = sectionLabel(tr("Jump host"), m_form);
+    m_routeLabel = routeLabel;
+    m_fields->addRow(routeLabel);
+    m_jump = new QComboBox(m_form);
+    m_jump->setObjectName(QStringLiteral("jump"));
+    m_jump->setToolTip(tr("Another saved SSH server to connect through, when this one can't be reached directly"));
+    m_fields->addRow(tr("Through"), m_jump);
+    m_jumpAddress = new QLineEdit(m_form);
+    m_jumpAddress->setObjectName(QStringLiteral("jumpAddress"));
+    m_jumpAddress->setPlaceholderText(tr("empty: the host above"));
+    m_jumpAddress->setToolTip(tr("The address the jump host reaches this server at, like its VPN address"));
+    m_fields->addRow(tr("Address from there"), m_jumpAddress);
+    m_directRow = new QWidget(m_form);
+    auto* directLayout = new QHBoxLayout(m_directRow);
+    directLayout->setContentsMargins(0, 0, 0, 0);
+    directLayout->setSpacing(6);
+    m_directIn = new QLineEdit(m_directRow);
+    m_directIn->setObjectName(QStringLiteral("directIn"));
+    m_directIn->setPlaceholderText(tr("empty: always through the jump host"));
+    m_directIn->setToolTip(tr("In this network (like 192.168.1.0/24) the host above is tried directly first"));
+    m_useNetwork = new QPushButton(m_directRow);
+    directLayout->addWidget(m_directIn, 1);
+    directLayout->addWidget(m_useNetwork);
+    m_fields->addRow(tr("Direct in network"), m_directRow);
     right->addWidget(m_form);
     right->addStretch(1);
     columns->addLayout(right, 1);
@@ -299,7 +338,13 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
     m_keyFile->setObjectName(QStringLiteral("keyFile"));
     m_password->setObjectName(QStringLiteral("password"));
     m_folder->setObjectName(QStringLiteral("folder"));
-    for (QLineEdit* e : {m_name, m_host, m_user, m_domain, m_keyFile, m_password, m_folder})
+    const QString here = currentNetwork();
+    m_useNetwork->setText(tr("Use %1").arg(here));
+    m_useNetwork->setToolTip(tr("The network this computer is in now"));
+    m_useNetwork->setVisible(!here.isEmpty());
+    connect(m_useNetwork, &QPushButton::clicked, this, [this, here] { m_directIn->setText(here); });
+    connect(m_jump, &QComboBox::currentIndexChanged, this, &ServersDialog::formChanged);
+    for (QLineEdit* e : {m_name, m_host, m_user, m_domain, m_keyFile, m_password, m_folder, m_jumpAddress, m_directIn})
         connect(e, &QLineEdit::textChanged, this, &ServersDialog::formChanged);
     connect(m_port, &QLineEdit::textChanged, this, &ServersDialog::formChanged);
     connect(m_type, &QButtonGroup::idToggled, this, [this](int, bool on) {
@@ -402,6 +447,9 @@ void ServersDialog::showServer(int row)
     m_keyFile->setText(s.keyFile);
     m_password->setText(has ? m_passwords[row] : QString());
     m_folder->setText(s.folder);
+    fillJumpHosts(has ? row : -1);
+    m_jumpAddress->setText(s.jumpAddress);
+    m_directIn->setText(s.directIn);
     m_loading = false;
     formChanged();
 }
@@ -411,6 +459,11 @@ void ServersDialog::formChanged()
     const bool smb = m_type->checkedId() == 1;
     m_fields->setRowVisible(m_domain, smb);
     m_fields->setRowVisible(m_keyRow, !smb);
+    const bool jumps = !smb && !m_jump->currentData().toString().isEmpty();
+    m_fields->setRowVisible(m_routeLabel, !smb);
+    m_fields->setRowVisible(m_jump, !smb);
+    m_fields->setRowVisible(m_jumpAddress, jumps);
+    m_fields->setRowVisible(m_directRow, jumps);
     m_folder->setPlaceholderText(smb ? tr("share/folder; empty: the list of shares") : tr("empty: the home folder"));
     m_port->setPlaceholderText(smb ? QStringLiteral("445") : QStringLiteral("22"));
     const int row = m_list->currentRow();
@@ -420,6 +473,7 @@ void ServersDialog::formChanged()
         return;
     }
     SavedServer& s = m_servers[row];
+    const QString oldName = nameOf(s);
     s.name = m_name->text().trimmed();
     // Keep a type's other fields (a key file for SSH…) while switching back and forth.
     const QString type = smb ? QStringLiteral("smb") : QStringLiteral("sftp");
@@ -431,6 +485,18 @@ void ServersDialog::formChanged()
     s.domain = smb ? m_domain->text().trimmed() : QString();
     s.keyFile = smb ? QString() : m_keyFile->text().trimmed();
     s.folder = m_folder->text().trimmed();
+    s.jump = jumps ? m_jump->currentData().toString() : QString();
+    s.jumpAddress = jumps ? m_jumpAddress->text().trimmed() : QString();
+    s.directIn = jumps ? m_directIn->text().trimmed() : QString();
+    // Servers that go through this one follow a new name.
+    if (const QString newName = nameOf(s); !oldName.isEmpty() && newName != oldName) {
+        for (int i = 0; i < m_servers.size(); ++i) {
+            if (i != row && m_servers[i].jump == oldName) {
+                m_servers[i].jump = newName;
+                updateRow(i);
+            }
+        }
+    }
     m_passwords[row] = m_password->text();
     m_address->setText(s.host.isEmpty() ? tr("Type a host to see the address") : s.uri());
     updateRow(row);
@@ -464,6 +530,26 @@ bool ServersDialog::save()
             s.name = s.host;
         list.append(s);
     }
+    // A jump host must be another saved SSH server; the networks must read.
+    for (int i = 0; i < list.size(); ++i) {
+        const SavedServer& s = list[i];
+        QString problem;
+        if (!s.jump.isEmpty()) {
+            const bool found = std::any_of(list.begin(), list.end(), [&](const SavedServer& o) {
+                return o.name == s.jump && o.type == QLatin1String("sftp") && &o != &s;
+            });
+            if (!found)
+                problem = tr("%1 goes through %2, which isn't a saved SSH server.").arg(s.name, s.jump);
+            else if (QString why; !s.directIn.isEmpty() && parseNetworks(s.directIn, &why).isEmpty())
+                problem = tr("%1: %2.").arg(s.name, why);
+        }
+        if (!problem.isEmpty()) {
+            m_list->setCurrentRow(i);
+            m_error->setText(problem);
+            m_error->show();
+            return false;
+        }
+    }
     if (!ServerList::instance().save(list)) {
         m_error->setText(tr("Cannot write %1").arg(ServerList::instance().path()));
         m_error->show();
@@ -480,6 +566,27 @@ bool ServersDialog::save()
                 storePassword(s, password);
         });
     return true;
+}
+
+// The other SSH servers, to go through; one that isn't there any more
+// stays listed so nothing changes behind the user's back.
+void ServersDialog::fillJumpHosts(int row)
+{
+    const QSignalBlocker block(m_jump);
+    m_jump->clear();
+    m_jump->addItem(tr("None: connect directly"), QString());
+    const QString current = row >= 0 ? m_servers[row].jump : QString();
+    for (int i = 0; i < m_servers.size(); ++i) {
+        const SavedServer& o = m_servers[i];
+        if (i != row && o.type == QLatin1String("sftp") && !nameOf(o).isEmpty())
+            m_jump->addItem(iconFor(o), nameOf(o), nameOf(o));
+    }
+    int at = m_jump->findData(current);
+    if (at < 0) {
+        m_jump->addItem(tr("%1 (not saved)").arg(current), current);
+        at = m_jump->count() - 1;
+    }
+    m_jump->setCurrentIndex(at);
 }
 
 void ServersDialog::updateHeading()

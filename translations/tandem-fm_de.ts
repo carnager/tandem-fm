@@ -578,8 +578,24 @@
         <translation>Passphrase für deinen SSH-Schlüssel</translation>
     </message>
     <message>
+        <source>The jump host %1 isn&apos;t one of your saved SSH servers</source>
+        <translation>Der Jump-Host %1 ist keiner deiner gespeicherten SSH-Server</translation>
+    </message>
+    <message>
         <source>No host in %1</source>
         <translation>Kein Host in %1</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t connect to the jump host %1</source>
+        <translation>Keine Verbindung zum Jump-Host %1</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t reach %1 through the jump host %2: %3</source>
+        <translation>%1 ist über den Jump-Host %2 nicht erreichbar: %3</translation>
+    </message>
+    <message>
+        <source>Another machine answered at %1</source>
+        <translation>Unter %1 hat sich ein anderer Rechner gemeldet</translation>
     </message>
     <message>
         <source>The server has no SFTP: %1</source>
@@ -588,6 +604,10 @@
     <message>
         <source>The host key of %1 has CHANGED (now %2 %3). This can mean someone is intercepting the connection. If the server was reinstalled, remove its old key from ~/.ssh/known_hosts.</source>
         <translation>Der Host-Schlüssel von %1 hat sich GEÄNDERT (jetzt %2 %3). Das kann heißen, dass jemand die Verbindung abfängt. Wurde der Server neu installiert, den alten Schlüssel aus ~/.ssh/known_hosts entfernen.</translation>
+    </message>
+    <message>
+        <source>First connection to the jump host %1. Is this its key?</source>
+        <translation>Erste Verbindung zum Jump-Host %1. Ist das sein Schlüssel?</translation>
     </message>
     <message>
         <source>First connection to %1. Is this its key?</source>
@@ -855,6 +875,14 @@
     <message>
         <source>7-Zip is not installed</source>
         <translation>7-Zip ist nicht installiert</translation>
+    </message>
+    <message>
+        <source>&quot;%1&quot; isn&apos;t a network like 192.168.1.0/24</source>
+        <translation>„%1“ ist kein Netz wie 192.168.1.0/24</translation>
+    </message>
+    <message>
+        <source>via %1</source>
+        <translation>über %1</translation>
     </message>
 </context>
 <context>
@@ -5118,6 +5146,42 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Auswählen…</translation>
     </message>
     <message>
+        <source>Jump host</source>
+        <translation>Jump-Host</translation>
+    </message>
+    <message>
+        <source>Another saved SSH server to connect through, when this one can&apos;t be reached directly</source>
+        <translation>Ein anderer gespeicherter SSH-Server, über den verbunden wird, wenn dieser nicht direkt erreichbar ist</translation>
+    </message>
+    <message>
+        <source>Through</source>
+        <translation>Über</translation>
+    </message>
+    <message>
+        <source>empty: the host above</source>
+        <translation>leer: der Host oben</translation>
+    </message>
+    <message>
+        <source>The address the jump host reaches this server at, like its VPN address</source>
+        <translation>Die Adresse, unter der der Jump-Host diesen Server erreicht, etwa seine VPN-Adresse</translation>
+    </message>
+    <message>
+        <source>Address from there</source>
+        <translation>Adresse von dort</translation>
+    </message>
+    <message>
+        <source>empty: always through the jump host</source>
+        <translation>leer: immer über den Jump-Host</translation>
+    </message>
+    <message>
+        <source>In this network (like 192.168.1.0/24) the host above is tried directly first</source>
+        <translation>In diesem Netz (etwa 192.168.1.0/24) wird zuerst der Host oben direkt versucht</translation>
+    </message>
+    <message>
+        <source>Direct in network</source>
+        <translation>Direkt im Netz</translation>
+    </message>
+    <message>
         <source>Passwords are kept in the desktop keyring.</source>
         <translation>Passwörter werden im Schlüsselbund des Desktops gespeichert.</translation>
     </message>
@@ -5136,6 +5200,14 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Save and &amp;connect</source>
         <translation>Speichern und &amp;verbinden</translation>
+    </message>
+    <message>
+        <source>Use %1</source>
+        <translation>%1 nehmen</translation>
+    </message>
+    <message>
+        <source>The network this computer is in now</source>
+        <translation>Das Netz, in dem dieser Rechner gerade ist</translation>
     </message>
     <message>
         <source>%1. Fix it in an editor; Tandem won&apos;t overwrite it.</source>
@@ -5158,8 +5230,24 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Ein Server braucht einen Host.</translation>
     </message>
     <message>
+        <source>%1 goes through %2, which isn&apos;t a saved SSH server.</source>
+        <translation>%1 geht über %2, das kein gespeicherter SSH-Server ist.</translation>
+    </message>
+    <message>
+        <source>%1: %2.</source>
+        <translation>%1: %2.</translation>
+    </message>
+    <message>
         <source>Cannot write %1</source>
         <translation>%1 kann nicht geschrieben werden</translation>
+    </message>
+    <message>
+        <source>None: connect directly</source>
+        <translation>Keiner: direkt verbinden</translation>
+    </message>
+    <message>
+        <source>%1 (not saved)</source>
+        <translation>%1 (nicht gespeichert)</translation>
     </message>
     <message>
         <source>Import from SSH config</source>
