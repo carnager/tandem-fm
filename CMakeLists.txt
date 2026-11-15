@@ -157,6 +157,32 @@ else()
   message(STATUS "Network locations (GIO/GVfs): disabled (gio-2.0 not found)")
 endif()
 
+# Wayland: an activation token for started programs, so their windows get
+# the focus (xdg-activation). Without it, those may open unfocused.
+if(NOT APPLE AND PkgConfig_FOUND)
+  pkg_check_modules(WAYLAND_CLIENT IMPORTED_TARGET wayland-client)
+  find_program(WAYLAND_SCANNER wayland-scanner)
+endif()
+if(WAYLAND_CLIENT_FOUND AND WAYLAND_SCANNER)
+  enable_language(C)
+  set(ACTIVATION_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/xdg-activation-v1.xml)
+  set(WAYLAND_GEN ${CMAKE_CURRENT_BINARY_DIR}/wayland)
+  file(MAKE_DIRECTORY ${WAYLAND_GEN})
+  add_custom_command(
+    OUTPUT ${WAYLAND_GEN}/xdg-activation-v1-client-protocol.h ${WAYLAND_GEN}/xdg-activation-v1-protocol.c
+    COMMAND ${WAYLAND_SCANNER} client-header ${ACTIVATION_XML} ${WAYLAND_GEN}/xdg-activation-v1-client-protocol.h
+    COMMAND ${WAYLAND_SCANNER} private-code ${ACTIVATION_XML} ${WAYLAND_GEN}/xdg-activation-v1-protocol.c
+    DEPENDS ${ACTIVATION_XML})
+  target_sources(tandem_ui PRIVATE src/ui/Activation.h src/ui/Activation_wayland.cpp
+    ${WAYLAND_GEN}/xdg-activation-v1-client-protocol.h ${WAYLAND_GEN}/xdg-activation-v1-protocol.c)
+  target_include_directories(tandem_ui PRIVATE ${WAYLAND_GEN})
+  target_link_libraries(tandem_ui PRIVATE PkgConfig::WAYLAND_CLIENT)
+  message(STATUS "Focus for started programs (Wayland xdg-activation): enabled")
+else()
+  target_sources(tandem_ui PRIVATE src/ui/Activation.h src/ui/Activation_none.cpp)
+  message(STATUS "Focus for started programs (Wayland xdg-activation): disabled (wayland-client or wayland-scanner not found)")
+endif()
+
 # Optional: native SFTP (libssh).
 if(PkgConfig_FOUND)
   pkg_check_modules(LIBSSH IMPORTED_TARGET libssh>=0.11)
