@@ -237,7 +237,12 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     hl->addWidget(m_freeLabel);
     layout->addWidget(m_header);
 
-    // A transfer into this folder shows here, where its files arrive.
+    m_view = new FileView(this);
+    m_view->setInArchiveCheck([this] { return inArchive(); });
+    layout->addWidget(m_view, 1);
+
+    // A transfer into this folder shows here, where its files arrive: below
+    // the list, which then ends higher up; the rows on screen stay put.
     m_transfer = new QFrame(this);
     m_transfer->setObjectName(QStringLiteral("transfer"));
     setThemeStyle(m_transfer, QStringLiteral(
@@ -268,13 +273,11 @@ Panel::Panel(QWidget* parent) : QFrame(parent)
     tl->addWidget(m_transferBar);
     m_transfer->hide();
     auto* twrap = new QHBoxLayout;
-    twrap->setContentsMargins(8, 2, 8, 6);
+    twrap->setContentsMargins(8, 4, 8, 4);
     twrap->addWidget(m_transfer);
     layout->addLayout(twrap);
-
-    m_view = new FileView(this);
-    m_view->setInArchiveCheck([this] { return inArchive(); });
-    layout->addWidget(m_view, 1);
+    m_transferHide.setSingleShot(true);
+    connect(&m_transferHide, &QTimer::timeout, m_transfer, &QWidget::hide);
 
     m_filterBar = new QWidget(this);
     m_filterBar->setObjectName(QStringLiteral("filterBar"));
@@ -1352,14 +1355,24 @@ void Panel::markAll(bool on)
 
 void Panel::showTransfer(Job* job, const QString& text)
 {
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (!job) {
-        m_transfer->hide();
+        // Shown: stays a moment, so it doesn't just flash.
+        const qint64 left = kTransferMinShow - (now - m_transferShownAt);
+        if (m_transfer->isVisible() && left > 0) {
+            if (!m_transferHide.isActive())
+                m_transferHide.start(int(left));
+        } else {
+            m_transfer->hide();
+        }
         m_transferJob = nullptr;
         return;
     }
+    m_transferHide.stop();
     const Job::Snapshot s = job->snapshot();
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (job != m_transferJob) {  // a new one: speed from scratch
+        if (!m_transferJob)
+            m_transferSince = now;
         m_transferJob = job;
         m_transferBytes = s.bytesDone;
         m_transferMs = now;
@@ -1392,7 +1405,11 @@ void Panel::showTransfer(Job* job, const QString& text)
     m_transferBar->setValue(permille);
     m_transferPause->setIcon(IconCache::themed(s.paused ? "media-playback-start" : "media-playback-pause"));
     m_transferPause->setToolTip(s.paused ? tr("Resume") : tr("Pause"));
-    m_transfer->show();
+    // Quick ones (a move on one drive, a few small files) never show.
+    if (!m_transfer->isVisible() && now - m_transferSince >= kTransferDelay) {
+        m_transfer->show();
+        m_transferShownAt = now;
+    }
 }
 
 void Panel::markNames(const QStringList& names)
