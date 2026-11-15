@@ -3763,6 +3763,11 @@ private slots:
             QTest::keyClick(m_window.get(), Qt::Key_M, Qt::ControlModifier | Qt::ShiftModifier);
             QCOMPARE(button->isVisibleTo(m_window.get()), !m_window->menuBar()->isVisibleTo(m_window.get()));
         }
+        // The icon sits left of the menus; the top bar has no name.
+        auto* logo = qobject_cast<QLabel*>(m_window->menuBar()->cornerWidget(Qt::TopLeftCorner));
+        QVERIFY(logo && !logo->pixmap().isNull());
+        for (auto* label : m_window->findChild<QWidget*>("topBar")->findChildren<QLabel*>())
+            QVERIFY(label->text() != "Tandem");
     }
 
     void dropDefaultAction()
