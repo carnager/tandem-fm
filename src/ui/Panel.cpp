@@ -987,7 +987,7 @@ QStringList layoutOf(QHeaderView* h, const QList<int>& autoHidden)
             out << QLatin1Char('-') + id;
             continue;
         }
-        if (c == FileModel::ColName) {  // takes what's left
+        if (c == FileModel::ColName || c == FileModel::ColExt) {  // takes what's left; fits its extensions
             out << id;
             continue;
         }
@@ -1035,7 +1035,7 @@ void Panel::applyColumnLayout()
         h->moveSection(h->visualIndex(c), visual++);
         bool ok = false;
         const int width = parts.value(1).toInt(&ok);
-        if (ok && width > 0 && c != FileModel::ColName)
+        if (ok && width > 0 && c != FileModel::ColName && c != FileModel::ColExt)  // older layouts kept ext's width
             m_view->setColumnWidth(c, width);
         h->setSectionHidden(c, hidden && c != FileModel::ColName);
     }
