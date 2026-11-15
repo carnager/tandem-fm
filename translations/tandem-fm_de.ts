@@ -884,6 +884,10 @@
         <source>via %1</source>
         <translation>über %1</translation>
     </message>
+    <message>
+        <source>The default app for the type</source>
+        <translation>Die Standard-App für den Typ</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>
@@ -5640,18 +5644,6 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
         <translation>Geändert, seit du es eingeschaltet hast: prüfe es und schalte es wieder ein.</translation>
     </message>
     <message>
-        <source>Editor (F4)</source>
-        <translation>Editor (F4)</translation>
-    </message>
-    <message>
-        <source>The default app for the file type</source>
-        <translation>Das Standardprogramm für den Dateityp</translation>
-    </message>
-    <message>
-        <source>A command; the file is added at the end. Terminal editors (vim, nano) need a terminal: e.g. &quot;kitty nvim&quot;.</source>
-        <translation>Ein Befehl; die Datei kommt ans Ende. Terminal-Editoren (vim, nano) brauchen ein Terminal: z. B. &quot;kitty nvim&quot;.</translation>
-    </message>
-    <message>
         <source>Terminal (Ctrl+Alt+T)</source>
         <translation>Terminal (Strg+Alt+T)</translation>
     </message>
@@ -5734,6 +5726,30 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Default</source>
         <translation>Standard</translation>
+    </message>
+    <message>
+        <source>Text and code</source>
+        <translation>Text und Code</translation>
+    </message>
+    <message>
+        <source>Pictures</source>
+        <translation>Bilder</translation>
+    </message>
+    <message>
+        <source>Videos</source>
+        <translation>Videos</translation>
+    </message>
+    <message>
+        <source>Music and sound</source>
+        <translation>Musik und Ton</translation>
+    </message>
+    <message>
+        <source>Editors (F4)</source>
+        <translation>Editoren (F4)</translation>
+    </message>
+    <message>
+        <source>An app from the list (terminal apps open in the terminal below), or a command the file is added to. Other files open in their default app.</source>
+        <translation>Eine App aus der Liste (Terminal-Apps öffnen im Terminal darunter) oder ein Befehl, an den die Datei angehängt wird. Andere Dateien öffnen in ihrer Standard-App.</translation>
     </message>
     <message>
         <source>Reset all keys</source>

@@ -3770,6 +3770,52 @@ private slots:
             QVERIFY(label->text() != "Tandem");
     }
 
+    // F4 opens the editor chosen for the kind of file: pictures in the
+    // picture editor, text in the text editor.
+    void editorPerType()
+    {
+        auto script = [&](const QString& name) {
+            const QString path = m_tmp.filePath(name);
+            writeFile(path, QString("#!/bin/sh\necho %1 > \"$1.edited\"\n").arg(name).toUtf8());
+            QFile::setPermissions(path, QFile::permissions(path) | QFile::ExeOwner);
+            return path;
+        };
+        QSettings().setValue("tools/editor", script("text-editor"));
+        QSettings().setValue("tools/imageEditor", script("image-editor"));
+        auto restore = qScopeGuard([] {
+            QSettings().remove("tools/editor");
+            QSettings().remove("tools/imageEditor");
+        });
+        writeFile(L("pic.png"), "png");
+        writeFile(L("notes.txt"), "txt");
+        auto removeFiles = qScopeGuard([&] {
+            for (const char* f : {"pic.png", "notes.txt", "pic.png.edited", "notes.txt.edited"})
+                QFile::remove(L(f));
+        });
+        QTRY_VERIFY(leftModel()->rowOf("notes.txt") >= 0 && leftModel()->rowOf("pic.png") >= 0);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "pic.png");
+        QTest::keyClick(m_left->view(), Qt::Key_F4);
+        QTRY_COMPARE(readFile(L("pic.png.edited")).trimmed(), QByteArray("image-editor"));
+        moveCursorTo(m_left, "notes.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_F4);
+        QTRY_COMPARE(readFile(L("notes.txt.edited")).trimmed(), QByteArray("text-editor"));
+
+        // Settings › Tools: a box per kind; a command typed in is kept.
+        SettingsDialog dlg(m_window.get());
+        auto* video = dlg.findChild<QComboBox*>("editor-video");
+        QVERIFY(video && dlg.findChild<QComboBox*>("editor-text") && dlg.findChild<QComboBox*>("editor-audio"));
+        video->setEditText("my-video-editor --flag");
+        emit video->lineEdit()->editingFinished();
+        QCOMPARE(QSettings().value("tools/videoEditor").toString(), QString("my-video-editor --flag"));
+        video->setCurrentIndex(0);  // "The default app", picked from the list
+        emit video->activated(0);
+        QCOMPARE(QSettings().value("tools/videoEditor").toString(), QString());
+        QSettings().remove("tools/videoEditor");
+    }
+
     void dropDefaultAction()
     {
         auto restore = qScopeGuard([] { FileView::setDropMoves(false, true); });

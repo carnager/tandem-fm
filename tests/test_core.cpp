@@ -38,6 +38,7 @@
 #include <QDateTime>
 #include <QFile>
 #include <QElapsedTimer>
+#include <QMimeDatabase>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QSignalSpy>
@@ -493,6 +494,29 @@ private slots:
         QCOMPARE(DesktopApps::instance().defaultTerminal(), QString("my-terminal --flag"));
         s.setValue("tools/terminal", "");
         QVERIFY(DesktopApps::instance().defaultTerminal() != "my-terminal --flag");
+    }
+
+    // F4's groups: text (code and config too, through their ancestors),
+    // pictures, videos, sound; everything else has none.
+    void editGroups()
+    {
+        QMimeDatabase db;
+        auto group = [&](const QString& name) {
+            const QMimeType t = db.mimeTypeForFile(name, QMimeDatabase::MatchExtension);
+            return DesktopApps::editGroup(QStringList{t.name()} + t.allAncestors());
+        };
+        QCOMPARE(group("a.txt"), QString("text"));
+        QCOMPARE(group("main.cpp"), QString("text"));
+        QCOMPARE(group("data.json"), QString("text"));
+        QCOMPARE(group("run.sh"), QString("text"));
+        QCOMPARE(group("a.png"), QString("image"));
+        QCOMPARE(group("a.svg"), QString("image"));
+        QCOMPARE(group("a.mkv"), QString("video"));
+        QCOMPARE(group("a.flac"), QString("audio"));
+        QCOMPARE(group("a.pdf"), QString());
+        QCOMPARE(group("a.zip"), QString());
+        QCOMPARE(DesktopApps::editorKey("text"), QString("tools/editor"));  // as before the groups
+        QCOMPARE(DesktopApps::editorKey("image"), QString("tools/imageEditor"));
     }
 
     void defaultAppFromMimeappsList()

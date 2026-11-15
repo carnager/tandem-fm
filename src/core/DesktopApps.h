@@ -37,6 +37,13 @@ public:
     // Settings › Tools (tools/terminal) when set, else $TERMINAL or the
     // first one installed.
     QString defaultTerminal() const;
+    DesktopApp app(const QString& id) const;  // empty id if not installed
+
+    // F4 picks an editor per group of file types: "text" (anything that is
+    // text: code, config, …), "image", "video", "audio"; "" for others.
+    static QString editGroup(const QStringList& mimeChain);
+    static QString editorKey(const QString& group);  // its setting: tools/editor, tools/imageEditor, …
+    static QString groupMime(const QString& group);  // a type that stands for the group
 
     // Makes appId the default for mime: updates [Default Applications] in
     // $XDG_CONFIG_HOME/mimeapps.list, keeping everything else in the file.

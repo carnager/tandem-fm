@@ -1,4 +1,6 @@
 #include "ui/SettingsDialog.h"
+
+#include "core/DesktopApps.h"
 #include "ui/OpenUrl.h"
 
 #include "ui/Keymap.h"
@@ -19,6 +21,7 @@
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFormLayout>
 #include <QFontDatabase>
 #include <QDesktopServices>
 #include <QDir>
@@ -187,6 +190,35 @@ QWidget* segments(QWidget* parent, const QList<QPair<QString, QString>>& choices
     }
     h->addStretch(1);
     return w;
+}
+
+// F4's editor for a group of file types: the default app, an installed app
+// that handles the type (saved as its .desktop id) or a command typed in.
+QComboBox* editorBox(QWidget* parent, const QString& group)
+{
+    const QString key = DesktopApps::editorKey(group);
+    const QString automatic = QObject::tr("The default app for the type");
+    auto* box = new QComboBox(parent);
+    box->setObjectName(QStringLiteral("editor-") + group);
+    box->setEditable(true);
+    box->setInsertPolicy(QComboBox::NoInsert);
+    box->addItem(automatic, QString());
+    for (const DesktopApp& app : DesktopApps::instance().appsFor({DesktopApps::groupMime(group)}))
+        box->addItem(QIcon::fromTheme(app.icon), app.name, app.id);
+    const QString current = QSettings().value(key).toString();
+    const int at = current.isEmpty() ? 0 : box->findData(current);
+    if (at >= 0)
+        box->setCurrentIndex(at);
+    else
+        box->setEditText(current);
+    auto save = [box, key] {
+        const QString text = box->currentText().trimmed();
+        const int i = box->findText(text);
+        QSettings().setValue(key, i >= 0 ? box->itemData(i).toString() : text);  // an app by its id, else the command
+    };
+    QObject::connect(box, &QComboBox::activated, box, save);  // also the same entry again, after typing
+    QObject::connect(box->lineEdit(), &QLineEdit::editingFinished, box, save);
+    return box;
 }
 
 // An editable choice of installed programs ("" = automatic).
@@ -789,15 +821,19 @@ void SettingsDialog::fillPlugins()
 QWidget* SettingsDialog::toolsPage()
 {
     Page page(this);
-    page.add(tr("Editor (F4)"),
-             programBox(this, QStringLiteral("tools/editor"),
-                        {QStringLiteral("kate"), QStringLiteral("gnome-text-editor"), QStringLiteral("gedit"),
-                         QStringLiteral("code"), QStringLiteral("codium"), QStringLiteral("zed"), QStringLiteral("mousepad"),
-                         QStringLiteral("xed"), QStringLiteral("pluma"), QStringLiteral("featherpad"),
-                         QStringLiteral("kwrite"), QStringLiteral("subl")},
-                        tr("The default app for the file type")),
-             tr("A command; the file is added at the end. Terminal editors (vim, nano) need a terminal: "
-                "e.g. \"kitty nvim\"."));
+    // Default apps are mostly viewers: F4 gets an editor per kind of file.
+    const std::pair<const char*, const char*> groups[] = {
+        {"text", QT_TR_NOOP("Text and code")}, {"image", QT_TR_NOOP("Pictures")},
+        {"video", QT_TR_NOOP("Videos")},       {"audio", QT_TR_NOOP("Music and sound")}};
+    auto* editors = new QWidget(this);
+    auto* form = new QFormLayout(editors);
+    form->setContentsMargins(0, 0, 0, 0);
+    form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    for (const auto& [group, label] : groups)
+        form->addRow(tr(label), editorBox(editors, QLatin1String(group)));
+    page.add(tr("Editors (F4)"), editors,
+             tr("An app from the list (terminal apps open in the terminal below), or a command the file is "
+                "added to. Other files open in their default app."));
     page.add(tr("Terminal (Ctrl+Alt+T)"),
              programBox(this, QStringLiteral("tools/terminal"),
                         {QStringLiteral("kitty"), QStringLiteral("alacritty"), QStringLiteral("foot"), QStringLiteral("wezterm"),
