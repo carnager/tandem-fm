@@ -888,6 +888,10 @@
         <source>The default app for the type</source>
         <translation>Die Standard-App für den Typ</translation>
     </message>
+    <message>
+        <source>Tandem (built-in)</source>
+        <translation>Tandem (eingebaut)</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>
@@ -6072,6 +6076,61 @@ sftp und smb sind eingebaut; die anderen werden mit GVfs eingehängt (andere Pro
     <message>
         <source>Click to change · → ← direction · Space skip · Del delete</source>
         <translation>Klicken zum Ändern · → ← Richtung · Leertaste auslassen · Entf löschen</translation>
+    </message>
+</context>
+<context>
+    <name>tandem::TextEditor</name>
+    <message>
+        <source>Find (Enter: next, Shift+Enter: previous)</source>
+        <translation>Suchen (Enter: nächster, Umschalt+Enter: vorheriger)</translation>
+    </message>
+    <message>
+        <source>Loading…</source>
+        <translation>Wird geladen…</translation>
+    </message>
+    <message>
+        <source>Too big to edit here (over %1 MB): shown read-only.</source>
+        <translation>Zu groß zum Bearbeiten (über %1 MB): nur zum Lesen geöffnet.</translation>
+    </message>
+    <message>
+        <source>Not UTF-8 text: shown read-only, so saving can&apos;t change bytes it doesn&apos;t understand.</source>
+        <translation>Kein UTF-8-Text: nur zum Lesen geöffnet, damit Speichern keine unverstandenen Bytes verändert.</translation>
+    </message>
+    <message>
+        <source>You can&apos;t write to this file: shown read-only.</source>
+        <translation>Diese Datei ist nicht beschreibbar: nur zum Lesen geöffnet.</translation>
+    </message>
+    <message>
+        <source>Cannot read: %1</source>
+        <translation>Kann nicht gelesen werden: %1</translation>
+    </message>
+    <message>
+        <source>(read-only)</source>
+        <translation>(schreibgeschützt)</translation>
+    </message>
+    <message>
+        <source>Ctrl+F: find   Esc: close</source>
+        <translation>Strg+F: suchen   Esc: schließen</translation>
+    </message>
+    <message>
+        <source>Ctrl+S: save   Ctrl+F: find   Esc: close</source>
+        <translation>Strg+S: speichern   Strg+F: suchen   Esc: schließen</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t save: %1</source>
+        <translation>Speichern fehlgeschlagen: %1</translation>
+    </message>
+    <message>
+        <source>Unsaved changes</source>
+        <translation>Ungespeicherte Änderungen</translation>
+    </message>
+    <message>
+        <source>Save the changes to %1?</source>
+        <translation>Änderungen an %1 speichern?</translation>
+    </message>
+    <message>
+        <source>Not found: %1</source>
+        <translation>Nicht gefunden: %1</translation>
     </message>
 </context>
 <context>

@@ -29,6 +29,7 @@
 #include "ui/DiskUsageDialog.h"
 #include "ui/DuplicatesDialog.h"
 #include "ui/FileView.h"
+#include "ui/TextEditor.h"
 #include "ui/ThumbGrid.h"
 #include "core/DesktopApps.h"
 #include "ui/FuzzyPopup.h"
@@ -3814,6 +3815,71 @@ private slots:
         emit video->activated(0);
         QCOMPARE(QSettings().value("tools/videoEditor").toString(), QString());
         QSettings().remove("tools/videoEditor");
+    }
+
+    // The built-in editor: F4 with it chosen; saving keeps the byte-order
+    // mark, CRLF, permissions and links; other encodings are read-only;
+    // closing with changes asks.
+    void builtinEditor()
+    {
+        QSettings().setValue("tools/editor", "tandem");
+        auto restore = qScopeGuard([] { QSettings().remove("tools/editor"); });
+        writeFile(L("crlf.txt"), "\xEF\xBB\xBFone\r\ntwo\r\n");
+        QFile::setPermissions(L("crlf.txt"), QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup);
+        QVERIFY(QFile::link(L("crlf.txt"), L("crlf-link.txt")));
+        writeFile(L("latin.txt"), "caf\xE9\n");
+        auto removeFiles = qScopeGuard([&] {
+            for (const char* f : {"crlf.txt", "crlf-link.txt", "latin.txt"})
+                QFile::remove(L(f));
+        });
+        QTRY_VERIFY(leftModel()->rowOf("crlf-link.txt") >= 0);
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        moveCursorTo(m_left, "crlf-link.txt");
+        QTest::keyClick(m_left->view(), Qt::Key_F4);
+        TextEditor* ed = nullptr;
+        QTRY_VERIFY((ed = m_window->findChild<TextEditor*>()) && !ed->editor()->isReadOnly());
+        QCOMPARE(ed->editor()->toPlainText(), QString("one\ntwo\n"));
+        QVERIFY(!ed->isModified());
+
+        // F4 again: the same window.
+        m_window->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(m_window.get()));
+        m_left->view()->setFocus();
+        QTest::keyClick(m_left->view(), Qt::Key_F4);
+        QCOMPARE(m_window->findChildren<TextEditor*>().size(), 1);
+
+        ed->editor()->moveCursor(QTextCursor::End);
+        ed->editor()->insertPlainText("three\n");
+        QVERIFY(ed->isModified());
+        QVERIFY(ed->windowTitle().startsWith("● "));
+        QSignalSpy saved(ed, &TextEditor::saved);
+        ed->save();
+        QTRY_COMPARE(saved.count(), 1);
+        QCOMPARE(saved.first().first().toBool(), true);
+        QVERIFY(!ed->isModified());
+        QCOMPARE(readFile(L("crlf.txt")), QByteArray("\xEF\xBB\xBFone\r\ntwo\r\nthree\r\n"));
+        QVERIFY(QFileInfo(L("crlf-link.txt")).isSymLink());
+        const QFile::Permissions perms = QFile::permissions(L("crlf.txt"));  // rw-r----- as before
+        QVERIFY(perms.testFlag(QFile::WriteOwner) && perms.testFlag(QFile::ReadGroup));
+        QVERIFY(!perms.testFlag(QFile::WriteGroup) && !perms.testFlag(QFile::ReadOther));
+
+        // Closing with changes asks; Discard leaves the file alone.
+        ed->editor()->insertPlainText("four\n");
+        QPointer<TextEditor> gone(ed);
+        answerNextDialog([](QWidget* w) { qobject_cast<QMessageBox*>(w)->button(QMessageBox::Discard)->click(); });
+        ed->close();
+        QTRY_VERIFY(!gone);
+        QCOMPARE(readFile(L("crlf.txt")), QByteArray("\xEF\xBB\xBFone\r\ntwo\r\nthree\r\n"));
+
+        // Not UTF-8: read-only, with a note.
+        TextEditor* latin = TextEditor::open(L("latin.txt"), m_window.get());
+        QSignalSpy loaded(latin, &TextEditor::loaded);
+        QTRY_VERIFY(loaded.count() == 1 || latin->isReadOnly());
+        QTRY_VERIFY(latin->isReadOnly());
+        QVERIFY(latin->editor()->isReadOnly());
+        latin->close();
     }
 
     void dropDefaultAction()
