@@ -79,6 +79,10 @@ public:
     QList<int> autoHiddenColumns() const { return m_autoHidden; }
     void fitColumns();  // also sizes the Ext column to the longest extension
     void setCurrentRow(int row, bool center = false);
+    // F2 while renaming: the whole name, F2 again just the part before the
+    // extension. False when no rename is going on.
+    bool toggleRenameSelection();
+    static int baseNameLength(const QString& name);  // before ".ext"; -1 without one
     // Thumbnails in a grid instead of the detailed list.
     void setThumbnails(bool on);
     bool thumbnails() const;

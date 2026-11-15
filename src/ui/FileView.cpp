@@ -376,12 +376,35 @@ void FileDelegate::setEditorData(QWidget* editor, const QModelIndex& idx) const
     // Select the name without extension, like every good file manager.
     const auto* model = static_cast<const FileModel*>(idx.model());
     const FileEntry* e = model->entry(idx.row());
-    const int extLen = (e && !e->isDir) ? int(extensionOf(name).size()) : 0;
-    const int dot = extLen > 0 ? int(name.size()) - extLen - 1 : -1;
-    if (dot > 0)
+    const int dot = e && !e->isDir ? FileView::baseNameLength(name) : -1;
+    ed->setProperty("baseLength", dot);
+    // Qt selects the whole text once the editor is open: after that.
+    QTimer::singleShot(0, ed, [ed, dot] {
+        if (dot > 0)
+            ed->setSelection(0, dot);
+        else
+            ed->selectAll();
+    });
+}
+
+int FileView::baseNameLength(const QString& name)
+{
+    const int extLen = int(extensionOf(name).size());
+    return extLen > 0 ? int(name.size()) - extLen - 1 : -1;
+}
+
+bool FileView::toggleRenameSelection()
+{
+    auto* ed = qobject_cast<QLineEdit*>(QApplication::focusWidget());
+    if (state() != EditingState || !ed || !viewport()->isAncestorOf(ed))
+        return false;
+    // The name as typed now: its own extension, not the one it started with.
+    const int dot = ed->property("baseLength").toInt() > 0 ? baseNameLength(ed->text()) : -1;
+    if (dot > 0 && ed->selectedText() == ed->text())
         ed->setSelection(0, dot);
     else
         ed->selectAll();
+    return true;
 }
 
 void FileDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& opt, const QModelIndex&) const

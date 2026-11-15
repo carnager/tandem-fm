@@ -96,7 +96,7 @@ tandem-fm ~/Projects ~/Downloads
 | F3 / F4 | View / edit; the viewer follows the cursor, ↑ / ↓ (j / k) and N / P step through the folder, T keeps to the same type, Space plays videos and music |
 | F5 / F6 | Copy / move to the other panel |
 | F7 / F8 | New folder / move to trash |
-| F2, Shift+F6 | Rename |
+| F2, Shift+F6 | Rename (the name is selected; F2 again adds the extension) |
 | Ctrl+M | Rename multiple files |
 | Ctrl+Q | Show or hide previews |
 | Ctrl+F | Filter the current folder |
