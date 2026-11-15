@@ -3,6 +3,7 @@
 #include "core/Job.h"
 
 #include <QByteArray>
+#include <QHash>
 #include <QStringList>
 
 #include <atomic>
@@ -52,6 +53,9 @@ private:
     bool backendItem(const QString& src, QString dst);
     bool backendFile(Backend* sb, const QString& src, Backend* db, QString dst, const FileStat& st);
     void backendScan(const QString& path, int64_t& files, int64_t& bytes);
+    // Folder contents as the scan saw them: only those are copied, so a copy
+    // into its own folder (the same server under another name) can't recurse.
+    QHash<QString, QStringList> m_listed;
     static ConflictSide sideOf(const QString& path, const FileStat& st);
 
     Mode m_mode;

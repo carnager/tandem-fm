@@ -1811,6 +1811,10 @@
         <translation>Tandem kann %1 nicht öffnen</translation>
     </message>
     <message>
+        <source>Cannot move a folder into itself: %1</source>
+        <translation>Ein Ordner kann nicht in sich selbst verschoben werden: %1</translation>
+    </message>
+    <message>
         <source>Skipped link %1 (%2)</source>
         <translation>Verknüpfung %1 übersprungen (%2)</translation>
     </message>

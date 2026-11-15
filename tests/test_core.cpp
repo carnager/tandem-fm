@@ -1910,6 +1910,36 @@ private slots:
         registerBackend("test", nullptr);
     }
 
+    // A folder into its own subfolder on a server: refused under the same
+    // name; under another name for the same server it can't recurse.
+    void sftpIntoItself()
+    {
+        registerBuiltinBackends();
+        if (!hasBackend("sftp"))
+            QSKIP("built without libssh");
+        SshServer server;
+        if (!server.start())
+            QSKIP("could not start a test sshd");
+        setAuthHandler([](const AuthQuestion&) -> std::optional<QString> { return QString("yes"); });
+        auto restore = qScopeGuard([] { setAuthHandler({}); });
+        QTemporaryDir tmp;
+        const QString a = tmp.path() + "/a";
+        QVERIFY(QDir().mkpath(a + "/b"));
+        writeFile(a + "/f.txt", "x");
+
+        CopyJob same(CopyJob::Mode::Move, {server.location(a)}, server.location(a + "/b"));
+        runJob(same);
+        QVERIFY2(same.errors().join(' ').contains("Cannot move a folder into itself"), qPrintable(same.errors().join(' ')));
+        QVERIFY(!QFileInfo::exists(a + "/b/a"));
+
+        const QString other = QStringLiteral("sftp://127.0.0.1:%1").arg(server.port());
+        CopyJob copy(CopyJob::Mode::Copy, {server.location(a)}, other + a + "/b");
+        runJob(copy);
+        QVERIFY(QFileInfo::exists(a + "/b/a/f.txt"));
+        QVERIFY(QFileInfo(a + "/b/a/b").isDir());
+        QVERIFY(!QFileInfo::exists(a + "/b/a/b/a"));  // what was there before, nothing more
+    }
+
     void sftpBackend()
     {
         registerBuiltinBackends();

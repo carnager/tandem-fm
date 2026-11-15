@@ -51,7 +51,9 @@ void CopyJob::runWithBackends()
         for (const QString& s : std::as_const(m_sources)) {
             const QString dst = destIsDir ? joinPath(m_destination, baseName(s)) : m_destination;
             if (sameServer(s, dst) && (dst == s || dst.startsWith(s + QLatin1Char('/')))) {
-                addError(tr("Cannot copy a folder into itself: %1").arg(s));
+                addError((m_mode == Mode::Move ? tr("Cannot move a folder into itself: %1")
+                                               : tr("Cannot copy a folder into itself: %1"))
+                             .arg(s));
                 continue;
             }
             items.append({s, dst});
@@ -139,8 +141,14 @@ void CopyJob::backendScan(const QString& path, int64_t& files, int64_t& bytes)
         ListOptions opt;
         opt.showHidden = true;
         const ListResult l = b->list(path, opt, nullptr);
-        for (const FileEntry& e : l.entries)
+        if (l.error)
+            return;  // the copy lists it again (and asks)
+        QStringList names;
+        for (const FileEntry& e : l.entries) {
+            names << e.name;
             backendScan(joinPath(path, e.name), files, bytes);
+        }
+        m_listed.insert(path, names);
     } else if (!st.isLink) {
         bytes += st.size;
     }
@@ -217,19 +225,24 @@ bool CopyJob::backendItem(const QString& src, QString dst)
                 if (askError(tr("Cannot create folder"), dst, e) != Answer::Retry)
                     return false;
         }
-        ListOptions opt;
-        opt.showHidden = true;
-        ListResult l;
-        for (;;) {
-            l = sb->list(src, opt, nullptr);
-            if (!l.error)
-                break;
-            if (askError(tr("Cannot read folder"), src, l.error) != Answer::Retry)
-                return false;
+        QStringList names = m_listed.value(src);
+        if (!m_listed.contains(src)) {
+            ListOptions opt;
+            opt.showHidden = true;
+            for (;;) {
+                const ListResult l = sb->list(src, opt, nullptr);
+                if (!l.error) {
+                    for (const FileEntry& e : l.entries)
+                        names << e.name;
+                    break;
+                }
+                if (askError(tr("Cannot read folder"), src, l.error) != Answer::Retry)
+                    return false;
+            }
         }
         bool ok = true;
-        for (const FileEntry& e : l.entries) {
-            if (!backendItem(joinPath(src, e.name), joinPath(dst, e.name)))
+        for (const QString& name : std::as_const(names)) {
+            if (!backendItem(joinPath(src, name), joinPath(dst, name)))
                 ok = false;
             if (isCancelled())
                 return false;
