@@ -1066,9 +1066,15 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* e)
         obj->isWidgetType()) {
         auto* w = static_cast<QWidget*>(obj);
         auto* ke = static_cast<QKeyEvent*>(e);
-        if ((w == m_viewer || m_viewer->isAncestorOf(w)) && !qobject_cast<QLineEdit*>(w) && movesViewerPanel(ke)) {
+        const int direction = (w == m_viewer || m_viewer->isAncestorOf(w)) && !qobject_cast<QLineEdit*>(w)
+                                  ? viewerPanelStep(ke) : 0;
+        if (direction) {
             if (e->type() == QEvent::ShortcutOverride) {
                 e->accept();  // not the viewer's own j / k
+                return true;
+            }
+            if (m_viewer->sameKindOnly()) {  // like N / P: past files of other types
+                m_viewer->step(direction);
                 return true;
             }
             QKeyEvent copy(QEvent::KeyPress, ke->key(), ke->modifiers(), ke->text(), ke->isAutoRepeat());
@@ -1079,18 +1085,18 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* e)
     return QMainWindow::eventFilter(obj, e);
 }
 
-bool MainWindow::movesViewerPanel(const QKeyEvent* e) const
+int MainWindow::viewerPanelStep(const QKeyEvent* e) const
 {
     const Qt::KeyboardModifiers mods = e->modifiers() & ~Qt::KeypadModifier;
     if (!mods && (e->key() == Qt::Key_Up || e->key() == Qt::Key_Down))
-        return true;
+        return e->key() == Qt::Key_Down ? 1 : -1;
     if (!m_viewerPanel->view()->vimKeys())
-        return false;
+        return 0;
     const QString token = Keymap::tokenFor(e);
     for (const Keymap::Binding& b : Keymap::instance().modalBindings())
         if (b.sequence == QStringList{token} && (b.action == QLatin1String("down") || b.action == QLatin1String("up")))
-            return true;
-    return false;
+            return b.action == QLatin1String("down") ? 1 : -1;
+    return 0;
 }
 
 // --------------------------------------------------------------- commands
@@ -1429,8 +1435,8 @@ bool MainWindow::stepViewer(int direction, bool sameKind)
     return false;
 }
 
-// The linked viewer shows the file under its panel's cursor; on a folder it
-// keeps the last file.
+// The linked viewer shows the file under its panel's cursor; on a folder,
+// or a file of another type while it keeps to one, it keeps the last file.
 void MainWindow::followInViewer()
 {
     Panel* p = m_viewerPanel;
@@ -1438,6 +1444,8 @@ void MainWindow::followInViewer()
         return;
     const FileEntry* e = p->currentEntry();
     if (!e || e->isDir || e->isParent)
+        return;
+    if (m_viewer->sameKindOnly() && ViewerWindow::kindOf(e->name) != ViewerWindow::kindOf(m_viewer->currentPath()))
         return;
     const QString path = p->currentPath();
     if (m_viewer->currentPath() != path)

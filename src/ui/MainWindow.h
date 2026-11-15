@@ -216,7 +216,7 @@ private:
     QPointer<Panel> m_viewerPanel;
     bool stepViewer(int direction, bool sameKind);
     void followInViewer();
-    bool movesViewerPanel(const QKeyEvent* e) const;
+    int viewerPanelStep(const QKeyEvent* e) const;  // 1 / -1: a key that moves the panel down / up, else 0
     double m_panelRatio = 0.5;  // left panel's share of the two panels
     QList<IconTheme> m_iconThemes;
     bool m_iconThemesLoaded = false;
