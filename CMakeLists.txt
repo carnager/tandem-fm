@@ -88,6 +88,7 @@ add_library(tandem_ui STATIC
   src/ui/Dialogs.h src/ui/Dialogs.cpp
   src/ui/OpenUrl.h src/ui/OpenUrl.cpp
   src/ui/DialogKeys.h src/ui/DialogKeys.cpp
+  src/ui/DialogSize.h src/ui/DialogSize.cpp
   src/ui/JobManager.h src/ui/JobManager.cpp
   src/ui/JobsPanel.h src/ui/JobsPanel.cpp
   src/ui/MainWindow.h src/ui/MainWindow.cpp

@@ -8,6 +8,7 @@
 #include "ui/CardList.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
+#include "ui/DialogSize.h"
 
 #include <QButtonGroup>
 #include <QComboBox>
@@ -90,6 +91,7 @@ ServersDialog::ServersDialog(QWidget* parent, const QString& uri) : QDialog(pare
 {
     setWindowTitle(tr("Locations"));
     resize(1000, 640);
+    rememberSize(this, QStringLiteral("servers"));
     setThemeStyle(this, QStringLiteral(
         "QListWidget#servers, QListWidget#bookmarkList { background: transparent; border: none; outline: none; }"
         "QPushButton#flat { background: transparent; border: none; color: @dimText; padding: 5px 8px;"
@@ -614,6 +616,7 @@ void ServersDialog::importFromSsh()
     QDialog dlg(this);
     dlg.setWindowTitle(tr("Import from SSH config"));
     dlg.resize(520, 420);
+    rememberSize(&dlg, QStringLiteral("sshImport"));
     auto* layout = new QVBoxLayout(&dlg);
     layout->setContentsMargins(18, 16, 18, 14);
     auto* intro = new QLabel(hosts.isEmpty() ? tr("No hosts found in %1.").arg(sshConfigPath.isEmpty()

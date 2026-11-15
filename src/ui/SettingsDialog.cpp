@@ -15,6 +15,7 @@
 #include "ui/Panel.h"
 #include "ui/Theme.h"
 #include "core/Workspaces.h"
+#include "ui/DialogSize.h"
 
 #include <QAction>
 #include <QApplication>
@@ -262,6 +263,7 @@ SettingsDialog::SettingsDialog(MainWindow* window) : QDialog(window), m_window(w
 {
     setWindowTitle(tr("Settings"));
     resize(860, 600);
+    rememberSize(this, QStringLiteral("settings"));
     setThemeStyle(this, QStringLiteral(
         "QListWidget#nav { background: transparent; border: none; outline: none; }"
         "QListWidget#nav::item { padding: 8px 12px; border-radius: 6px; color: @text; }"

@@ -3,6 +3,7 @@
 #include "core/Util.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
+#include "ui/DialogSize.h"
 
 #include <QDateTime>
 #include <QHBoxLayout>
@@ -59,6 +60,7 @@ TrashDialog::TrashDialog(QWidget* parent) : QDialog(parent)
 {
     setWindowTitle(tr("Trash"));
     resize(980, 620);
+    rememberSize(this, QStringLiteral("trash"));
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 16, 18, 14);
     layout->setSpacing(10);

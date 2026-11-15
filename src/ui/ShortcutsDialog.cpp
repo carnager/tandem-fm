@@ -1,6 +1,7 @@
 #include "ui/ShortcutsDialog.h"
 
 #include "ui/Theme.h"
+#include "ui/DialogSize.h"
 
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -206,6 +207,7 @@ ShortcutsDialog::ShortcutsDialog(QWidget* parent) : QDialog(parent)
     setWindowTitle(tr("Keyboard shortcuts"));
     const QSize avail = parent ? parent->window()->size() : QSize(1300, 860);
     resize(qMin(1240, avail.width() - 60), qMin(820, avail.height() - 60));
+    rememberSize(this, QStringLiteral("shortcuts"));
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(22, 18, 22, 16);
     layout->setSpacing(12);

@@ -6,6 +6,7 @@
 #include "core/Util.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
+#include "ui/DialogSize.h"
 
 #include <QButtonGroup>
 #include <QPainter>
@@ -320,6 +321,7 @@ SyncDialog::SyncDialog(const QString& left, const QString& right, Runner runner,
     const Theme& t = theme();
     setWindowTitle(tr("Synchronize folders"));
     resize(1040, 680);
+    rememberSize(this, QStringLiteral("sync"));
     setThemeStyle(this, QStringLiteral(
         "QToolButton#segment { padding: 5px 14px; border: 1px solid @border; background: @base; }"
         "QToolButton#segment:checked { background: @accent; color: @accentText; border-color: @accent; }"
@@ -758,6 +760,7 @@ void SyncDialog::showDiff(const QString& title, const QString& text)
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     dlg->setWindowTitle(title);
     dlg->resize(860, 560);
+    rememberSize(dlg, QStringLiteral("syncDiff"));
     auto* l = new QVBoxLayout(dlg);
     auto* view = new QPlainTextEdit(text, dlg);
     view->setReadOnly(true);

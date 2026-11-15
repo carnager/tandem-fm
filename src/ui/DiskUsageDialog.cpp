@@ -3,6 +3,7 @@
 #include "core/Util.h"
 #include "ui/IconCache.h"
 #include "ui/Theme.h"
+#include "ui/DialogSize.h"
 
 #include <QElapsedTimer>
 #include <QHBoxLayout>
@@ -66,6 +67,7 @@ DiskUsageDialog::DiskUsageDialog(QString root, bool remote, QWidget* parent)
 {
     setWindowTitle(tr("Disk usage"));
     resize(900, 640);
+    rememberSize(this, QStringLiteral("diskUsage"));
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 16, 18, 14);
     layout->setSpacing(10);

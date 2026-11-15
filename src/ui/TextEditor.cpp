@@ -2,6 +2,7 @@
 
 #include "core/Util.h"
 #include "ui/Theme.h"
+#include "ui/DialogSize.h"
 
 #include <QCloseEvent>
 #include <QFile>
@@ -65,6 +66,7 @@ TextEditor::TextEditor(const QString& path, QWidget* parent) : QWidget(parent, Q
 {
     setAttribute(Qt::WA_DeleteOnClose);
     resize(900, 700);
+    rememberSize(this, QStringLiteral("textEditor"));
     setThemeStyle(this, QStringLiteral(
         "TextEditor { background: @window; }"
         "QPlainTextEdit { background: @base; color: @text; border: none; selection-background-color: @accent;"
