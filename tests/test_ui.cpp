@@ -2111,6 +2111,12 @@ private slots:
         QTest::keyClicks(QApplication::focusWidget(), " *.jpg");
         QTRY_COMPARE(visible(), QStringList({"alpine.jpg"}));
         QCOMPARE(m_left->currentName(), QString("alpine.jpg"));
+        // Of several patterns one is enough, as in a shell.
+        QTest::keyClicks(QApplication::focusWidget(), " *.txt");
+        QTRY_COMPARE(visible(), QStringList({"alpha.txt", "alpine.jpg"}));
+        for (int i = 0; i < 6; ++i)
+            QTest::keyClick(QApplication::focusWidget(), Qt::Key_Backspace);
+        QTRY_COMPARE(visible(), QStringList({"alpine.jpg"}));
 
         // Live updates respect the filter.
         writeFile(L("flt/also.jpg"), "x");     // "al" + jpg: shows up

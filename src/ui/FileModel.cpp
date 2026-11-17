@@ -448,12 +448,17 @@ void FileModel::accountMark(const FileEntry& e, int sign)
 
 bool FileModel::matchesFilter(const FileEntry& e) const
 {
-    if (e.isParent || m_filterTerms.isEmpty())
+    if (e.isParent)
         return true;
     for (const QRegularExpression& rx : m_filterTerms)
         if (!rx.match(e.name).hasMatch())
             return false;
-    return true;
+    if (m_filterPatterns.isEmpty())
+        return true;
+    for (const QRegularExpression& rx : m_filterPatterns)
+        if (rx.match(e.name).hasMatch())
+            return true;
+    return false;
 }
 
 // Splits `all` (sorted, without "..") into visible and hidden.
@@ -479,11 +484,14 @@ void FileModel::setFilter(const QString& text)
         return;
     m_filter = text;
     m_filterTerms.clear();
+    m_filterPatterns.clear();
     for (const QString& term : text.split(QLatin1Char(' '), Qt::SkipEmptyParts)) {
-        const bool wild = term.contains(QLatin1Char('*')) || term.contains(QLatin1Char('?'));
-        const QString pattern = wild ? QRegularExpression::wildcardToRegularExpression(term)
-                                     : QRegularExpression::escape(term);
-        m_filterTerms.append(QRegularExpression(pattern, QRegularExpression::CaseInsensitiveOption));
+        if (term.contains(QLatin1Char('*')) || term.contains(QLatin1Char('?')))
+            m_filterPatterns.append(QRegularExpression(QRegularExpression::wildcardToRegularExpression(term),
+                                                       QRegularExpression::CaseInsensitiveOption));
+        else
+            m_filterTerms.append(
+                QRegularExpression(QRegularExpression::escape(term), QRegularExpression::CaseInsensitiveOption));
     }
     beginResetModel();
     std::vector<FileEntry> all;
