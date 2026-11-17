@@ -1504,7 +1504,7 @@ private slots:
         QVERIFY(!gitStatusFor(QDir::rootPath()).inRepo);
     }
 
-    // The live filter: all words in the path, patterns on the name, smart case.
+    // The live filter: all words in the path, any pattern on the name, smart case.
     void pathMatcher()
     {
         QVERIFY(PathMatcher("  ").isEmpty());
@@ -1516,6 +1516,12 @@ private slots:
         QVERIFY(!PathMatcher("*.jpg").matches("x.jpg/readme"));   // the name, not a folder on the way
         QVERIFY(PathMatcher("ph *.jpg").matches("Photos/a.jpg"));
         QVERIFY(!PathMatcher("ph *.jpg").matches("Music/a.jpg"));
+        // Several patterns: one is enough; the words still all count.
+        QVERIFY(PathMatcher("*.pdf *.odt").matches("docs/a.odt"));
+        QVERIFY(PathMatcher("*.pdf *.odt").matches("docs/b/a.pdf"));
+        QVERIFY(!PathMatcher("*.pdf *.odt").matches("docs/a.jpg"));
+        QVERIFY(PathMatcher("inv *.pdf *.odt").matches("inv/a.odt"));
+        QVERIFY(!PathMatcher("inv *.pdf *.odt").matches("docs/a.odt"));
     }
 
     void search()

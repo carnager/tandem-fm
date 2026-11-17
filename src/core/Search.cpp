@@ -283,9 +283,9 @@ bool PathMatcher::matches(const QString& path) const
         return true;
     const QString name = path.section(QLatin1Char('/'), -1);
     for (const QRegularExpression& rx : m_patterns)
-        if (!rx.match(name).hasMatch())
-            return false;
-    return true;
+        if (rx.match(name).hasMatch())
+            return true;
+    return false;
 }
 
 }  // namespace tandem

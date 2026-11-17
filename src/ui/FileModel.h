@@ -135,7 +135,8 @@ private:
     std::vector<FileEntry> m_hidden;   // filtered out
     QString m_filter;
     QHash<QString, char> m_git;
-    QList<QRegularExpression> m_filterTerms;
+    QList<QRegularExpression> m_filterTerms;     // words: all of them
+    QList<QRegularExpression> m_filterPatterns;  // *.ext: any of them
     SortSpec m_sort;
     Stats m_stats;
     bool m_countable = false, m_countHidden = false;

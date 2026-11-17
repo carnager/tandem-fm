@@ -99,9 +99,9 @@ tandem-fm ~/Projects ~/Downloads
 | F2, Shift+F6 | Rename (the name is selected; F2 again adds the extension) |
 | Ctrl+M | Rename multiple files |
 | Ctrl+Q | Show or hide previews |
-| Ctrl+F | Filter the current folder |
+| Ctrl+F | Filter the current folder: every word must match; of patterns like `*.pdf *.odt` one is enough |
 | Alt+F7 | Search a local folder tree by name or file contents; results open in a new tab |
-| Ctrl+Shift+F | Filter as you type through all subfolders, in a new tab; results work like any folder |
+| Ctrl+Shift+F | Filter as you type through all subfolders (also on servers), in a new tab; results work like any folder |
 | Ctrl+B / Ctrl+Shift+B | Put the selection on shelf 1–4 / bring a shelf here, which empties it: 1–4 copies, Shift+1–4 moves, Space looks inside (or click one at the bottom) |
 | Ctrl+J | Jump to a visited folder |
 | Alt+W | Open a workspace, or save the open tabs as one |

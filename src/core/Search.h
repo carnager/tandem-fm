@@ -41,7 +41,8 @@ QString listServerTree(const QString& root, bool all, const std::atomic<bool>* c
 
 // The live filter's matching, on paths relative to the searched folder:
 // every space-separated word must be in the path ("ph 24 raw" finds
-// Photos/2024/x.raw); one with * or ? is a pattern for the name itself.
+// Photos/2024/x.raw); one with * or ? is a pattern for the name itself,
+// and of several patterns one is enough ("*.pdf *.odt", as in a shell).
 // Ignores case unless a word has capitals.
 class PathMatcher {
 public:
